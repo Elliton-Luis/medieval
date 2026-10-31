@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=15";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=16";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -15,7 +15,7 @@ import {
   buildStructure,
   updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=15";
+} from "./rpg.js?v=16";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;
@@ -145,6 +145,14 @@ export class WeaponSystem {
       this.models[def.id] = model;
     }
     for (const model of Object.values(this.models)) model.visible = false;
+
+    // Luz dinâmica da tocha empunhada pelo jogador (THREE.PointLight de 18m com cintilação)
+    this.torchLight = new THREE.PointLight("#ff9d3a", 0, 18.0, 1.6);
+    this.torchLight.castShadow = false;
+    this.torchLight.position.set(0, 0.78, 0);
+    if (this.models.torch) {
+      this.models.torch.add(this.torchLight);
+    }
   }
 
   _createThrownSpear(scene) {
@@ -290,6 +298,17 @@ export class WeaponSystem {
     }
     this._updateThrownSpear(dt);
     this._updateMusketTracer(dt);
+
+    // Atualiza a cintilação e intensidade da luz da tocha equipada
+    if (this.torchLight) {
+      const isTorchActive = this.currentId === "torch" && !dead;
+      if (isTorchActive) {
+        // Cintilação suave de chama de tocha (~2.2 a 2.6 de intensidade)
+        this.torchLight.intensity = 2.4 + Math.sin(now * 0.012) * 0.25 + Math.cos(now * 0.027) * 0.15;
+      } else {
+        this.torchLight.intensity = 0;
+      }
+    }
 
     if (this.buildMode) {
       this._cancelCharge();

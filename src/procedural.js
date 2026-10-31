@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { distanceToRoad, VILLAGES } from "./kingdom.js";
-import { NPC } from "./npc.js?v=15";
+import { NPC } from "./npc.js?v=16";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
@@ -629,45 +629,58 @@ export class Werewolf extends NPC {
     });
     Object.assign(this, body);
 
-    // Peito musculoso, pelagem espessa e corcunda lupina imponente
-    const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.65, 0.38), chestFur);
-    chestPlate.position.set(0, 1.25, 0.08);
-    this.model.add(chestPlate);
-
-    const mane = new THREE.Mesh(new THREE.DodecahedronGeometry(0.34, 1), darkFur);
-    mane.position.set(0, 1.48, -0.08);
-    mane.scale.set(1.4, 1.1, 1.35);
-    this.model.add(mane);
-
-    // Focinho lupino alongado com presas afiadas
-    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.35, 5), darkFur);
-    snout.rotation.x = Math.PI / 2;
-    snout.position.set(0, -0.02, 0.22);
-    this.head.add(snout);
-
-    const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), fur);
-    jaw.position.set(0, -0.09, 0.17);
-    this.head.add(jaw);
-
-    // Presas inferiores brancas
-    for (const sx of [-0.045, 0.045]) {
-      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.08, 4), clawMat);
-      fang.position.set(sx, -0.04, 0.24);
-      fang.rotation.x = Math.PI;
-      this.head.add(fang);
+    // Crânio lupino esculpido e angular (substitui a cabeça humana e remove a bola gigante)
+    while (this.head.children.length > 0) {
+      this.head.remove(this.head.children[0]);
     }
 
-    // Orelhas pontudas eretas e olhos brancos sobrenaturais
+    // Crânio canino angular com fronte reforçada
+    const skull = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.28), darkFur);
+    skull.position.set(0, 0.04, 0.02);
+    this.head.add(skull);
+
+    // Dorso e ombros fortes sem corcunda arredondada desproporcional
+    const shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.26, 0.32), darkFur);
+    shoulders.position.set(0, 1.38, -0.02);
+    this.model.add(shoulders);
+
+    const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.55, 0.34), chestFur);
+    chestPlate.position.set(0, 1.2, 0.06);
+    this.model.add(chestPlate);
+
+    // Focinho afilado lupino
+    const muzzle = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 5), darkFur);
+    muzzle.rotation.x = Math.PI / 2;
+    muzzle.position.set(0, -0.01, 0.26);
+    this.head.add(muzzle);
+
+    const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.06, 0.22), fur);
+    lowerJaw.position.set(0, -0.07, 0.22);
+    this.head.add(lowerJaw);
+
+    // Presas brancas pontiagudas
+    for (const sx of [-0.038, 0.038]) {
+      const topFang = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.07, 4), clawMat);
+      topFang.position.set(sx, -0.04, 0.29);
+      topFang.rotation.x = Math.PI;
+      this.head.add(topFang);
+
+      const botFang = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.07, 4), clawMat);
+      botFang.position.set(sx, -0.03, 0.31);
+      this.head.add(botFang);
+    }
+
+    // Orelhas lupinas eretas e pontiagudas
     for (const side of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 4), darkFur);
-      ear.position.set(side * 0.11, 0.21, -0.04);
-      ear.rotation.z = -side * 0.25;
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.19, 4), darkFur);
+      ear.position.set(side * 0.09, 0.21, -0.02);
+      ear.rotation.z = -side * 0.18;
       ear.rotation.x = -0.15;
       this.head.add(ear);
 
-      // Olho branco místico com leve feixe
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 7, 6), eyeMat);
-      eye.position.set(side * 0.055, 0.035, 0.13);
+      // Olhos brancos místicos com brilho etéreo
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 5), eyeMat);
+      eye.position.set(side * 0.055, 0.05, 0.15);
       this.head.add(eye);
     }
 

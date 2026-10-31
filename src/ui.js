@@ -1,5 +1,5 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
-import { drawWeaponIcon } from "./weapondata.js?v=15";
+import { drawWeaponIcon } from "./weapondata.js?v=16";
 
 export class GameUI {
   constructor(renderer) {

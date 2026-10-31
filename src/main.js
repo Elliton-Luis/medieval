@@ -1,33 +1,33 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
-import { InputManager } from "./input.js?v=15";
-import { World, SHADOW_RADIUS } from "./world.js?v=15";
-import { Player } from "./player.js?v=15";
-import { ThirdPersonCamera } from "./camera.js?v=15";
-import { DayNightCycle } from "./daynight.js?v=15";
-import { GameUI } from "./ui.js?v=15";
-import { createSettlement } from "./settlement.js?v=15";
-import { NPCSystem } from "./npc.js?v=15";
-import { InteractionSystem } from "./interactions.js?v=15";
+import { InputManager } from "./input.js?v=16";
+import { World, SHADOW_RADIUS } from "./world.js?v=16";
+import { Player } from "./player.js?v=16";
+import { ThirdPersonCamera } from "./camera.js?v=16";
+import { DayNightCycle } from "./daynight.js?v=16";
+import { GameUI } from "./ui.js?v=16";
+import { createSettlement } from "./settlement.js?v=16";
+import { NPCSystem } from "./npc.js?v=16";
+import { InteractionSystem } from "./interactions.js?v=16";
 import { SpriteEffects } from "./effects.js";
-import { CombatSystem } from "./combat.js?v=15";
-import { WeaponSystem } from "./weapons.js?v=15";
-import { AimSystem } from "./aim.js?v=15";
+import { CombatSystem } from "./combat.js?v=16";
+import { WeaponSystem } from "./weapons.js?v=16";
+import { AimSystem } from "./aim.js?v=16";
 import { ExplosionSystem } from "./explosions.js";
-import { GameAudio } from "./audio.js?v=15";
+import { GameAudio } from "./audio.js?v=16";
 import { DropSystem } from "./drops.js";
-import { Minimap } from "./minimap.js?v=15";
-import { EnemyDirector } from "./enemies.js?v=15";
+import { Minimap } from "./minimap.js?v=16";
+import { EnemyDirector } from "./enemies.js?v=16";
 import { DeathScreen } from "./deathScreen.js";
-import { TorchSystem, Candle, setupAtmosphere } from "./torches.js?v=15";
+import { TorchSystem, Candle, setupAtmosphere } from "./torches.js?v=16";
 import { FireSystem } from "./fire.js";
-import { HouseSystem } from "./houses.js?v=15";
-import { SleepSystem } from "./sleep.js?v=15";
+import { HouseSystem } from "./houses.js?v=16";
+import { SleepSystem } from "./sleep.js?v=16";
 import { loadGame } from "./save.js";
-import { HorseManager } from "./horses.js?v=15";
-import { RidingSystem, dismountHorse } from "./riding.js?v=15";
+import { HorseManager } from "./horses.js?v=16";
+import { RidingSystem, dismountHorse } from "./riding.js?v=16";
 import { MusicDirector } from "./music.js";
-import { PauseMenu } from "./pause.js?v=15";
+import { PauseMenu } from "./pause.js?v=16";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
 import {
@@ -69,7 +69,7 @@ import {
   notifyMissionFistHit,
   payDebtorMission,
   updateMissionProgress,
-} from "./rpg.js?v=15";
+} from "./rpg.js?v=16";
 import {
   initProceduralEnv,
   createSeededRandom,
@@ -79,7 +79,7 @@ import {
   assignNpcAnchors,
   updateWildernessSpawns,
   createMonstersPool,
-} from "./procedural.js?v=15";
+} from "./procedural.js?v=16";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
