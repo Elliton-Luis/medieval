@@ -89,6 +89,8 @@ export function createPlayer(scene) {
 
   let velocityX = 0;
   let velocityZ = 0;
+  let velocityY = 0;
+  let grounded = true;
   let angle = 0;
 
   function update(dt, input, camera, colliders) {
@@ -131,7 +133,9 @@ export function createPlayer(scene) {
 
     const targetX = hasInput ? moveX * PLAYER.moveSpeed : 0;
     const targetZ = hasInput ? moveZ * PLAYER.moveSpeed : 0;
-    const rate = hasInput ? PLAYER.acceleration : PLAYER.deceleration;
+    const control = grounded ? 1 : PLAYER.airControl;
+    const rate =
+      (hasInput ? PLAYER.acceleration : PLAYER.deceleration) * control;
     const blend = 1 - Math.exp(-rate * dt);
 
     velocityX += (targetX - velocityX) * blend;
@@ -140,6 +144,22 @@ export function createPlayer(scene) {
     group.position.x += velocityX * dt;
     group.position.z += velocityZ * dt;
     resolveCollisions(group.position, colliders);
+
+    if (input.wasPressed('Space') && grounded) {
+      velocityY = PLAYER.jumpSpeed;
+      grounded = false;
+    }
+
+    if (!grounded) {
+      velocityY -= PLAYER.gravity * dt;
+      group.position.y += velocityY * dt;
+
+      if (group.position.y <= 0) {
+        group.position.y = 0;
+        velocityY = 0;
+        grounded = true;
+      }
+    }
 
     const speedSq = velocityX * velocityX + velocityZ * velocityZ;
     if (speedSq > 0.04) {
@@ -152,8 +172,12 @@ export function createPlayer(scene) {
       group.rotation.y = angle;
     }
 
+    const height = group.position.y;
     shadow.position.x = group.position.x;
     shadow.position.z = group.position.z;
+    shadow.scale.setScalar(1 + height * 0.15);
+    shadowMaterial.opacity =
+      PLAYER.shadowOpacity * Math.max(0.25, 1 - height * 0.45);
   }
 
   return { group, shadow, update };
