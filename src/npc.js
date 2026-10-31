@@ -3,8 +3,8 @@ import { makeSkinnedMaterial } from "./skins.js";
 import { makeRandom } from "./utils.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
-import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=14";
-import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js?v=14";
+import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=15";
+import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js?v=15";
 
 function getDeterministicFleeTarget(npc) {
   const anchors = npc.root?.userData?.anchors;

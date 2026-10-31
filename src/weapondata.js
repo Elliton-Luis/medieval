@@ -11,6 +11,8 @@ import { makeSkinnedMaterial } from "./skins.js";
 export const WEAPON_LIST = [
   { id: "fists", name: "Mãos", slot: 1, type: "fists", grip: "none", hands: 1, damage: 1, reach: 1.9, arc: 0.45, cooldown: 0.3, length: 0.26, hitDelay: 0.09, weight: 1.0, knock: 2.2, combo: true, anim: [5, 6, 5], lunge: 2.4, sound: "punch", price: 0 },
   { id: "torch", name: "Tocha mágica", slot: 1, type: "melee", weaponType: "TORCH", grip: "blade", hands: 1, damage: 2, reach: 2.6, arc: 0.45, cooldown: 0.42, length: 0.36, hitDelay: 0.1, weight: 1.0, knock: 2.8, combo: true, anim: [0, 1, 2], lunge: 2.8, sound: "slash", price: 15 },
+  { id: "makeshift_spear", name: "Lança Improvisada", slot: 6, type: "melee", weaponType: "SPEAR", grip: "pole", hands: 2, pole: true, damage: 2, reach: 3.8, arc: 0.5, cooldown: 0.65, length: 0.42, hitDelay: 0.13, weight: 0.9, knock: 3.8, anim: [4], lunge: 3.0, sound: "stab", price: 0, durability: 10, maxDurability: 10, isImprovised: true },
+  { id: "makeshift_club", name: "Porrete Rústico", slot: 4, type: "melee", grip: "blade", hands: 1, damage: 2, reach: 2.6, arc: 0.45, cooldown: 0.6, length: 0.45, hitDelay: 0.15, weight: 0.95, knock: 5.2, combo: true, anim: [1, 0, 2], lunge: 2.5, sound: "smash", price: 0, durability: 15, maxDurability: 15, isImprovised: true },
   { id: "axe", name: "Machado de Lenhador", slot: 2, type: "melee", toolType: "AXE", grip: "blade", hands: 1, damage: 2, reach: 2.9, arc: 0.45, cooldown: 0.56, length: 0.42, hitDelay: 0.14, weight: 0.94, knock: 4.2, combo: true, anim: [1, 0, 2], lunge: 0, sound: "chop", price: 0 },
   { id: "dagger", name: "Adaga", slot: 2, type: "melee", grip: "blade", hands: 1, damage: 1, reach: 2.1, arc: 0.5, cooldown: 0.26, length: 0.24, hitDelay: 0.08, weight: 1.0, knock: 1.6, combo: true, anim: [4, 4, 0], lunge: 3.2, sound: "stab", price: 25 },
   { id: "knife", name: "Faca", slot: 2, type: "melee", grip: "blade", hands: 1, damage: 1, reach: 1.9, arc: 0.5, cooldown: 0.22, length: 0.22, hitDelay: 0.07, weight: 1.0, knock: 1.4, combo: true, anim: [4, 0, 4], lunge: 3, sound: "stab", price: 12 },
@@ -148,6 +150,20 @@ const builders = {
   greatsword(g, M) {
     handle(g, M, -0.35, 0.2, 0.038); crossguard(g, M, 0.55, 0.26); blade(g, M, 0.14, 0.26, 1.55, 0.034); pommel(g, M, -0.38);
   },
+  makeshift_spear(g, M) {
+    handle(g, M, -0.5, 1.4, 0.032);
+    // Ponta de madeira lascada afiada
+    mesh(g, new THREE.ConeGeometry(0.065, 0.38, 4), M.wood, 0, 1.58, 0);
+    // Amarração rústica de cipó/couro
+    mesh(g, new THREE.CylinderGeometry(0.042, 0.042, 0.12, 6), M.leather, 0, 1.38, 0);
+  },
+  makeshift_club(g, M) {
+    handle(g, M, -0.22, 0.65, 0.045);
+    // Tronco grosso com pedras encravadas
+    mesh(g, new THREE.CylinderGeometry(0.09, 0.06, 0.42, 6), M.darkWood, 0, 0.62, 0);
+    mesh(g, new THREE.DodecahedronGeometry(0.12, 0), M.iron, 0.04, 0.72, 0.02);
+    mesh(g, new THREE.ConeGeometry(0.04, 0.12, 4), M.iron, -0.09, 0.66, 0).rotation.z = Math.PI / 2;
+  },
   spear(g, M) {
     handle(g, M, -0.55, 1.5, 0.03);
     mesh(g, new THREE.ConeGeometry(0.07, 0.34, 5), M.steel, 0, 1.67, 0);
@@ -210,6 +226,8 @@ const icons = {
   warhammer(c) { line(c, 14, 48, 34, 14); c.strokeRect(24, 6, 22, 12); line(c, 46, 12, 52, 12); },
   greatsword(c) { line(c, 8, 50, 44, 4); line(c, 44, 4, 48, 8); line(c, 14, 30, 30, 44); line(c, 4, 52, 10, 46); },
   spear(c) { line(c, 8, 50, 40, 12); c.beginPath(); c.moveTo(38, 6); c.lineTo(46, 18); c.lineTo(34, 14); c.closePath(); c.stroke(); },
+  makeshift_spear(c) { line(c, 8, 50, 40, 12); line(c, 36, 16, 46, 6); line(c, 46, 6, 38, 20); },
+  makeshift_club(c) { line(c, 10, 48, 26, 26); c.lineWidth = 6; line(c, 26, 26, 44, 8); c.lineWidth = 3; },
   halberd(c) { line(c, 8, 50, 38, 10); c.beginPath(); c.moveTo(36, 6); c.lineTo(46, 12); c.lineTo(34, 24); c.closePath(); c.stroke(); line(c, 40, 14, 28, 16); },
   shortbow(c) { c.beginPath(); c.arc(34, 28, 18, 2.1, 4.2, false); c.stroke(); line(c, 24, 14, 24, 42); line(c, 14, 28, 42, 28); line(c, 38, 24, 42, 28); line(c, 38, 32, 42, 28); },
   longbow(c) { c.beginPath(); c.arc(38, 28, 26, 2.3, 4.0, false); c.stroke(); line(c, 21, 6, 21, 50); line(c, 10, 28, 46, 28); line(c, 42, 24, 46, 28); line(c, 42, 32, 46, 28); },

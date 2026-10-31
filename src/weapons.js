@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=14";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=15";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -15,7 +15,7 @@ import {
   buildStructure,
   updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=14";
+} from "./rpg.js?v=15";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;
@@ -260,8 +260,8 @@ export class WeaponSystem {
 
     const selection = this.input.consumeWeaponSelection();
     if (selection > 0) {
-      if (this.buildMode && (selection === 1 || selection === 2)) {
-        this.selectedBuildType = selection === 1 ? "HOUSE" : "CORRAL";
+      if (this.buildMode && (selection === 1 || selection === 2 || selection === 3)) {
+        this.selectedBuildType = selection === 1 ? "HOUSE" : selection === 2 ? "CORRAL" : "PLACE_ITEM";
         this._announceBuildMode();
       } else {
         if (this.buildMode) this.buildMode = false;
@@ -271,7 +271,9 @@ export class WeaponSystem {
     const wheel = this.input.consumeWheelStep();
     if (wheel !== 0) {
       if (this.buildMode) {
-        this.selectedBuildType = this.selectedBuildType === "HOUSE" ? "CORRAL" : "HOUSE";
+        const types = ["HOUSE", "CORRAL", "PLACE_ITEM"];
+        const curIdx = types.indexOf(this.selectedBuildType || "HOUSE");
+        this.selectedBuildType = types[(curIdx + (wheel > 0 ? 1 : types.length - 1)) % types.length];
         this._announceBuildMode();
       } else {
         this.cycle(wheel);
@@ -297,8 +299,12 @@ export class WeaponSystem {
         true,
         this.selectedBuildType || "HOUSE",
       );
-      if (this.input.consumeAttackPressed() && !dead) {
-        this._tryBuildInMode();
+      if ((this.input.consumeAttackPressed() || this.input.consumeInteractPressed?.()) && !dead) {
+        if (this.selectedBuildType === "PLACE_ITEM") {
+          this._tryPlaceHeldItem();
+        } else {
+          this._tryBuildInMode();
+        }
       }
       this._updateTrajectory(def);
       this._updateProjectiles(dt);
@@ -377,9 +383,118 @@ export class WeaponSystem {
     const label =
       this.selectedBuildType === "HOUSE"
         ? `CASA PRÓPRIA (${BUILD_COSTS.HOUSE.wood} Mad, ${BUILD_COSTS.HOUSE.stone} Ped)`
-        : `CURRAL DE CAVALOS (${BUILD_COSTS.CORRAL.wood} Mad, ${BUILD_COSTS.CORRAL.hay} Feno)`;
+        : this.selectedBuildType === "CORRAL"
+          ? `CURRAL DE CAVALOS (${BUILD_COSTS.CORRAL.wood} Mad, ${BUILD_COSTS.CORRAL.hay} Feno)`
+          : `FIXAR ${this.currentWeapon.name.toLocaleUpperCase("pt-BR")} NA PAREDE/CHÃO [E]`;
     this.ui.setWeapon("MODO CONSTRUÇÃO (C)", label);
-    this.ui.showToast(`Construir: ${label} · [1/2 ou Roda] Trocar · [Clique Esq] Erguer`);
+    this.ui.showToast(`Construir: ${label} · [1/2/3 ou Roda] Trocar · [Clique/E] Fixar ou Erguer`);
+  }
+
+  _tryPlaceHeldItem() {
+    const def = this.currentWeapon;
+    if (def.id === "fists") {
+      this.ui.showToast("Equipe uma tocha ou arma para fixar na parede ou chão!");
+      return;
+    }
+
+    const forwardX = -Math.sin(this._yaw);
+    const forwardZ = -Math.cos(this._yaw);
+    const px = this.player.x;
+    const pz = this.player.z;
+    const py = (this.player.root?.position?.y ?? 0) + 1.2;
+
+    const reach = 2.4;
+    const targetX = px + forwardX * reach;
+    const targetZ = pz + forwardZ * reach;
+    const isNearWall = this.world.isBlockedAt(targetX, targetZ, 0.45);
+
+    this.placedItems = this.placedItems || [];
+
+    if (def.id === "torch") {
+      // Fixa Tocha
+      let placed;
+      if (isNearWall) {
+        placed = this.houses?.torches?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false);
+      } else {
+        const ground = this.world.heightAt(targetX, targetZ);
+        placed = this.houses?.torches?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true);
+      }
+      this.effects.play("star", targetX, py, targetZ, "#ffa834", 1.2);
+      this.audio.weaponSwing?.("chop", false);
+      this.ui.showToast("Tocha fixada! Pressione E para recolher.");
+      this.placedItems.push({
+        id: "torch",
+        x: targetX,
+        y: py,
+        z: targetZ,
+        torchSource: placed,
+      });
+      return;
+    }
+
+    // Fixa Arma na Parede / Expositor
+    const ground = this.world.heightAt(targetX, targetZ);
+    const placeY = isNearWall ? py : ground + 0.5;
+
+    const model = buildWeaponModel(def.id);
+    if (model) {
+      model.position.set(targetX, placeY, targetZ);
+      model.rotation.y = this._yaw + Math.PI / 2;
+      if (isNearWall) {
+        model.rotation.z = Math.PI / 4;
+      }
+      this.scene.add(model);
+      this.effects.play("star", targetX, placeY, targetZ, "#ffe082", 1.1);
+      this.audio.weaponSwing?.("slash", false);
+      this.ui.showToast(`${def.name} fixada! Pressione E para recolher.`);
+
+      this.placedItems.push({
+        id: def.id,
+        name: def.name,
+        x: targetX,
+        y: placeY,
+        z: targetZ,
+        model,
+        durability: this.durability?.[def.id],
+      });
+
+      // Remove a arma equipada
+      this.owned.delete(def.id);
+      this.selectSlot(1);
+    }
+  }
+
+  tryPickupPlacedItem() {
+    if (!this.placedItems || this.placedItems.length === 0) return false;
+    const px = this.player.x;
+    const pz = this.player.z;
+    const py = (this.player.root?.position?.y ?? 0) + 1.0;
+
+    for (let i = 0; i < this.placedItems.length; i++) {
+      const item = this.placedItems[i];
+      const dx = item.x - px;
+      const dz = item.z - pz;
+      if (dx * dx + dz * dz < 2.3 * 2.3) {
+        this.placedItems.splice(i, 1);
+        if (item.id === "torch") {
+          if (item.torchSource?.group) item.torchSource.group.parent?.remove(item.torchSource.group);
+          if (item.torchSource?.sprite) item.torchSource.sprite.parent?.remove(item.torchSource.sprite);
+          this.unlock("torch", false);
+          this.equip("torch", false);
+          this.ui.showToast("Tocha recolhida de volta ao inventário!");
+        } else {
+          if (item.model) item.model.parent?.remove(item.model);
+          this.unlock(item.id, false);
+          if (item.durability !== undefined) this.setWeaponDurability(item.id, item.durability);
+          this.equip(item.id, false);
+          this.ui.showToast(`${item.name} recolhida para o alforje!`);
+        }
+        this.audio.weaponSwing?.("chop", false);
+        this.effects.play("glint", item.x, py, item.z, "#ffd970", 1.0);
+        return true;
+      }
+    }
+    return false;
   }
 
   _tryBuildInMode() {
@@ -404,11 +519,37 @@ export class WeaponSystem {
     }
   }
 
+  setWeaponDurability(id, amount) {
+    this.durability = this.durability || {};
+    this.durability[id] = amount;
+    this._refreshWeaponHud();
+  }
+
+  _consumeDurability(def) {
+    if (!def.isImprovised) return;
+    this.durability = this.durability || {};
+    const cur = this.durability[def.id] !== undefined ? this.durability[def.id] : (def.durability || 10);
+    const next = cur - 1;
+    this.durability[def.id] = next;
+
+    if (next <= 0) {
+      delete this.durability[def.id];
+      this.owned.delete(def.id);
+      this.effects.play("dust", this.player.x, this.player.root.position.y + 1.2, this.player.z, "#a67d4b", 1.4);
+      this.audio.weaponSwing?.("chop", false);
+      this.ui.showToast(`💥 ${def.name} quebrou com o impacto!`);
+      this.selectSlot(1); // Retorna aos punhos
+    } else {
+      this._refreshWeaponHud();
+    }
+  }
+
   _swing(def, cameraYaw, charge) {
     this._lastYaw = cameraYaw;
     this.player._lastGatherYaw = cameraYaw;
     if (this.combat.attackMelee(cameraYaw, def, charge)) {
       this.cooldown = this.combat.attackCooldown;
+      this._consumeDurability(def);
       if (def.id === "torch") {
         this._igniteWithTorch(cameraYaw);
       } else if (def.toolType === "AXE" || def.toolType === "PICKAXE") {
@@ -768,19 +909,22 @@ export class WeaponSystem {
   _refreshWeaponHud() {
     const def = this.currentWeapon;
     const spearThrown = def.id === "spear" && this.models.spear?.userData?.isThrown;
+    const durVal = this.durability?.[def.id] !== undefined ? this.durability[def.id] : def.durability;
     const ammoText = spearThrown
       ? "NO CHÃO (E RECUPERA)"
-      : def.toolType === "AXE"
-        ? "FERRAMENTA · CORTAR ÁRVORES"
-        : def.toolType === "PICKAXE"
-          ? "FERRAMENTA · MINERAR PEDRAS"
-          : def.type === "musket"
-            ? "PÓLVORA (RECARGA 3.5S)"
-            : def.ammo
-              ? `${this.ammo[def.ammo]} ${AMMO_LABELS[def.ammo]}`
-              : def.type === "fists"
-                ? "SEM ARMA"
-                : "CORPO A CORPO";
+      : def.isImprovised
+        ? `DURABILIDADE: ${durVal}/${def.maxDurability || 10}`
+        : def.toolType === "AXE"
+          ? "FERRAMENTA · CORTAR ÁRVORES"
+          : def.toolType === "PICKAXE"
+            ? "FERRAMENTA · MINERAR PEDRAS"
+            : def.type === "musket"
+              ? "PÓLVORA (RECARGA 3.5S)"
+              : def.ammo
+                ? `${this.ammo[def.ammo]} ${AMMO_LABELS[def.ammo]}`
+                : def.type === "fists"
+                  ? "SEM ARMA"
+                  : "CORPO A CORPO";
     this.ui.setWeapon(def.name.toLocaleUpperCase("pt-BR"), ammoText);
     const entries = SLOTS.map((ids, index) => {
       const owned = ids.filter((id) => this.owned.has(id));

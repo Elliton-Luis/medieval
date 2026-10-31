@@ -1,7 +1,7 @@
 // Montaria: montar com F, galope com inércia, turbo (Shift) com fôlego, saltos (Space),
 // atropelamento, batida em obstáculos e assobio (H) para chamar o cavalo.
 import * as THREE from "three";
-import { PlayerStats, checkWitnesses } from "./rpg.js?v=14";
+import { PlayerStats, checkWitnesses } from "./rpg.js?v=15";
 
 const GALLOP = 13.5;
 const TURBO = 21;

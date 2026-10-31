@@ -18,7 +18,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=14";
+} from "./rpg.js?v=15";
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
@@ -72,6 +72,7 @@ export class InteractionSystem {
       if (!this.ui.dialoguePanel.hidden) this.ui.closeDialogue();
       else if (
         !this.weapons?.tryPickupSpear?.() &&
+        !this.weapons?.tryPickupPlacedItem?.() &&
         !this.drops?.tryPickup() &&
         !this.candle?.interact() &&
         !this.houses?.interact() &&
@@ -93,10 +94,22 @@ export class InteractionSystem {
       message ||
       `Recursos na mochila: ${inv.wood} Madeira · ${inv.stone} Pedra · ${inv.hay} Feno · ${inv.torches} Tocha(s) · ${inv.gold} Moedas.\nUse o Machado (2) em árvores e a Picareta (3) em rochas para coletar materiais.`;
     const canTorch = inv.wood >= 1 && inv.hay >= 1;
+    const canSpear = inv.wood >= 3;
+    const canClub = inv.wood >= 2 && inv.stone >= 1;
     const canHouse = inv.wood >= BUILD_COSTS.HOUSE.wood && inv.stone >= BUILD_COSTS.HOUSE.stone;
     const canCorral = inv.wood >= BUILD_COSTS.CORRAL.wood && inv.hay >= BUILD_COSTS.CORRAL.hay;
 
     const actions = [
+      {
+        id: "craft:makeshift_spear",
+        label: "Criar Lança Improvisada (3 Madeira · 10 usos de durabilidade)",
+        disabled: !canSpear,
+      },
+      {
+        id: "craft:makeshift_club",
+        label: "Criar Porrete Rústico (2 Madeira + 1 Pedra · 15 usos)",
+        disabled: !canClub,
+      },
       {
         id: "craft:torch",
         label: `Criar Tocha (1 Madeira + 1 Feno) · tens ${inv.torches}`,
@@ -459,6 +472,20 @@ export class InteractionSystem {
       return;
     }
 
+    if (action === "craft:makeshift_spear") {
+      if (PlayerInventory.craftMakeshiftSpear()) {
+        this.ui.showToast("Lança de Madeira Improvisada pronta (Slot 6 · 10 usos)!");
+        this._showCraftingMenu("Lança confeccionada com ponta afiada! Ela quebra após 10 golpes.");
+      }
+      return;
+    }
+    if (action === "craft:makeshift_club") {
+      if (PlayerInventory.craftMakeshiftClub()) {
+        this.ui.showToast("Porrete Rústico pronto (Slot 4 · 15 usos)!");
+        this._showCraftingMenu("Porrete robusto pronto! Alta força de impacto por 15 golpes.");
+      }
+      return;
+    }
     if (action === "craft:torch") {
       if (PlayerInventory.craftTorch()) {
         this.ui.showToast("Tocha confeccionada e equipada (Slot 1)!");

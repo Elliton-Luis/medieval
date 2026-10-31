@@ -153,6 +153,37 @@ export const PlayerInventory = {
     }
     return false;
   },
+
+  craftMakeshiftSpear: () => {
+    if (PlayerInventory.wood >= 3) {
+      PlayerInventory.wood -= 3;
+      if (_env.weapons) {
+        _env.weapons.unlock("makeshift_spear", true);
+        _env.weapons.setWeaponDurability?.("makeshift_spear", 10);
+        _env.weapons.equip("makeshift_spear", false);
+      }
+      _env.audio?.weaponSwing?.("chop", false);
+      syncPlayerStatsToPlayer();
+      return true;
+    }
+    return false;
+  },
+
+  craftMakeshiftClub: () => {
+    if (PlayerInventory.wood >= 2 && PlayerInventory.stone >= 1) {
+      PlayerInventory.wood -= 2;
+      PlayerInventory.stone -= 1;
+      if (_env.weapons) {
+        _env.weapons.unlock("makeshift_club", true);
+        _env.weapons.setWeaponDurability?.("makeshift_club", 15);
+        _env.weapons.equip("makeshift_club", false);
+      }
+      _env.audio?.weaponSwing?.("smash", false);
+      syncPlayerStatsToPlayer();
+      return true;
+    }
+    return false;
+  },
 };
 
 let _lastSyncedGold = 0;
@@ -1118,6 +1149,12 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
 export const BUILD_COSTS = {
   HOUSE: { wood: 20, stone: 10 },
   CORRAL: { wood: 10, hay: 5 },
+  TORCH_STAND: { wood: 1, hay: 1 },
+};
+
+export const CRAFT_DURABILITY = {
+  makeshift_spear: 10,
+  makeshift_club: 15,
 };
 
 const _playerBuildingsPool = [];

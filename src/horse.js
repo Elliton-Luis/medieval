@@ -2,17 +2,31 @@ import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 
 const GEO = {
-  body: new THREE.CapsuleGeometry(0.36, 0.95, 4, 10),
-  neck: new THREE.CapsuleGeometry(0.15, 0.5, 3, 8),
-  head: new THREE.CapsuleGeometry(0.115, 0.3, 3, 8),
-  ear: new THREE.ConeGeometry(0.04, 0.12, 4),
-  thigh: new THREE.CapsuleGeometry(0.095, 0.3, 3, 7),
-  shin: new THREE.CapsuleGeometry(0.058, 0.38, 3, 7),
-  hoof: new THREE.BoxGeometry(0.11, 0.07, 0.14),
-  tail: new THREE.CapsuleGeometry(0.06, 0.55, 3, 6),
-  mane: new THREE.BoxGeometry(0.05, 0.5, 0.12),
-  saddle: new THREE.BoxGeometry(0.46, 0.08, 0.48),
-  blanket: new THREE.BoxGeometry(0.6, 0.05, 0.64),
+  torso: new THREE.CapsuleGeometry(0.38, 0.96, 4, 12),
+  flank: new THREE.SphereGeometry(0.39, 10, 8).scale(0.96, 1.05, 1.0),
+  chest: new THREE.SphereGeometry(0.41, 10, 8).scale(1.0, 1.15, 1.05),
+  withers: new THREE.ConeGeometry(0.12, 0.22, 5),
+  neckBase: new THREE.CylinderGeometry(0.18, 0.26, 0.48, 8),
+  neckTop: new THREE.CylinderGeometry(0.14, 0.18, 0.42, 8),
+  jaw: new THREE.SphereGeometry(0.15, 8, 6).scale(0.85, 1.1, 1.15),
+  muzzle: new THREE.BoxGeometry(0.16, 0.16, 0.32),
+  ear: new THREE.ConeGeometry(0.045, 0.16, 4),
+  eye: new THREE.SphereGeometry(0.02, 5, 4),
+  mane: new THREE.BoxGeometry(0.06, 0.58, 0.16),
+  maneForelock: new THREE.ConeGeometry(0.05, 0.16, 4),
+  thighFront: new THREE.CapsuleGeometry(0.105, 0.34, 4, 8),
+  thighRear: new THREE.CapsuleGeometry(0.13, 0.38, 4, 8),
+  joint: new THREE.SphereGeometry(0.075, 7, 6),
+  cannon: new THREE.CapsuleGeometry(0.062, 0.38, 4, 8),
+  pastern: new THREE.CylinderGeometry(0.055, 0.065, 0.1, 7),
+  hoof: new THREE.CylinderGeometry(0.08, 0.095, 0.1, 8),
+  tailBase: new THREE.CylinderGeometry(0.06, 0.08, 0.35, 6),
+  tailPlume: new THREE.ConeGeometry(0.11, 0.65, 5),
+  saddle: new THREE.BoxGeometry(0.5, 0.12, 0.52),
+  saddleCantle: new THREE.BoxGeometry(0.48, 0.12, 0.14),
+  stirrup: new THREE.TorusGeometry(0.06, 0.015, 4, 8),
+  blanket: new THREE.BoxGeometry(0.64, 0.06, 0.68),
+  bridle: new THREE.BoxGeometry(0.18, 0.18, 0.03),
 };
 
 const CORPSE_TIME = 5;
@@ -101,31 +115,75 @@ export class Horse {
     this.model.rotation.order = "YXZ";
     this.root.add(this.model);
     const m = this.model;
-    add(m, GEO.body, hide, 0, 1.1, 0).rotation.x = Math.PI / 2;
-    // pescoço e cabeça num grupo próprio: baixam para pastar
+    // Tronco anatômico equino: peito largo, cernelha alta e flancos esculpidos
+    add(m, GEO.torso, hide, 0, 1.14, 0).rotation.x = Math.PI / 2;
+    add(m, GEO.chest, hide, 0, 1.18, 0.44);
+    add(m, GEO.flank, hide, 0, 1.15, -0.42);
+    const withers = add(m, GEO.withers, hide, 0, 1.48, 0.46);
+    withers.rotation.x = -0.3;
+
+    // Pescoço musculoso arqueado e cabeça nobre
     this.neck = new THREE.Group();
-    this.neck.position.set(0, 1.42, 0.68);
+    this.neck.position.set(0, 1.42, 0.65);
     m.add(this.neck);
-    add(this.neck, GEO.neck, hide, 0, 0.13, 0.12).rotation.x = 0.7;
-    add(this.neck, GEO.head, hide, 0, 0.41, 0.44).rotation.x = 2.0;
-    for (const side of [-1, 1]) add(this.neck, GEO.ear, hide, side * 0.07, 0.6, 0.34);
-    add(this.neck, GEO.mane, dark, 0, 0.26, 0.02).rotation.x = 0.7;
-    add(m, GEO.tail, dark, 0, 1.14, -1.1).rotation.x = -2.2;
-    add(m, GEO.blanket, blanket, 0, 1.47, -0.05);
-    add(m, GEO.saddle, leather, 0, 1.53, -0.05);
+
+    const nBase = add(this.neck, GEO.neckBase, hide, 0, 0.16, 0.14);
+    nBase.rotation.x = 0.65;
+    const nTop = add(this.neck, GEO.neckTop, hide, 0, 0.42, 0.28);
+    nTop.rotation.x = 0.52;
+
+    // Cabeça esculpida: queixo arredondado, focinho cônico e olhos
+    add(this.neck, GEO.jaw, hide, 0, 0.62, 0.38);
+    const muzzle = add(this.neck, GEO.muzzle, hide, 0, 0.56, 0.55);
+    muzzle.rotation.x = 0.42;
+    add(this.neck, GEO.bridle, leather, 0, 0.58, 0.45);
+
+    // Olhos escuros laterais
+    for (const side of [-1, 1]) {
+      add(this.neck, GEO.eye, dark, side * 0.14, 0.64, 0.42);
+      const ear = add(this.neck, GEO.ear, hide, side * 0.08, 0.78, 0.32);
+      ear.rotation.z = -side * 0.15;
+    }
+
+    // Crina volumosa e topete
+    const mane = add(this.neck, GEO.mane, dark, 0, 0.38, 0.08);
+    mane.rotation.x = 0.58;
+    add(this.neck, GEO.maneForelock, dark, 0, 0.74, 0.36);
+
+    // Cauda realista bifurcada em leque
+    const tailBase = add(m, GEO.tailBase, dark, 0, 1.25, -0.95);
+    tailBase.rotation.x = -2.1;
+    const tailPlume = add(m, GEO.tailPlume, dark, 0, 0.95, -1.22);
+    tailPlume.rotation.x = -2.35;
+
+    // Sela de montaria com estribos, cantle traseiro e manta bordada
+    add(m, GEO.blanket, blanket, 0, 1.48, -0.05);
+    add(m, GEO.saddle, leather, 0, 1.54, -0.05);
+    add(m, GEO.saddleCantle, leather, 0, 1.62, -0.28);
+    for (const side of [-1, 1]) {
+      const stirrup = add(m, GEO.stirrup, leather, side * 0.32, 1.15, -0.05);
+      stirrup.rotation.y = Math.PI / 2;
+    }
 
     this.legs = [];
     this.knees = [];
+    // Pernas articuladas com coxas robustas, junta de jarrete/joelho e cascos esculpidos
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+      const isFront = sz > 0;
       const leg = new THREE.Group();
-      leg.position.set(sx * 0.2, 0.97, sz * 0.58);
+      leg.position.set(sx * 0.22, 1.05, sz * 0.56);
       m.add(leg);
-      add(leg, GEO.thigh, hide, 0, -0.2, 0);
+
+      add(leg, isFront ? GEO.thighFront : GEO.thighRear, hide, 0, -0.18, 0);
       const knee = new THREE.Group();
-      knee.position.set(0, -0.45, 0);
+      knee.position.set(0, -0.42, 0);
       leg.add(knee);
-      add(knee, GEO.shin, hide, 0, -0.27, 0);
-      add(knee, GEO.hoof, dark, 0, -0.52, 0.02);
+
+      add(knee, GEO.joint, hide, 0, 0, 0);
+      add(knee, GEO.cannon, hide, 0, -0.25, 0);
+      add(knee, GEO.pastern, hide, 0, -0.46, 0.02);
+      add(knee, GEO.hoof, dark, 0, -0.54, 0.03);
+
       this.legs.push(leg);
       this.knees.push(knee);
     }
