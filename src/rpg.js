@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { triggerCultistMessenger } from "./decay.js?v=19";
 
 // ============================================================================
 // 1. Parâmetros e Cache de Vetores (Zero-GC)
@@ -518,6 +519,8 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
       PlayerStats.cha = Math.max(1, PlayerStats.cha - 5);
       triggerWantedLevel(2); // Ganha 2 estrelas/escudos
       _env.ui?.showToast("Assassinato testemunhado! Carisma -5 · Procurado +2");
+      // Desperta o Mensageiro de Cinzas para ação maligna
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     }
   }
 
@@ -917,6 +920,10 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
   if (_env.effects && _env.player) {
     _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
   }
+  if (voluntaryOffer >= 20) {
+    // Oferta generosa atrai a mensagem virtuosa do Cátaro
+    triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
+  }
   syncPlayerStatsToPlayer();
   return true;
 }
@@ -944,6 +951,9 @@ export function interactWithBeggar(playerPos, npcBeggar) {
       _env.effects?.play("star", npcEntity.x, npcEntity.root.position.y + 1.8, npcEntity.z, "#ffd86b", 1.1);
     }
     _env.audio?.coin?.();
+    if (Math.random() < 0.5) {
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
+    }
     syncPlayerStatsToPlayer();
     return true;
   }
@@ -2419,18 +2429,27 @@ export function sellResourcesToNPC(npcType) {
     PlayerStats.hay = PlayerInventory.hay;
     PlayerInventory.gold += 10; // Vende feno
     _env.audio?.coin?.();
+    if (Math.random() < 0.5) {
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
+    }
     syncPlayerStatsToPlayer();
     return true;
   } else if (npcType === "BLACKSMITH" && PlayerInventory.wood >= 10) {
     PlayerInventory.wood -= 10;
     PlayerInventory.gold += 25; // Vende lenha para a fornalha
     _env.audio?.coin?.();
+    if (Math.random() < 0.5) {
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
+    }
     syncPlayerStatsToPlayer();
     return true;
   } else if (npcType === "STONE" && PlayerInventory.stone >= 5) {
     PlayerInventory.stone -= 5;
     PlayerInventory.gold += 15; // Vende pedras brutas/minério
     _env.audio?.coin?.();
+    if (Math.random() < 0.5) {
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
+    }
     syncPlayerStatsToPlayer();
     return true;
   }

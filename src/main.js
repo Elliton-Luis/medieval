@@ -87,6 +87,12 @@ import {
   createCultistsPool,
   updateCultistsLifeCycle,
 } from "./cult.js?v=19";
+import {
+  WorldDecay,
+  triggerDailyDecayCycle,
+  updateEclipseLightning,
+  updateMessenger,
+} from "./decay.js?v=19";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -229,8 +235,12 @@ for (let i = 0; i < cultistsPool.length; i++) {
 npcs.onWantedChange = (level) => ui.setWanted(level);
 npcs.onAlert = (message) => ui.showToast(message);
 
+dayNight.onNewDay = () => {
+  triggerDailyDecayCycle(world, npcs.npcs, horses.horses, ui, scene, effects);
+};
+
 if (new URLSearchParams(location.search).has("debug")) {
-  window.__game = { MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+  window.__game = { WorldDecay, triggerDailyDecayCycle, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 }
 
 const saved = loadGame();
@@ -304,6 +314,8 @@ function frame(now) {
     updateWildernessSpawns(player.root.position, settlement.cityData, dayNight.isNight, monstersPool, dt);
     updateCultistsLifeCycle(cultistsPool, player, npcs.npcs, weapons.firePool, dt, dayNight.isNight, settlement.cityData);
   }
+  updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
+  updateMessenger(dt, player, effects, ui, audio, world);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay);
   interactions.update(dt);
   combat.update(dt);

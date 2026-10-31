@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { clamp } from "./utils.js";
+import { updateAtmosphereDecay } from "./decay.js?v=19";
 
 const _hemiSkyDay = new THREE.Color("#eaf0dd");
 const _hemiSkyNight = new THREE.Color("#141e30");
@@ -24,10 +25,19 @@ export class DayNightCycle {
     this.isNight = false;
     this._lastClock = "";
     this._lastMinute = -1;
+    this._prevProgress = 0.36;
+    this.onNewDay = null;
   }
 
-  update(dt, playerX, playerZ) {
+  update(dt, playerX, playerZ, renderer = null) {
+    const prevProg = this._prevProgress;
     this.progress = (this.progress + dt / CONFIG.dayLengthSeconds) % 1;
+    if (this.progress < prevProg && prevProg > 0.85) {
+      // Virada da meia-noite in-game executada exatamente 1 vez por dia
+      this.onNewDay?.();
+    }
+    this._prevProgress = this.progress;
+
     this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
     const elevation = Math.sin(this.solarAngle);
     this.daylight = clamp((elevation + 0.16) / 0.82, 0.025, 1);
@@ -52,6 +62,10 @@ export class DayNightCycle {
     this.hemisphere.intensity = 0.16 + this.daylight * 1.18;
     this.hemisphere.color.copy(_hemiSkyDay).lerp(_hemiSkyNight, night * 0.9);
     this.hemisphere.groundColor.copy(_hemiGroundDay).lerp(_hemiGroundNight, night * 0.9);
+
+    // Ajuste de atmosfera sombria, neblina corrompida e Eclipse Vermelho
+    updateAtmosphereDecay(this, this.scene, renderer);
+
     // a câmera de sombra anda em degraus de 2 m: o mapa não "treme" enquanto o jogador anda
     const sx = Math.round(playerX / 2) * 2;
     const sz = Math.round(playerZ / 2) * 2;

@@ -4,6 +4,7 @@ import { NPC } from "./npc.js?v=19";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
+import { WorldDecay } from "./decay.js?v=19";
 
 // ============================================================================
 // 1. Sistema de Seed (PRNG Mulberry32) e Texturas Procedurais de Baixo Custo
@@ -736,11 +737,11 @@ export class Werewolf extends NPC {
     const speedMult = this.userData.speedMult || 1.35;
     const baseSpeed = 4.2 * speedMult; // ~5.67 m/s (mais rápido que lobos e guardas)
 
-    // Barreira Mística da Cidade: O lobisomem é banido pelo solo sagrado e muralhas da cidade
+    // Barreira Mística da Cidade: O lobisomem é banido pelo solo sagrado (exceto durante o Eclipse)
     let repulseX = 0;
     let repulseZ = 0;
     let repulseForce = 0;
-    if (_procEnv.activeCities) {
+    if (!WorldDecay.isEclipse && _procEnv.activeCities) {
       for (const city of _procEnv.activeCities.values()) {
         if (!city || !city.center) continue;
         const cdx = this.x - city.center.x;
@@ -858,8 +859,9 @@ export function updateWildernessSpawns(playerPos, cityData, isNight, monstersPoo
   }
   const insideSafeZone = minDistToCitySq < wallDistSq + 400;
 
-  // Edge Case: Despawn imediato do Lobisomem no amanhecer (!isNight) ou se o jogador cruzar os portões da muralha
-  if (!isNight || minDistToCitySq < wallDistSq) {
+  // Edge Case: Despawn imediato do Lobisomem no amanhecer ou ao cruzar os portões (ignorado durante o Eclipse)
+  const isSafeByWalls = !WorldDecay.isEclipse && minDistToCitySq < wallDistSq;
+  if ((!isNight && !WorldDecay.isEclipse) || isSafeByWalls) {
     for (let i = 0; i < monstersPool.length; i++) {
       const m = monstersPool[i];
       if (m.visible) {
@@ -869,15 +871,17 @@ export function updateWildernessSpawns(playerPos, cityData, isNight, monstersPoo
     return;
   }
 
-  // Se estiver dentro da cidade ou perto da luz da muralha, não spawna novos monstros
-  if (insideSafeZone) return;
+  // Se estiver dentro da cidade ou perto da muralha, não spawna monstros normais (exceto no Eclipse)
+  if (!WorldDecay.isEclipse && insideSafeZone) return;
 
-  // Também evita spawnar dentro do perímetro iluminado das vilas secundárias
-  for (let i = 0; i < VILLAGES.length; i++) {
-    const v = VILLAGES[i];
-    const vdx = _tempVec.x - v.x;
-    const vdz = _tempVec.z - v.z;
-    if (vdx * vdx + vdz * vdz < 38 * 38) return;
+  // Também evita spawnar dentro do perímetro iluminado das vilas secundárias (exceto no Eclipse)
+  if (!WorldDecay.isEclipse) {
+    for (let i = 0; i < VILLAGES.length; i++) {
+      const v = VILLAGES[i];
+      const vdx = _tempVec.x - v.x;
+      const vdz = _tempVec.z - v.z;
+      if (vdx * vdx + vdz * vdz < 38 * 38) return;
+    }
   }
 
   // Rate-limiting do trigger (~1 avaliação por segundo ou gatilho probabilístico do frame)
