@@ -24,6 +24,21 @@ export const COLORS = {
   sun: 0xfff2d8,
   skyLight: 0xd8eef5,
   bounceLight: 0x7d9470,
+  playerBody: 0x3f8f8a,
+  playerNose: 0xffe3b3,
+  shadow: 0x263b33,
+};
+
+export const PLAYER = {
+  radius: 0.45,
+  moveSpeed: 6,
+  acceleration: 16,
+  deceleration: 22,
+  turnSpeed: 14,
+  bodyRadius: 0.4,
+  bodyLength: 0.8,
+  shadowRadius: 0.55,
+  shadowOpacity: 0.3,
 };
 
 export const DEBUG = {

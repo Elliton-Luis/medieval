@@ -1,26 +1,33 @@
 import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { createDebugPanel } from './debug.js';
+import { input } from './input.js';
+import { createPlayer } from './player.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const { scene, camera, updateCamera } = createScene();
+const { scene, camera, colliders, updateCamera } = createScene();
+const player = createPlayer(scene);
 const debug = import.meta.env.DEV ? createDebugPanel() : null;
 
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect(document);
 
-function animate() {
-  const rawDt = clock.getDelta();
+function animate(timestamp) {
+  timer.update(timestamp);
+  const rawDt = timer.getDelta();
   const dt = Math.min(rawDt, 0.05);
 
-  updateCamera(0, 0, dt);
+  player.update(dt, input, camera, colliders);
+  updateCamera(player.group.position.x, player.group.position.z, dt);
   renderer.render(scene, camera);
   if (debug) debug.update(rawDt, renderer.info.render.calls);
+  input.endFrame();
 
   requestAnimationFrame(animate);
 }
