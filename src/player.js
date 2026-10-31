@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
-import { PlayerStats } from "./rpg.js?v=18";
+import { PlayerStats } from "./rpg.js?v=19";
 
 const ROLL_DURATION = 0.55;
 const ROLL_SPEED = 9.5;

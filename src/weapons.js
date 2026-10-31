@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=18";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=19";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -15,7 +15,7 @@ import {
   buildStructure,
   updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=18";
+} from "./rpg.js?v=19";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;

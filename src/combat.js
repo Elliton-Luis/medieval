@@ -8,7 +8,7 @@ import {
   spawnLoot,
   takeDamage,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=18";
+} from "./rpg.js?v=19";
 
 export class CombatSystem {
   constructor(player, npcs, input, effects, ui, settlement, audio, cameraRig) {
@@ -154,6 +154,15 @@ export class CombatSystem {
         spawnLoot(npc.root ? npc.root.position : { x: npc.x, z: npc.z }, 35);
         syncPlayerStatsToPlayer(this.player, this.ui);
         this.ui.showToast("Lobisomem abatido! +35 moedas · Carisma +1");
+      }
+    } else if (npc.roleKey === "cultist") {
+      // Invasão sobrenatural dos Cátaros: sem testemunhas nem Wanted Level
+      if (defeated) {
+        PlayerStats.cha += 1;
+        syncPlayerStatsToPlayer(this.player, this.ui);
+        this.effects.play("dust", npc.x, npc.root.position.y + 1.1, npc.z, "#14141a", 2.6);
+        this.effects.play("star", npc.x, npc.root.position.y + 1.2, npc.z, "#8844cc", 1.8);
+        this.ui.showToast("✦ O Cultista do Demiurgo desvaneceu em cinzas e névoa negra! Relíquias recuperadas.");
       }
     } else if (npc.temporary) {
       if (defeated && npc.hostile && npc.roleKey !== "horse") this.npcs.addWantedPoints(0.3);

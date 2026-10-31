@@ -1,33 +1,33 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
-import { InputManager } from "./input.js?v=18";
-import { World, SHADOW_RADIUS } from "./world.js?v=18";
-import { Player } from "./player.js?v=18";
-import { ThirdPersonCamera } from "./camera.js?v=18";
-import { DayNightCycle } from "./daynight.js?v=18";
-import { GameUI } from "./ui.js?v=18";
-import { createSettlement } from "./settlement.js?v=18";
-import { NPCSystem } from "./npc.js?v=18";
-import { InteractionSystem } from "./interactions.js?v=18";
+import { InputManager } from "./input.js?v=19";
+import { World, SHADOW_RADIUS } from "./world.js?v=19";
+import { Player } from "./player.js?v=19";
+import { ThirdPersonCamera } from "./camera.js?v=19";
+import { DayNightCycle } from "./daynight.js?v=19";
+import { GameUI } from "./ui.js?v=19";
+import { createSettlement } from "./settlement.js?v=19";
+import { NPCSystem } from "./npc.js?v=19";
+import { InteractionSystem } from "./interactions.js?v=19";
 import { SpriteEffects } from "./effects.js";
-import { CombatSystem } from "./combat.js?v=18";
-import { WeaponSystem } from "./weapons.js?v=18";
-import { AimSystem } from "./aim.js?v=18";
+import { CombatSystem } from "./combat.js?v=19";
+import { WeaponSystem } from "./weapons.js?v=19";
+import { AimSystem } from "./aim.js?v=19";
 import { ExplosionSystem } from "./explosions.js";
-import { GameAudio } from "./audio.js?v=18";
+import { GameAudio } from "./audio.js?v=19";
 import { DropSystem } from "./drops.js";
-import { Minimap } from "./minimap.js?v=18";
-import { EnemyDirector } from "./enemies.js?v=18";
+import { Minimap } from "./minimap.js?v=19";
+import { EnemyDirector } from "./enemies.js?v=19";
 import { DeathScreen } from "./deathScreen.js";
-import { TorchSystem, Candle, setupAtmosphere } from "./torches.js?v=18";
+import { TorchSystem, Candle, setupAtmosphere } from "./torches.js?v=19";
 import { FireSystem } from "./fire.js";
-import { HouseSystem } from "./houses.js?v=18";
-import { SleepSystem } from "./sleep.js?v=18";
+import { HouseSystem } from "./houses.js?v=19";
+import { SleepSystem } from "./sleep.js?v=19";
 import { loadGame } from "./save.js";
-import { HorseManager } from "./horses.js?v=18";
-import { RidingSystem, dismountHorse } from "./riding.js?v=18";
+import { HorseManager } from "./horses.js?v=19";
+import { RidingSystem, dismountHorse } from "./riding.js?v=19";
 import { MusicDirector } from "./music.js";
-import { PauseMenu } from "./pause.js?v=18";
+import { PauseMenu } from "./pause.js?v=19";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
 import {
@@ -70,7 +70,7 @@ import {
   payDebtorMission,
   updateMissionProgress,
   updateFallingTrees,
-} from "./rpg.js?v=18";
+} from "./rpg.js?v=19";
 import {
   initProceduralEnv,
   createSeededRandom,
@@ -80,7 +80,13 @@ import {
   assignNpcAnchors,
   updateWildernessSpawns,
   createMonstersPool,
-} from "./procedural.js?v=18";
+} from "./procedural.js?v=19";
+import {
+  createCultistCluesMeshes,
+  spawnCultistClues,
+  createCultistsPool,
+  updateCultistsLifeCycle,
+} from "./cult.js?v=19";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -212,6 +218,14 @@ const director = new EnemyDirector(scene, world, npcs, effects, explosions, audi
 director.combat = combat;
 director.cameraRig = cameraRig;
 const monstersPool = createMonstersPool(scene, world, npcs, effects, combat, 2);
+const { skullsMesh, weaponsMesh } = createCultistCluesMeshes(scene);
+if (settlement.cityData) {
+  spawnCultistClues(skullsMesh, weaponsMesh, 88231, settlement.cityData.center, scene, world);
+}
+const cultistsPool = createCultistsPool(scene, world, effects, combat, 2);
+for (let i = 0; i < cultistsPool.length; i++) {
+  npcs.npcs.push(cultistsPool[i]);
+}
 npcs.onWantedChange = (level) => ui.setWanted(level);
 npcs.onAlert = (message) => ui.showToast(message);
 
@@ -288,6 +302,7 @@ function frame(now) {
   const timeOfDay = (dayNight.progress * 24) % 24;
   if (settlement.cityData) {
     updateWildernessSpawns(player.root.position, settlement.cityData, dayNight.isNight, monstersPool, dt);
+    updateCultistsLifeCycle(cultistsPool, player, npcs.npcs, weapons.firePool, dt, dayNight.isNight, settlement.cityData);
   }
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay);
   interactions.update(dt);

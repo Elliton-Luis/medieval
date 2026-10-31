@@ -20,6 +20,8 @@ const LOOT = {
   merchant: { coins: [8, 14], items: [["gem", 0.7], ["potion", 0.25]] },
   smith: { coins: [5, 9], items: [["bolts", 0.4]] },
   guard: { coins: [4, 8], items: [["bolts", 0.4], ["arrows", 0.4], ["potion", 0.12]], weapons: [["spear", 0.2], ["shortsword", 0.1], ["axe", 0.1], ["dagger", 0.08]] },
+  cultist: { coins: [18, 35], items: [["gem", 0.75], ["potion", 0.5]], weapons: [["dagger", 0.4], ["shortsword", 0.2]] },
+  werewolf: { coins: [25, 45], items: [["gem", 0.8]] },
 };
 
 const ITEMS = {

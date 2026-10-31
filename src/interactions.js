@@ -18,7 +18,15 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=18";
+} from "./rpg.js?v=19";
+import { checkAltarInteraction } from "./cult.js?v=19";
+
+const CULTIST_RUMORS = [
+  "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
+  "«O padre diz que máscaras de pássaro são contos para assustar crianças.»",
+  "«Se os Cátaros quisessem nosso fim, por que não invadem os portões? É tudo invenção.»",
+  "«Dizem que eles adoram o Demiurgo e não temem a morte... que Deus nos guarde fora dos muros.»",
+];
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
@@ -76,11 +84,13 @@ export class InteractionSystem {
         !this.drops?.tryPickup() &&
         !this.candle?.interact() &&
         !this.houses?.interact() &&
-        !this._tryGatherHayBale()
+        !this._tryGatherHayBale() &&
+        !this._tryInteractAltar()
       ) {
         this._interactNearby();
       }
     }
+    this._checkAltarNearby();
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
@@ -184,6 +194,25 @@ export class InteractionSystem {
     } else {
       this.ui.showToast(`Isca de feno largada no chão (${PlayerInventory.hay} restante)`);
     }
+  }
+
+  _checkAltarNearby() {
+    const altar = checkAltarInteraction(this.player.root.position);
+    if (altar && !altar.inspected && !this.ui.dialoguePanel.hidden) {
+      this.ui.setPrompt("✦ ALTAR DOS CÁTAROS [E] Inspecionar Pistas");
+    }
+  }
+
+  _tryInteractAltar() {
+    const altar = checkAltarInteraction(this.player.root.position);
+    if (altar) {
+      altar.inspected = true;
+      PlayerStats.cha += 1;
+      this.ui.showToast(`✦ Pistas dos Cátaros: ${altar.lorePrompt} (+1 Carisma)`);
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      return true;
+    }
+    return false;
   }
 
   _interactNearby() {
@@ -409,6 +438,10 @@ export class InteractionSystem {
           id: "mission:horse_theft",
           label: "✦ Missão: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
         },
+        {
+          id: "rumor:cult",
+          label: "Ouvir boatos sobre as sombras além dos muros",
+        },
         ...(MissionState.activeId
           ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
           : []),
@@ -469,6 +502,11 @@ export class InteractionSystem {
     if (action === "mission:cancel") {
       failActiveMission("Missão cancelada.");
       this._showNPCDialogue("Sem problemas. Avise se mudar de ideia.");
+      return;
+    }
+    if (action === "rumor:cult") {
+      const rumor = CULTIST_RUMORS[Math.floor(Math.random() * CULTIST_RUMORS.length)];
+      this._showNPCDialogue(rumor);
       return;
     }
 
