@@ -1,8 +1,10 @@
 # Puris
 
-Protótipo de um jogo de ação 3D leve que roda no navegador. Esta etapa entrega
-apenas as mecânicas básicas: andar, pular e lançar bolas de fogo em um alvo de
-teste. Não há história, inimigos, menus, som nem assets externos.
+Protótipo de jogo de ação 3D leve que roda no navegador. Um homem armado com uma
+metralhadora de munição infinita enfrenta hordas de zumbis em uma arena aberta.
+O objetivo é sobreviver o máximo possível enquanto o cronômetro corre.
+
+Não há história, menus, som nem assets externos.
 
 ## Stack
 
@@ -33,62 +35,88 @@ npm run preview
 
 ## Controles
 
-| Ação         | Controle                     |
-| ------------ | ---------------------------- |
-| Andar        | `W` `A` `S` `D` / setas      |
-| Pular        | `Espaço`                     |
-| Bola de fogo | Clique esquerdo / `F`        |
-| Mover câmera | Arrastar com o botão direito |
-| Zoom         | Roda do mouse                |
+| Ação          | Controle                     |
+| ------------- | ---------------------------- |
+| Andar         | `W` `A` `S` `D` / setas      |
+| Mirar         | Mouse                        |
+| Atirar        | Segurar clique esquerdo / `F` |
+| Pular         | `Espaço`                     |
+| Mover câmera  | Arrastar com o botão direito |
+| Zoom          | Roda do mouse                |
+| Reiniciar     | `R` (depois de morrer)       |
 
 O movimento é relativo à câmera, que orbita em volta do jogador. Diagonais são
-normalizadas, o personagem gira suavemente para a direção do movimento e não
-atravessa obstáculos. O pulo usa gravidade e não permite pulo duplo; a sombra no
-chão indica a altura.
+normalizadas, o personagem gira para a direção do mouse e não atravessa
+obstáculos. O pulo usa gravidade e não permite pulo duplo; a sombra no chão
+indica a altura.
 
-A bola de fogo sai da frente do personagem, voa em linha reta, tem tempo de vida
-limitado e retorna ao pool ao expirar ou colidir. O alvo de teste pisca quando
-atingido.
+Segurar o botão esquerdo dispara continuamente, sem limite de munição. As balas
+saem do cano da arma, voam em linha reta e colidem com zumbis e obstáculos.
+
+## Regras do jogo
+
+- Hordas de zumbis surgem ao redor do jogador em intervalos regulares.
+- Cada horda é maior que a anterior, até um limite; o intervalo entre hordas
+  diminui com o tempo.
+- Os zumbis perseguem o jogador, desviam dos obstáculos e atacam quando chegam
+  perto. Cada ataque tira vida, com um pequeno intervalo global entre danos.
+- Cada zumbi suporta três tiros. Acertos soltam partículas de sangue; tiros em
+  obstáculos soltam faíscas.
+- O HUD mostra o cronômetro de sobrevivência, a vida e o número de abates.
+- Quando a vida chega a zero, o jogo congela e mostra o tempo sobrevivido e os
+  abates. Pressione `R` para recomeçar.
 
 ## Estrutura
 
 ```text
 index.html
 src/
-  main.js      renderer, loop, junta os módulos
-  scene.js     cena, câmera, luzes, chão, obstáculos e alvo
+  main.js      renderer, loop, estado do jogo, game over e reinício
+  scene.js     cena, câmera orbital, luzes, chão e obstáculos
   input.js     estado do teclado/mouse (sem lógica de jogo)
-  player.js    movimento, rotação, pulo e colisão
-  fireball.js  pool de projéteis, partículas, lançamento e colisão
+  player.js    modelo com arma, movimento, mira, pulo e colisão
+  bullet.js    metralhadora, balas, rastro e partículas
+  zombies.js   hordas, instancing, perseguição, ataque e dano
+  hud.js       cronômetro, vida, abates e tela de game over
   config.js    constantes de ajuste
   debug.js     painel de FPS e draw calls (só em desenvolvimento)
 ```
 
 ## Ajustes
 
-Velocidades, aceleração, gravidade, força do pulo, cooldown, tempo de vida,
-tamanho dos pools, câmera, névoa e cores ficam em `src/config.js`.
+Velocidades, aceleração, gravidade, força do pulo, vida, dano, cadência de tiro,
+tempo de vida das balas, tamanho dos pools, hordas, câmera, névoa e cores ficam
+em `src/config.js`, organizados por área (`PLAYER`, `GAME`, `BULLET`, `ZOMBIE`,
+`CAMERA`, `WORLD` e `COLORS`).
+
+Para deixar o jogo mais fácil ou difícil, ajuste principalmente `ZOMBIE.health`,
+`ZOMBIE.minSpeed`, `ZOMBIE.maxSpeed`, `ZOMBIE.attackDamage`,
+`ZOMBIE.spawnInterval`, `ZOMBIE.hordeGrowth` e `GAME.damageCooldown`.
 
 ## Desempenho
 
-- Pool fixo de 16 bolas de fogo e 96 partículas: nada é criado ou destruído por
-  tiro.
-- Geometrias e materiais compartilhados entre obstáculos, projéteis e partículas.
-- Sem alocações de objetos dentro do loop do jogo; vetores e buffers são
-  reutilizados.
-- Matrizes de objetos estáticos não são recalculadas a cada frame.
+- Pools fixos: 64 balas, 160 partículas e 48 zumbis. Nada é criado ou destruído
+  durante o jogo.
+- Zumbis desenhados com `InstancedMesh` (corpo, cabeça e braços: 3 draw calls) e
+  balas com um único `InstancedMesh`.
+- Geometrias e materiais compartilhados; vetores, matrizes e buffers são
+  reutilizados dentro do loop.
+- Objetos estáticos têm a matriz congelada e não são recalculados por frame.
 - Uma única luz com sombra, shadow map de 1024 e área de sombra acompanhando o
   jogador.
-- Brilho do projétil feito com material emissivo, sprite aditivo e partículas,
-  sem luz dinâmica.
+- Partículas, rastro e clarão do cano usam materiais aditivos, sem luz dinâmica.
 - `setPixelRatio(Math.min(devicePixelRatio, 2))`, névoa leve e sem
   pós-processamento.
+- Colisão de balas em subpassos para não atravessar zumbis em alta velocidade.
 - Delta time limitado a `0.05s` para evitar saltos após travadas.
-- Draw calls exibidos no painel de debug: cerca de 21 na cena base (incluindo o
-  passe de sombra) e 23 com um projétil ativo.
+- Draw calls exibidos no painel de debug: cerca de 32 na cena com jogador,
+  obstáculos, zumbis e balas (incluindo o passe de sombra).
 
-O painel de debug aparece apenas durante o desenvolvimento (`npm run dev`).
+O painel de debug aparece no canto inferior esquerdo apenas durante o
+desenvolvimento (`npm run dev`).
 
 ## Status
 
-Protótipo das fases 0 a 5 concluído, com câmera orbital. Escopo fechado nas três mecânicas básicas.
+Protótipo jogável concluído: sobrevivência com hordas, metralhadora de munição
+infinita, cronômetro, vida, abates, game over e reinício. Sem som, menus ou
+suporte a toque.
