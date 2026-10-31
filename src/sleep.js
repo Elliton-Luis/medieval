@@ -1,5 +1,5 @@
 import { saveGame } from "./save.js";
-import { PlayerStats, PlayerInventory } from "./rpg.js?v=16";
+import { PlayerStats, PlayerInventory } from "./rpg.js?v=17";
 
 const CSS = `
 .sleep-layer { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; display: grid; place-content: center; text-align: center; transition: opacity 1.2s ease; }

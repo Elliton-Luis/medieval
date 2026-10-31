@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=16";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=17";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -15,7 +15,7 @@ import {
   buildStructure,
   updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=16";
+} from "./rpg.js?v=17";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;
@@ -257,29 +257,31 @@ export class WeaponSystem {
     const now = performance.now();
 
     if (this.input.consumeBuildModePressed?.()) {
-      this.buildMode = !this.buildMode;
       if (this.buildMode) {
-        this._announceBuildMode();
-      } else {
+        this.buildMode = false;
         this.ui.showToast("Modo Construção encerrado.");
         this._refreshWeaponHud();
+      } else {
+        this.openBuildHub();
       }
     }
 
     const selection = this.input.consumeWeaponSelection();
     if (selection > 0) {
-      if (this.buildMode && (selection === 1 || selection === 2 || selection === 3)) {
-        this.selectedBuildType = selection === 1 ? "HOUSE" : selection === 2 ? "CORRAL" : "PLACE_ITEM";
-        this._announceBuildMode();
+      if (this.buildMode) {
+        const types = Object.keys(BUILD_COSTS);
+        if (selection >= 1 && selection <= types.length) {
+          this.selectedBuildType = types[selection - 1];
+          this._announceBuildMode();
+        }
       } else {
-        if (this.buildMode) this.buildMode = false;
         this.selectSlot(selection);
       }
     }
     const wheel = this.input.consumeWheelStep();
     if (wheel !== 0) {
       if (this.buildMode) {
-        const types = ["HOUSE", "CORRAL", "PLACE_ITEM"];
+        const types = [...Object.keys(BUILD_COSTS), "PLACE_ITEM"];
         const curIdx = types.indexOf(this.selectedBuildType || "HOUSE");
         this.selectedBuildType = types[(curIdx + (wheel > 0 ? 1 : types.length - 1)) % types.length];
         this._announceBuildMode();
@@ -398,15 +400,45 @@ export class WeaponSystem {
     }
   }
 
+  openBuildHub() {
+    this.ui.showBuildHub(
+      BUILD_COSTS,
+      PlayerInventory,
+      (selectedType) => {
+        this.startBuildMode(selectedType);
+      },
+      () => {
+        this.startBuildMode("PLACE_ITEM");
+      },
+    );
+  }
+
+  startBuildMode(type = "HOUSE") {
+    this.buildMode = true;
+    this.selectedBuildType = type;
+    this._announceBuildMode();
+    document.body?.requestPointerLock?.();
+  }
+
   _announceBuildMode() {
-    const label =
-      this.selectedBuildType === "HOUSE"
-        ? `CASA PRÓPRIA (${BUILD_COSTS.HOUSE.wood} Mad, ${BUILD_COSTS.HOUSE.stone} Ped)`
-        : this.selectedBuildType === "CORRAL"
-          ? `CURRAL DE CAVALOS (${BUILD_COSTS.CORRAL.wood} Mad, ${BUILD_COSTS.CORRAL.hay} Feno)`
-          : `FIXAR ${this.currentWeapon.name.toLocaleUpperCase("pt-BR")} NA PAREDE/CHÃO [E]`;
+    const type = this.selectedBuildType || "HOUSE";
+    if (type === "PLACE_ITEM") {
+      const label = `FIXAR ${this.currentWeapon.name.toLocaleUpperCase("pt-BR")} NA PAREDE/CHÃO [E]`;
+      this.ui.setWeapon("MODO CONSTRUÇÃO (C)", label);
+      this.ui.showToast(`Modo: ${label} · [C] Catálogo · [Clique/E] Fixar`);
+      return;
+    }
+
+    const cost = BUILD_COSTS[type] || BUILD_COSTS.HOUSE;
+    const parts = [];
+    if (cost.wood) parts.push(`${cost.wood} Mad`);
+    if (cost.stone) parts.push(`${cost.stone} Ped`);
+    if (cost.hay) parts.push(`${cost.hay} Feno`);
+    const costStr = parts.join(", ");
+
+    const label = `${(cost.label || type).toLocaleUpperCase("pt-BR")} (${costStr})`;
     this.ui.setWeapon("MODO CONSTRUÇÃO (C)", label);
-    this.ui.showToast(`Construir: ${label} · [1/2/3 ou Roda] Trocar · [Clique/E] Fixar ou Erguer`);
+    this.ui.showToast(`Construir: ${cost.label || type} · [Clique/E] Erguer · [C] Abrir Catálogo · [Roda] Trocar`);
   }
 
   _tryPlaceHeldItem() {
@@ -517,8 +549,8 @@ export class WeaponSystem {
   }
 
   _tryBuildInMode() {
-    const type = this.selectedBuildType;
-    const cost = BUILD_COSTS[type];
+    const type = this.selectedBuildType || "HOUSE";
+    const cost = BUILD_COSTS[type] || BUILD_COSTS.HOUSE;
     const built = buildStructure(
       this.player.root.position,
       this.player.model.rotation,
@@ -526,15 +558,14 @@ export class WeaponSystem {
       this.playerBuildingsPool,
     );
     if (built) {
-      const name = type === "HOUSE" ? "Casa Própria" : "Curral de Cavalos";
-      this.ui.showToast(`${name} construído com sucesso!`);
+      this.ui.showToast(`✦ ${cost.label || type} erguido com sucesso no reino!`);
       this._announceBuildMode();
     } else {
-      const req =
-        type === "HOUSE"
-          ? `${cost.wood} Madeira e ${cost.stone} Pedra (tens ${PlayerInventory.wood} Mad, ${PlayerInventory.stone} Ped)`
-          : `${cost.wood} Madeira e ${cost.hay} Feno (tens ${PlayerInventory.wood} Mad, ${PlayerInventory.hay} Feno)`;
-      this.ui.showToast(`Recursos insuficientes! Precisas de ${req}`);
+      const parts = [];
+      if (cost.wood) parts.push(`${cost.wood} Madeira (tens ${PlayerInventory.wood})`);
+      if (cost.stone) parts.push(`${cost.stone} Pedra (tens ${PlayerInventory.stone})`);
+      if (cost.hay) parts.push(`${cost.hay} Feno (tens ${PlayerInventory.hay})`);
+      this.ui.showToast(`Recursos insuficientes! Precisas de: ${parts.join(" · ")}`);
     }
   }
 

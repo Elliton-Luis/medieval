@@ -1,5 +1,5 @@
 import { ROADS, VILLAGES } from "./kingdom.js";
-import { MissionState } from "./rpg.js?v=16";
+import { MissionState } from "./rpg.js?v=17";
 
 const SIZE = 224;
 const RADIUS = SIZE / 2 - 5;
@@ -182,31 +182,62 @@ export class Minimap {
       }
     }
 
-    // Waypoint de Missão Ativa (diamante dourado pulsante no radar ou seta dourada na borda)
-    if (MissionState.activeId && MissionState.targetLocation) {
-      const tx = MissionState.targetLocation.x ?? 0;
-      const tz = MissionState.targetLocation.z ?? 0;
-      this._project(tx, tz, px, pz, cos, sin, _ptA);
+    // Waypoint de Missão Ativa (diamante dourado pulsante no radar ou seta dourada na borda com distância em metros)
+    let targetX = null;
+    let targetZ = null;
+    if (MissionState.activeId) {
+      if (MissionState.targetLocation) {
+        targetX = MissionState.targetLocation.x ?? 0;
+        targetZ = MissionState.targetLocation.z ?? 0;
+      } else if (MissionState.targetNPC) {
+        const root = MissionState.targetNPC.root || MissionState.targetNPC;
+        targetX = root.position ? root.position.x : root.x;
+        targetZ = root.position ? root.position.z : root.z;
+      }
+    }
+
+    if (targetX !== null && targetZ !== null) {
+      const distM = Math.round(Math.hypot(targetX - px, targetZ - pz));
+      this._project(targetX, targetZ, px, pz, cos, sin, _ptA);
       const wx = _ptA[0];
       const wy = _ptA[1];
       const wDist = Math.hypot(wx - SIZE / 2, wy - SIZE / 2);
-      const rPulse = 5.5 + 2.2 * pulse;
-      if (wDist < RADIUS - 8) {
+      const rPulse = 5.5 + 2.5 * pulse;
+
+      if (wDist < RADIUS - 10) {
+        // Ondas de radar concêntricas em expansão ao redor do alvo
         ctx.save();
+        ctx.strokeStyle = `rgba(255, 215, 0, ${0.85 - 0.7 * pulse})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(wx, wy, 8 + pulse * 12, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Diamante dourado de objetivo
         ctx.translate(wx, wy);
         ctx.rotate(Math.PI / 4);
         ctx.fillStyle = "#ffe26a";
         ctx.strokeStyle = "#181305";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.rect(-rPulse * 0.65, -rPulse * 0.65, rPulse * 1.3, rPulse * 1.3);
+        ctx.rect(-rPulse * 0.7, -rPulse * 0.7, rPulse * 1.4, rPulse * 1.4);
         ctx.stroke();
         ctx.fill();
         ctx.restore();
+
+        // Texto de distância em metros acima do marcador
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.strokeStyle = "#101010";
+        ctx.lineWidth = 3;
+        ctx.strokeText(`${distM}m`, wx, wy - 11);
+        ctx.fillStyle = "#ffe26a";
+        ctx.fillText(`${distM}m`, wx, wy - 11);
       } else {
+        // Marcador indicador na borda com seta direcionada
         const wAngle = Math.atan2(wy - SIZE / 2, wx - SIZE / 2);
-        const ex = SIZE / 2 + Math.cos(wAngle) * (RADIUS - 6);
-        const ey = SIZE / 2 + Math.sin(wAngle) * (RADIUS - 6);
+        const ex = SIZE / 2 + Math.cos(wAngle) * (RADIUS - 8);
+        const ey = SIZE / 2 + Math.sin(wAngle) * (RADIUS - 8);
         ctx.save();
         ctx.translate(ex, ey);
         ctx.rotate(wAngle);
@@ -214,14 +245,46 @@ export class Minimap {
         ctx.strokeStyle = "#181305";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(7, 0);
-        ctx.lineTo(-4, -5.5);
-        ctx.lineTo(-4, 5.5);
+        ctx.moveTo(8, 0);
+        ctx.lineTo(-5, -6);
+        ctx.lineTo(-5, 6);
         ctx.closePath();
         ctx.stroke();
         ctx.fill();
         ctx.restore();
+
+        // Distância em metros ligeiramente recuada da borda
+        const distDist = RADIUS - 22;
+        const tx = SIZE / 2 + Math.cos(wAngle) * distDist;
+        const ty = SIZE / 2 + Math.sin(wAngle) * distDist;
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.strokeStyle = "#101010";
+        ctx.lineWidth = 3;
+        ctx.strokeText(`${distM}m`, tx, ty + 4);
+        ctx.fillStyle = "#ffe26a";
+        ctx.fillText(`${distM}m`, tx, ty + 4);
       }
+
+      // Tarja informativa de missão ativa no topo do minimapa
+      ctx.save();
+      ctx.fillStyle = "rgba(13, 18, 16, 0.88)";
+      ctx.strokeStyle = "#d2a969aa";
+      ctx.lineWidth = 1;
+      const bW = 104;
+      const bH = 17;
+      const bX = SIZE / 2 - bW / 2;
+      const bY = 8;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(bX, bY, bW, bH, 3) : ctx.rect(bX, bY, bW, bH);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = "bold 10px Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#ffe26a";
+      ctx.fillText(`✦ ALVO: ${distM}m`, SIZE / 2, bY + 12);
+      ctx.restore();
     }
 
     // jogador: seta apontando para onde o personagem olha

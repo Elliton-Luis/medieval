@@ -492,3 +492,304 @@ kbd { display: inline-block; padding: 3px 6px; border: 1px solid #e8e1c933; bord
 @media (max-width: 1100px) { .slot { width: 52px; height: 52px; } .slot canvas { left: 6px; top: 5px; width: 38px; height: 38px; } }
 
 .controls-card { max-width: 560px; }
+
+/* ============================================================================
+   Banner de Missão Ativa no Topo (HUD de Alta Visibilidade com Distância)
+   ============================================================================ */
+.mission-hud {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 320px;
+  max-width: 520px;
+  padding: 10px 18px;
+  background: rgba(13, 18, 16, 0.94);
+  border: 2px solid #d2a969dd;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  animation: missionPulse 4s infinite ease-in-out;
+}
+.mission-hud[hidden] { display: none; }
+@keyframes missionPulse {
+  0%, 100% { border-color: #d2a969cc; box-shadow: 0 8px 30px rgba(0,0,0,0.8); }
+  50% { border-color: #ffd76aee; box-shadow: 0 8px 34px rgba(255, 215, 0, 0.25); }
+}
+.mission-hud-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.mission-hud-glyph {
+  color: #ffd27a;
+  font-size: 16px;
+  text-shadow: 0 0 10px #ffb84a;
+}
+.mission-hud-title {
+  flex: 1;
+  font: 700 16px Georgia, serif;
+  color: #fff4d6;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.mission-hud-dist {
+  background: rgba(212, 154, 58, 0.22);
+  border: 1px solid #f0cf7aaa;
+  color: #ffd76a;
+  font: 800 12px ui-monospace, monospace;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: .06em;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.mission-hud-desc {
+  font: 500 13px Georgia, serif;
+  color: #ddd1b4;
+  letter-spacing: .02em;
+  line-height: 1.35;
+}
+
+/* ============================================================================
+   Hub de Construção Medieval (Modal Tecla C - Catálogo de 10 Estruturas)
+   ============================================================================ */
+.build-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 8, 0.82);
+  backdrop-filter: blur(5px);
+  padding: 20px;
+}
+.build-panel[hidden] { display: none; }
+
+.build-modal-box {
+  width: 100%;
+  max-width: 1060px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d1310fa;
+  border: 2px solid #d2a969ee;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95);
+  overflow: hidden;
+}
+
+.build-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: #141c17;
+  border-bottom: 2px solid #d2a96955;
+  flex-wrap: wrap;
+}
+.build-title-wrap h2 {
+  font: 700 24px Georgia, serif;
+  color: #fff4d6;
+  letter-spacing: .06em;
+  margin: 2px 0 3px;
+}
+.build-subtitle {
+  font-size: 13px;
+  color: #ccbfa0;
+  margin: 0;
+}
+.build-funds-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.build-funds-row .funds-label {
+  font: 700 11px sans-serif;
+  letter-spacing: .12em;
+  color: #d2a969;
+}
+.build-close-btn {
+  background: #221414;
+  border: 1px solid #e06050aa;
+  color: #ff9080;
+  font-size: 18px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.build-close-btn:hover { background: #441818; color: #fff; }
+
+.build-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #101612;
+  border-bottom: 1px solid #d2a96933;
+}
+.build-tab {
+  background: #18221c;
+  border: 1px solid #d2a96944;
+  border-radius: 4px;
+  color: #d6cab0;
+  font: 700 12px Georgia, serif;
+  letter-spacing: .06em;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.build-tab:hover { background: #243229; color: #fff; }
+.build-tab.active {
+  background: #d49a3a;
+  border-color: #ffd76a;
+  color: #120e06;
+  font-weight: 800;
+}
+
+.build-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.build-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #121a15;
+  border: 1px solid #d2a96955;
+  border-radius: 6px;
+  padding: 14px;
+  gap: 12px;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+.build-card:hover {
+  transform: translateY(-2px);
+  border-color: #f0cf7a;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+}
+.build-card.unaffordable {
+  opacity: 0.72;
+}
+
+.build-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.build-card-icon {
+  font-size: 28px;
+  line-height: 1;
+  background: #1a241e;
+  border: 1px solid #d2a96944;
+  border-radius: 6px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.build-card-title-wrap {
+  flex: 1;
+}
+.build-card-title {
+  font: 700 16px Georgia, serif;
+  color: #fff4d6;
+  margin: 0 0 4px;
+}
+.build-card-desc {
+  font: 400 12px Georgia, serif;
+  color: #bbb094;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.build-card-costs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cost-tag {
+  font: 700 11px ui-monospace, monospace;
+  padding: 3px 7px;
+  border-radius: 3px;
+  letter-spacing: .04em;
+}
+.cost-tag.ok {
+  background: #1b3322;
+  border: 1px solid #48995a;
+  color: #8be09f;
+}
+.cost-tag.missing {
+  background: #331a1a;
+  border: 1px solid #994848;
+  color: #e08b8b;
+}
+
+.build-card-btn {
+  background: #d49a3a;
+  border: 1px solid #ffd76a;
+  border-radius: 4px;
+  color: #120e06;
+  font: 800 13px Georgia, serif;
+  letter-spacing: .06em;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: background .15s, transform .1s;
+}
+.build-card-btn:hover {
+  background: #f0cf7a;
+  transform: translateY(-1px);
+}
+.build-card.unaffordable .build-card-btn {
+  background: #3a3224;
+  border-color: #55442e;
+  color: #a89475;
+}
+
+.build-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: #141c17;
+  border-top: 2px solid #d2a96944;
+  flex-wrap: wrap;
+}
+.build-hint {
+  font-size: 12px;
+  color: #d6caa8;
+}
+.build-place-item-btn {
+  background: #1d2720;
+  border: 1px solid #d2a96988;
+  border-radius: 4px;
+  color: #f0cf7a;
+  font: 700 12px Georgia, serif;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.build-place-item-btn:hover {
+  background: #2a3a2e;
+  border-color: #ffd76a;
+  color: #fff;
+}

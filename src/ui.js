@@ -1,5 +1,5 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
-import { drawWeaponIcon } from "./weapondata.js?v=16";
+import { drawWeaponIcon } from "./weapondata.js?v=17";
 
 export class GameUI {
   constructor(renderer) {
@@ -54,6 +54,24 @@ export class GameUI {
     this.chargeFill = document.getElementById("charge-fill");
     this.controls = document.getElementById("controls-card");
     this.prompt = document.getElementById("prompt");
+    this.missionHud = document.getElementById("mission-hud");
+    this.missionHudTitle = document.getElementById("mission-hud-title");
+    this.missionHudDist = document.getElementById("mission-hud-dist");
+    this.missionHudDesc = document.getElementById("mission-hud-desc");
+    this._activeMissionState = null;
+
+    // Hub Modal de Construção (Tecla C - 10 Obras)
+    this.buildPanel = document.getElementById("build-panel");
+    this.buildGrid = document.getElementById("build-grid");
+    this.buildWood = document.getElementById("build-wood");
+    this.buildStone = document.getElementById("build-stone");
+    this.buildHay = document.getElementById("build-hay");
+    this.buildClose = document.getElementById("build-close");
+    this.buildTabs = document.getElementById("build-tabs");
+    this.buildPlaceItemBtn = document.getElementById("build-place-item-btn");
+    this._buildActiveTab = "all";
+    this.onBuildClose = null;
+
     this.candleText = document.getElementById("candle-text");
     this.candleCount = document.getElementById("candle-count");
     this.candleStat = document.getElementById("candle-stat");
@@ -193,12 +211,163 @@ export class GameUI {
   }
 
   setMissionStatus(missionState) {
+    this._activeMissionState = missionState;
     if (missionState && missionState.activeId) {
       this._missionBannerText = `✦ ${missionState.title}: ${missionState.objectiveText || "Siga o marcador dourado"}`;
+      if (this.missionHud) {
+        this.missionHud.hidden = false;
+        if (this.missionHudTitle) this.missionHudTitle.textContent = missionState.title || "MISSÃO";
+        if (this.missionHudDesc) this.missionHudDesc.textContent = missionState.objectiveText || "Siga o marcador no minimapa";
+      }
     } else {
       this._missionBannerText = "";
+      if (this.missionHud) this.missionHud.hidden = true;
     }
     this.setPrompt("");
+  }
+
+  updateMissionHud(playerPos) {
+    if (!this.missionHud || this.missionHud.hidden || !this._activeMissionState?.activeId || !playerPos) return;
+
+    let targetX = null;
+    let targetZ = null;
+    const ms = this._activeMissionState;
+    if (ms.targetLocation) {
+      targetX = ms.targetLocation.x ?? 0;
+      targetZ = ms.targetLocation.z ?? 0;
+    } else if (ms.targetNPC) {
+      const root = ms.targetNPC.root || ms.targetNPC;
+      targetX = root.position ? root.position.x : root.x;
+      targetZ = root.position ? root.position.z : root.z;
+    }
+
+    if (targetX !== null && targetZ !== null && this.missionHudDist) {
+      const px = playerPos.x ?? playerPos.position?.x ?? 0;
+      const pz = playerPos.z ?? playerPos.position?.z ?? 0;
+      const dist = Math.round(Math.hypot(targetX - px, targetZ - pz));
+      this.missionHudDist.textContent = `${dist}m`;
+    }
+  }
+
+  showBuildHub(catalog, playerInventory, onSelectCallback, onPlaceItemCallback) {
+    if (!this.buildPanel) return;
+
+    this._buildActiveTab = "all";
+    if (this.buildWood) this.buildWood.textContent = String(playerInventory?.wood ?? 0);
+    if (this.buildStone) this.buildStone.textContent = String(playerInventory?.stone ?? 0);
+    if (this.buildHay) this.buildHay.textContent = String(playerInventory?.hay ?? 0);
+
+    if (this.buildTabs) {
+      const tabs = this.buildTabs.querySelectorAll(".build-tab");
+      tabs.forEach((tab) => {
+        tab.onclick = () => {
+          tabs.forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          this._buildActiveTab = tab.getAttribute("data-tab") || "all";
+          this._renderBuildGrid(catalog, playerInventory, this._buildActiveTab, onSelectCallback);
+        };
+      });
+    }
+
+    if (this.buildPlaceItemBtn) {
+      this.buildPlaceItemBtn.onclick = () => {
+        this.closeBuildHub();
+        onPlaceItemCallback?.();
+      };
+    }
+
+    if (this.buildClose) {
+      this.buildClose.onclick = () => this.closeBuildHub();
+    }
+
+    this._renderBuildGrid(catalog, playerInventory, "all", onSelectCallback);
+    this.buildPanel.hidden = false;
+    document.exitPointerLock?.();
+  }
+
+  closeBuildHub() {
+    if (!this.buildPanel || this.buildPanel.hidden) return;
+    this.buildPanel.hidden = true;
+    this.onBuildClose?.();
+  }
+
+  _renderBuildGrid(catalog, playerInventory, tab = "all", onSelectCallback) {
+    if (!this.buildGrid) return;
+    this.buildGrid.replaceChildren();
+
+    const inv = playerInventory || { wood: 0, stone: 0, hay: 0 };
+    const entries = Object.entries(catalog);
+
+    for (let i = 0; i < entries.length; i++) {
+      const [type, item] = entries[i];
+      if (tab === "vila" && item.category !== "VILA") continue;
+      if (tab === "defesa" && item.category !== "DEFESA") continue;
+
+      const card = document.createElement("div");
+      card.className = "build-card";
+
+      const hasWood = (inv.wood || 0) >= (item.wood || 0);
+      const hasStone = (inv.stone || 0) >= (item.stone || 0);
+      const hasHay = (inv.hay || 0) >= (item.hay || 0);
+      const canAfford = hasWood && hasStone && hasHay;
+
+      if (!canAfford) card.classList.add("unaffordable");
+
+      const head = document.createElement("div");
+      head.className = "build-card-head";
+
+      const iconBox = document.createElement("span");
+      iconBox.className = "build-card-icon";
+      iconBox.textContent = item.icon || "🏠";
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "build-card-title-wrap";
+
+      const title = document.createElement("h3");
+      title.className = "build-card-title";
+      title.textContent = item.label || type;
+
+      const desc = document.createElement("p");
+      desc.className = "build-card-desc";
+      desc.textContent = item.desc || "";
+
+      titleWrap.append(title, desc);
+      head.append(iconBox, titleWrap);
+
+      const costsRow = document.createElement("div");
+      costsRow.className = "build-card-costs";
+
+      if (item.wood) {
+        const tag = document.createElement("span");
+        tag.className = `cost-tag ${hasWood ? "ok" : "missing"}`;
+        tag.textContent = `♣ ${item.wood} Mad (${inv.wood || 0})`;
+        costsRow.append(tag);
+      }
+      if (item.stone) {
+        const tag = document.createElement("span");
+        tag.className = `cost-tag ${hasStone ? "ok" : "missing"}`;
+        tag.textContent = `◆ ${item.stone} Ped (${inv.stone || 0})`;
+        costsRow.append(tag);
+      }
+      if (item.hay) {
+        const tag = document.createElement("span");
+        tag.className = `cost-tag ${hasHay ? "ok" : "missing"}`;
+        tag.textContent = `❖ ${item.hay} Feno (${inv.hay || 0})`;
+        costsRow.append(tag);
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "build-card-btn";
+      btn.textContent = canAfford ? "PROJETAR & ERGUER" : "RECURSOS INSUFICIENTES";
+      btn.onclick = () => {
+        this.closeBuildHub();
+        onSelectCallback?.(type);
+      };
+
+      card.append(head, costsRow, btn);
+      this.buildGrid.append(card);
+    }
   }
 
   setWanted(level) {

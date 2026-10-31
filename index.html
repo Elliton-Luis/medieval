@@ -79,6 +79,50 @@
 
       <div id="loading" class="loading"><span class="loading-seal">✦</span><span>PREPARANDO AS TERRAS...</span></div>
       <div id="notice" class="notice">Clique no mundo para capturar o mouse · ESC libera</div>
+
+      <!-- Banner de Missão Ativa no topo da tela com distância em tempo real -->
+      <section id="mission-hud" class="mission-hud" hidden>
+        <div class="mission-hud-top">
+          <span class="mission-hud-glyph">✦</span>
+          <span id="mission-hud-title" class="mission-hud-title">MISSÃO</span>
+          <span id="mission-hud-dist" class="mission-hud-dist">0m</span>
+        </div>
+        <div id="mission-hud-desc" class="mission-hud-desc">Siga o marcador no minimapa</div>
+      </section>
+
+      <!-- Hub de Construção Medieval (Tecla C) com Catálogo de 10 Estruturas -->
+      <section id="build-panel" class="build-panel" role="dialog" aria-modal="true" aria-labelledby="build-title" hidden>
+        <div class="build-modal-box">
+          <header class="build-modal-header">
+            <div class="build-title-wrap">
+              <span class="eyebrow">REINO DE CALDERA · ARQUITETURA</span>
+              <h2 id="build-title">PROJETOS DE CONSTRUÇÃO</h2>
+              <p class="build-subtitle">Selecione uma estrutura para projetar no terreno e erguer com o martelo.</p>
+            </div>
+            <div class="build-funds-row">
+              <span class="funds-label">RECURSOS:</span>
+              <span class="fund-badge"><i class="glyph">♣</i> <strong id="build-wood">0</strong> Madeira</span>
+              <span class="fund-badge"><i class="glyph">◆</i> <strong id="build-stone">0</strong> Pedra</span>
+              <span class="fund-badge"><i class="glyph">❖</i> <strong id="build-hay">0</strong> Feno</span>
+              <button id="build-close" class="build-close-btn" type="button" aria-label="Fechar">✕</button>
+            </div>
+          </header>
+
+          <nav id="build-tabs" class="build-tabs" role="tablist">
+            <button type="button" class="build-tab active" data-tab="all">TODAS AS OBRAS (10)</button>
+            <button type="button" class="build-tab" data-tab="vila">HABITAÇÃO & VILA</button>
+            <button type="button" class="build-tab" data-tab="defesa">DEFESA & TRABALHO</button>
+          </nav>
+
+          <div id="build-grid" class="build-grid"></div>
+
+          <footer class="build-footer">
+            <span class="build-hint">💡 Dica: Ao escolher uma obra, mova o holograma verde pelo terreno e clique com <strong>Botão Esquerdo</strong> ou <strong>E</strong> para erguer.</span>
+            <button id="build-place-item-btn" class="build-place-item-btn" type="button">📌 Fixar Tocha ou Arma na Parede / Chão</button>
+          </footer>
+        </div>
+      </section>
+
       <section id="dialogue-panel" class="dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="dialogue-title" hidden>
         <button id="dialogue-close" class="dialogue-close" type="button" aria-label="Fechar">×</button>
         <div class="dialogue-layout">
@@ -116,6 +160,6 @@
       <div id="prompt" class="prompt" hidden></div>
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
-    <script type="module" src="./src/main.js?v=16"></script>
+    <script type="module" src="./src/main.js?v=17"></script>
   </body>
 </html>

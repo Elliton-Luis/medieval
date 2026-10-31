@@ -1083,8 +1083,118 @@ function _registerHarvestedInstance(mesh, instanceId) {
   });
 }
 
+const _treeChopProgress = new Map();
+const _fallingTrees = [];
+
+function _spawnFallingTree(instancedMesh, instanceId, player, hitPt) {
+  const item = instancedMesh.userData?.items?.[instanceId];
+  if (!_env.scene) return;
+
+  const bx = item ? item.x : (hitPt?.x ?? 0);
+  const by = item ? (item.y ?? 0) : (hitPt?.y ?? 0);
+  const bz = item ? item.z : (hitPt?.z ?? 0);
+  const rotY = item ? (item.rotation ?? 0) : 0;
+  const scale = item ? (item.scale ?? 1.0) : 1.0;
+
+  // Direção de queda para longe do jogador
+  const px = player?.x ?? player?.position?.x ?? (bx - 1);
+  const pz = player?.z ?? player?.position?.z ?? (bz - 1);
+  let fwdX = bx - px;
+  let fwdZ = bz - pz;
+  const len = Math.hypot(fwdX, fwdZ) || 1;
+  fwdX /= len;
+  fwdZ /= len;
+
+  // Eixo perpendicular de rotação horizontal
+  const axis = new THREE.Vector3(-fwdZ, 0, fwdX).normalize();
+
+  const pivot = new THREE.Group();
+  pivot.position.set(bx, by, bz);
+
+  const treeMesh = new THREE.Mesh(instancedMesh.geometry, instancedMesh.material);
+  treeMesh.rotation.set(0, rotY, 0);
+  treeMesh.scale.set(scale, scale, scale);
+  treeMesh.castShadow = true;
+  pivot.add(treeMesh);
+
+  _env.scene.add(pivot);
+
+  _fallingTrees.push({
+    pivot,
+    mesh: treeMesh,
+    axis,
+    elapsed: 0,
+    duration: 1.25, // ~1.25s de tombo físico suave
+    baseX: bx,
+    baseY: by,
+    baseZ: bz,
+    fwdX,
+    fwdZ,
+    scale,
+    species: instancedMesh.userData?.species,
+  });
+}
+
+/**
+ * Atualiza a física de rotação e impacto no solo de árvores derrubadas.
+ */
+export function updateFallingTrees(dt) {
+  if (_fallingTrees.length === 0) return;
+
+  for (let i = _fallingTrees.length - 1; i >= 0; i--) {
+    const fTree = _fallingTrees[i];
+    fTree.elapsed += dt;
+    const progress = Math.min(1.0, fTree.elapsed / fTree.duration);
+
+    // Queda física acelerada por gravidade (ease-in 1.85)
+    const angle = Math.pow(progress, 1.85) * (Math.PI * 0.49);
+    fTree.pivot.quaternion.setFromAxisAngle(fTree.axis, angle);
+
+    if (progress >= 1.0) {
+      // Impacto estrondoso no solo com poeira e detritos
+      playWoodChopSound();
+      const topDist = fTree.scale * 3.6;
+      const hitX = fTree.baseX + fTree.fwdX * topDist;
+      const hitZ = fTree.baseZ + fTree.fwdZ * topDist;
+      const hitY = _env.world ? _env.world.heightAt(hitX, hitZ) : fTree.baseY;
+
+      if (_env.effects) {
+        _env.effects.play("dust", hitX, hitY + 0.35, hitZ, "#63472d", 2.2);
+        _env.effects.play(
+          "dust",
+          fTree.baseX + fTree.fwdX * (topDist * 0.5),
+          fTree.baseY + 0.25,
+          fTree.baseZ + fTree.fwdZ * (topDist * 0.5),
+          "#8c6742",
+          1.5,
+        );
+      }
+
+      // Concede madeira e feno após o tombo físico completo
+      const gainedWood = Math.floor(Math.random() * 3) + 2;
+      PlayerInventory.wood += gainedWood;
+      const gainedHay = fTree.species === "bush" || Math.random() < 0.5 ? 1 : 0;
+      if (gainedHay > 0) {
+        PlayerInventory.hay += gainedHay;
+        PlayerStats.hay = PlayerInventory.hay;
+      }
+      _env.ui?.showToast?.(
+        `+${gainedWood} Madeira${gainedHay ? " · +1 Feno" : ""} (Total: ${PlayerInventory.wood} Mad)`,
+      );
+      syncPlayerStatsToPlayer();
+
+      if (_env.scene) {
+        _env.scene.remove(fTree.pivot);
+      }
+      fTree.pivot.remove(fTree.mesh);
+      _fallingTrees.splice(i, 1);
+    }
+  }
+}
+
 /**
  * Ação de bater com a ferramenta em árvores ou pedras.
+ * Árvores agora requerem 4 golpes de machado para tombar fisicamente!
  * @param {object} player
  * @param {'AXE'|'PICKAXE'} toolType
  * @param {Array<THREE.InstancedMesh>} [environmentInstancedMeshes]
@@ -1094,31 +1204,36 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
   if (!hit || hit.instanceId === undefined) return false;
 
   if (toolType === "AXE" && hit.object.name === "Trees") {
-    const gainedWood = Math.floor(Math.random() * 3) + 1;
-    PlayerInventory.wood += gainedWood;
-    const gainedHay = hit.object.userData?.species === "bush" || Math.random() < 0.45 ? 1 : 0;
-    if (gainedHay > 0) {
-      PlayerInventory.hay += gainedHay;
-      PlayerStats.hay = PlayerInventory.hay;
+    const treeKey = `${hit.object.id}_${hit.instanceId}`;
+    const hits = (_treeChopProgress.get(treeKey) || 0) + 1;
+
+    const pt = hit.point || hit.object.userData?.items?.[hit.instanceId];
+
+    if (hits < 4) {
+      _treeChopProgress.set(treeKey, hits);
+      playWoodChopSound();
+      if (pt && _env.effects) {
+        _env.effects.play("dust", pt.x, (pt.y ?? 0) + 0.8, pt.z, "#c29b67", 0.75);
+      }
+      _env.ui?.showToast?.(`Golpeando árvore... (${hits}/4 cortes)`);
+      return true;
     }
+
+    // 4º Golpe: tomba a árvore suavemente por gravidade
+    _treeChopProgress.delete(treeKey);
     playWoodChopSound();
 
     _registerHarvestedInstance(hit.object, hit.instanceId);
 
-    // "Derruba" a árvore encolhendo sua instância para 0 (Zero-GC)
+    // Oculta a árvore instanciada imediatamente
     hit.object.getMatrixAt(hit.instanceId, _dummyMatrix);
     _dummyMatrix.scale(_zeroScale);
     hit.object.setMatrixAt(hit.instanceId, _dummyMatrix);
     hit.object.instanceMatrix.needsUpdate = true;
 
-    const pt = hit.point || hit.object.userData?.items?.[hit.instanceId];
-    if (pt && _env.effects) {
-      _env.effects.play("dust", pt.x, (pt.y ?? 0) + 0.8, pt.z, "#a67d4b", 1.1);
-    }
-    _env.ui?.showToast?.(
-      `+${gainedWood} Madeira${gainedHay ? " · +1 Feno" : ""} (Madeira: ${PlayerInventory.wood})`,
-    );
-    syncPlayerStatsToPlayer();
+    // Dispara a árvore tombando em direção oposta ao jogador
+    _spawnFallingTree(hit.object, hit.instanceId, player, pt);
+    _env.ui?.showToast?.(`Árvore caindo! (4/4)`);
     return true;
   } else if (toolType === "PICKAXE" && hit.object.name === "Rocks") {
     const gainedStone = Math.floor(Math.random() * 2) + 1;
@@ -1144,12 +1259,90 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
 }
 
 // ============================================================================
-// 11. Modo Construção, Pool de Estruturas do Jogador e Empregos de Camponês
+// 11. Modo Construção: Catálogo de 10 Estruturas, Pool e Preview Holográfico
 // ============================================================================
 export const BUILD_COSTS = {
-  HOUSE: { wood: 20, stone: 10 },
-  CORRAL: { wood: 10, hay: 5 },
-  TORCH_STAND: { wood: 1, hay: 1 },
+  CABIN: {
+    wood: 12,
+    stone: 4,
+    label: "Cabana Rústica",
+    desc: "Refúgio de caçador com paredes de toras de carvalho e teto inclinado.",
+    category: "VILA",
+    icon: "⛺",
+  },
+  HOUSE: {
+    wood: 20,
+    stone: 10,
+    label: "Casa de Enxaimel",
+    desc: "Residência nobre de dois pisos com mobília, cama, lareira e baú.",
+    category: "VILA",
+    icon: "🏠",
+  },
+  CORRAL: {
+    wood: 10,
+    hay: 5,
+    label: "Curral de Cavalos",
+    desc: "Cercado resistente com porteira frontal e cocho de feno para montarias.",
+    category: "DEFESA",
+    icon: "🐎",
+  },
+  BARN: {
+    wood: 18,
+    stone: 6,
+    hay: 8,
+    label: "Celeiro / Depósito",
+    desc: "Galpão amplo com base de cantaria, teto de palha e fardos armazenados.",
+    category: "DEFESA",
+    icon: "🛖",
+  },
+  WATCHTOWER: {
+    wood: 22,
+    stone: 8,
+    label: "Torre de Vigia",
+    desc: "Alta torre de sentinela com escadaria e plataforma com parapeito elevado.",
+    category: "DEFESA",
+    icon: "🏰",
+  },
+  WALL_GATE: {
+    wood: 14,
+    stone: 4,
+    label: "Paliçada com Portão",
+    desc: "Muralha de toras afiadas fortificadas com portal de entrada e vigas.",
+    category: "DEFESA",
+    icon: "🛡️",
+  },
+  BLACKSMITH_SHED: {
+    wood: 15,
+    stone: 12,
+    label: "Forja do Ferreiro",
+    desc: "Oficina rústica com fornalha de pedra, bigorna de ferro e bancada.",
+    category: "DEFESA",
+    icon: "⚒️",
+  },
+  WELL: {
+    wood: 6,
+    stone: 14,
+    label: "Poço de Cantaria",
+    desc: "Poço circular de pedra esculpida com roldana de madeira e balde suspenso.",
+    category: "VILA",
+    icon: "🪣",
+  },
+  TORCH_POST: {
+    wood: 4,
+    hay: 2,
+    label: "Poste de Iluminação",
+    desc: "Poste alto de madeira com suporte de ferro forjado e tocha permanente.",
+    category: "VILA",
+    icon: "🏮",
+  },
+  CAMPFIRE: {
+    wood: 6,
+    stone: 6,
+    label: "Fogueira de Acampamento",
+    desc: "Círculo de pedras com brasas ardentes e troncos rústicos para assento.",
+    category: "VILA",
+    icon: "🔥",
+  },
 };
 
 export const CRAFT_DURABILITY = {
@@ -1334,12 +1527,549 @@ function _buildPlayerHouseMesh() {
   return group;
 }
 
+function _buildPlayerCabinMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x77796d, roughness: 0.95, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4e3620, roughness: 0.92, flatShading: true });
+  const logMat = new THREE.MeshStandardMaterial({ color: 0x3d2915, roughness: 0.95, flatShading: true });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x6e3d2c, roughness: 0.9, flatShading: true });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a5b3a, roughness: 0.9, flatShading: true });
+  const rugMat = new THREE.MeshStandardMaterial({ color: 0x2a5435, roughness: 0.95, flatShading: true });
+
+  // Fundação baixa de pedra
+  const found = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.4, 3.2), stoneMat);
+  found.position.set(0, 0.1, 0);
+  found.castShadow = true;
+  group.add(found);
+
+  // Piso de tábuas
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 2.9), floorMat);
+  floor.position.set(0, 0.25, 0);
+  group.add(floor);
+
+  // Paredes de toras de carvalho
+  const backW = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 0.26), logMat);
+  backW.position.set(0, 1.35, -1.35);
+  backW.castShadow = true;
+  group.add(backW);
+
+  const leftW = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.2, 2.9), logMat);
+  leftW.position.set(-1.7, 1.35, 0);
+  leftW.castShadow = true;
+  group.add(leftW);
+
+  const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.2, 2.9), logMat);
+  rightW.position.set(1.7, 1.35, 0);
+  rightW.castShadow = true;
+  group.add(rightW);
+
+  // Fachada com vão de porta
+  const frontL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.26), logMat);
+  frontL.position.set(-1.15, 1.35, 1.35);
+  frontL.castShadow = true;
+  group.add(frontL);
+
+  const frontR = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.26), logMat);
+  frontR.position.set(1.15, 1.35, 1.35);
+  frontR.castShadow = true;
+  group.add(frontR);
+
+  const header = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.45, 0.28), timberMat);
+  header.position.set(0, 2.2, 1.35);
+  group.add(header);
+
+  // Telhado inclinado de duas águas
+  for (const side of [-1, 1]) {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 3.4), roofMat);
+    slope.position.set(side * 1.0, 2.8, 0);
+    slope.rotation.z = -side * 0.48;
+    slope.castShadow = true;
+    group.add(slope);
+  }
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 3.5), timberMat);
+  ridge.position.set(0, 3.25, 0);
+  group.add(ridge);
+
+  // Interior: banqueta e tapete de caça
+  const rug = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.02, 1.2), rugMat);
+  rug.position.set(0, 0.31, 0);
+  group.add(rug);
+
+  const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.45, 6), timberMat);
+  stool.position.set(0.9, 0.48, -0.6);
+  group.add(stool);
+
+  group.visible = false;
+  group.userData = { type: "CABIN", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerBarnMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6e6e66, roughness: 0.95, flatShading: true });
+  const woodPlankMat = new THREE.MeshStandardMaterial({ color: 0x543b23, roughness: 0.9, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x3d2714, roughness: 0.92, flatShading: true });
+  const hayMat = new THREE.MeshStandardMaterial({ color: 0xdfbe60, roughness: 0.9, flatShading: true });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a4530, roughness: 0.88, flatShading: true });
+
+  // Base reforçada de cantaria
+  const base = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.6, 5.0), stoneMat);
+  base.position.set(0, 0.25, 0);
+  base.castShadow = true;
+  group.add(base);
+
+  // Paredes altas de celeiro
+  const backW = new THREE.Mesh(new THREE.BoxGeometry(5.9, 3.5, 0.25), woodPlankMat);
+  backW.position.set(0, 2.1, -2.3);
+  backW.castShadow = true;
+  group.add(backW);
+
+  const leftW = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.5, 4.6), woodPlankMat);
+  leftW.position.set(-2.9, 2.1, 0);
+  leftW.castShadow = true;
+  group.add(leftW);
+
+  const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.5, 4.6), woodPlankMat);
+  rightW.position.set(2.9, 2.1, 0);
+  rightW.castShadow = true;
+  group.add(rightW);
+
+  // Frente com grande vão de carga
+  const frontL = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3.5, 0.25), woodPlankMat);
+  frontL.position.set(-1.95, 2.1, 2.3);
+  frontL.castShadow = true;
+  group.add(frontL);
+
+  const frontR = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3.5, 0.25), woodPlankMat);
+  frontR.position.set(1.95, 2.1, 2.3);
+  frontR.castShadow = true;
+  group.add(frontR);
+
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 0.32), timberMat);
+  lintel.position.set(0, 3.5, 2.3);
+  group.add(lintel);
+
+  // Pilares mestres nos cantos
+  for (const cx of [-2.95, 2.95]) {
+    for (const cz of [-2.35, 2.35]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.8, 0.35), timberMat);
+      post.position.set(cx, 2.1, cz);
+      group.add(post);
+    }
+  }
+
+  // Telhado alto de duas águas
+  for (const side of [-1, 1]) {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.16, 5.3), roofMat);
+    slope.position.set(side * 1.55, 4.5, 0);
+    slope.rotation.z = -side * 0.58;
+    slope.castShadow = true;
+    group.add(slope);
+  }
+
+  // Fardos de feno empilhados no interior
+  for (let fx = -1.8; fx <= -0.8; fx += 0.9) {
+    for (let fz = -1.4; fz <= 0.4; fz += 0.8) {
+      const bale = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.7), hayMat);
+      bale.position.set(fx, 0.75, fz);
+      group.add(bale);
+    }
+  }
+
+  group.visible = false;
+  group.userData = { type: "BARN", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerWatchtowerMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x73746c, roughness: 0.95, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x46321d, roughness: 0.92, flatShading: true });
+  const plankMat = new THREE.MeshStandardMaterial({ color: 0x6e5132, roughness: 0.9, flatShading: true });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x69392b, roughness: 0.9, flatShading: true });
+
+  // 4 sapatas de pedra nas bases
+  for (const px of [-1.3, 1.3]) {
+    for (const pz of [-1.3, 1.3]) {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.55), stoneMat);
+      foot.position.set(px, 0.25, pz);
+      group.add(foot);
+
+      // Pilares mestres subindo 6.2 metros
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 6.2, 0.28), timberMat);
+      post.position.set(px, 3.4, pz);
+      post.castShadow = true;
+      group.add(post);
+    }
+  }
+
+  // Travessas horizontais de reforço
+  for (const hy of [2.0, 4.2]) {
+    const beamF = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 0.18), timberMat);
+    beamF.position.set(0, hy, 1.3);
+    group.add(beamF);
+    const beamB = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 0.18), timberMat);
+    beamB.position.set(0, hy, -1.3);
+    group.add(beamB);
+    const beamL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 2.8), timberMat);
+    beamL.position.set(-1.3, hy, 0);
+    group.add(beamL);
+    const beamR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 2.8), timberMat);
+    beamR.position.set(1.3, hy, 0);
+    group.add(beamR);
+  }
+
+  // Plataforma superior de vigia (em y = 5.2m)
+  const platform = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.18, 3.3), plankMat);
+  platform.position.set(0, 5.2, 0);
+  platform.castShadow = true;
+  group.add(platform);
+
+  // Parapeito de proteção com frestas de tiro
+  const railF = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.95, 0.14), plankMat);
+  railF.position.set(0, 5.75, 1.58);
+  group.add(railF);
+  const railB = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.95, 0.14), plankMat);
+  railB.position.set(0, 5.75, -1.58);
+  group.add(railB);
+  const railL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.95, 3.1), plankMat);
+  railL.position.set(-1.58, 5.75, 0);
+  group.add(railL);
+  const railR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.95, 3.1), plankMat);
+  railR.position.set(1.58, 5.75, 0);
+  group.add(railR);
+
+  // Telhadinho piramidal 4 águas no topo
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.4, 4), roofMat);
+  roof.position.set(0, 6.9, 0);
+  roof.rotation.y = Math.PI / 4;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Escada rústica inclinada na lateral traseira
+  const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.65, 5.6, 0.12), timberMat);
+  ladder.position.set(0, 2.7, -1.55);
+  ladder.rotation.x = 0.22;
+  group.add(ladder);
+
+  group.visible = false;
+  group.userData = { type: "WATCHTOWER", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerWallGateMesh() {
+  const group = new THREE.Group();
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x48321e, roughness: 0.93, flatShading: true });
+  const logMat = new THREE.MeshStandardMaterial({ color: 0x3d2915, roughness: 0.95, flatShading: true });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x70706a, roughness: 0.95, flatShading: true });
+
+  // Paliçada de estacas pontiagudas laterais
+  const postGeo = new THREE.CylinderGeometry(0.12, 0.16, 3.2, 5);
+  for (let x = -3.4; x <= -1.2; x += 0.28) {
+    const post = new THREE.Mesh(postGeo, logMat);
+    post.position.set(x, 1.6, 0);
+    post.castShadow = true;
+    group.add(post);
+  }
+  for (let x = 1.2; x <= 3.4; x += 0.28) {
+    const post = new THREE.Mesh(postGeo, logMat);
+    post.position.set(x, 1.6, 0);
+    post.castShadow = true;
+    group.add(post);
+  }
+
+  // Traves horizontais de amarração
+  for (const hy of [0.9, 2.2]) {
+    const railL = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.14, 0.14), timberMat);
+    railL.position.set(-2.3, hy, -0.16);
+    group.add(railL);
+    const railR = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.14, 0.14), timberMat);
+    railR.position.set(2.3, hy, -0.16);
+    group.add(railR);
+  }
+
+  // Pilares do Portal Central
+  for (const gx of [-1.15, 1.15]) {
+    const gPost = new THREE.Mesh(new THREE.BoxGeometry(0.38, 3.8, 0.38), timberMat);
+    gPost.position.set(gx, 1.9, 0);
+    gPost.castShadow = true;
+    group.add(gPost);
+
+    const stoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.55), stoneMat);
+    stoneBase.position.set(gx, 0.2, 0);
+    group.add(stoneBase);
+  }
+
+  // Viga lintel superior e platibanda
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.32, 0.42), timberMat);
+  lintel.position.set(0, 3.65, 0);
+  group.add(lintel);
+
+  // Portões de madeira entreabertos
+  const gateL = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.5, 0.12), timberMat);
+  gateL.position.set(-0.6, 1.35, 0.2);
+  gateL.rotation.y = -0.35;
+  group.add(gateL);
+
+  const gateR = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.5, 0.12), timberMat);
+  gateR.position.set(0.6, 1.35, 0.2);
+  gateR.rotation.y = 0.35;
+  group.add(gateR);
+
+  group.visible = false;
+  group.userData = { type: "WALL_GATE", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerBlacksmithMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x686862, roughness: 0.95, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.92, flatShading: true });
+  const ironMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.65, roughness: 0.45, flatShading: true });
+  const fireMat = new THREE.MeshStandardMaterial({ color: 0xff5511, emissive: 0xff3300, emissiveIntensity: 1.5 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x5a3426, roughness: 0.9, flatShading: true });
+
+  // Piso rústico de pedras
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 3.8), stoneMat);
+  floor.position.set(0, 0.1, 0);
+  group.add(floor);
+
+  // 4 Pilares de carvalho
+  for (const px of [-1.9, 1.9]) {
+    for (const pz of [-1.6, 1.6]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.9, 0.24), timberMat);
+      post.position.set(px, 1.5, pz);
+      group.add(post);
+    }
+  }
+
+  // Telhado inclinado de uma água
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.14, 4.1), roofMat);
+  roof.position.set(0, 3.1, 0);
+  roof.rotation.x = -0.14;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Fornalha e chaminé de pedra no fundo
+  const forge = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.2), stoneMat);
+  forge.position.set(1.1, 0.7, -1.0);
+  group.add(forge);
+
+  const coals = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.8), fireMat);
+  coals.position.set(1.1, 1.28, -1.0);
+  group.add(coals);
+
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.65, 2.6, 0.65), stoneMat);
+  chimney.position.set(1.1, 2.6, -1.0);
+  group.add(chimney);
+
+  // Toco de tora com bigorna de ferro
+  const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.65, 7), timberMat);
+  stump.position.set(-0.6, 0.42, 0.2);
+  group.add(stump);
+
+  const anvilBase = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.32, 0.34), ironMat);
+  anvilBase.position.set(-0.6, 0.85, 0.2);
+  group.add(anvilBase);
+
+  const anvilHorn = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.38, 5), ironMat);
+  anvilHorn.position.set(-0.85, 0.95, 0.2);
+  anvilHorn.rotation.z = Math.PI / 2;
+  group.add(anvilHorn);
+
+  // Bancada de ferramentas e balde de têmpera
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.75, 0.7), timberMat);
+  bench.position.set(-1.1, 0.48, -1.1);
+  group.add(bench);
+
+  const tub = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.28, 0.55, 6), timberMat);
+  tub.position.set(0.1, 0.38, -1.1);
+  group.add(tub);
+
+  group.visible = false;
+  group.userData = { type: "BLACKSMITH_SHED", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerWellMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x777872, roughness: 0.95, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.92, flatShading: true });
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0x225577, roughness: 0.1, metalness: 0.1 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x6e3d2c, roughness: 0.9, flatShading: true });
+
+  // Brocal cilíndrico de pedras
+  const wellRim = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 0.85, 10, 1, true), stoneMat);
+  wellRim.position.set(0, 0.42, 0);
+  wellRim.castShadow = true;
+  group.add(wellRim);
+
+  const water = new THREE.Mesh(new THREE.CircleGeometry(1.05, 10), waterMat);
+  water.position.set(0, 0.25, 0);
+  water.rotation.x = -Math.PI / 2;
+  group.add(water);
+
+  // Pilares laterais de carvalho
+  for (const sx of [-1.15, 1.15]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.3, 0.18), timberMat);
+    post.position.set(sx, 1.25, 0);
+    group.add(post);
+  }
+
+  // Trave horizontal com roldana
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.16, 0.16), timberMat);
+  beam.position.set(0, 2.3, 0);
+  group.add(beam);
+
+  const spool = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.6, 8), timberMat);
+  spool.position.set(0, 2.1, 0);
+  spool.rotation.z = Math.PI / 2;
+  group.add(spool);
+
+  // Balde suspenso
+  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.32, 6), timberMat);
+  bucket.position.set(0, 1.35, 0);
+  group.add(bucket);
+
+  // Telhadinho de duas águas
+  for (const side of [-1, 1]) {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 1.8), roofMat);
+    slope.position.set(side * 0.62, 2.7, 0);
+    slope.rotation.z = -side * 0.52;
+    slope.castShadow = true;
+    group.add(slope);
+  }
+
+  group.visible = false;
+  group.userData = { type: "WELL", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerTorchPostMesh() {
+  const group = new THREE.Group();
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x48321e, roughness: 0.92, flatShading: true });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x73736c, roughness: 0.95, flatShading: true });
+  const ironMat = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, metalness: 0.6, roughness: 0.45 });
+  const fireMat = new THREE.MeshStandardMaterial({ color: 0xff7722, emissive: 0xff4400, emissiveIntensity: 2.0 });
+
+  // Sapata de pedra
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, 0.55), stoneMat);
+  base.position.set(0, 0.2, 0);
+  group.add(base);
+
+  // Mastro vertical de madeira
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 3.2, 6), timberMat);
+  post.position.set(0, 1.8, 0);
+  post.castShadow = true;
+  group.add(post);
+
+  // Suporte de ferro forjado
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.08, 0.08), ironMat);
+  bracket.position.set(0.24, 3.1, 0);
+  group.add(bracket);
+
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, 0.26, 6, 1, true), ironMat);
+  basket.position.set(0.48, 3.25, 0);
+  group.add(basket);
+
+  // Tocha permanente com chama
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 5), fireMat);
+  flame.position.set(0.48, 3.48, 0);
+  group.add(flame);
+
+  // Luz dinâmica da tocha construída
+  const torchLight = new THREE.PointLight(0xffaa44, 2.2, 14, 1.8);
+  torchLight.position.set(0.48, 3.55, 0);
+  torchLight.castShadow = false;
+  group.add(torchLight);
+
+  group.visible = false;
+  group.userData = { type: "TORCH_POST", collidersRegistered: false };
+  return group;
+}
+
+function _buildPlayerCampfireMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6e6e66, roughness: 0.95, flatShading: true });
+  const logMat = new THREE.MeshStandardMaterial({ color: 0x3d2714, roughness: 0.95, flatShading: true });
+  const ashMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1.0 });
+  const fireMat = new THREE.MeshStandardMaterial({ color: 0xff6611, emissive: 0xff3300, emissiveIntensity: 2.2 });
+
+  // Cinzas no solo
+  const ash = new THREE.Mesh(new THREE.CircleGeometry(0.75, 8), ashMat);
+  ash.position.set(0, 0.02, 0);
+  ash.rotation.x = -Math.PI / 2;
+  group.add(ash);
+
+  // Círculo de pedras arredondadas
+  const rockGeo = new THREE.DodecahedronGeometry(0.18, 0);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    const r = new THREE.Mesh(rockGeo, stoneMat);
+    r.position.set(Math.cos(ang) * 0.72, 0.12, Math.sin(ang) * 0.72);
+    group.add(r);
+  }
+
+  // Lenhas em cone no centro
+  const woodLogGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.75, 5);
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2;
+    const log = new THREE.Mesh(woodLogGeo, logMat);
+    log.position.set(Math.cos(ang) * 0.18, 0.22, Math.sin(ang) * 0.18);
+    log.rotation.z = 0.42;
+    log.rotation.y = ang;
+    group.add(log);
+  }
+
+  // Chama ardente
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.55, 6), fireMat);
+  flame.position.set(0, 0.38, 0);
+  group.add(flame);
+
+  // Luz suave da fogueira
+  const fireLight = new THREE.PointLight(0xff8833, 2.4, 16, 1.8);
+  fireLight.position.set(0, 0.55, 0);
+  group.add(fireLight);
+
+  // Dois troncos caídos de assento ao redor
+  const seatGeo = new THREE.CylinderGeometry(0.2, 0.22, 1.6, 6);
+  const seat1 = new THREE.Mesh(seatGeo, logMat);
+  seat1.position.set(0, 0.2, -1.35);
+  seat1.rotation.z = Math.PI / 2;
+  group.add(seat1);
+
+  const seat2 = new THREE.Mesh(seatGeo, logMat);
+  seat2.position.set(0, 0.2, 1.35);
+  seat2.rotation.z = Math.PI / 2;
+  group.add(seat2);
+
+  group.visible = false;
+  group.userData = { type: "CAMPFIRE", collidersRegistered: false };
+  return group;
+}
+
+export function buildStructureMeshByType(type) {
+  switch (type) {
+    case "CABIN": return _buildPlayerCabinMesh();
+    case "HOUSE": return _buildPlayerHouseMesh();
+    case "CORRAL": return _buildPlayerCorralMesh();
+    case "BARN": return _buildPlayerBarnMesh();
+    case "WATCHTOWER": return _buildPlayerWatchtowerMesh();
+    case "WALL_GATE": return _buildPlayerWallGateMesh();
+    case "BLACKSMITH_SHED": return _buildPlayerBlacksmithMesh();
+    case "WELL": return _buildPlayerWellMesh();
+    case "TORCH_POST": return _buildPlayerTorchPostMesh();
+    case "CAMPFIRE": return _buildPlayerCampfireMesh();
+    default: return _buildPlayerHouseMesh();
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Preview Holográfico 3D da Construção (Hologram / Blueprint Preview)
+// Suporta com precisão as 10 estruturas medievais!
 // ----------------------------------------------------------------------------
 let _buildPreviewGroup = null;
-let _previewHouseGroup = null;
-let _previewCorralGroup = null;
+const _previewGroupsMap = new Map();
 const _previewGreenMat = new THREE.MeshBasicMaterial({ color: 0x3cd070, transparent: true, opacity: 0.48, wireframe: false });
 const _previewRedMat = new THREE.MeshBasicMaterial({ color: 0xf54a38, transparent: true, opacity: 0.48, wireframe: false });
 
@@ -1348,27 +2078,21 @@ function _getBuildPreviewGroup(scene = _env.scene) {
   _buildPreviewGroup = new THREE.Group();
   _buildPreviewGroup.name = "BuildPreviewHologram";
 
-  _previewHouseGroup = _buildPlayerHouseMesh();
-  _previewHouseGroup.traverse((obj) => {
-    if (obj.isMesh) {
-      obj.material = _previewGreenMat;
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-    }
-  });
-  _previewHouseGroup.visible = false;
-  _buildPreviewGroup.add(_previewHouseGroup);
-
-  _previewCorralGroup = _buildPlayerCorralMesh();
-  _previewCorralGroup.traverse((obj) => {
-    if (obj.isMesh) {
-      obj.material = _previewGreenMat;
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-    }
-  });
-  _previewCorralGroup.visible = false;
-  _buildPreviewGroup.add(_previewCorralGroup);
+  const allTypes = Object.keys(BUILD_COSTS);
+  for (let i = 0; i < allTypes.length; i++) {
+    const t = allTypes[i];
+    const meshGroup = buildStructureMeshByType(t);
+    meshGroup.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.material = _previewGreenMat;
+        obj.castShadow = false;
+        obj.receiveShadow = false;
+      }
+    });
+    meshGroup.visible = false;
+    _buildPreviewGroup.add(meshGroup);
+    _previewGroupsMap.set(t, meshGroup);
+  }
 
   _buildPreviewGroup.visible = false;
   scene.add(_buildPreviewGroup);
@@ -1384,22 +2108,30 @@ export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE")
 
   if (!active) {
     preview.visible = false;
-    if (_previewHouseGroup) _previewHouseGroup.visible = false;
-    if (_previewCorralGroup) _previewCorralGroup.visible = false;
+    for (const grp of _previewGroupsMap.values()) {
+      grp.visible = false;
+    }
     return;
   }
 
   const cost = BUILD_COSTS[type] || BUILD_COSTS.HOUSE;
   const canAfford =
-    PlayerInventory.wood >= cost.wood &&
+    PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
     (cost.hay ? PlayerInventory.hay >= cost.hay : true);
 
   const activeMat = canAfford ? _previewGreenMat : _previewRedMat;
 
+  // Ajusta a distância frontal conforme a escala do edifício
+  const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
+    ? 2.6
+    : ["CABIN", "CORRAL", "BLACKSMITH_SHED"].includes(type)
+      ? 3.8
+      : 4.8;
+
   const rotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
   _buildEuler.set(0, rotY, 0);
-  _buildOffset.set(0, 0, 4.2).applyEuler(_buildEuler);
+  _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
 
   const bx = (playerPos.x ?? 0) + _buildOffset.x;
   const bz = (playerPos.z ?? 0) + _buildOffset.z;
@@ -1409,18 +2141,15 @@ export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE")
   preview.rotation.y = rotY;
   preview.visible = true;
 
-  if (type === "HOUSE") {
-    if (_previewHouseGroup) {
-      _previewHouseGroup.visible = true;
-      _previewHouseGroup.traverse((obj) => { if (obj.isMesh) obj.material = activeMat; });
+  for (const [t, grp] of _previewGroupsMap.entries()) {
+    if (t === type) {
+      grp.visible = true;
+      grp.traverse((obj) => {
+        if (obj.isMesh) obj.material = activeMat;
+      });
+    } else {
+      grp.visible = false;
     }
-    if (_previewCorralGroup) _previewCorralGroup.visible = false;
-  } else {
-    if (_previewCorralGroup) {
-      _previewCorralGroup.visible = true;
-      _previewCorralGroup.traverse((obj) => { if (obj.isMesh) obj.material = activeMat; });
-    }
-    if (_previewHouseGroup) _previewHouseGroup.visible = false;
   }
 }
 
@@ -1481,16 +2210,17 @@ function _buildPlayerCorralMesh() {
   return group;
 }
 
-export function createPlayerBuildingsPool(scene = _env.scene, world = _env.world, countPerType = 6) {
+export function createPlayerBuildingsPool(scene = _env.scene, world = _env.world, countPerType = 3) {
   if (_playerBuildingsPool.length > 0 || !scene) return _playerBuildingsPool;
-  for (let i = 0; i < countPerType; i++) {
-    const h = _buildPlayerHouseMesh();
-    scene.add(h);
-    _playerBuildingsPool.push(h);
-
-    const c = _buildPlayerCorralMesh();
-    scene.add(c);
-    _playerBuildingsPool.push(c);
+  const types = Object.keys(BUILD_COSTS);
+  for (let i = 0; i < types.length; i++) {
+    const t = types[i];
+    const qty = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(t) ? 5 : countPerType;
+    for (let j = 0; j < qty; j++) {
+      const b = buildStructureMeshByType(t);
+      scene.add(b);
+      _playerBuildingsPool.push(b);
+    }
   }
   return _playerBuildingsPool;
 }
@@ -1508,7 +2238,9 @@ function _registerBuildingColliders(building, world = _env.world) {
     z: bz - lx * sin + lz * cos,
   });
 
-  if (building.userData.type === "HOUSE") {
+  const type = building.userData.type;
+
+  if (type === "HOUSE") {
     const top = by + 3.6;
     const bottom = by - 2.5;
     const pBack = toW(0, -2.0);
@@ -1522,7 +2254,7 @@ function _registerBuildingColliders(building, world = _env.world) {
     world.addOrientedBox(pRight.x, pRight.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: true });
     world.addOrientedBox(pFrontL.x, pFrontL.z, 1.65, 0.34, ry, bottom, top, { move: true, shot: true, cam: true });
     world.addOrientedBox(pFrontR.x, pFrontR.z, 1.65, 0.34, ry, bottom, top, { move: true, shot: true, cam: true });
-  } else if (building.userData.type === "CORRAL") {
+  } else if (type === "CORRAL") {
     const top = by + 1.5;
     const bottom = by - 1.0;
     const pBack = toW(0, -2.5);
@@ -1536,6 +2268,72 @@ function _registerBuildingColliders(building, world = _env.world) {
     world.addOrientedBox(pRight.x, pRight.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
     world.addOrientedBox(pFrontL.x, pFrontL.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
     world.addOrientedBox(pFrontR.x, pFrontR.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "CABIN") {
+    const top = by + 2.8;
+    const bottom = by - 1.0;
+    const pBack = toW(0, -1.35);
+    const pLeft = toW(-1.7, 0);
+    const pRight = toW(1.7, 0);
+    const pFrontL = toW(-1.15, 1.35);
+    const pFrontR = toW(1.15, 1.35);
+
+    world.addOrientedBox(pBack.x, pBack.z, 3.6, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pLeft.x, pLeft.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pRight.x, pRight.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.2, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.2, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
+  } else if (type === "BARN") {
+    const top = by + 4.5;
+    const bottom = by - 1.5;
+    const pBack = toW(0, -2.3);
+    const pLeft = toW(-2.9, 0);
+    const pRight = toW(2.9, 0);
+    const pFrontL = toW(-1.95, 2.3);
+    const pFrontR = toW(1.95, 2.3);
+
+    world.addOrientedBox(pBack.x, pBack.z, 6.0, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pLeft.x, pLeft.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pRight.x, pRight.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.8, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.8, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
+  } else if (type === "WATCHTOWER") {
+    const top = by + 6.8;
+    const bottom = by - 1.0;
+    // 4 postes estruturais
+    for (const px of [-1.3, 1.3]) {
+      for (const pz of [-1.3, 1.3]) {
+        const p = toW(px, pz);
+        world.addOrientedBox(p.x, p.z, 0.6, 0.6, ry, bottom, top, { move: true, shot: false, cam: false });
+      }
+    }
+  } else if (type === "WALL_GATE") {
+    const top = by + 3.4;
+    const bottom = by - 1.0;
+    const pLeft = toW(-2.3, 0);
+    const pRight = toW(2.3, 0);
+    world.addOrientedBox(pLeft.x, pLeft.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pRight.x, pRight.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
+  } else if (type === "BLACKSMITH_SHED") {
+    const top = by + 3.0;
+    const bottom = by - 1.0;
+    const pForge = toW(1.1, -1.0);
+    const pBench = toW(-1.1, -1.1);
+    const pAnvil = toW(-0.6, 0.2);
+    world.addOrientedBox(pForge.x, pForge.z, 1.5, 1.3, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedBox(pBench.x, pBench.z, 1.7, 0.8, ry, bottom, top, { move: true, shot: false, cam: false });
+    world.addOrientedBox(pAnvil.x, pAnvil.z, 0.7, 0.7, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "WELL") {
+    const top = by + 2.4;
+    const bottom = by - 1.0;
+    world.addOrientedBox(bx, bz, 2.3, 2.3, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "TORCH_POST") {
+    const top = by + 3.4;
+    const bottom = by - 1.0;
+    world.addOrientedBox(bx, bz, 0.55, 0.55, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "CAMPFIRE") {
+    const top = by + 0.9;
+    const bottom = by - 0.5;
+    world.addOrientedBox(bx, bz, 1.6, 1.6, ry, bottom, top, { move: true, shot: false, cam: false });
   }
   building.userData.collidersRegistered = true;
 }
@@ -1544,15 +2342,15 @@ function _registerBuildingColliders(building, world = _env.world) {
  * Constroi uma estrutura no mundo se houver recursos.
  * @param {THREE.Vector3|{x:number,y?:number,z:number}} playerPos
  * @param {THREE.Euler|{y:number}|number} playerRot
- * @param {'HOUSE'|'CORRAL'} type
+ * @param {string} type
  * @param {Array<THREE.Object3D>} [playerBuildingsPool]
  */
-export function buildStructure(playerPos, playerRot, type, playerBuildingsPool = _playerBuildingsPool) {
+export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuildingsPool = _playerBuildingsPool) {
   const cost = BUILD_COSTS[type];
   if (!cost) return false;
 
   if (
-    PlayerInventory.wood >= cost.wood &&
+    PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
     (cost.hay ? PlayerInventory.hay >= cost.hay : true)
   ) {
@@ -1561,11 +2359,15 @@ export function buildStructure(playerPos, playerRot, type, playerBuildingsPool =
         ? playerBuildingsPool
         : createPlayerBuildingsPool(_env.scene, _env.world);
 
-    // Pega estrutura do pool para evitar instanciar no loop principal
-    const building = pool.find((b) => b.userData.type === type && !b.visible);
-    if (!building) return false;
+    // Pega estrutura do pool ou cria se o pool estiver esgotado
+    let building = pool.find((b) => b.userData.type === type && !b.visible);
+    if (!building) {
+      building = buildStructureMeshByType(type);
+      if (_env.scene) _env.scene.add(building);
+      pool.push(building);
+    }
 
-    PlayerInventory.wood -= cost.wood;
+    if (cost.wood) PlayerInventory.wood -= cost.wood;
     if (cost.stone) PlayerInventory.stone -= cost.stone;
     if (cost.hay) {
       PlayerInventory.hay -= cost.hay;
@@ -1579,8 +2381,13 @@ export function buildStructure(playerPos, playerRot, type, playerBuildingsPool =
       _buildEuler.set(0, rotY, 0);
     }
 
-    // Posiciona 3 metros à frente do jogador
-    _buildOffset.set(0, 0, 3).applyEuler(_buildEuler);
+    const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
+      ? 2.6
+      : ["CABIN", "CORRAL", "BLACKSMITH_SHED"].includes(type)
+        ? 3.8
+        : 4.8;
+
+    _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
     const bx = (playerPos.x ?? 0) + _buildOffset.x;
     const bz = (playerPos.z ?? 0) + _buildOffset.z;
     const by = _env.world ? _env.world.heightAt(bx, bz) : playerPos.y ?? 0;
@@ -1589,11 +2396,11 @@ export function buildStructure(playerPos, playerRot, type, playerBuildingsPool =
     building.rotation.y = rotY;
     building.visible = true;
 
-    // Caso de Borda 5.2: Empurra imediatamente os colisores de parede para o mundo físico
+    // Registra colisões no mundo físico
     _registerBuildingColliders(building, _env.world);
 
     if (_env.effects) {
-      _env.effects.play("dust", bx, by + 0.5, bz, "#cdbb97", 1.45);
+      _env.effects.play("dust", bx, by + 0.6, bz, "#cdbb97", 1.6);
     }
     playWoodChopSound();
     syncPlayerStatsToPlayer();
