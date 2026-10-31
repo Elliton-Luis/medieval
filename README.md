@@ -33,15 +33,18 @@ npm run preview
 
 ## Controles
 
-| Ação         | Teclas                  |
-| ------------ | ----------------------- |
-| Andar        | `W` `A` `S` `D` / setas |
-| Pular        | `Espaço`                |
-| Bola de fogo | Clique esquerdo / `F`   |
+| Ação         | Controle                     |
+| ------------ | ---------------------------- |
+| Andar        | `W` `A` `S` `D` / setas      |
+| Pular        | `Espaço`                     |
+| Bola de fogo | Clique esquerdo / `F`        |
+| Mover câmera | Arrastar com o botão direito |
+| Zoom         | Roda do mouse                |
 
-O movimento é relativo à câmera. Diagonais são normalizadas, o personagem gira
-suavemente para a direção do movimento e não atravessa obstáculos. O pulo usa
-gravidade e não permite pulo duplo; a sombra no chão indica a altura.
+O movimento é relativo à câmera, que orbita em volta do jogador. Diagonais são
+normalizadas, o personagem gira suavemente para a direção do movimento e não
+atravessa obstáculos. O pulo usa gravidade e não permite pulo duplo; a sombra no
+chão indica a altura.
 
 A bola de fogo sai da frente do personagem, voa em linha reta, tem tempo de vida
 limitado e retorna ao pool ao expirar ou colidir. O alvo de teste pisca quando
@@ -88,4 +91,4 @@ O painel de debug aparece apenas durante o desenvolvimento (`npm run dev`).
 
 ## Status
 
-Protótipo das fases 0 a 5 concluído. Escopo fechado nas três mecânicas básicas.
+Protótipo das fases 0 a 5 concluído, com câmera orbital. Escopo fechado nas três mecânicas básicas.
