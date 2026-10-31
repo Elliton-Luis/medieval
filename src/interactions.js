@@ -1,0 +1,582 @@
+import {
+  PlayerStats,
+  PlayerEquipment,
+  PlayerInventory,
+  BUILD_COSTS,
+  MissionState,
+  buyUpgrade,
+  interactWithPriest,
+  interactWithBeggar,
+  dropHayBait,
+  buildStructure,
+  sellResourcesToNPC,
+  generateDeliveryMission,
+  generateDebtMission,
+  generateHorseTheftMission,
+  generateBountyMission,
+  startMission,
+  failActiveMission,
+  payDebtorMission,
+  syncPlayerStatsToPlayer,
+} from "./rpg.js?v=10";
+
+export class InteractionSystem {
+  constructor(player, npcs, input, ui, weapons) {
+    this.player = player;
+    this.npcs = npcs;
+    this.input = input;
+    this.ui = ui;
+    this.weapons = weapons;
+    this.activeNPC = null;
+    this.drops = null;
+    this.candle = null;
+    this.houses = null;
+    this.horses = null;
+    this.hayBales = null;
+    this._vitalsTimer = 0;
+    this.ui.onDialogAction = (action) => this._choose(action);
+    this.ui.onDialogClose = () => this._close();
+    this.ui.setVitals(player.health, player.maxHealth, player.coins, player.potions);
+    this.ui.setRPGStats?.(PlayerStats, PlayerEquipment);
+  }
+
+  _price(base) {
+    return Math.max(1, Math.round(base * PlayerStats.getPriceMult()));
+  }
+
+  update(dt) {
+    if (this.player.knockedOut) {
+      this.input.consumeInteractPressed();
+      this.input.consumeHayBaitPressed();
+      this.input.consumeCraftMenuPressed?.();
+      return;
+    }
+
+    if (this.input.consumeCraftMenuPressed?.()) {
+      if (!this.ui.dialoguePanel.hidden && !this.activeNPC) {
+        this.ui.closeDialogue();
+      } else {
+        this.activeNPC = null;
+        this.input.setModalOpen(true);
+        if (document.pointerLockElement) document.exitPointerLock();
+        this._showCraftingMenu();
+      }
+      return;
+    }
+
+    if (this.input.consumeHayBaitPressed()) {
+      this._tryDropHayBait();
+    }
+
+    if (this.input.consumeInteractPressed()) {
+      if (!this.ui.dialoguePanel.hidden) this.ui.closeDialogue();
+      else if (
+        !this.weapons?.tryPickupSpear?.() &&
+        !this.drops?.tryPickup() &&
+        !this.candle?.interact() &&
+        !this.houses?.interact() &&
+        !this._tryGatherHayBale()
+      ) {
+        this._interactNearby();
+      }
+    }
+    this._vitalsTimer += dt;
+    if (this._vitalsTimer >= 0.25) {
+      this._vitalsTimer = 0;
+      syncPlayerStatsToPlayer(this.player, this.ui);
+    }
+  }
+
+  _showCraftingMenu(message = "") {
+    const inv = PlayerInventory;
+    const body =
+      message ||
+      `Recursos na mochila: ${inv.wood} Madeira · ${inv.stone} Pedra · ${inv.hay} Feno · ${inv.torches} Tocha(s) · ${inv.gold} Moedas.\nUse o Machado (2) em árvores e a Picareta (3) em rochas para coletar materiais.`;
+    const canTorch = inv.wood >= 1 && inv.hay >= 1;
+    const canHouse = inv.wood >= BUILD_COSTS.HOUSE.wood && inv.stone >= BUILD_COSTS.HOUSE.stone;
+    const canCorral = inv.wood >= BUILD_COSTS.CORRAL.wood && inv.hay >= BUILD_COSTS.CORRAL.hay;
+
+    const actions = [
+      {
+        id: "craft:torch",
+        label: `Criar Tocha (1 Madeira + 1 Feno) · tens ${inv.torches}`,
+        disabled: !canTorch,
+      },
+      {
+        id: "craft:candle",
+        label: `Criar Vela de Sebo (1 Madeira + 1 Feno) · tens ${this.candle?.count ?? 0}`,
+        disabled: !canTorch,
+      },
+      {
+        id: "build:house",
+        label: `Construir Casa Própria (${BUILD_COSTS.HOUSE.wood} Madeira + ${BUILD_COSTS.HOUSE.stone} Pedra)`,
+        disabled: !canHouse,
+      },
+      {
+        id: "build:corral",
+        label: `Construir Curral de Cavalos (${BUILD_COSTS.CORRAL.wood} Madeira + ${BUILD_COSTS.CORRAL.hay} Feno)`,
+        disabled: !canCorral,
+      },
+      { id: "close", label: "Fechar menu (I)" },
+    ];
+    this.ui.showDialogue("Ofício & Sobrevivência (Camponês)", body, actions);
+  }
+
+  _tryGatherHayBale() {
+    if (!this.hayBales) return false;
+    for (let i = 0; i < this.hayBales.length; i++) {
+      const bale = this.hayBales[i];
+      if (!bale || bale.burning || bale.burned) continue;
+      const dx = bale.x - this.player.x;
+      const dz = bale.z - this.player.z;
+      if (dx * dx + dz * dz < 2.5 * 2.5) {
+        if (PlayerInventory.hay >= 20) {
+          this.ui.showToast("Alforje de feno cheio (20/20) · venda ao fazendeiro ou use G");
+          return true;
+        }
+        PlayerInventory.hay = Math.min(20, PlayerInventory.hay + 2);
+        PlayerStats.hay = PlayerInventory.hay;
+        syncPlayerStatsToPlayer(this.player, this.ui);
+        this.ui.showToast(`+2 Feno recolhido (Total: ${PlayerInventory.hay}) · use G p/ isca ou I p/ criar tocha`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _tryDropHayBait() {
+    if (PlayerInventory.hay <= 0) {
+      this.ui.showToast("Sem feno no alforje · recolha num fardo (E) ou corte arbustos");
+      return;
+    }
+    PlayerInventory.hay--;
+    PlayerStats.hay = PlayerInventory.hay;
+    const { attractedCount } = dropHayBait(
+      { x: this.player.x, y: this.player.root.position.y, z: this.player.z },
+      this.horses?.horses || [],
+    );
+    syncPlayerStatsToPlayer(this.player, this.ui);
+    if (attractedCount > 0) {
+      this.ui.showToast(`Isca de feno largada! ${attractedCount} cavalo(s) atraído(s) pelo faro`);
+    } else {
+      this.ui.showToast(`Isca de feno largada no chão (${PlayerInventory.hay} restante)`);
+    }
+  }
+
+  _interactNearby() {
+    let target = null;
+    let best = 3.8 * 3.8;
+    for (let i = 0; i < this.npcs.npcs.length; i++) {
+      const npc = this.npcs.npcs[i];
+      if (!npc.alive || npc.temporary || npc.root?.userData?.isSleeping) continue;
+      const dx = npc.x - this.player.x;
+      const dz = npc.z - this.player.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq < best) { best = distSq; target = npc; }
+    }
+    if (!target) {
+      this.ui.showToast("Chegue mais perto de alguém para conversar.");
+      return;
+    }
+    this.activeNPC = target;
+    this.input.setModalOpen(true);
+    if (document.pointerLockElement) document.exitPointerLock();
+    this._showNPCDialogue();
+  }
+
+  _nextArmorTier() {
+    const cur = PlayerEquipment.armorNegationChance;
+    if (cur < 0.3) return { chance: 0.3, cost: this._price(25), label: "Cota de Malha (30% chance de anular dano)" };
+    if (cur < 0.5) return { chance: 0.5, cost: this._price(45), label: " couraça Real (50% chance de anular dano)" };
+    if (cur < 0.7) return { chance: 0.7, cost: this._price(75), label: "Armadura Completa (70% máx anulação)" };
+    return null;
+  }
+
+  _showNPCDialogue(message = "") {
+    const npc = this.activeNPC;
+    if (!npc || !npc.alive) { this.ui.closeDialogue(); return; }
+    const mult = PlayerStats.getPriceMult();
+    const discountPct = Math.round((1 - mult) * 100);
+    const chaNote = discountPct > 0
+      ? ` (Carisma ${PlayerStats.cha}: -${discountPct}% nos preços)`
+      : discountPct < 0
+        ? ` (Carisma ${PlayerStats.cha}: +${Math.abs(discountPct)}% nos preços)`
+        : "";
+
+    let body = `${npc.task}.${chaNote}`;
+    let actions = [{ id: "close", label: "Encerrar conversa" }];
+
+    if (npc.root?.userData?.isMissionDebtor) {
+      body =
+        message ||
+        "Piedade! A geada estragou minha lavoura e ainda não tenho as 20 moedas que devo à estalagem! Não me espanque!";
+      actions = [
+        {
+          id: "mission:pay_debt",
+          label: "Pagar a dívida pelo camponês (-20 moedas · +4 Carisma)",
+          disabled: this.player.coins < 20,
+        },
+        {
+          id: "close",
+          label: "Cobrar na marra (use os Punhos [Slot 1] sem matá-lo!)",
+        },
+      ];
+      this.ui.showDialogue(npc.name, body, actions);
+      return;
+    }
+
+    if (npc.roleKey === "smith") {
+      body = (message || "Aço novo, direto da forja. Escolha com cuidado: cada arma tem seu peso e seu jeito.") + chaNote;
+      const wares = this.weapons.shopWeapons().slice(0, 5);
+      const nextArmor = this._nextArmorTier();
+      const pWeaponUp = this._price(20 + PlayerEquipment.weaponLevel * 10);
+      const pRepair = this._price(8);
+      const pBolts = this._price(8);
+      const pKnives = this._price(15);
+      const pOil = this._price(14);
+      const pTrainStr = this._price(18);
+      actions = [
+        {
+          id: "sell:blacksmith",
+          label: `Trabalhar: Vender 10 Madeiras para a fornalha (+25 moedas) · tens ${PlayerInventory.wood} Mad`,
+          disabled: PlayerInventory.wood < 10,
+        },
+        {
+          id: "sell:stone",
+          label: `Trabalhar: Vender 5 Pedras brutas (+15 moedas) · tens ${PlayerInventory.stone} Ped`,
+          disabled: PlayerInventory.stone < 5,
+        },
+        nextArmor
+          ? { id: "upgrade:armor", label: `Forjar ${nextArmor.label} · ${nextArmor.cost} moedas`, disabled: this.player.coins < nextArmor.cost }
+          : { id: "upgrade:armor", label: "Armadura Real Completa (70% deflexão) · adquirida", disabled: true },
+        { id: "upgrade:weapon", label: `Afiar Arsenal (Nível ${PlayerEquipment.weaponLevel} → ${PlayerEquipment.weaponLevel + 1}, +25% dano) · ${pWeaponUp} moedas`, disabled: this.player.coins < pWeaponUp },
+        { id: "repair", label: `Reparar vitalidade/placas · ${pRepair} moedas`, disabled: this.player.coins < pRepair || this.player.health >= this.player.maxHealth },
+        { id: "train:str", label: `Treinar Força na bigorna (+1 FOR, atual ${PlayerStats.str}) · ${pTrainStr} moedas`, disabled: this.player.coins < pTrainStr },
+        ...wares.map((w) => {
+          const wp = this._price(w.price);
+          return { id: `buy:${w.id}:${wp}`, label: `${w.name} · ${wp} moedas (slot ${w.slot}${w.hands === 2 ? ", duas mãos" : ""})`, disabled: this.player.coins < wp };
+        }),
+        { id: "bolts", label: `Virotes de balestra ×4 · ${pBolts} moedas`, disabled: this.player.coins < pBolts },
+        { id: "knives", label: `Facas de arremesso ×5 · ${pKnives} moedas`, disabled: this.player.coins < pKnives },
+        { id: "oil", label: `Potes de óleo ×2 · ${pOil} moedas`, disabled: this.player.coins < pOil },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "merchant") {
+      body = (message || "Tenho provisões, relíquias e serviços urgentes para quem busca moedas rápidas.") + chaNote;
+      const pCandle = this._price(6);
+      const pPotion = this._price(10);
+      const pArrows = this._price(7);
+      const pBombs = this._price(15);
+      const pTrainCha = this._price(16);
+      const pBlessing = this._price(35);
+      actions = [
+        {
+          id: "mission:deliver",
+          label: "✦ Missão: Entrega de Suprimentos (+30 moedas, +2 CAR)",
+        },
+        {
+          id: "mission:debt",
+          label: "✦ Missão: A Cobrança na Vila (+40 moedas nos Punhos ou +4 CAR)",
+        },
+        ...(MissionState.activeId
+          ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+          : []),
+        { id: "blessing", label: PlayerEquipment.blessingActive ? "Colar da Bênção · equipado" : `Colar da Bênção (15% chance de cortar dano ao meio) · ${pBlessing} moedas`, disabled: PlayerEquipment.blessingActive || this.player.coins < pBlessing },
+        { id: "candle", label: `Vela · ${pCandle} moedas`, disabled: this.player.coins < pCandle },
+        { id: "potion", label: `Poção de vigor · ${pPotion} moedas (${this.player.potions} no alforje)`, disabled: this.player.coins < pPotion || this.player.potions >= 4 },
+        { id: "arrows", label: `Flechas · ${pArrows} moedas`, disabled: this.player.coins < pArrows },
+        { id: "bombs", label: `Duas bombas de mão · ${pBombs} moedas`, disabled: this.player.coins < pBombs },
+        { id: "train:cha", label: `Cortesia e Retórica (+1 CAR, atual ${PlayerStats.cha}) · ${pTrainCha} moedas`, disabled: this.player.coins < pTrainCha },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "farmer") {
+      body = (message || "Pão fresco da horta e feno aromático para domar cavalos pelo faro.") + chaNote;
+      const pBread = this._price(5);
+      const pHay = this._price(4);
+      const pTrainCon = this._price(20);
+      const pTrainSpd = this._price(16);
+      actions = [
+        {
+          id: "sell:farmer",
+          label: `Trabalhar: Vender 5 Fenos colhidos (+10 moedas) · tens ${PlayerInventory.hay} Feno`,
+          disabled: PlayerInventory.hay < 5,
+        },
+        { id: "bread", label: `Pão da horta · ${pBread} moedas`, disabled: this.player.coins < pBread || this.player.health >= this.player.maxHealth },
+        { id: "hay", label: `Fardo de feno ×2 (isca G) · ${pHay} moedas (${PlayerInventory.hay}/20)`, disabled: this.player.coins < pHay || PlayerInventory.hay >= 20 },
+        { id: "train:con", label: `Vigor do Campo (+2 CON, atual ${PlayerStats.con}) · ${pTrainCon} moedas`, disabled: this.player.coins < pTrainCon },
+        { id: "train:spd", label: `Passo Ligeiro (+1 VEL, atual ${PlayerStats.spd}) · ${pTrainSpd} moedas`, disabled: this.player.coins < pTrainSpd },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "priest") {
+      body = message || "Filho, a graça da capela absolve os arrependidos, apazigua a guarda real e purifica o espírito.";
+      const pBlessing = this._price(35);
+      actions = [
+        { id: "priest:confess", label: "Confessar pecados / Indulgência (zera Procurado e +2 CAR) · 50 moedas", disabled: this.player.coins < 50 },
+        { id: "blessing", label: PlayerEquipment.blessingActive ? "Colar da Bênção · já consagrado" : `Consagrar Colar da Bênção · ${pBlessing} moedas`, disabled: PlayerEquipment.blessingActive || this.player.coins < pBlessing },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "beggar") {
+      const alreadyGave = Boolean(npc.root?.userData?.hasReceivedAlms);
+      body = message || (alreadyGave
+        ? "Que os céus iluminem o teu caminho, benfeitor! Jamais esquecerei tua bondade."
+        : "Uma moeda para um pobre faminto, nobre viajante? Deus lhe pagará em dobro na estima do povo.");
+      actions = [
+        {
+          id: "beggar:alms",
+          label: alreadyGave ? "Esmola já entregue · +1 Carisma recebido" : "Dar esmola ao pobre (+1 CAR) · 5 moedas",
+          disabled: alreadyGave || this.player.coins < 5,
+        },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "guard") {
+      body = message || "Mantenha a estrada principal. Há bandidos acampados além das muralhas com recompensa pela cabeça.";
+      actions = [
+        {
+          id: "mission:bounty",
+          label: "✦ Missão: Caça ao Bandido nas terras ermas (+65 moedas, +2 CAR)",
+        },
+        ...(MissionState.activeId
+          ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+          : []),
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else {
+      body = message || "Psst... Um comprador discreto paga 60 moedas por um Cavalo Puro-Sangue furtado da muralha leste.";
+      actions = [
+        {
+          id: "mission:horse_theft",
+          label: "✦ Missão: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
+        },
+        ...(MissionState.activeId
+          ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+          : []),
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    }
+    this.ui.showDialogue(npc.name, body, actions);
+  }
+
+  _choose(action) {
+    if (action === "close") { this.ui.closeDialogue(); return; }
+
+    const cityAnchors = this.npcs?.settlement?.cityData?.anchors || null;
+    if (action === "mission:deliver") {
+      const m = generateDeliveryMission(this.activeNPC, cityAnchors);
+      startMission(m);
+      this.ui.closeDialogue();
+      this.ui.showToast("Missão Iniciada: Entrega de Suprimentos! Siga o pilar de luz dourado.");
+      return;
+    }
+    if (action === "mission:debt") {
+      const m = generateDebtMission(this.activeNPC, cityAnchors);
+      startMission(m);
+      this.ui.closeDialogue();
+      this.ui.showToast("Missão Iniciada: A Cobrança! Use os Punhos (Slot 1) no devedor ou pague por ele.");
+      return;
+    }
+    if (action === "mission:horse_theft") {
+      const m = generateHorseTheftMission(this.activeNPC, cityAnchors);
+      startMission(m);
+      this.ui.closeDialogue();
+      this.ui.showToast("Missão Iniciada: Roubo de Montaria! Furte o Puro-Sangue na muralha leste.");
+      return;
+    }
+    if (action === "mission:bounty") {
+      const m = generateBountyMission(this.activeNPC, cityAnchors);
+      startMission(m);
+      this.ui.closeDialogue();
+      this.ui.showToast("Missão Iniciada: Caça ao Bandido! Elimine o alvo fora da muralha.");
+      return;
+    }
+    if (action === "mission:pay_debt") {
+      if (payDebtorMission(this.activeNPC?.root)) {
+        this.ui.closeDialogue();
+      }
+      return;
+    }
+    if (action === "mission:cancel") {
+      failActiveMission("Missão cancelada.");
+      this._showNPCDialogue("Sem problemas. Avise se mudar de ideia.");
+      return;
+    }
+
+    if (action === "craft:torch") {
+      if (PlayerInventory.craftTorch()) {
+        this.ui.showToast("Tocha confeccionada e equipada (Slot 1)!");
+        this._showCraftingMenu("Tocha pronta! Ela não se apaga com o vento e incendeia inimigos.");
+      }
+      return;
+    }
+    if (action === "craft:candle") {
+      if (PlayerInventory.wood >= 1 && PlayerInventory.hay >= 1) {
+        PlayerInventory.wood--;
+        PlayerInventory.hay--;
+        PlayerStats.hay = PlayerInventory.hay;
+        if (this.candle) {
+          this.candle.count++;
+          this.candle._sync?.();
+        }
+        syncPlayerStatsToPlayer(this.player, this.ui);
+        this.ui.showToast("Vela de sebo confeccionada! Pressione V para acender.");
+        this._showCraftingMenu("Vela pronta! Pressione V durante a noite para acendê-la.");
+      }
+      return;
+    }
+    if (action === "build:house" || action === "build:corral") {
+      const type = action === "build:house" ? "HOUSE" : "CORRAL";
+      const built = buildStructure(
+        this.player.root.position,
+        this.player.model.rotation,
+        type,
+        this.weapons?.playerBuildingsPool,
+      );
+      if (built) {
+        this.ui.closeDialogue();
+        this.ui.showToast(type === "HOUSE" ? "Casa Própria erguida à sua frente!" : "Curral de Cavalos erguido à sua frente!");
+      }
+      return;
+    }
+
+    if (action === "sell:blacksmith") {
+      if (sellResourcesToNPC("BLACKSMITH")) {
+        this.ui.showToast("+25 moedas! Vendeste 10 madeiras ao ferreiro.");
+        this._showNPCDialogue("Boa lenha seca! A fornalha vai arder forte hoje. Aqui estão tuas 25 moedas.");
+      }
+      return;
+    }
+    if (action === "sell:stone") {
+      if (sellResourcesToNPC("STONE")) {
+        this.ui.showToast("+15 moedas! Vendeste 5 pedras brutas ao ferreiro.");
+        this._showNPCDialogue("Minério firme! Bom trabalho na picareta, toma tuas 15 moedas.");
+      }
+      return;
+    }
+    if (action === "sell:farmer") {
+      if (sellResourcesToNPC("FARMER")) {
+        this.ui.showToast("+10 moedas! Vendeste 5 fenos ao fazendeiro.");
+        this._showNPCDialogue("Feno fresco de primeira! Os animais agradecem. Toma tuas 10 moedas.");
+      }
+      return;
+    }
+    const nextArmor = this._nextArmorTier();
+    const pWeaponUp = this._price(20 + PlayerEquipment.weaponLevel * 10);
+    const pRepair = this._price(8);
+    const pPotion = this._price(10);
+    const pCandle = this._price(6);
+    const pBread = this._price(5);
+    const pHay = this._price(4);
+    const pBolts = this._price(8);
+    const pArrows = this._price(7);
+    const pBombs = this._price(15);
+    const pKnives = this._price(15);
+    const pOil = this._price(14);
+    const pTrainStr = this._price(18);
+    const pTrainCha = this._price(16);
+    const pTrainCon = this._price(20);
+    const pTrainSpd = this._price(16);
+    const pBlessing = this._price(35);
+
+    if (action === "upgrade:armor" && nextArmor) {
+      if (buyUpgrade("ARMOR", nextArmor.cost, nextArmor.chance)) {
+        const pct = Math.round(PlayerEquipment.armorNegationChance * 100);
+        this.ui.showToast(`Armadura aprimorada: ${pct}% de chance de anular golpes!`);
+        this._showNPCDialogue(`Placas temperadas! Agora tens ${pct}% de chance de defletir qualquer golpe sem sofrer dano.`);
+      }
+    } else if (action === "upgrade:weapon") {
+      if (buyUpgrade("WEAPON", pWeaponUp)) {
+        this.ui.showToast(`Armas aprimoradas para Nível ${PlayerEquipment.weaponLevel}!`);
+        this._showNPCDialogue("Fio de navalha! Suas armas agora causam muito mais estrago.");
+      }
+    } else if (action === "blessing") {
+      if (buyUpgrade("BLESSING", pBlessing)) {
+        this.ui.showToast("Colar da Bênção ativo! Chance passiva de reduzir danos pela metade.");
+        this._showNPCDialogue("Que este amuleto sagrado proteja seu peito nos momentos de provação.");
+      }
+    } else if (action === "priest:confess") {
+      if (interactWithPriest(this.player.root.position, this.activeNPC, 50)) {
+        this.ui.showToast("Indulgência concedida! Procurado zerado · Carisma +2");
+        this._showNPCDialogue("Ego te absolvo! Seus pecados foram perdoados e a guarda foi apaziguada.");
+      }
+    } else if (action === "beggar:alms" && this.activeNPC) {
+      if (interactWithBeggar(this.player.root.position, this.activeNPC.root)) {
+        this.ui.showToast("Deste esmola ao pobre · Carisma +1!");
+        this._showNPCDialogue("Mil bênçãos sobre a tua cabeça! Povo de Caldera, vede que alma generosa!");
+      }
+    } else if (action === "repair" && this.player.coins >= pRepair && this.player.health < this.player.maxHealth) {
+      this.player.coins -= pRepair;
+      this.player.health = this.player.maxHealth;
+      this.ui.showToast("Armadura e vitalidade restauradas.");
+      this._showNPCDialogue("Pronto. As fivelas e placas estão firmes de novo.");
+    } else if (action === "train:str" && this.player.coins >= pTrainStr) {
+      this.player.coins -= pTrainStr;
+      PlayerStats.str += 1;
+      this.ui.showToast(`Força aumentou para ${PlayerStats.str}! (+5% dano corpo a corpo)`);
+      this._showNPCDialogue("Belo golpe no malho! Seus braços estão mais fortes.");
+    } else if (action === "train:cha" && this.player.coins >= pTrainCha) {
+      this.player.coins -= pTrainCha;
+      PlayerStats.cha = Math.min(20, PlayerStats.cha + 1);
+      this.ui.showToast(`Carisma aumentou para ${PlayerStats.cha}! (Melhores preços)`);
+      this._showNPCDialogue("Boa lábia abre portas e baixa preços em todo o reino.");
+    } else if (action === "train:con" && this.player.coins >= pTrainCon) {
+      this.player.coins -= pTrainCon;
+      PlayerStats.con += 2;
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      this.ui.showToast(`Constituição aumentou para ${PlayerStats.con}! (+Vida máxima e firmeza)`);
+      this._showNPCDialogue("Com essa saúde de ferro, nenhum golpe vai te derrubar fácil.");
+    } else if (action === "train:spd" && this.player.coins >= pTrainSpd) {
+      this.player.coins -= pTrainSpd;
+      PlayerStats.spd += 1;
+      this.ui.showToast(`Velocidade aumentou para ${PlayerStats.spd}! (+3% velocidade e fôlego)`);
+      this._showNPCDialogue("Pés leves como o vento da colina!");
+    } else if (action === "potion" && this.player.coins >= pPotion && this.player.potions < 4) {
+      this.player.coins -= pPotion;
+      this.player.potions++;
+      this.ui.showToast("Poção guardada no alforje.");
+      this._showNPCDialogue("Uma poção a mais no alforje. Volte quando precisar.");
+    } else if (action === "candle") {
+      if (this.candle?.buy(pCandle)) this._showNPCDialogue("Uma boa vela para as noites sem lua.");
+    } else if (action === "bread" && this.player.coins >= pBread && this.player.health < this.player.maxHealth) {
+      this.player.coins -= pBread;
+      this.player.health = Math.min(this.player.maxHealth, this.player.health + 1);
+      this.ui.showToast("Pão comprado: +1 vitalidade.");
+      this._showNPCDialogue("Feito hoje cedo. Vai recuperar suas forças.");
+    } else if (action === "hay" && this.player.coins >= pHay && PlayerInventory.hay < 20) {
+      this.player.coins -= pHay;
+      PlayerInventory.gold = this.player.coins;
+      PlayerInventory.hay = Math.min(20, PlayerInventory.hay + 2);
+      PlayerStats.hay = PlayerInventory.hay;
+      this.ui.showToast(`Feno guardado (${PlayerInventory.hay}/20) · use G para atrair cavalos`);
+      this._showNPCDialogue("Basta largar no chão com G: qualquer cavalo num raio de 30m vem comer mansinho.");
+    } else if (action === "bolts") {
+      this._buyAmmo("bolts", 4, pBolts, "Virotes adicionados ao alforje.");
+    } else if (action === "arrows") {
+      this._buyAmmo("arrows", 6, pArrows, "Flechas adicionadas ao alforje.");
+    } else if (action === "bombs") {
+      this._buyAmmo("bombs", 2, pBombs, "Bombas de mão adicionadas ao alforje.");
+    } else if (action === "knives") {
+      this._buyAmmo("knives", 5, pKnives, "Facas de arremesso adicionadas ao alforje.");
+    } else if (action === "oil") {
+      this._buyAmmo("oil", 2, pOil, "Potes de óleo adicionadas ao alforje.");
+    } else if (action.startsWith("buy:")) {
+      const parts = action.split(":");
+      const id = parts[1];
+      const cost = Number(parts[2]);
+      if (this.weapons.purchase(id, cost)) this._showNPCDialogue("Boa escolha. Aço que não falha.");
+    }
+    PlayerStats.gold = this.player.coins;
+    syncPlayerStatsToPlayer(this.player, this.ui);
+    this.ui.setRPGStats?.(PlayerStats, PlayerEquipment);
+  }
+
+  _buyAmmo(type, amount, cost, message) {
+    if (this.player.coins < cost || !this.weapons.buyAmmo(type, amount)) return;
+    this.player.coins -= cost;
+    this.ui.showToast(message);
+    this._showNPCDialogue("Mercadoria entregue. Boa sorte na estrada.");
+  }
+
+  _close() {
+    this.activeNPC = null;
+    this.input.setModalOpen(false);
+  }
+}
