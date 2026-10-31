@@ -27,6 +27,13 @@ export const COLORS = {
   playerBody: 0x3f8f8a,
   playerNose: 0xffe3b3,
   shadow: 0x263b33,
+  fireCore: 0xffd27a,
+  fireEmissive: 0xff5a12,
+  fireHalo: 0xffa64d,
+  fireParticle: 0xffb25e,
+  targetBody: 0xe0c49b,
+  targetBase: 0x7a6650,
+  targetFlash: 0xff7a1a,
 };
 
 export const PLAYER = {
@@ -42,6 +49,25 @@ export const PLAYER = {
   bodyLength: 0.8,
   shadowRadius: 0.55,
   shadowOpacity: 0.3,
+};
+
+export const FIREBALL = {
+  poolSize: 16,
+  speed: 14,
+  lifetime: 1.2,
+  cooldown: 0.35,
+  radius: 0.16,
+  coreRadius: 0.16,
+  haloScale: 0.9,
+  spawnOffset: 0.7,
+  spawnHeight: 1,
+  trailInterval: 0.02,
+  trailLife: 0.35,
+  burstCount: 10,
+  burstLife: 0.32,
+  burstSpeed: 3.2,
+  particlePoolSize: 96,
+  particleSize: 0.45,
 };
 
 export const DEBUG = {

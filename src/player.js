@@ -91,7 +91,8 @@ export function createPlayer(scene) {
   let velocityZ = 0;
   let velocityY = 0;
   let grounded = true;
-  let angle = 0;
+  let angle = Math.PI;
+  group.rotation.y = angle;
 
   function update(dt, input, camera, colliders) {
     camera.getWorldDirection(forward);

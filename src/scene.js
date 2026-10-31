@@ -110,6 +110,61 @@ export function createScene() {
     });
   }
 
+  const targetGeometry = new THREE.CylinderGeometry(0.22, 0.32, 1.2, 8);
+  const targetMaterial = new THREE.MeshLambertMaterial({
+    color: COLORS.targetBody,
+    emissive: COLORS.targetFlash,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const targetBody = new THREE.Mesh(targetGeometry, targetMaterial);
+  targetBody.position.y = 0.6;
+  targetBody.castShadow = true;
+  targetBody.receiveShadow = true;
+
+  const targetHeadGeometry = new THREE.SphereGeometry(0.3, 8, 6);
+  const targetHead = new THREE.Mesh(targetHeadGeometry, targetMaterial);
+  targetHead.position.y = 1.45;
+  targetHead.castShadow = true;
+
+  const targetBaseGeometry = new THREE.CylinderGeometry(0.45, 0.45, 0.12, 8);
+  const targetBaseMaterial = new THREE.MeshLambertMaterial({
+    color: COLORS.targetBase,
+    flatShading: true,
+  });
+  const targetBase = new THREE.Mesh(targetBaseGeometry, targetBaseMaterial);
+  targetBase.position.y = 0.06;
+  targetBase.castShadow = true;
+  targetBase.receiveShadow = true;
+
+  const targetGroup = new THREE.Group();
+  targetGroup.position.set(0, 0, -8);
+  targetGroup.add(targetBody, targetHead, targetBase);
+  scene.add(targetGroup);
+
+  colliders.push({
+    minX: -0.4,
+    maxX: 0.4,
+    minZ: -8.4,
+    maxZ: -7.6,
+    maxY: 1.6,
+  });
+
+  let targetFlash = 0;
+  const target = {
+    position: new THREE.Vector3(0, 0.95, -8),
+    radius: 0.55,
+    hit() {
+      targetFlash = 1;
+      targetMaterial.emissiveIntensity = 2.8;
+    },
+    update(dt) {
+      if (targetFlash <= 0) return;
+      targetFlash = Math.max(0, targetFlash - dt * 2);
+      targetMaterial.emissiveIntensity = targetFlash * 2.8;
+    },
+  };
+
   function updateCamera(x, z, dt) {
     const t = 1 - Math.exp(-CAMERA.followSpeed * dt);
     smoothTarget.x += (x - smoothTarget.x) * t;
@@ -124,5 +179,5 @@ export function createScene() {
     sun.target.updateMatrixWorld();
   }
 
-  return { scene, camera, colliders, updateCamera };
+  return { scene, camera, colliders, target, updateCamera };
 }
