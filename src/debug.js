@@ -3,7 +3,7 @@ import { DEBUG } from './config.js';
 export function createDebugPanel() {
   const panel = document.createElement('div');
   panel.style.position = 'fixed';
-  panel.style.top = '12px';
+  panel.style.bottom = '12px';
   panel.style.left = '12px';
   panel.style.padding = '6px 10px';
   panel.style.borderRadius = '6px';

@@ -7,6 +7,8 @@ let lastMouseY = 0;
 let dragX = 0;
 let dragY = 0;
 let wheelDelta = 0;
+let pointerX = window.innerWidth / 2;
+let pointerY = window.innerHeight / 2;
 
 function onKeyDown(event) {
   if (event.repeat) return;
@@ -24,6 +26,9 @@ function onKeyUp(event) {
 }
 
 function onMouseDown(event) {
+  pointerX = event.clientX;
+  pointerY = event.clientY;
+
   if (event.button === 2) {
     rightDragging = true;
     lastMouseX = event.clientX;
@@ -38,6 +43,9 @@ function onMouseDown(event) {
 }
 
 function onMouseMove(event) {
+  pointerX = event.clientX;
+  pointerY = event.clientY;
+
   if (!rightDragging) return;
 
   dragX += event.clientX - lastMouseX;
@@ -87,6 +95,12 @@ export const input = {
   },
   get wheelDelta() {
     return wheelDelta;
+  },
+  get pointerX() {
+    return pointerX;
+  },
+  get pointerY() {
+    return pointerY;
   },
   isDown(code) {
     return down.has(code);

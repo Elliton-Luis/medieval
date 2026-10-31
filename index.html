@@ -5,20 +5,200 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Puris</title>
     <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
         background: #9ec8d8;
+        cursor: crosshair;
       }
 
       canvas {
         display: block;
       }
+
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        user-select: none;
+        color: #f4faf6;
+        text-shadow: 0 1px 3px rgba(8, 20, 16, 0.55);
+      }
+
+      #hud-time {
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 20px;
+        border-radius: 999px;
+        background: rgba(18, 32, 28, 0.6);
+        border: 1px solid rgba(244, 250, 246, 0.16);
+        font-size: 26px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+      }
+
+      .hud-panel {
+        position: absolute;
+        top: 18px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: rgba(18, 32, 28, 0.6);
+        border: 1px solid rgba(244, 250, 246, 0.14);
+      }
+
+      .hud-health {
+        left: 18px;
+        width: 218px;
+      }
+
+      .hud-kills {
+        right: 18px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .hud-label {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+
+      .hud-health-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 5px;
+      }
+
+      .hud-bar {
+        flex: 1;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(5, 14, 11, 0.55);
+        overflow: hidden;
+      }
+
+      #hud-health-fill {
+        height: 100%;
+        width: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7ee08a, #4ec06a);
+        transition: width 0.12s linear, background 0.2s linear;
+      }
+
+      #hud-health-fill.low {
+        background: linear-gradient(90deg, #ff9b5a, #e8452f);
+      }
+
+      #hud-health-text {
+        min-width: 30px;
+        font-size: 13px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      #hud-kills {
+        font-size: 22px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #game-over {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 18, 15, 0.58);
+        color: #f4faf6;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      #game-over[hidden] {
+        display: none;
+      }
+
+      #game-over .panel {
+        padding: 28px 42px;
+        border-radius: 18px;
+        background: rgba(14, 26, 22, 0.86);
+        border: 1px solid rgba(244, 250, 246, 0.16);
+        text-align: center;
+        box-shadow: 0 18px 60px rgba(4, 12, 9, 0.45);
+      }
+
+      #game-over h1 {
+        margin: 0 0 18px;
+        font-size: 30px;
+        letter-spacing: 0.02em;
+      }
+
+      #game-over p {
+        margin: 6px 0;
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      #game-over strong {
+        font-variant-numeric: tabular-nums;
+        color: #ffd257;
+      }
+
+      #game-over .hint {
+        margin-top: 20px;
+        font-size: 14px;
+        opacity: 0.75;
+      }
+
+      #game-over kbd {
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: rgba(244, 250, 246, 0.14);
+        border: 1px solid rgba(244, 250, 246, 0.28);
+        font-family: inherit;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
+    <div id="hud">
+      <div id="hud-time">00:00.0</div>
+      <div class="hud-panel hud-health">
+        <span class="hud-label">Vida</span>
+        <div class="hud-health-row">
+          <div class="hud-bar"><div id="hud-health-fill"></div></div>
+          <span id="hud-health-text">100</span>
+        </div>
+      </div>
+      <div class="hud-panel hud-kills">
+        <span class="hud-label">Abates</span>
+        <span id="hud-kills">0</span>
+      </div>
+    </div>
+    <div id="game-over" hidden>
+      <div class="panel">
+        <h1>Você morreu</h1>
+        <p>Sobreviveu <strong id="final-time">00:00.0</strong></p>
+        <p>Abates <strong id="final-kills">0</strong></p>
+        <p class="hint">Pressione <kbd>R</kbd> para recomeçar</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

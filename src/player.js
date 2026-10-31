@@ -4,6 +4,13 @@ import { COLORS, PLAYER } from './config.js';
 const up = new THREE.Vector3(0, 1, 0);
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const aimPlane = new THREE.Plane(
+  new THREE.Vector3(0, 1, 0),
+  -PLAYER.aimHeight,
+);
+const aimPoint = new THREE.Vector3();
 
 function resolveCollisions(position, colliders) {
   const radius = PLAYER.radius;
@@ -49,33 +56,95 @@ function resolveCollisions(position, colliders) {
 export function createPlayer(scene) {
   const group = new THREE.Group();
 
-  const bodyGeometry = new THREE.CapsuleGeometry(
-    PLAYER.bodyRadius,
-    PLAYER.bodyLength,
-    4,
-    8,
-  );
   const bodyMaterial = new THREE.MeshLambertMaterial({
     color: COLORS.playerBody,
+    emissive: COLORS.hitFlash,
+    emissiveIntensity: 0,
     flatShading: true,
   });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  const skinMaterial = new THREE.MeshLambertMaterial({
+    color: COLORS.playerSkin,
+    emissive: COLORS.hitFlash,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const gunMaterial = new THREE.MeshLambertMaterial({
+    color: COLORS.playerGun,
+    emissive: COLORS.hitFlash,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const accentMaterial = new THREE.MeshLambertMaterial({
+    color: COLORS.playerGunAccent,
+    emissive: COLORS.hitFlash,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const flashableMaterials = [
+    bodyMaterial,
+    skinMaterial,
+    gunMaterial,
+    accentMaterial,
+  ];
+
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(PLAYER.bodyRadius, PLAYER.bodyLength, 4, 8),
+    bodyMaterial,
+  );
   body.position.y = PLAYER.bodyRadius + PLAYER.bodyLength / 2;
+  body.castShadow = true;
   body.updateMatrix();
   body.matrixAutoUpdate = false;
   group.add(body);
 
-  const noseGeometry = new THREE.ConeGeometry(0.16, 0.34, 4);
-  const noseMaterial = new THREE.MeshLambertMaterial({
-    color: COLORS.playerNose,
-    flatShading: true,
-  });
-  const nose = new THREE.Mesh(noseGeometry, noseMaterial);
-  nose.rotation.x = Math.PI / 2;
-  nose.position.set(0, 1, PLAYER.bodyRadius + 0.15);
-  nose.updateMatrix();
-  nose.matrixAutoUpdate = false;
-  group.add(nose);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 8, 6),
+    skinMaterial,
+  );
+  head.position.y = 1.68;
+  head.castShadow = true;
+  head.updateMatrix();
+  head.matrixAutoUpdate = false;
+  group.add(head);
+
+  const armGeometry = new THREE.BoxGeometry(0.16, 0.16, 0.72);
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Mesh(armGeometry, bodyMaterial);
+    arm.position.set(side * 0.28, 1.16, 0.42);
+    arm.castShadow = true;
+    arm.updateMatrix();
+    arm.matrixAutoUpdate = false;
+    group.add(arm);
+  }
+
+  const gunBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.2, 0.62),
+    gunMaterial,
+  );
+  gunBody.position.set(0.24, 1.1, 0.66);
+  gunBody.castShadow = true;
+  gunBody.updateMatrix();
+  gunBody.matrixAutoUpdate = false;
+  group.add(gunBody);
+
+  const barrel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.08, 0.56),
+    accentMaterial,
+  );
+  barrel.position.set(0.24, 1.12, 1.08);
+  barrel.castShadow = true;
+  barrel.updateMatrix();
+  barrel.matrixAutoUpdate = false;
+  group.add(barrel);
+
+  const magazine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.24, 0.12),
+    accentMaterial,
+  );
+  magazine.position.set(0.24, 0.94, 0.62);
+  magazine.updateMatrix();
+  magazine.matrixAutoUpdate = false;
+  group.add(magazine);
 
   scene.add(group);
 
@@ -96,9 +165,29 @@ export function createPlayer(scene) {
   let velocityY = 0;
   let grounded = true;
   let angle = Math.PI;
+  let aimAngle = Math.PI;
+  let flash = 0;
   group.rotation.y = angle;
 
+  function setFlash(intensity) {
+    for (let i = 0; i < flashableMaterials.length; i += 1) {
+      flashableMaterials[i].emissiveIntensity = intensity;
+    }
+  }
+
   function update(dt, input, camera, colliders) {
+    pointer.x = (input.pointerX / window.innerWidth) * 2 - 1;
+    pointer.y = -(input.pointerY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+
+    if (raycaster.ray.intersectPlane(aimPlane, aimPoint)) {
+      const aimX = aimPoint.x - group.position.x;
+      const aimZ = aimPoint.z - group.position.z;
+      if (aimX * aimX + aimZ * aimZ > 0.09) {
+        aimAngle = Math.atan2(aimX, aimZ);
+      }
+    }
+
     camera.getWorldDirection(forward);
     forward.y = 0;
     const forwardLength = Math.hypot(forward.x, forward.z);
@@ -166,15 +255,16 @@ export function createPlayer(scene) {
       }
     }
 
-    const speedSq = velocityX * velocityX + velocityZ * velocityZ;
-    if (speedSq > 0.04) {
-      const targetAngle = Math.atan2(velocityX, velocityZ);
-      const difference = Math.atan2(
-        Math.sin(targetAngle - angle),
-        Math.cos(targetAngle - angle),
-      );
-      angle += difference * (1 - Math.exp(-PLAYER.turnSpeed * dt));
-      group.rotation.y = angle;
+    const difference = Math.atan2(
+      Math.sin(aimAngle - angle),
+      Math.cos(aimAngle - angle),
+    );
+    angle += difference * (1 - Math.exp(-PLAYER.aimTurnSpeed * dt));
+    group.rotation.y = angle;
+
+    if (flash > 0) {
+      flash = Math.max(0, flash - dt);
+      setFlash((flash / PLAYER.flashTime) * 1.8);
     }
 
     const height = group.position.y;
@@ -185,5 +275,36 @@ export function createPlayer(scene) {
       PLAYER.shadowOpacity * Math.max(0.25, 1 - height * 0.45);
   }
 
-  return { group, shadow, update };
+  function flashHit() {
+    flash = PLAYER.flashTime;
+    setFlash(1.8);
+  }
+
+  function reset() {
+    group.position.set(0, 0, 0);
+    velocityX = 0;
+    velocityZ = 0;
+    velocityY = 0;
+    grounded = true;
+    angle = Math.PI;
+    aimAngle = Math.PI;
+    flash = 0;
+    group.rotation.y = angle;
+    setFlash(0);
+    shadow.position.x = 0;
+    shadow.position.z = 0;
+    shadow.scale.setScalar(1);
+    shadowMaterial.opacity = PLAYER.shadowOpacity;
+  }
+
+  return {
+    group,
+    shadow,
+    update,
+    flashHit,
+    reset,
+    get angle() {
+      return angle;
+    },
+  };
 }
