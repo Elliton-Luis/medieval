@@ -1,21 +1,28 @@
 import * as THREE from 'three';
+import { createScene } from './scene.js';
+import { createDebugPanel } from './debug.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x9ec8d8);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  50,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100,
-);
+const { scene, camera, updateCamera } = createScene();
+const debug = import.meta.env.DEV ? createDebugPanel() : null;
 
-function render() {
+const clock = new THREE.Clock();
+
+function animate() {
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
+
+  updateCamera(0, 0, dt);
   renderer.render(scene, camera);
+  if (debug) debug.update(rawDt, renderer.info.render.calls);
+
+  requestAnimationFrame(animate);
 }
 
 function resize() {
@@ -23,9 +30,8 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  render();
 }
 
 window.addEventListener('resize', resize);
 
-render();
+requestAnimationFrame(animate);
