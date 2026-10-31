@@ -3,8 +3,8 @@ import { makeSkinnedMaterial } from "./skins.js";
 import { makeRandom } from "./utils.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
-import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=11";
-import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js?v=11";
+import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=12";
+import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js?v=12";
 
 function getDeterministicFleeTarget(npc) {
   const anchors = npc.root?.userData?.anchors;
@@ -232,6 +232,22 @@ export class NPC {
       addPart(this.model, new THREE.BoxGeometry(0.035, 0.2, 0.04), accent, 0, 1.18, 0.165);
       addPart(this.model, new THREE.BoxGeometry(0.12, 0.035, 0.04), accent, 0, 1.21, 0.165);
       addPart(face, GEO.cap, cloth, 0, 0.045, 0);
+
+      // Hóstia Sagrada e Cálice dourado para a celebração da Santa Missa
+      const hostGroup = new THREE.Group();
+      hostGroup.position.set(0, -0.45, 0.22);
+      this.rightArm.add(hostGroup);
+      const hostMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const chaliceMat = new THREE.MeshStandardMaterial({ color: 0xffdf6d, metalness: 0.7, roughness: 0.3 });
+      const hostDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 12), hostMat);
+      hostDisc.position.set(0, 0.35, 0);
+      hostDisc.rotation.x = Math.PI / 2;
+      hostGroup.add(hostDisc);
+      const chalice = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.04, 0.16, 8), chaliceMat);
+      chalice.position.set(0, 0.12, 0);
+      hostGroup.add(chalice);
+      hostGroup.visible = false;
+      this.hostMesh = hostGroup;
     } else if (this.roleKey === "beggar") {
       addPart(this.model, new THREE.BoxGeometry(0.28, 0.45, 0.03), leather, 0, 0.95, 0.15);
       addPart(this.model, GEO.bag, leather, -0.26, 0.82, 0.04);
@@ -288,6 +304,11 @@ export class NPC {
     }
     if (this.mode !== "work") {
       this._updateAlert(dt, playerX, playerZ);
+      return;
+    }
+    // Rotina da Celebração da Santa Missa (NPCs assistem, comungam e recebem bênção)
+    if (this.massTask) {
+      this._updateMassBehavior(dt);
       return;
     }
     // Rotina de sono noturno (21h às 6h): interpola até sua âncora fixa de residência (home) e desativa renderização
@@ -418,6 +439,229 @@ export class NPC {
     } else if (this.roleKey !== "farmer") {
       this.model.rotation.x = 0;
     }
+  }
+
+  _updateMassBehavior(dt) {
+    const task = this.massTask;
+    const ground = this.world.heightAt(this.x, this.z);
+
+    if (this.roleKey === "priest") {
+      // Comportamento do Padre na Santa Missa
+      if (this.massTarget) {
+        const dx = this.massTarget.x - this.x;
+        const dz = this.massTarget.z - this.z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq > 0.45 * 0.45) {
+          const dist = Math.sqrt(dSq);
+          const step = Math.min(this.role.speed * dt, dist);
+          this.x += (dx / dist) * step;
+          this.z += (dz / dist) * step;
+          this.model.rotation.y = Math.atan2(dx, dz);
+          this.walkPhase += dt * 8.5;
+          const stride = Math.sin(this.walkPhase) * 0.52;
+          this.leftLeg.rotation.x = stride;
+          this.rightLeg.rotation.x = -stride;
+          bendJoints(this, stride, stride);
+          this.task = "Dirigindo-se ao Altar-Mor";
+        } else {
+          if (typeof this.massTarget.yaw === "number") this.model.rotation.y = this.massTarget.yaw;
+          this.leftLeg.rotation.x = 0;
+          this.rightLeg.rotation.x = 0;
+          bendJoints(this, 0, 0);
+        }
+      }
+
+      if (task === "PREACHING") {
+        this.task = "Celebrando a Santa Missa: Homilia no Altar";
+        if (this.hostMesh) this.hostMesh.visible = false;
+        // Gestos oratórios com ambos os braços
+        this.rightArm.rotation.x = -1.1 + Math.sin(this.animTime * 2.2) * 0.35;
+        this.leftArm.rotation.x = -0.9 + Math.cos(this.animTime * 1.8) * 0.3;
+      } else if (task === "ELEVATION") {
+        this.task = "Oferta da Sagrada Hóstia no Altar";
+        if (this.hostMesh) this.hostMesh.visible = true;
+        // Elevação solene com os dois braços erguidos ao céu
+        this.rightArm.rotation.x = -2.6 + Math.sin(this.animTime * 1.5) * 0.08;
+        this.leftArm.rotation.x = -2.6 - Math.sin(this.animTime * 1.5) * 0.08;
+      } else if (task === "DISTRIBUTE_COMMUNION") {
+        this.task = "Distribuindo a Sagrada Comunhão aos Fiéis";
+        if (this.hostMesh) this.hostMesh.visible = true;
+        this.rightArm.rotation.x = -1.2 + Math.sin(this.animTime * 3.0) * 0.2;
+        this.leftArm.rotation.x = -1.0;
+      } else if (task === "FINAL_BLESSING") {
+        this.task = "Concedendo a Bênção Final aos Fiéis";
+        if (this.hostMesh) this.hostMesh.visible = false;
+        // Sinal da cruz no ar com o braço direito
+        this.rightArm.rotation.x = -1.8 + Math.sin(this.animTime * 3.2) * 0.35;
+        this.rightArm.rotation.z = Math.cos(this.animTime * 3.2) * 0.35;
+        this.leftArm.rotation.x = -0.5;
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    // Comportamento dos Fiéis (Civis / Aldeões) na Santa Missa
+    if (task === "GO_TO_PEW") {
+      this.task = "Entrando na Igreja para a Santa Missa";
+      if (this.massTarget) {
+        const dx = this.massTarget.x - this.x;
+        const dz = this.massTarget.z - this.z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq > 0.4 * 0.4) {
+          const dist = Math.sqrt(dSq);
+          const step = Math.min(this.role.speed * dt, dist);
+          this.x += (dx / dist) * step;
+          this.z += (dz / dist) * step;
+          this.model.rotation.y = Math.atan2(dx, dz);
+          this.walkPhase += dt * 8.5;
+          const stride = Math.sin(this.walkPhase) * 0.52;
+          this.leftLeg.rotation.x = stride;
+          this.rightLeg.rotation.x = -stride;
+          bendJoints(this, stride, stride);
+        } else {
+          this.x = this.massTarget.x;
+          this.z = this.massTarget.z;
+          if (typeof this.massTarget.yaw === "number") this.model.rotation.y = this.massTarget.yaw;
+          this.massTask = "SITTING_IN_PEW";
+        }
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    if (task === "SITTING_IN_PEW") {
+      this.task = "Sentado no banco ouvindo a Santa Missa";
+      this.x = this.massTarget?.x ?? this.x;
+      this.z = this.massTarget?.z ?? this.z;
+      if (typeof this.massTarget?.yaw === "number") this.model.rotation.y = this.massTarget.yaw;
+
+      // Pose de sentar no banco da igreja (Zero-GC)
+      this.leftLeg.rotation.x = -1.55;
+      this.rightLeg.rotation.x = -1.55;
+      if (this.leftKnee) this.leftKnee.rotation.x = 1.55;
+      if (this.rightKnee) this.rightKnee.rotation.x = 1.55;
+      this.leftArm.rotation.x = -0.55;
+      this.rightArm.rotation.x = -0.55;
+      this.model.position.y = -0.28;
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    if (task === "WALK_TO_COMMUNION") {
+      this.task = "Indo ao Altar para comungar";
+      this.model.position.y = 0;
+      if (this.communionTarget) {
+        const dx = this.communionTarget.x - this.x;
+        const dz = this.communionTarget.z - this.z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq > 0.45 * 0.45) {
+          const dist = Math.sqrt(dSq);
+          const step = Math.min(this.role.speed * dt, dist);
+          this.x += (dx / dist) * step;
+          this.z += (dz / dist) * step;
+          this.model.rotation.y = Math.atan2(dx, dz);
+          this.walkPhase += dt * 8.5;
+          const stride = Math.sin(this.walkPhase) * 0.52;
+          this.leftLeg.rotation.x = stride;
+          this.rightLeg.rotation.x = -stride;
+          bendJoints(this, stride, stride);
+        } else {
+          this.massTask = "RECEIVING_COMMUNION";
+          this.communionTimer = 2.4;
+        }
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    if (task === "RECEIVING_COMMUNION") {
+      this.task = "Recebendo a Sagrada Comunhão diante do Altar";
+      this.communionTimer = (this.communionTimer ?? 2.4) - dt;
+      // Reverência/genuflexão com as mãos postas
+      this.leftLeg.rotation.x = -0.8;
+      this.rightLeg.rotation.x = -0.8;
+      bendJoints(this, 0.7, 0.7);
+      this.leftArm.rotation.x = -1.45;
+      this.rightArm.rotation.x = -1.45;
+      this.model.position.y = -0.22;
+      this.model.rotation.x = 0.25;
+      if (this.communionTimer <= 0) {
+        this.massTask = "RETURN_TO_PEW";
+        this.hasReceivedCommunion = true;
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    if (task === "RETURN_TO_PEW") {
+      this.task = "Retornando ao banco após comungar";
+      this.model.position.y = 0;
+      this.model.rotation.x = 0;
+      if (this.massTarget) {
+        const dx = this.massTarget.x - this.x;
+        const dz = this.massTarget.z - this.z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq > 0.4 * 0.4) {
+          const dist = Math.sqrt(dSq);
+          const step = Math.min(this.role.speed * dt, dist);
+          this.x += (dx / dist) * step;
+          this.z += (dz / dist) * step;
+          this.model.rotation.y = Math.atan2(dx, dz);
+          this.walkPhase += dt * 8.5;
+          const stride = Math.sin(this.walkPhase) * 0.52;
+          this.leftLeg.rotation.x = stride;
+          this.rightLeg.rotation.x = -stride;
+          bendJoints(this, stride, stride);
+        } else {
+          this.x = this.massTarget.x;
+          this.z = this.massTarget.z;
+          if (typeof this.massTarget.yaw === "number") this.model.rotation.y = this.massTarget.yaw;
+          this.massTask = "SITTING_IN_PEW";
+        }
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    if (task === "LEAVE_CHURCH") {
+      this.task = "Saindo da Igreja após a bênção final";
+      this.model.position.y = 0;
+      this.model.rotation.x = 0;
+      if (this.exitTarget) {
+        const dx = this.exitTarget.x - this.x;
+        const dz = this.exitTarget.z - this.z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq > 1.2 * 1.2) {
+          const dist = Math.sqrt(dSq);
+          const step = Math.min(this.role.speed * dt, dist);
+          this.x += (dx / dist) * step;
+          this.z += (dz / dist) * step;
+          this.model.rotation.y = Math.atan2(dx, dz);
+          this.walkPhase += dt * 8.5;
+          const stride = Math.sin(this.walkPhase) * 0.52;
+          this.leftLeg.rotation.x = stride;
+          this.rightLeg.rotation.x = -stride;
+          bendJoints(this, stride, stride);
+        } else {
+          // Concluiu a saída: restaura rotina normal
+          this.massTask = null;
+          this.massTarget = null;
+          this.communionTarget = null;
+          this.exitTarget = null;
+          this.hasReceivedCommunion = false;
+          this.leftLeg.rotation.x = 0;
+          this.rightLeg.rotation.x = 0;
+          bendJoints(this, 0, 0);
+          this.endAlert?.();
+        }
+      } else {
+        this.massTask = null;
+      }
+      this.root.position.set(this.x, ground, this.z);
+      return;
+    }
+
+    this.root.position.set(this.x, ground, this.z);
   }
 
   // Anda um passo em direção (dx, dz) deslizando em volta de obstáculos.

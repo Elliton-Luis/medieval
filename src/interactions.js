@@ -18,7 +18,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=11";
+} from "./rpg.js?v=12";
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
@@ -310,21 +310,39 @@ export class InteractionSystem {
     } else if (npc.roleKey === "priest") {
       body =
         message ||
-        "Filho, entre na capela: podes sentar nos bancos para meditar, ajoelhar no Altar-Mor, benzer-te na pia de água benta ou tocar o sino da torre.";
-      const pBlessing = this._price(35);
-      const healCost = PlayerStats.cha >= 14 ? 0 : this._price(10);
+        "A paz esteja convosco, viajante. Na Casa do Pai, as bênçãos e o perdão dos céus são sempre dons gratuitos da graça divina para todos os corações contritos.";
       actions = [
         {
           id: "priest:heal",
-          label:
-            healCost === 0
-              ? "Receber Bênção de Cura (Grátis por tua devoção · CAR ≥ 14)"
-              : `Pedir Bênção de Cura (restaura toda a Vitalidade) · ${healCost} moedas`,
-          disabled: this.player.health >= this.player.maxHealth || this.player.coins < healCost,
+          label: "Receber Bênção de Cura dos Enfermos (Sempre Gratuito · Restaura Vitalidade)",
+          disabled: this.player.health >= this.player.maxHealth,
         },
-        { id: "priest:confess", label: "Confessar pecados / Indulgência (zera Procurado e +2 CAR) · 50 moedas", disabled: this.player.coins < 50 },
-        { id: "blessing", label: PlayerEquipment.blessingActive ? "Colar da Bênção · já consagrado" : `Consagrar Colar da Bênção · ${pBlessing} moedas`, disabled: PlayerEquipment.blessingActive || this.player.coins < pBlessing },
-        { id: "priest:guide", label: "Ouvir sermão sobre os mistérios da Igreja" },
+        {
+          id: "priest:confess",
+          label: "Confissão e Absolvição dos Pecados (Sempre Gratuito · Zera Procurado e +2 CAR)",
+        },
+        {
+          id: "blessing",
+          label: PlayerEquipment.blessingActive
+            ? "Colar da Bênção · já consagrado"
+            : "Consagrar Colar da Bênção (Graça Protetora · Gratuito)",
+          disabled: PlayerEquipment.blessingActive,
+        },
+        {
+          id: "priest:mass",
+          label: "✦ Celebrar a Santa Missa na Paróquia (Reunir os Fiéis e a Comunhão)",
+        },
+        {
+          id: "priest:offering:small",
+          label: "Fazer Oferta Voluntária de 5 moedas à paróquia (+1 CAR)",
+          disabled: this.player.coins < 5,
+        },
+        {
+          id: "priest:offering:generous",
+          label: "Fazer Oferta Voluntária de 20 moedas à paróquia (+3 CAR)",
+          disabled: this.player.coins < 20,
+        },
+        { id: "priest:guide", label: "Ouvir ensinamentos sobre os mistérios da Igreja" },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "beggar") {
@@ -500,31 +518,58 @@ export class InteractionSystem {
         this._showNPCDialogue("Fio de navalha! Suas armas agora causam muito mais estrago.");
       }
     } else if (action === "blessing") {
-      if (buyUpgrade("BLESSING", pBlessing)) {
-        this.ui.showToast("Colar da Bênção ativo! Chance passiva de reduzir danos pela metade.");
-        this._showNPCDialogue("Que este amuleto sagrado proteja seu peito nos momentos de provação.");
+      if (buyUpgrade("BLESSING", 0)) {
+        this.ui.showToast("Colar da Bênção consagrado com a graça celestial! (15% redução de dano)");
+        this._showNPCDialogue("«A graça de Deus é dom gratuito». Que este colar abençoado guarde o teu peito.");
       }
     } else if (action === "priest:heal") {
-      const healCost = PlayerStats.cha >= 14 ? 0 : this._price(10);
-      if (this.player.coins >= healCost && this.player.health < this.player.maxHealth) {
-        this.player.coins -= healCost;
-        PlayerStats.gold = this.player.coins;
-        this.player.health = this.player.maxHealth;
-        syncPlayerStatsToPlayer(this.player, this.ui);
-        this.ui.showToast("Bênção de Cura concedida! Vitalidade totalmente restaurada.");
-        this._showNPCDialogue("Que a luz sagrada restaure o vigor do teu corpo e guarde os teus passos.");
+      this.player.health = this.player.maxHealth;
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      this.ui.showToast("Bênção de Cura concedida gratuitamente! Vitalidade totalmente restaurada.");
+      this._showNPCDialogue("«Levanta-te e anda em paz». Que a luz sagrada renove tuas forças.");
+      return;
+    } else if (action === "priest:confess") {
+      if (interactWithPriest(this.player.root.position, this.activeNPC, 0)) {
+        this.ui.showToast("Absolvição concedida gratuitamente! Procurado zerado · Carisma +2");
+        this._showNPCDialogue("«Ego te absolvo a peccatis tuis». Seus pecados estão perdoados pela graça.");
       }
+      return;
+    } else if (action === "priest:offering:small" && this.player.coins >= 5) {
+      this.player.coins -= 5;
+      PlayerStats.gold = this.player.coins;
+      PlayerStats.cha = Math.min(20, PlayerStats.cha + 1);
+      this.audio.coin?.();
+      this.audio.choir?.();
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      this.ui.showToast("Oferta espontânea de 5 moedas entregue ao padre! +1 Carisma.");
+      this._showNPCDialogue("Deus abençoe vossa generosidade espontânea! Os frutos apoiarão os necessitados.");
+      return;
+    } else if (action === "priest:offering:generous" && this.player.coins >= 20) {
+      this.player.coins -= 20;
+      PlayerStats.gold = this.player.coins;
+      PlayerStats.cha = Math.min(20, PlayerStats.cha + 3);
+      this.audio.coin?.();
+      this.audio.choir?.();
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      this.ui.showToast("Oferta generosa de 20 moedas entregue ao padre! +3 Carisma.");
+      this._showNPCDialogue("Tua generosidade enche de júbilo a paróquia! Os céus recompensam os que ofertam com amor.");
+      return;
+    } else if (action === "priest:mass") {
+      if (this.houses?.startChurchMass) {
+        const started = this.houses.startChurchMass(true);
+        if (started) {
+          this.ui.closeDialogue();
+          this.ui.showToast("🔔 A celebração da Santa Missa foi iniciada na Igreja!");
+          return;
+        }
+      }
+      this._showNPCDialogue("A celebração eucarística já está em andamento no Altar-Mor!");
       return;
     } else if (action === "priest:guide") {
       this._showNPCDialogue(
-        "Dentro da Igreja podes abrir a porta (E), sentar nos bancos e rezar (E), ajoelhar diante do Altar-Mor para restaurar o vigor, benzer-te na pia de água benta, depositar ofertas ou tocar o sino da torre!",
+        "Na Casa do Senhor tudo é graça: confissões e bênçãos são sempre gratuitas. Podes fazer ofertas espontâneas, ajoelhar no altar, benzer-te na pia ou ler as Escrituras Sagradas sem pressa no atril.",
       );
       return;
-    } else if (action === "priest:confess") {
-      if (interactWithPriest(this.player.root.position, this.activeNPC, 50)) {
-        this.ui.showToast("Indulgência concedida! Procurado zerado · Carisma +2");
-        this._showNPCDialogue("Ego te absolvo! Seus pecados foram perdoados e a guarda foi apaziguada.");
-      }
     } else if (action === "beggar:alms" && this.activeNPC) {
       if (interactWithBeggar(this.player.root.position, this.activeNPC.root)) {
         this.ui.showToast("Deste esmola ao pobre · Carisma +1!");

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { distanceToRoad, VILLAGES } from "./kingdom.js";
-import { NPC } from "./npc.js?v=11";
+import { NPC } from "./npc.js?v=12";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";

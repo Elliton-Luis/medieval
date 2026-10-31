@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=11";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=12";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -13,8 +13,9 @@ import {
   gatherResource,
   createPlayerBuildingsPool,
   buildStructure,
+  updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=11";
+} from "./rpg.js?v=12";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;
@@ -290,12 +291,20 @@ export class WeaponSystem {
 
     if (this.buildMode) {
       this._cancelCharge();
+      updateBuildPreview(
+        this.player.root.position,
+        this.player.model?.rotation?.y ?? 0,
+        true,
+        this.selectedBuildType || "HOUSE",
+      );
       if (this.input.consumeAttackPressed() && !dead) {
         this._tryBuildInMode();
       }
       this._updateTrajectory(def);
       this._updateProjectiles(dt);
       return;
+    } else {
+      updateBuildPreview(this.player.root.position, 0, false);
     }
 
     if (def.id === "spear" && this.models.spear?.userData?.isThrown) {

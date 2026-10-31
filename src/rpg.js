@@ -867,25 +867,27 @@ function playChoirSound() {
 
 /**
  * Interação Específica: Confessar com o Padre.
- * Zera nível de procurado e restaura Carisma em troca de ouro.
+ * A confissão e a bênção são SEMPRE gratuitas (nunca cobram moedas obrigatoriamente).
+ * Se o jogador desejar, pode passar uma oferta voluntária opcional (voluntaryOffer > 0).
  */
-export function interactWithPriest(playerPos, npcPriest, customCost = 50) {
-  const confessionalCost = customCost;
+export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
   if (_env.player) PlayerStats.gold = _env.player.coins;
 
-  if (PlayerStats.gold >= confessionalCost) {
-    PlayerStats.gold -= confessionalCost;
+  // Oferta estritamente opcional: nunca impede a confissão ou bênção
+  if (voluntaryOffer > 0 && PlayerStats.gold >= voluntaryOffer) {
+    PlayerStats.gold -= voluntaryOffer;
     if (_env.player) _env.player.coins = PlayerStats.gold;
-    resetWantedLevel(); // Despista guardas e zera procurado
-    PlayerStats.cha = Math.min(20, PlayerStats.cha + 2); // Purifica a alma
-    playChoirSound(); // Efeito sonoro angelical
-    if (_env.effects && _env.player) {
-      _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
-    }
-    syncPlayerStatsToPlayer();
-    return true;
+    PlayerInventory.gold = PlayerStats.gold;
   }
-  return false;
+
+  resetWantedLevel(); // Despista guardas e zera procurado gratuitamente
+  PlayerStats.cha = Math.min(20, PlayerStats.cha + 2); // Purifica a alma
+  playChoirSound(); // Efeito sonoro angelical
+  if (_env.effects && _env.player) {
+    _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
+  }
+  syncPlayerStatsToPlayer();
+  return true;
 }
 
 /**
@@ -1125,56 +1127,264 @@ const _buildEuler = new THREE.Euler();
 function _buildPlayerHouseMesh() {
   const group = new THREE.Group();
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0x77796d, roughness: 0.95, flatShading: true });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.9, flatShading: true });
-  const timberMat = new THREE.MeshStandardMaterial({ color: 0x563e2b, roughness: 0.92, flatShading: true });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x654a3a, roughness: 0.9, flatShading: true });
+  const plasterMat = new THREE.MeshStandardMaterial({ color: 0xd9cca9, roughness: 0.88, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4e3620, roughness: 0.92, flatShading: true });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x6e3d2c, roughness: 0.9, flatShading: true });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a5b3a, roughness: 0.9, flatShading: true });
+  const rugMat = new THREE.MeshStandardMaterial({ color: 0x93302a, roughness: 0.95, flatShading: true });
+  const hayMat = new THREE.MeshStandardMaterial({ color: 0xd4b055, roughness: 0.9, flatShading: true });
+  const ironMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5, flatShading: true });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xffe29a, roughness: 0.3, transparent: true, opacity: 0.85 });
 
-  // Fundação de pedra que desce até o solo
-  const found = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.2, 4.4), stoneMat);
-  found.position.set(0, -1.52, 0);
+  // 1. Fundação maciça de pedra com degrau frontal de entrada
+  const found = new THREE.Mesh(new THREE.BoxGeometry(5.4, 3.2, 4.6), stoneMat);
+  found.position.set(0, -1.5, 0);
   found.castShadow = true;
   found.receiveShadow = true;
   group.add(found);
 
-  // Paredes laterais e traseira + fachada com vão de porta frontal (+Z)
-  const backW = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.2, 0.28), wallMat);
+  const step1 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.16, 0.7), stoneMat);
+  step1.position.set(0, 0.08, 2.45);
+  group.add(step1);
+
+  // 2. Piso de tábuas de madeira no interior
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.12, 4.0), floorMat);
+  floor.position.set(0, 0.06, 0);
+  group.add(floor);
+
+  // Tapete rústico de tear na entrada
+  const rug = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.02, 2.0), rugMat);
+  rug.position.set(0, 0.13, 0.3);
+  group.add(rug);
+
+  // 3. Paredes de Enxaimel (Half-Timbered): reboco + vigas de carvalho aparentes
+  // Parede Traseira (-Z)
+  const backW = new THREE.Mesh(new THREE.BoxGeometry(4.9, 3.1, 0.22), plasterMat);
   backW.position.set(0, 1.6, -2.0);
   backW.castShadow = true;
   group.add(backW);
 
-  const leftW = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.2, 4.2), wallMat);
-  leftW.position.set(-2.36, 1.6, 0);
+  // Parede Esquerda (-X)
+  const leftW = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.1, 4.1), plasterMat);
+  leftW.position.set(-2.4, 1.6, 0);
   leftW.castShadow = true;
   group.add(leftW);
 
-  const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.2, 4.2), wallMat);
-  rightW.position.set(2.36, 1.6, 0);
+  // Parede Direita (+X)
+  const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.1, 4.1), plasterMat);
+  rightW.position.set(2.4, 1.6, 0);
   rightW.castShadow = true;
   group.add(rightW);
 
-  const frontL = new THREE.Mesh(new THREE.BoxGeometry(1.65, 3.2, 0.28), wallMat);
-  frontL.position.set(-1.68, 1.6, 2.0);
+  // Fachada Frontal com vão de porta aberta (+Z)
+  const frontL = new THREE.Mesh(new THREE.BoxGeometry(1.65, 3.1, 0.22), plasterMat);
+  frontL.position.set(-1.62, 1.6, 2.0);
   frontL.castShadow = true;
   group.add(frontL);
 
-  const frontR = new THREE.Mesh(new THREE.BoxGeometry(1.65, 3.2, 0.28), wallMat);
-  frontR.position.set(1.68, 1.6, 2.0);
+  const frontR = new THREE.Mesh(new THREE.BoxGeometry(1.65, 3.1, 0.22), plasterMat);
+  frontR.position.set(1.62, 1.6, 2.0);
   frontR.castShadow = true;
   group.add(frontR);
 
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.85, 0.3), timberMat);
-  lintel.position.set(0, 2.78, 2.0);
-  group.add(lintel);
+  const doorHeader = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.85, 0.24), timberMat);
+  doorHeader.position.set(0, 2.72, 2.0);
+  group.add(doorHeader);
 
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.0, 2.0, 4), roofMat);
-  roof.position.set(0, 4.15, 0);
-  roof.rotation.y = Math.PI / 4;
-  roof.castShadow = true;
-  group.add(roof);
+  // Vigamento Enxaimel estrutural aparente nos 4 cantos e beirais
+  for (const cx of [-2.45, 2.45]) {
+    for (const cz of [-2.05, 2.05]) {
+      const cornerPost = new THREE.Mesh(new THREE.BoxGeometry(0.26, 3.2, 0.26), timberMat);
+      cornerPost.position.set(cx, 1.6, cz);
+      group.add(cornerPost);
+    }
+  }
+  // Viga cinta superior perimetral
+  const beamFront = new THREE.Mesh(new THREE.BoxGeometry(5.1, 0.2, 0.26), timberMat);
+  beamFront.position.set(0, 3.15, 2.05);
+  group.add(beamFront);
+  const beamBack = new THREE.Mesh(new THREE.BoxGeometry(5.1, 0.2, 0.26), timberMat);
+  beamBack.position.set(0, 3.15, -2.05);
+  group.add(beamBack);
+
+  // Janelas medievais com batentes e vidro âmbar nas laterais
+  for (const sx of [-2.42, 2.42]) {
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.9), glassMat);
+    glass.position.set(sx, 1.7, 0);
+    group.add(glass);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.05, 1.05), timberMat);
+    frame.position.set(sx, 1.7, 0);
+    group.add(frame);
+    // Venezianas/contraventuras de madeira abertas
+    const shutter = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.95, 0.45), timberMat);
+    shutter.position.set(sx + (sx > 0 ? 0.12 : -0.12), 1.7, 0.65);
+    shutter.rotation.y = sx > 0 ? -0.4 : 0.4;
+    group.add(shutter);
+  }
+
+  // 4. Telhado de duas águas medieval (Gable Roof) com beirais pronunciados
+  const roofPitch = 1.6;
+  const roofRun = 2.75;
+  const roofLen = Math.hypot(roofRun, roofPitch);
+  const roofAng = Math.atan2(roofPitch, roofRun);
+
+  for (const side of [-1, 1]) {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(roofLen + 0.35, 0.16, 4.7), roofMat);
+    slope.position.set(side * (roofRun * 0.5), 3.1 + roofPitch * 0.5, 0);
+    slope.rotation.z = -side * roofAng;
+    slope.castShadow = true;
+    group.add(slope);
+  }
+  // Cumeeira central reforçada
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 4.8), timberMat);
+  ridge.position.set(0, 3.1 + roofPitch + 0.05, 0);
+  group.add(ridge);
+
+  // Frontões triangulares (Oitões) na frente e trás
+  for (const fz of [-2.02, 2.02]) {
+    const gable = new THREE.Mesh(new THREE.ConeGeometry(2.7, roofPitch, 4), plasterMat);
+    gable.position.set(0, 3.1 + roofPitch * 0.46, fz);
+    gable.rotation.y = Math.PI / 4;
+    group.add(gable);
+  }
+
+  // Chaminé de pedra lateral
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.8, 0.7), stoneMat);
+  chimney.position.set(-1.8, 2.5, -1.5);
+  chimney.castShadow = true;
+  group.add(chimney);
+  const chimneyCap = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.15, 0.85), stoneMat);
+  chimneyCap.position.set(-1.8, 4.95, -1.5);
+  group.add(chimneyCap);
+
+  // 5. Interior Aconchegante Mobiliado (Cama rústica, Mesa de carvalho, Baú, Lareira)
+  // Cama com colchão de palha e travesseiro
+  const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.38, 2.0), timberMat);
+  bedFrame.position.set(-1.6, 0.25, 0.9);
+  group.add(bedFrame);
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 1.85), hayMat);
+  mattress.position.set(-1.6, 0.48, 0.9);
+  group.add(mattress);
+  const pillow = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.45), plasterMat);
+  pillow.position.set(-1.6, 0.58, 1.55);
+  group.add(pillow);
+
+  // Mesa rústica e banco
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 1.6), timberMat);
+  tableTop.position.set(1.5, 0.82, -0.6);
+  group.add(tableTop);
+  for (const tx of [1.1, 1.9]) {
+    for (const tz of [-1.2, 0.0]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.76, 0.1), timberMat);
+      leg.position.set(tx, 0.42, tz);
+      group.add(leg);
+    }
+  }
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 1.4), timberMat);
+  bench.position.set(0.95, 0.26, -0.6);
+  group.add(bench);
+
+  // Baú de madeira e ferro no canto
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.55, 0.55), timberMat);
+  chest.position.set(1.7, 0.35, 1.5);
+  group.add(chest);
+  const chestBands = new THREE.Mesh(new THREE.BoxGeometry(0.87, 0.57, 0.14), ironMat);
+  chestBands.position.set(1.7, 0.35, 1.5);
+  group.add(chestBands);
 
   group.visible = false;
   group.userData = { type: "HOUSE", collidersRegistered: false };
   return group;
+}
+
+// ----------------------------------------------------------------------------
+// Preview Holográfico 3D da Construção (Hologram / Blueprint Preview)
+// ----------------------------------------------------------------------------
+let _buildPreviewGroup = null;
+let _previewHouseGroup = null;
+let _previewCorralGroup = null;
+const _previewGreenMat = new THREE.MeshBasicMaterial({ color: 0x3cd070, transparent: true, opacity: 0.48, wireframe: false });
+const _previewRedMat = new THREE.MeshBasicMaterial({ color: 0xf54a38, transparent: true, opacity: 0.48, wireframe: false });
+
+function _getBuildPreviewGroup(scene = _env.scene) {
+  if (_buildPreviewGroup || !scene) return _buildPreviewGroup;
+  _buildPreviewGroup = new THREE.Group();
+  _buildPreviewGroup.name = "BuildPreviewHologram";
+
+  _previewHouseGroup = _buildPlayerHouseMesh();
+  _previewHouseGroup.traverse((obj) => {
+    if (obj.isMesh) {
+      obj.material = _previewGreenMat;
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+    }
+  });
+  _previewHouseGroup.visible = false;
+  _buildPreviewGroup.add(_previewHouseGroup);
+
+  _previewCorralGroup = _buildPlayerCorralMesh();
+  _previewCorralGroup.traverse((obj) => {
+    if (obj.isMesh) {
+      obj.material = _previewGreenMat;
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+    }
+  });
+  _previewCorralGroup.visible = false;
+  _buildPreviewGroup.add(_previewCorralGroup);
+
+  _buildPreviewGroup.visible = false;
+  scene.add(_buildPreviewGroup);
+  return _buildPreviewGroup;
+}
+
+/**
+ * Atualiza posição, rotação e visual translúcido do holograma 3D de construção.
+ */
+export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE") {
+  const preview = _getBuildPreviewGroup(_env.scene);
+  if (!preview) return;
+
+  if (!active) {
+    preview.visible = false;
+    if (_previewHouseGroup) _previewHouseGroup.visible = false;
+    if (_previewCorralGroup) _previewCorralGroup.visible = false;
+    return;
+  }
+
+  const cost = BUILD_COSTS[type] || BUILD_COSTS.HOUSE;
+  const canAfford =
+    PlayerInventory.wood >= cost.wood &&
+    (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
+    (cost.hay ? PlayerInventory.hay >= cost.hay : true);
+
+  const activeMat = canAfford ? _previewGreenMat : _previewRedMat;
+
+  const rotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
+  _buildEuler.set(0, rotY, 0);
+  _buildOffset.set(0, 0, 4.2).applyEuler(_buildEuler);
+
+  const bx = (playerPos.x ?? 0) + _buildOffset.x;
+  const bz = (playerPos.z ?? 0) + _buildOffset.z;
+  const by = _env.world ? _env.world.heightAt(bx, bz) : playerPos.y ?? 0;
+
+  preview.position.set(bx, by, bz);
+  preview.rotation.y = rotY;
+  preview.visible = true;
+
+  if (type === "HOUSE") {
+    if (_previewHouseGroup) {
+      _previewHouseGroup.visible = true;
+      _previewHouseGroup.traverse((obj) => { if (obj.isMesh) obj.material = activeMat; });
+    }
+    if (_previewCorralGroup) _previewCorralGroup.visible = false;
+  } else {
+    if (_previewCorralGroup) {
+      _previewCorralGroup.visible = true;
+      _previewCorralGroup.traverse((obj) => { if (obj.isMesh) obj.material = activeMat; });
+    }
+    if (_previewHouseGroup) _previewHouseGroup.visible = false;
+  }
 }
 
 function _buildPlayerCorralMesh() {

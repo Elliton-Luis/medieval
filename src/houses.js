@@ -6,19 +6,32 @@ import {
   interactWithChest,
   checkWitnesses,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=11";
+} from "./rpg.js?v=12";
 
 const LOOT_CHEST = { coins: [8, 20], items: [["potion", 0.3], ["gem", 0.2], ["bread", 0.4], ["bolts", 0.3], ["arrows", 0.3]] };
 const _targetScratch = { type: null, house: null, data: null, label: null };
 
-const SCRIPTURE_VERSES = [
-  "«Livro I das Crônicas de Caldera: Quando a noite desce sobre os vales, só a chama da fé e a vigília das tochas guardam os justos das feras da floresta.»",
-  "«Livro II dos Salmos da Montanha: Bem-aventurado o que reparte o pão com o mendigo na praça, pois sua estima diante do povo brilhará como ouro.»",
-  "«Livro III da Ordem Real: Aquele que busca redenção no altar encontrará abrigo sob o teto sagrado e perdão para suas faltas.»",
+const SCRIPTURE_CHAPTERS = [
+  {
+    title: "Capítulo I — A Luz nos Vales e a Vigília Noturna",
+    text: "«Quando a noite desce sobre as montanhas e as sombras engolem as estradas de Caldera, só a chama da fé e a vigília das tochas guardam os justos das feras e dos espíritos inquietos da floresta. Mantende vossa tocha acesa, pois a escuridão cede àquele que caminha com retidão e coragem.»",
+  },
+  {
+    title: "Capítulo II — O Pão Compartilhado e a Caridade",
+    text: "«Bem-aventurado o que reparte o feno e o pão com o mendigo na praça e socorre os que nada possuem, pois sua estima diante do povo brilhará mais que o ouro forjado. A avareza apodrece os celeiros, mas o coração generoso colhe lealdade em cada esquina do reino.»",
+  },
+  {
+    title: "Capítulo III — O Perdão no Altar e a Graça Gratuita",
+    text: "«Nenhum homem é rico o bastante para comprar a graça celestial, nem pobre demais para ser recusado diante do presbitério. O sacerdócio não negocia o perdão: as bênçãos e a confissão são gratuitas a todos os que buscam redenção no Altar Sagrado com o coração sincero.»",
+  },
+  {
+    title: "Capítulo IV — A Santa Ceia e a Comunhão dos Fiéis",
+    text: "«Reuni-vos sob o teto sagrado ao dobrar dos sinos. O sacerdote elevará a Hóstia imaculada e os fiéis se aproximarão do altar em santa paz. Aquele que comunga no santuário encontra renovação para as batalhas do mundo e paz duradoura para o seu espírito.»",
+  },
 ];
 
 export class HouseSystem {
-  constructor({ houses, player, ui, effects, audio, npcs, drops, sleep, candle, wells = [], townBenches = [] }) {
+  constructor({ houses, player, ui, effects, audio, npcs, drops, sleep, candle, input = null, wells = [], townBenches = [] }) {
     this.houses = houses;
     this.player = player;
     this.ui = ui;
@@ -28,6 +41,7 @@ export class HouseSystem {
     this.drops = drops;
     this.sleep = sleep;
     this.candle = candle;
+    this.input = input;
     this.wells = wells;
     this.townBenches = townBenches;
     this.current = null;
@@ -36,6 +50,20 @@ export class HouseSystem {
     this._wellCooldown = 0;
     this._altarBlessCooldown = 0;
     this._scriptureIndex = 0;
+
+    // Estado do evento da celebração da Santa Missa (Random Church Mass Event)
+    this.mass = {
+      active: false,
+      state: "IDLE", // IDLE, GATHERING, PREACHING, ELEVATION, COMMUNION, BLESSING, DISMISSAL
+      timer: 0,
+      church: null,
+      priest: null,
+      attendees: [],
+      communionQueue: [],
+      activeCommunionNpc: null,
+      communionCooldown: 0,
+      nextRandomCheck: 45, // Segundos até checar probabilidade de missa espontânea
+    };
   }
 
   // Dono de cada casa: o morador civil mais próximo que ainda não tem casa.
@@ -82,6 +110,9 @@ export class HouseSystem {
     const player = this.player;
     if (this._wellCooldown > 0) this._wellCooldown = Math.max(0, this._wellCooldown - dt);
     if (this._altarBlessCooldown > 0) this._altarBlessCooldown = Math.max(0, this._altarBlessCooldown - dt);
+
+    // Atualiza a celebração e dinâmica da Santa Missa na igreja
+    this.updateChurchMass(dt);
 
     let inside = null;
     let nearestDistance = 3.1 * 3.1;
@@ -423,11 +454,9 @@ export class HouseSystem {
       return true;
     }
     if (t.type === "lectern" && house?.lectern) {
-      const verse = SCRIPTURE_VERSES[this._scriptureIndex % SCRIPTURE_VERSES.length];
-      this._scriptureIndex++;
       this.audio.choir?.();
       this.effects.play("glint", house.lectern.x, house.floorY + 1.35, house.lectern.z, "#fff0a8", 1.15);
-      this.ui.showToast(verse);
+      this.openScriptureModal(this._scriptureIndex);
       return true;
     }
     if (t.type === "well" && t.data) {
@@ -480,6 +509,278 @@ export class HouseSystem {
       return true;
     }
     return false;
+  }
+
+  // Abre modal persistente de leitura das Escrituras Sagradas
+  openScriptureModal(chapterIndex = 0) {
+    this._scriptureIndex = (chapterIndex + SCRIPTURE_CHAPTERS.length) % SCRIPTURE_CHAPTERS.length;
+    const chapter = SCRIPTURE_CHAPTERS[this._scriptureIndex];
+    if (this.input) this.input.setModalOpen(true);
+    if (document.pointerLockElement) document.exitPointerLock();
+
+    const actions = [
+      {
+        id: "scripture:prev",
+        label: "◀ Capítulo Anterior",
+      },
+      {
+        id: "scripture:next",
+        label: "Próximo Capítulo ▶",
+      },
+      {
+        id: "scripture:close",
+        label: "Fechar Leitura (Retornar ao Jogo)",
+      },
+    ];
+
+    const prevAction = this.ui.onDialogAction;
+    const prevClose = this.ui.onDialogClose;
+
+    const cleanup = () => {
+      this.ui.onDialogAction = prevAction;
+      this.ui.onDialogClose = prevClose;
+      if (this.input) this.input.setModalOpen(false);
+    };
+
+    this.ui.onDialogAction = (actionId) => {
+      if (actionId === "scripture:close") {
+        this.ui.closeDialogue();
+        cleanup();
+      } else if (actionId === "scripture:prev") {
+        this.openScriptureModal(this._scriptureIndex - 1);
+      } else if (actionId === "scripture:next") {
+        this.openScriptureModal(this._scriptureIndex + 1);
+      }
+    };
+
+    this.ui.onDialogClose = () => {
+      cleanup();
+    };
+
+    this.ui.showDialogue(
+      `Crônicas Sagradas do Reino — ${chapter.title}`,
+      `${chapter.text}\n\n(Lendo no atril sagrado · Podes permanecer lendo pelo tempo que desejar)`,
+      actions,
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Celebração da Santa Missa (Random Church Mass Event)
+  // --------------------------------------------------------------------------
+  startChurchMass(force = false) {
+    if (this.mass.active) return false;
+    const church = this.houses.find((h) => h.type === "church");
+    if (!church) return false;
+
+    // Encontra o padre e fiéis civis nas imediações
+    let priest = null;
+    const attendees = [];
+    for (let i = 0; i < this.npcs.npcs.length; i++) {
+      const npc = this.npcs.npcs[i];
+      if (!npc.alive || npc.temporary || npc.controlled) continue;
+      if (npc.roleKey === "priest" && !priest) {
+        priest = npc;
+      } else if (
+        npc.roleKey !== "guard" &&
+        npc.roleKey !== "horse" &&
+        npc.roleKey !== "werewolf" &&
+        attendees.length < 4
+      ) {
+        attendees.push(npc);
+      }
+    }
+
+    if (!priest || attendees.length === 0) return false;
+
+    this.mass.active = true;
+    this.mass.state = "GATHERING";
+    this.mass.timer = 0;
+    this.mass.church = church;
+    this.mass.priest = priest;
+    this.mass.attendees = attendees;
+    this.mass.communionQueue = [];
+    this.mass.activeCommunionNpc = null;
+    this.mass.communionCooldown = 0;
+
+    // Abre a porta da igreja e toca o sino sagrado
+    church.door.open = true;
+    church.door.target = -1.65;
+    if (church.bellRope) church.bellRope.swingTimer = 5.0;
+    this.audio.churchBell?.();
+    this.audio.choir?.();
+
+    // Posiciona o Padre no Altar-Mor
+    priest.massTask = "PREACHING";
+    priest.massTarget = {
+      x: church.altar ? church.altar.x : church.x,
+      z: church.altar ? church.altar.z + 0.35 : church.z - 2.5,
+      yaw: (church.ry || 0) + Math.PI,
+    };
+
+    // Aloca cada fiel a um banco da igreja
+    const seats = church.seats || [];
+    for (let i = 0; i < attendees.length; i++) {
+      const npc = attendees[i];
+      const seat = seats[i % seats.length];
+      npc.massTask = "GO_TO_PEW";
+      npc.massTarget = seat
+        ? { x: seat.x, z: seat.z, yaw: seat.yaw }
+        : { x: church.x + (i % 2 === 0 ? -1.5 : 1.5), z: church.z, yaw: (church.ry || 0) + Math.PI };
+      npc.communionTarget = {
+        x: church.altar ? church.altar.x + (i % 2 === 0 ? -0.4 : 0.4) : church.x,
+        z: church.altar ? church.altar.z + 1.25 : church.z - 1.2,
+      };
+      npc.exitTarget = {
+        x: church.doorFront?.x ?? church.x,
+        z: church.doorFront?.z ? church.doorFront.z + 4.5 : church.z + 8.0,
+      };
+      npc.hasReceivedCommunion = false;
+    }
+
+    this.ui.showToast(`🔔 A celebração da Santa Missa está começando na ${church.name}!`);
+    return true;
+  }
+
+  updateChurchMass(dt) {
+    if (!this.mass.active) {
+      this.mass.nextRandomCheck -= dt;
+      if (this.mass.nextRandomCheck <= 0) {
+        this.mass.nextRandomCheck = 75 + Math.random() * 60; // Checa a cada ~1.5 - 2 minutos
+        // 45% de chance de iniciar missa espontânea se for dia
+        if (Math.random() < 0.45) {
+          this.startChurchMass(false);
+        }
+      }
+      return;
+    }
+
+    this.mass.timer += dt;
+    const { church, priest, attendees } = this.mass;
+
+    switch (this.mass.state) {
+      case "GATHERING": {
+        // Aguarda os fiéis chegarem e sentarem nos bancos
+        let allSeated = true;
+        for (let i = 0; i < attendees.length; i++) {
+          if (attendees[i].massTask !== "SITTING_IN_PEW") {
+            allSeated = false;
+            break;
+          }
+        }
+        if (allSeated || this.mass.timer > 16.0) {
+          for (let i = 0; i < attendees.length; i++) attendees[i].massTask = "SITTING_IN_PEW";
+          this.mass.state = "PREACHING";
+          this.mass.timer = 0;
+          priest.massTask = "PREACHING";
+          this.ui.showToast("Padre no Altar: «O Senhor esteja convosco. Ouvi as santas palavras...»");
+        }
+        break;
+      }
+
+      case "PREACHING": {
+        if (this.mass.timer > 9.0) {
+          // Passa para a oferta e elevação da Hóstia
+          this.mass.state = "ELEVATION";
+          this.mass.timer = 0;
+          priest.massTask = "ELEVATION";
+          this.audio.choir?.();
+          this.effects.play("star", priest.x, priest.root.position.y + 2.2, priest.z, "#fff1a8", 1.85);
+          this.ui.showToast("Padre no Altar: «Eis o Cordeiro de Deus que tira o pecado do mundo!»");
+        }
+        break;
+      }
+
+      case "ELEVATION": {
+        if (this.mass.timer > 6.0) {
+          // Inicia a fila da comunhão
+          this.mass.state = "COMMUNION";
+          this.mass.timer = 0;
+          priest.massTask = "DISTRIBUTE_COMMUNION";
+          this.mass.communionQueue = [...attendees];
+          this.mass.activeCommunionNpc = null;
+          this.mass.communionCooldown = 0.5;
+          this.ui.showToast("Início da Comunhão: Os fiéis se levantam e vão ao altar receber a bênção.");
+        }
+        break;
+      }
+
+      case "COMMUNION": {
+        this.mass.communionCooldown = Math.max(0, this.mass.communionCooldown - dt);
+
+        if (!this.mass.activeCommunionNpc && this.mass.communionQueue.length > 0 && this.mass.communionCooldown <= 0) {
+          const nextNpc = this.mass.communionQueue.shift();
+          this.mass.activeCommunionNpc = nextNpc;
+          nextNpc.massTask = "WALK_TO_COMMUNION";
+        }
+
+        if (this.mass.activeCommunionNpc) {
+          const curr = this.mass.activeCommunionNpc;
+          if (curr.hasReceivedCommunion && curr.massTask === "SITTING_IN_PEW") {
+            this.mass.activeCommunionNpc = null;
+            this.mass.communionCooldown = 1.0;
+          }
+        }
+
+        // Se toda a fila terminou e todos voltaram a sentar nos bancos
+        if (this.mass.communionQueue.length === 0 && !this.mass.activeCommunionNpc) {
+          let everyoneSeated = true;
+          for (let i = 0; i < attendees.length; i++) {
+            if (attendees[i].massTask !== "SITTING_IN_PEW") {
+              everyoneSeated = false;
+              break;
+            }
+          }
+          if (everyoneSeated || this.mass.timer > 35.0) {
+            this.mass.state = "FINAL_BLESSING";
+            this.mass.timer = 0;
+            priest.massTask = "FINAL_BLESSING";
+            this.audio.choir?.();
+            this.effects.play("glint", priest.x, priest.root.position.y + 2.0, priest.z, "#ffe57d", 2.0);
+            this.ui.showToast("Padre: «A bênção de Deus Todo-Poderoso desça sobre vós. Ide em paz!»");
+          }
+        }
+        break;
+      }
+
+      case "FINAL_BLESSING": {
+        if (this.mass.timer > 6.0) {
+          // Fiéis se levantam e saem da igreja
+          this.mass.state = "DISMISSAL";
+          this.mass.timer = 0;
+          for (let i = 0; i < attendees.length; i++) {
+            attendees[i].massTask = "LEAVE_CHURCH";
+          }
+          priest.massTask = null;
+          if (priest.hostMesh) priest.hostMesh.visible = false;
+          priest.endAlert?.();
+          this.ui.showToast("A Santa Missa foi encerrada. Os fiéis saem em paz.");
+        }
+        break;
+      }
+
+      case "DISMISSAL": {
+        let allExited = true;
+        for (let i = 0; i < attendees.length; i++) {
+          if (attendees[i].massTask) {
+            allExited = false;
+            break;
+          }
+        }
+        if (allExited || this.mass.timer > 20.0) {
+          for (let i = 0; i < attendees.length; i++) {
+            attendees[i].massTask = null;
+            attendees[i].endAlert?.();
+          }
+          this.mass.active = false;
+          this.mass.state = "IDLE";
+          this.mass.timer = 0;
+          this.mass.attendees = [];
+          this.mass.church = null;
+          this.mass.priest = null;
+        }
+        break;
+      }
+    }
   }
 
   // Golpes, tiros e explosões quebram a mobília.
