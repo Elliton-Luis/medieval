@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
-import { PlayerStats } from "./rpg.js?v=12";
+import { PlayerStats } from "./rpg.js?v=13";
 
 const ROLL_DURATION = 0.55;
 const ROLL_SPEED = 9.5;
@@ -121,38 +121,46 @@ export class Player {
     });
     Object.assign(this, body);
 
-    // Armadura leve: peitoral, ombreiras, cinto, grevas e túnica com brasão.
+    // Armadura do Jogador: Peitoral detalhado, espaldar, cinto com fivela, grevas e túnica
     const plate = new THREE.LatheGeometry(
-      [[0.01, 0.12], [0.15, 0.14], [0.17, 0.3], [0.21, 0.46], [0.22, 0.54], [0.15, 0.62], [0.01, 0.62]].map(([r, y]) => new THREE.Vector2(r, y)),
-      10,
-    ).scale(1, 1, 0.72);
-    this.chestArmor = makePart(plate, steel, this.model, 0, 0.8, 0.012);
-    makePart(new THREE.BoxGeometry(0.07, 0.3, 0.02), gold, this.model, 0, 1.28, 0.165, false);
-    makePart(new THREE.BoxGeometry(0.2, 0.06, 0.02), gold, this.model, 0, 1.36, 0.16, false);
+      [[0.01, 0.12], [0.16, 0.14], [0.18, 0.3], [0.22, 0.46], [0.225, 0.54], [0.16, 0.62], [0.01, 0.62]].map(([r, y]) => new THREE.Vector2(r, y)),
+      12,
+    ).scale(1.04, 1.0, 0.76);
+    this.chestArmor = makePart(plate, steel, this.model, 0, 0.82, 0.015);
+    makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), gold, this.model, 0, 1.3, 0.175, false);
+    makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), gold, this.model, 0, 1.38, 0.17, false);
+
+    // Ombreiras sólidas anatômicas
     for (const arm of [this.leftArm, this.rightArm]) {
-      const pauldron = makePart(new THREE.SphereGeometry(0.095, 9, 7), darkSteel, arm, 0, 0.03, 0);
-      pauldron.scale.set(1.2, 0.85, 1.05);
+      const pauldron = makePart(new THREE.SphereGeometry(0.1, 10, 8), darkSteel, arm, 0, 0.02, 0);
+      pauldron.scale.set(1.22, 0.9, 1.1);
+      makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), steel, arm, 0, -0.04, 0);
     }
-    const belt = makePart(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10), leather, this.model, 0, 0.84, 0);
-    belt.scale.z = 0.76;
-    makePart(new THREE.BoxGeometry(0.07, 0.06, 0.03), gold, this.model, 0, 0.84, 0.16, false);
-    const skirt = makePart(new THREE.CylinderGeometry(0.19, 0.26, 0.3, 10), cloth, this.model, 0, 0.66, 0);
-    skirt.scale.z = 0.74;
-    makePart(new THREE.BoxGeometry(0.2, 0.42, 0.025), heraldry, this.model, 0, 0.6, 0.185, false);
+    const belt = makePart(new THREE.CylinderGeometry(0.21, 0.21, 0.07, 12), leather, this.model, 0, 0.84, 0);
+    belt.scale.z = 0.78;
+    makePart(new THREE.BoxGeometry(0.08, 0.07, 0.035), gold, this.model, 0, 0.84, 0.17, false);
+    // Túnica e saia de placas integrada
+    const skirt = makePart(new THREE.CylinderGeometry(0.2, 0.28, 0.32, 12), cloth, this.model, 0, 0.66, 0);
+    skirt.scale.z = 0.76;
+    makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), heraldry, this.model, 0, 0.6, 0.19, false);
+
+    // Placas de perna / grevas
     for (const knee of [this.leftKnee, this.rightKnee]) {
-      makePart(new THREE.BoxGeometry(0.1, 0.24, 0.025), steel, knee, 0, -0.22, 0.055, false);
-      makePart(new THREE.SphereGeometry(0.06, 7, 5), darkSteel, knee, 0, 0, 0.03);
+      makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), steel, knee, 0, -0.19, 0.06, false);
+      makePart(new THREE.SphereGeometry(0.068, 8, 6), darkSteel, knee, 0, 0, 0.035);
     }
+    // Braçadeiras protetoras contínuas
     for (const fore of [this.leftForearm, this.rightForearm]) {
-      makePart(new THREE.CylinderGeometry(0.052, 0.046, 0.16, 8), darkSteel, fore, 0, -0.15, 0);
+      makePart(new THREE.CylinderGeometry(0.055, 0.048, 0.18, 9), darkSteel, fore, 0, -0.15, 0);
     }
 
-    // Elmo aberto com protetor de nariz e penacho.
+    // Elmo Cavaleiresco medieval com cota de malha / camal no pescoço
     const head = this.head;
-    makePart(new THREE.SphereGeometry(0.138, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.6), steel, head, 0, 0.03, -0.005);
-    makePart(new THREE.CylinderGeometry(0.142, 0.142, 0.03, 10), darkSteel, head, 0, 0.07, 0);
-    makePart(new THREE.BoxGeometry(0.02, 0.1, 0.02), steel, head, 0, -0.01, 0.128, false);
-    makePart(new THREE.ConeGeometry(0.03, 0.2, 4), heraldry, head, 0, 0.19, -0.06, false);
+    makePart(new THREE.CylinderGeometry(0.12, 0.15, 0.18, 10), darkSteel, head, 0, -0.1, 0); // Camal cobrindo o pescoço
+    makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), steel, head, 0, 0.035, -0.005);
+    makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), darkSteel, head, 0, 0.075, 0);
+    makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), steel, head, 0, -0.01, 0.132, false); // Nasal bar
+    makePart(new THREE.ConeGeometry(0.035, 0.22, 4), heraldry, head, 0, 0.2, -0.06, false); // Penacho de crista
 
     // Escudo no antebraço esquerdo: o grupo contra-gira o braço para a face ficar sempre para a frente.
     this.shield = new THREE.Group();

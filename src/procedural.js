@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { distanceToRoad, VILLAGES } from "./kingdom.js";
-import { NPC } from "./npc.js?v=12";
+import { NPC } from "./npc.js?v=13";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
@@ -608,16 +608,15 @@ export class Werewolf extends NPC {
   }
 
   _buildModel() {
-    const fur = makeSkinnedMaterial("leather", "#2a221e", 0, 0.96);
-    const darkFur = makeSkinnedMaterial("leather", "#181310", 0, 0.98);
-    const clawMat = makeSkinnedMaterial("metal", "#c9c0ad", 0.3, 0.5);
-    const eyeMat = new THREE.MeshStandardMaterial({
-      color: "#ff3b1f",
-      emissive: "#ff2200",
-      emissiveIntensity: 2.2,
-      roughness: 0.3,
+    const fur = makeSkinnedMaterial("leather", "#221c18", 0, 0.98);
+    const darkFur = makeSkinnedMaterial("leather", "#120e0b", 0, 1.0);
+    const chestFur = makeSkinnedMaterial("leather", "#362a22", 0, 0.95);
+    const clawMat = makeSkinnedMaterial("metal", "#dfd8c8", 0.45, 0.4);
+    // Olhos brancos brilhantes, místicos e sobrenaturais
+    const eyeMat = new THREE.MeshBasicMaterial({
+      color: "#ffffff",
     });
-    this.flashMaterials = [fur, darkFur, clawMat];
+    this.flashMaterials = [fur, darkFur, chestFur, clawMat];
 
     const body = buildHumanoid(this.model, {
       skin: fur,
@@ -630,43 +629,62 @@ export class Werewolf extends NPC {
     });
     Object.assign(this, body);
 
-    // Peito musculoso e corcunda lupina
-    const mane = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), darkFur);
-    mane.position.set(0, 1.36, -0.06);
-    mane.scale.set(1.25, 0.95, 1.2);
+    // Peito musculoso, pelagem espessa e corcunda lupina imponente
+    const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.65, 0.38), chestFur);
+    chestPlate.position.set(0, 1.25, 0.08);
+    this.model.add(chestPlate);
+
+    const mane = new THREE.Mesh(new THREE.DodecahedronGeometry(0.34, 1), darkFur);
+    mane.position.set(0, 1.48, -0.08);
+    mane.scale.set(1.4, 1.1, 1.35);
     this.model.add(mane);
 
-    // Focinho de lobo, orelhas pontudas e olhos vermelhos brilhantes no escuro
-    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.28, 5), darkFur);
+    // Focinho lupino alongado com presas afiadas
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.35, 5), darkFur);
     snout.rotation.x = Math.PI / 2;
-    snout.position.set(0, -0.02, 0.19);
+    snout.position.set(0, -0.02, 0.22);
     this.head.add(snout);
 
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), fur);
+    jaw.position.set(0, -0.09, 0.17);
+    this.head.add(jaw);
+
+    // Presas inferiores brancas
+    for (const sx of [-0.045, 0.045]) {
+      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.08, 4), clawMat);
+      fang.position.set(sx, -0.04, 0.24);
+      fang.rotation.x = Math.PI;
+      this.head.add(fang);
+    }
+
+    // Orelhas pontudas eretas e olhos brancos sobrenaturais
     for (const side of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 4), darkFur);
-      ear.position.set(side * 0.09, 0.18, -0.02);
-      ear.rotation.z = -side * 0.22;
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 4), darkFur);
+      ear.position.set(side * 0.11, 0.21, -0.04);
+      ear.rotation.z = -side * 0.25;
+      ear.rotation.x = -0.15;
       this.head.add(ear);
 
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 5), eyeMat);
-      eye.position.set(side * 0.055, 0.03, 0.125);
+      // Olho branco místico com leve feixe
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 7, 6), eyeMat);
+      eye.position.set(side * 0.055, 0.035, 0.13);
       this.head.add(eye);
     }
 
     // Garras afiadas nas duas mãos
     for (const forearm of [this.leftForearm, this.rightForearm]) {
       for (let c = -1; c <= 1; c++) {
-        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.16, 4), clawMat);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.18, 4), clawMat);
         claw.rotation.x = Math.PI * 0.78;
-        claw.position.set(c * 0.035, -0.32, 0.06);
+        claw.position.set(c * 0.038, -0.32, 0.07);
         forearm.add(claw);
       }
     }
 
-    // Cauda lupina
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.55, 5), darkFur);
+    // Cauda lupina espessa
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.65, 5), darkFur);
     tail.position.set(0, 0.78, -0.24);
-    tail.rotation.x = -2.3;
+    tail.rotation.x = -2.25;
     this.model.add(tail);
   }
 
@@ -705,29 +723,71 @@ export class Werewolf extends NPC {
     const speedMult = this.userData.speedMult || 1.35;
     const baseSpeed = 4.2 * speedMult; // ~5.67 m/s (mais rápido que lobos e guardas)
 
-    const think = meleeThink(this, dt, playerX, playerZ);
-    const mx = dist > 2.1 ? dx / Math.max(dist, 0.001) : think.mx;
-    const mz = dist > 2.1 ? dz / Math.max(dist, 0.001) : think.mz;
-    const moveSpeed = (dist > 2.1 ? 1.0 : think.speed) * baseSpeed;
-
-    const mLen = Math.hypot(mx, mz);
-    if (mLen > 0.001 && moveSpeed > 0.05) {
-      this._stepTowards(mx / mLen, mz / mLen, moveSpeed * dt);
-      this.walkPhase += dt * 15.5;
+    // Barreira Mística da Cidade: O lobisomem é banido pelo solo sagrado e muralhas da cidade
+    let repulseX = 0;
+    let repulseZ = 0;
+    let repulseForce = 0;
+    if (_procEnv.activeCities) {
+      for (const city of _procEnv.activeCities.values()) {
+        if (!city || !city.center) continue;
+        const cdx = this.x - city.center.x;
+        const cdz = this.z - city.center.z;
+        const cDist = Math.hypot(cdx, cdz);
+        const barrierDist = city.radius + 18.0;
+        if (cDist < barrierDist) {
+          const push = Math.max(0, (barrierDist - cDist) / 18.0);
+          repulseX += (cdx / Math.max(0.001, cDist)) * push;
+          repulseZ += (cdz / Math.max(0.001, cDist)) * push;
+          repulseForce += push;
+        }
+      }
     }
 
-    const targetYaw = Math.atan2(dx, dz);
-    const diffYaw = Math.atan2(Math.sin(targetYaw - this.model.rotation.y), Math.cos(targetYaw - this.model.rotation.y));
-    this.model.rotation.y += diffYaw * (1 - Math.exp(-14 * dt));
+    // Calcula direção de perseguição/cerco
+    const think = meleeThink(this, dt, playerX, playerZ);
+    let moveDirX = 0;
+    let moveDirZ = 0;
+    let moveSpeed = 0;
+
+    if (repulseForce > 0.05) {
+      // Repelido pela fronteira da cidade: não entra de forma alguma
+      const rLen = Math.hypot(repulseX, repulseZ);
+      moveDirX = repulseX / Math.max(0.001, rLen);
+      moveDirZ = repulseZ / Math.max(0.001, rLen);
+      moveSpeed = baseSpeed * 0.95;
+    } else {
+      moveDirX = dist > 2.0 ? dx / Math.max(dist, 0.001) : think.mx;
+      moveDirZ = dist > 2.0 ? dz / Math.max(dist, 0.001) : think.mz;
+      moveSpeed = (dist > 2.0 ? 1.0 : think.speed) * baseSpeed;
+    }
+
+    const mLen = Math.hypot(moveDirX, moveDirZ);
+    if (mLen > 0.001 && moveSpeed > 0.05) {
+      const stepX = moveDirX / mLen;
+      const stepZ = moveDirZ / mLen;
+      this._stepTowards(stepX, stepZ, moveSpeed * dt);
+      this.walkPhase += dt * (moveSpeed * 2.8);
+
+      // Orientação corporal correta: vira o corpo para a DIREÇÃO DO MOVIMENTO (evita deslizar de lado)
+      const moveYaw = Math.atan2(stepX, stepZ);
+      const diffYaw = Math.atan2(Math.sin(moveYaw - this.model.rotation.y), Math.cos(moveYaw - this.model.rotation.y));
+      this.model.rotation.y += diffYaw * (1 - Math.exp(-18 * dt));
+    } else {
+      // Quando parado perto do alvo, encara o jogador de frente
+      const targetYaw = Math.atan2(dx, dz);
+      const diffYaw = Math.atan2(Math.sin(targetYaw - this.model.rotation.y), Math.cos(targetYaw - this.model.rotation.y));
+      this.model.rotation.y += diffYaw * (1 - Math.exp(-14 * dt));
+    }
 
     const ground = this.world.heightAt(this.x, this.z);
     this.root.position.set(this.x, ground, this.z);
 
-    const stride = Math.sin(this.walkPhase) * 0.95;
+    const isMoving = mLen > 0.001 && moveSpeed > 0.1;
+    const stride = isMoving ? Math.sin(this.walkPhase) * 0.92 : 0;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
     bendJoints(this, stride, stride);
-    this.model.rotation.x = 0.34; // Postura predadora curvada para a frente
+    this.model.rotation.x = 0.32; // Postura predadora curvada para a frente
     this.leftArm.rotation.x = -0.75 - stride * 0.55;
     this.rightArm.rotation.x = -0.75 + stride * 0.55;
 
@@ -741,7 +801,7 @@ export class Werewolf extends NPC {
       this.rightArm.rotation.x = -2.2 + slash * 2.6;
       this.leftArm.rotation.x = -2.0 + slash * 2.4;
     }
-    this.task = "Caçando na escuridão";
+    this.task = repulseForce > 0.05 ? "Banido pela proteção da cidade" : "Caçando na escuridão";
   }
 }
 
