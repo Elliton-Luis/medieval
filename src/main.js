@@ -28,7 +28,7 @@ function animate(timestamp) {
   player.update(dt, input, camera, colliders);
   fireballs.update(dt, input, player, colliders, target);
   target.update(dt);
-  updateCamera(player.group.position.x, player.group.position.z, dt);
+  updateCamera(player.group.position.x, player.group.position.z, dt, input);
   renderer.render(scene, camera);
   if (debug) debug.update(rawDt, renderer.info.render.calls);
   input.endFrame();

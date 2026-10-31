@@ -8,13 +8,19 @@ export const WORLD = {
 
 export const CAMERA = {
   fov: 35,
-  offsetX: 10,
-  offsetY: 15,
-  offsetZ: 10,
   targetHeight: 0.7,
   followSpeed: 6,
   near: 0.1,
   far: 220,
+  initialYaw: Math.PI / 4,
+  initialPitch: 0.815,
+  initialDistance: 20.6,
+  minPitch: 0.3,
+  maxPitch: 1.35,
+  minDistance: 8,
+  maxDistance: 32,
+  dragSensitivity: 0.005,
+  zoomSensitivity: 0.001,
 };
 
 export const COLORS = {

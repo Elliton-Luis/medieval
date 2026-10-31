@@ -21,13 +21,20 @@ export function createScene() {
     CAMERA.far,
   );
 
-  const cameraOffset = new THREE.Vector3(
-    CAMERA.offsetX,
-    CAMERA.offsetY,
-    CAMERA.offsetZ,
-  );
+  let yaw = CAMERA.initialYaw;
+  let pitch = CAMERA.initialPitch;
+  let distance = CAMERA.initialDistance;
+
+  const cameraOffset = new THREE.Vector3();
   const smoothTarget = new THREE.Vector3(0, CAMERA.targetHeight, 0);
   const desiredCamera = new THREE.Vector3();
+
+  let horizontalDistance = Math.cos(pitch) * distance;
+  cameraOffset.set(
+    Math.sin(yaw) * horizontalDistance,
+    Math.sin(pitch) * distance,
+    Math.cos(yaw) * horizontalDistance,
+  );
   camera.position.copy(smoothTarget).add(cameraOffset);
   camera.lookAt(smoothTarget);
 
@@ -176,11 +183,33 @@ export function createScene() {
     },
   };
 
-  function updateCamera(x, z, dt) {
+  function updateCamera(x, z, dt, input) {
+    yaw -= input.dragX * CAMERA.dragSensitivity;
+    pitch = Math.max(
+      CAMERA.minPitch,
+      Math.min(
+        CAMERA.maxPitch,
+        pitch - input.dragY * CAMERA.dragSensitivity,
+      ),
+    );
+    distance = Math.max(
+      CAMERA.minDistance,
+      Math.min(
+        CAMERA.maxDistance,
+        distance * Math.exp(input.wheelDelta * CAMERA.zoomSensitivity),
+      ),
+    );
+
     const t = 1 - Math.exp(-CAMERA.followSpeed * dt);
     smoothTarget.x += (x - smoothTarget.x) * t;
     smoothTarget.z += (z - smoothTarget.z) * t;
 
+    horizontalDistance = Math.cos(pitch) * distance;
+    cameraOffset.set(
+      Math.sin(yaw) * horizontalDistance,
+      Math.sin(pitch) * distance,
+      Math.cos(yaw) * horizontalDistance,
+    );
     desiredCamera.copy(smoothTarget).add(cameraOffset);
     camera.position.lerp(desiredCamera, t);
     camera.lookAt(smoothTarget);
