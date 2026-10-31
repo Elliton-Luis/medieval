@@ -52,6 +52,10 @@ export function createFireballs(scene) {
     const core = new THREE.Mesh(coreGeometry, coreMaterial);
     const halo = new THREE.Sprite(haloMaterial);
     halo.scale.setScalar(FIREBALL.haloScale);
+    core.updateMatrix();
+    core.matrixAutoUpdate = false;
+    halo.updateMatrix();
+    halo.matrixAutoUpdate = false;
     group.add(core, halo);
     group.visible = false;
     scene.add(group);

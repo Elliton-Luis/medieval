@@ -61,6 +61,8 @@ export function createPlayer(scene) {
   });
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
   body.position.y = PLAYER.bodyRadius + PLAYER.bodyLength / 2;
+  body.updateMatrix();
+  body.matrixAutoUpdate = false;
   group.add(body);
 
   const noseGeometry = new THREE.ConeGeometry(0.16, 0.34, 4);
@@ -71,6 +73,8 @@ export function createPlayer(scene) {
   const nose = new THREE.Mesh(noseGeometry, noseMaterial);
   nose.rotation.x = Math.PI / 2;
   nose.position.set(0, 1, PLAYER.bodyRadius + 0.15);
+  nose.updateMatrix();
+  nose.matrixAutoUpdate = false;
   group.add(nose);
 
   scene.add(group);

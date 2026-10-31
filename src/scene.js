@@ -64,6 +64,8 @@ export function createScene() {
   const ground = new THREE.Mesh(groundGeometry, groundMaterial);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.updateMatrix();
+  ground.matrixAutoUpdate = false;
   scene.add(ground);
 
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -137,9 +139,18 @@ export function createScene() {
   targetBase.castShadow = true;
   targetBase.receiveShadow = true;
 
+  targetBody.updateMatrix();
+  targetBody.matrixAutoUpdate = false;
+  targetHead.updateMatrix();
+  targetHead.matrixAutoUpdate = false;
+  targetBase.updateMatrix();
+  targetBase.matrixAutoUpdate = false;
+
   const targetGroup = new THREE.Group();
   targetGroup.position.set(0, 0, -8);
   targetGroup.add(targetBody, targetHead, targetBase);
+  targetGroup.updateMatrix();
+  targetGroup.matrixAutoUpdate = false;
   scene.add(targetGroup);
 
   colliders.push({
