@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { NPC } from "./npc.js?v=17";
+import { NPC } from "./npc.js?v=18";
 import { Horse } from "./horse.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, separation, pruneTokens, requestToken, releaseToken } from "./melee.js";
-import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=17";
+import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=18";
 
 const _playerPosVec = new THREE.Vector3();
 

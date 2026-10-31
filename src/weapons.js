@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=17";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js?v=18";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -15,7 +15,7 @@ import {
   buildStructure,
   updateBuildPreview,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=17";
+} from "./rpg.js?v=18";
 
 const MAX_THROW = 26;
 const DOT_COUNT = 26;
@@ -257,13 +257,18 @@ export class WeaponSystem {
     const now = performance.now();
 
     if (this.input.consumeBuildModePressed?.()) {
-      if (this.buildMode) {
-        this.buildMode = false;
-        this.ui.showToast("Modo Construção encerrado.");
-        this._refreshWeaponHud();
+      if (this.buildHubOpen || (this.ui.buildPanel && !this.ui.buildPanel.hidden)) {
+        this.closeBuildHub();
+      } else if (this.buildMode) {
+        this.exitBuildMode();
       } else {
         this.openBuildHub();
       }
+    }
+
+    if (this.buildHubOpen || (this.ui.buildPanel && !this.ui.buildPanel.hidden)) {
+      updateBuildPreview(this.player.root.position, 0, false);
+      return;
     }
 
     const selection = this.input.consumeWeaponSelection();
@@ -401,6 +406,15 @@ export class WeaponSystem {
   }
 
   openBuildHub() {
+    this.buildHubOpen = true;
+    this.buildMode = false;
+    updateBuildPreview(this.player.root.position, 0, false);
+    this.input.setModalOpen(true);
+
+    this.ui.onBuildClose = () => {
+      this.closeBuildHub();
+    };
+
     this.ui.showBuildHub(
       BUILD_COSTS,
       PlayerInventory,
@@ -413,11 +427,36 @@ export class WeaponSystem {
     );
   }
 
+  closeBuildHub() {
+    this.buildHubOpen = false;
+    this.buildMode = false;
+    this.ui.closeBuildHub();
+    this.input.setModalOpen(false);
+    updateBuildPreview(this.player.root.position, 0, false);
+    this._refreshWeaponHud();
+    try {
+      this.input.canvas?.requestPointerLock?.();
+    } catch (_) {}
+  }
+
+  exitBuildMode() {
+    this.buildMode = false;
+    this.buildHubOpen = false;
+    this.input.setModalOpen(false);
+    updateBuildPreview(this.player.root.position, 0, false);
+    this.ui.showToast("Modo Construção encerrado.");
+    this._refreshWeaponHud();
+  }
+
   startBuildMode(type = "HOUSE") {
+    this.buildHubOpen = false;
     this.buildMode = true;
     this.selectedBuildType = type;
+    this.input.setModalOpen(false);
     this._announceBuildMode();
-    document.body?.requestPointerLock?.();
+    try {
+      this.input.canvas?.requestPointerLock?.();
+    } catch (_) {}
   }
 
   _announceBuildMode() {

@@ -18,7 +18,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=17";
+} from "./rpg.js?v=18";
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {

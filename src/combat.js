@@ -8,7 +8,7 @@ import {
   spawnLoot,
   takeDamage,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=17";
+} from "./rpg.js?v=18";
 
 export class CombatSystem {
   constructor(player, npcs, input, effects, ui, settlement, audio, cameraRig) {

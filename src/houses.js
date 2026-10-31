@@ -6,7 +6,7 @@ import {
   interactWithChest,
   checkWitnesses,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=17";
+} from "./rpg.js?v=18";
 
 const LOOT_CHEST = { coins: [8, 20], items: [["potion", 0.3], ["gem", 0.2], ["bread", 0.4], ["bolts", 0.3], ["arrows", 0.3]] };
 const _targetScratch = { type: null, house: null, data: null, label: null };

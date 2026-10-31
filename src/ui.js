@@ -1,5 +1,5 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
-import { drawWeaponIcon } from "./weapondata.js?v=17";
+import { drawWeaponIcon } from "./weapondata.js?v=18";
 
 export class GameUI {
   constructor(renderer) {
@@ -114,8 +114,26 @@ export class GameUI {
         event.preventDefault();
         this.controls?.classList.toggle("hidden");
       }
+      if ((event.code === "KeyC" || event.code === "Escape") && !event.repeat) {
+        if (this.buildPanel && !this.buildPanel.hidden) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.closeBuildHub();
+        }
+      }
     });
     document.getElementById("dialogue-close").addEventListener("click", () => this.closeDialogue());
+
+    if (this.buildPanel) {
+      this.buildPanel.addEventListener("mousedown", (e) => e.stopPropagation());
+      this.buildPanel.addEventListener("mouseup", (e) => e.stopPropagation());
+      this.buildPanel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (e.target === this.buildPanel) {
+          this.closeBuildHub();
+        }
+      });
+    }
   }
 
   hideLoading() {

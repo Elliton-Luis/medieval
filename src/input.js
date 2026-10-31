@@ -55,18 +55,20 @@ export class InputManager {
       this.aimHeld = false;
     };
     this._onPointerMove = (event) => {
-      if (document.pointerLockElement === this.canvas) {
+      if (document.pointerLockElement === this.canvas && !this.modalOpen) {
         this.lookX += event.movementX;
         this.lookY += event.movementY;
       }
     };
     // roda do mouse: troca de arma; com Shift, zoom da câmera
     this._onWheel = (event) => {
+      if (this.modalOpen) return;
       if (event.shiftKey) this.zoomDelta += event.deltaY || event.deltaX;
       else this.wheelAccum += event.deltaY;
       event.preventDefault();
     };
     this._onClick = () => {
+      if (this.modalOpen) return;
       if (document.pointerLockElement !== this.canvas && this.canvas.requestPointerLock) this.canvas.requestPointerLock();
     };
     this._onPointerDown = (event) => {
@@ -134,6 +136,13 @@ export class InputManager {
   }
 
   consumeLook(out) {
+    if (this.modalOpen) {
+      out.x = 0;
+      out.y = 0;
+      this.lookX = 0;
+      this.lookY = 0;
+      return out;
+    }
     out.x = this.lookX;
     out.y = this.lookY;
     this.lookX = 0;
@@ -239,10 +248,17 @@ export class InputManager {
 
   setModalOpen(open) {
     this.modalOpen = open;
+    this.lookX = 0;
+    this.lookY = 0;
     if (open) {
       this.keys.clear();
       this.attackHeld = false;
       this.aimHeld = false;
+      if (document.pointerLockElement) {
+        try {
+          document.exitPointerLock?.();
+        } catch (_) {}
+      }
     }
   }
 }

@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { ROADS, VILLAGES } from "./kingdom.js";
-import { makeRandom } from "./utils.js?v=17";
-import { createHouse, createChurchBuilding } from "./house.js?v=17";
+import { makeRandom } from "./utils.js?v=18";
+import { createHouse, createChurchBuilding } from "./house.js?v=18";
 import { createHay } from "./fire.js";
-import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js?v=17";
+import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js?v=18";
 
 const sharedHouseMat = createSharedHouseMaterial();
 const wallMat = sharedHouseMat;
