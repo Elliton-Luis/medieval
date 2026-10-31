@@ -1,122 +1,84 @@
-# Puris
+# GTA Medieval — Caldera
 
-Protótipo de jogo de ação 3D leve que roda no navegador. Um homem armado com uma
-metralhadora de munição infinita enfrenta hordas de zumbis em uma arena aberta.
-O objetivo é sobreviver o máximo possível enquanto o cronômetro corre.
+Protótipo standalone em JavaScript puro e Three.js ES modules, sem build ou framework. Os personagens e armas são modelos 3D proceduralmente montados; inclui sprites CC0 locais para efeitos e retratos. Three.js é carregado pelo import map no CDN.
 
-Não há história, menus, som nem assets externos.
+## Executar
 
-## Stack
-
-- [Three.js](https://threejs.org/) `0.187.0` (versão fixa)
-- [Vite](https://vite.dev/) `8.3.5` (versão fixa)
-- JavaScript puro com módulos ES (sem TypeScript e sem frameworks)
-
-## Requisitos
-
-- Node.js `20.19+` ou `22.12+`
-- npm
-
-## Como rodar
+Sirva a raiz do repositório por HTTP (abrir `index.html` diretamente como `file://` não carrega ES modules):
 
 ```bash
-npm install
-npm run dev
+python3 -m http.server 4173
 ```
 
-Abra o endereço exibido no terminal (por padrão `http://localhost:5173`).
-
-Para testar a build de produção:
-
-```bash
-npm run build
-npm run preview
-```
+Depois abra `http://localhost:4173`.
 
 ## Controles
 
-| Ação          | Controle                     |
-| ------------- | ---------------------------- |
-| Andar         | `W` `A` `S` `D` / setas      |
-| Mirar         | Mouse                        |
-| Atirar        | Segurar clique esquerdo / `F` |
-| Pular         | `Espaço`                     |
-| Mover câmera  | Arrastar com o botão direito |
-| Zoom          | Roda do mouse                |
-| Reiniciar     | `R` (depois de morrer)       |
+- `W A S D` ou setas: mover · `Shift`: correr · `Space`: pular · `C`: rolar (esquiva com invulnerabilidade) · `U`: modo furtivo (agachado; os cavalos não fogem)
+- **Botão direito**: mirar (câmera sobre o ombro, mira no centro da tela) · **Clique esquerdo** (ou `J`): atacar/atirar, mesmo com o botão direito pressionado
+- **Armas `1`–`9`**: escolhe o slot; apertar o mesmo número de novo alterna entre as armas dele. A **roda do mouse** troca de arma e **Shift + roda** dá zoom na câmera
+- `Q` (segurar): escudo, só com armas de uma mão · `F`: monta/desmonta perto de um cavalo (também bloqueia, como antes) · `R`: poção · `E`: interagir/pegar · `H`: assobiar · `V`: vela
+- `M`: liga/desliga a música · `Esc`: pausa (volumes de música e de efeitos separados)
 
-O movimento é relativo à câmera, que orbita em volta do jogador. Diagonais são
-normalizadas, o personagem gira para a direção do mouse e não atravessa
-obstáculos. O pulo usa gravidade e não permite pulo duplo; a sombra no chão
-indica a altura.
+## Reino de Caldera
 
-Segurar o botão esquerdo dispara continuamente, sem limite de munição. As balas
-saem do cano da arma, voam em linha reta e colidem com zumbis e obstáculos.
+Além da capital há seis vilas (Ferrovale, Pedraluz, Salgueiro, Cinzal, Brumas e Atalaia do Norte), ligadas por estradas de pedra e cercadas por bosques. O terreno é aplainado em volta de cada vila. O minimapa gira com a câmera e mostra vilas, estradas e guardas.
 
-## Regras do jogo
+## Combate, NPCs e crime
 
-- Hordas de zumbis surgem ao redor do jogador em intervalos regulares.
-- Cada horda é maior que a anterior, até um limite; o intervalo entre hordas
-  diminui com o tempo.
-- Os zumbis perseguem o jogador, desviam dos obstáculos e atacam quando chegam
-  perto. Cada ataque tira vida, com um pequeno intervalo global entre danos.
-- Cada zumbi suporta três tiros. Acertos soltam partículas de sangue; tiros em
-  obstáculos soltam faíscas.
-- O HUD mostra o cronômetro de sobrevivência, a vida e o número de abates.
-- Quando a vida chega a zero, o jogo congela e mostra o tempo sobrevivido e os
-  abates. Pressione `R` para recomeçar.
+- NPCs derrotados voltam ao seu posto depois de alguns segundos (se o jogador não estiver perto).
+- Quem vê um crime foge ou corre até o guarda mais próximo para denunciar. Se a testemunha morrer antes de chegar, o crime não é reportado.
+- **Procurado de 1 a 5.** Golpes e mortes presenciados (ou denunciados) somam pontos; o nível sobe com o total. Os guardas da região perseguem e atacam, e a cada nível o reino manda mais reforços, que chegam de longe:
+  - 1: infantaria · 2: + arqueiros · 3: + besteiros · 4: + cavaleiros montados · 5: + canhoneiros, em maior número.
+  - Arqueiros e besteiros mantêm distância e atiram; canhoneiros plantam o canhão e disparam balas explosivas; cavaleiros fazem investidas com a lança e pisoteiam.
+  - Sem novos crimes (e com os inimigos longe) a perseguição acaba e os reforços se retiram.
+- **Cavalo e cavaleiro são duas entidades**, cada uma com sua vida. Matar o cavalo derruba o cavaleiro, que segue a pé; matar o cavaleiro deixa o cavalo fugindo. Tiros baixos acertam o cavalo, tiros altos acertam o cavaleiro.
+- Os inimigos atacam com preparação visível (0,4–0,6 s), no máximo 2 por vez; os outros cercam a 3–4 m esperando a vez, mantêm distância entre si e recuam depois do golpe. Levar um golpe empurra 1–2 m, dá 0,5 s de invencibilidade e, com vida baixa, a tela dessatura e o coração bate.
+- Todo NPC derrotado larga moedas (que são atraídas ao chegar perto) e, conforme o ofício, pão, maçã, joia, poção, virotes ou flechas (pegue com `E`).
+- A bomba de mão tem explosão em camadas: clarão e luz, bola de fogo, fumaça, onda de choque, faíscas, destroços, marca de queimado e tremor de câmera.
 
-## Estrutura
+## Cavalos
 
-```text
-index.html
-src/
-  main.js      renderer, loop, estado do jogo, game over e reinício
-  scene.js     cena, câmera orbital, luzes, chão e obstáculos
-  input.js     estado do teclado/mouse (sem lógica de jogo)
-  player.js    modelo com arma, movimento, mira, pulo e colisão
-  bullet.js    metralhadora, balas, rastro e partículas
-  zombies.js   hordas, instancing, perseguição, ataque e dano
-  hud.js       cronômetro, vida, abates e tela de game over
-  config.js    constantes de ajuste
-  debug.js     painel de FPS e draw calls (só em desenvolvimento)
-```
+- Manadas selvagens por chunk (limite total de 14) pastam, andam, trotam e fogem se atacadas ou assustadas (corrida do jogador por perto, tiros, explosões). Alguns cavalos ficam amarrados junto às casas, com um morador como dono.
+- `F` perto de um cavalo monta. Cavalos selvagens podem empinar e derrubar nas primeiras tentativas; roubar o de um NPC conta como crime.
+- Montado: galope com inércia e derrapagem, turbo com `Shift` (gasta o fôlego), salto com `Space`, atropelamento (derruba NPCs); bater numa árvore derruba o jogador e machuca (pedras o cavalo pisa por cima, paredes só o barram), combate montado (espada, arco, besta, mosquete). A câmera se afasta e o campo de visão abre com a velocidade.
+- Ao desmontar o cavalo fica parado; `H` assobia para chamá-lo.
 
-## Ajustes
+## Casas, interiores e dormir
 
-Velocidades, aceleração, gravidade, força do pulo, vida, dano, cadência de tiro,
-tempo de vida das balas, tamanho dos pools, hordas, câmera, névoa e cores ficam
-em `src/config.js`, organizados por área (`PLAYER`, `GAME`, `BULLET`, `ZOMBIE`,
-`CAMERA`, `WORLD` e `COLORS`).
+- Cada casa tem colisores por parede (vão real na porta e nas janelas), base de pedra, enxaimel, telhado de palha ou telha com beiral, chaminé, venezianas e porta de madeira. Tamanho, cores e telhado variam de casa para casa.
+- `E` abre e fecha portas. Dentro da casa o telhado some e as paredes ficam translúcidas; a câmera colide com as paredes. Há cama, mesa, bancos, baú com saque, lareira e estante com potes. Mesa, bancos e potes quebram com golpes, tiros e explosões.
+- Entrar em casa alheia à vista do dono (ou abrir o baú, quebrar a mobília) faz o dono gritar e correr para chamar os guardas.
+- `E` na cama, de noite: a tela escurece, o tempo avança até o amanhecer, a vida volta e o jogo é salvo (localStorage, restaurado ao abrir o jogo). De dia: "Ainda não é hora de repousar". Procurado: "Não podes dormir enquanto és caçado". A pousada de Caldera cobra 5 moedas; cada casa já tem os campos de dono e preço, prontos para o futuro sistema de casa própria.
 
-Para deixar o jogo mais fácil ou difícil, ajuste principalmente `ZOMBIE.health`,
-`ZOMBIE.minSpeed`, `ZOMBIE.maxSpeed`, `ZOMBIE.attackDamage`,
-`ZOMBIE.spawnInterval`, `ZOMBIE.hordeGrowth` e `GAME.damageCooldown`.
+## Tochas, vela e fogo
 
-## Desempenho
+- Tochas nas paredes das casas, nas igrejas e em postes pelas ruas acendem ao anoitecer e apagam ao amanhecer (há um gancho para a chuva). Só as 4 mais próximas usam luz de verdade; as demais usam emissivo, sprite de brilho e fagulhas.
+- O jogador começa com uma vela apagada. `V` equipa; `E` perto de tocha ou lareira acende. A vela acesa é a luz que segue o jogador, dura 4 minutos e apaga se você correr muito, galopar ou rolar. Velas se compram com o mercador e no estande das igrejas.
+- Chegar com a vela acesa perto de feno ateia fogo; o fogo se espalha pelos fardos e pode queimar telhados de palha vizinhos (e machuca quem ficar perto).
 
-- Pools fixos: 64 balas, 160 partículas e 48 zumbis. Nada é criado ou destruído
-  durante o jogo.
-- Zumbis desenhados com `InstancedMesh` (corpo, cabeça e braços: 3 draw calls) e
-  balas com um único `InstancedMesh`.
-- Geometrias e materiais compartilhados; vetores, matrizes e buffers são
-  reutilizados dentro do loop.
-- Objetos estáticos têm a matriz congelada e não são recalculados por frame.
-- Uma única luz com sombra, shadow map de 1024 e área de sombra acompanhando o
-  jogador.
-- Partículas, rastro e clarão do cano usam materiais aditivos, sem luz dinâmica.
-- `setPixelRatio(Math.min(devicePixelRatio, 2))`, névoa leve e sem
-  pós-processamento.
-- Colisão de balas em subpassos para não atravessar zumbis em alta velocidade.
-- Delta time limitado a `0.05s` para evitar saltos após travadas.
-- Draw calls exibidos no painel de debug: cerca de 32 na cena com jogador,
-  obstáculos, zumbis e balas (incluindo o passe de sombra).
+## Armas (slots 1–9)
 
-O painel de debug aparece no canto inferior esquerdo apenas durante o
-desenvolvimento (`npm run dev`).
+| Slot | Armas |
+| --- | --- |
+| 1 | Punhos |
+| 2 | Adaga, faca |
+| 3 | Espada curta, espada longa |
+| 4 | Machado, maça, mangual |
+| 5 | Martelo de guerra, montante (duas mãos, lentos; atacar segurando carrega o golpe e arremessa inimigos) |
+| 6 | Lança, alabarda (alcance longo; a cavalo e em movimento ganham alcance e dano) |
+| 7 | Arco curto, arco longo |
+| 8 | Balestra leve, balestra pesada |
+| 9 | Facas de arremesso, bomba incendiária, pote de óleo (cria uma poça em chamas) |
 
-## Status
+Cada arma tem dano, alcance, velocidade, peso (afeta a velocidade de movimento), som e animação próprios (`src/weapondata.js`). As armas leves fazem combo de 3 golpes (o último é mais forte). Você começa com punhos, espada curta, arco curto, balestra leve e bomba incendiária. Novas armas se compram no ferreiro (armeiro) ou saem dos drops de guardas, soldados e cavaleiros.
 
-Protótipo jogável concluído: sobrevivência com hordas, metralhadora de munição
-infinita, cronômetro, vida, abates, game over e reinício. Sem som, menus ou
-suporte a toque.
+## Música
+
+A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do primeiro clique: `town.mp3` nas vilas, `explore.mp3` no mundo aberto, `DST-GrassLands.mp3` nas planícies longe das vilas, `forest_2.ogg` dentro da floresta, `wanted.mp3` com procurado 1–3 e `chase.mp3` com procurado 4–5 (se esse arquivo não existir, toca `tense.mp3`). Dentro de casa o volume cai.
+
+## Fase 1
+
+Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.
+
+Os retratos de HUD usam **[Kenney Roguelike Characters](https://kenney.nl/assets/roguelike-characters)** e os efeitos de slash, estrelas, chama e fumaça usam **[Kenney Particle Pack](https://kenney.nl/assets/particle-pack)**. Ambos são CC0; as licenças estão junto dos arquivos em `assets/sprites/`. Os modelos de personagens e armas permanecem totalmente 3D e usam mapas procedurais de tecido, couro e metal.
