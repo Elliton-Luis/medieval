@@ -1,117 +1,248 @@
-const down = new Set();
-const pressed = new Set();
+export class InputManager {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.keys = new Set();
+    this.lookX = 0;
+    this.lookY = 0;
+    this.zoomDelta = 0;
+    this.wheelAccum = 0;
+    this.jumpPressed = false;
+    this.attackPressed = false;
+    this.attackHeld = false;
+    this.aimHeld = false;
+    this.interactPressed = false;
+    this.usePressed = false;
+    this.dodgePressed = false;
+    this.candlePressed = false;
+    this.whistlePressed = false;
+    this.mountPressed = false;
+    this.crouchPressed = false;
+    this.aimAssistPressed = false;
+    this.hayBaitPressed = false;
+    this.buildModePressed = false;
+    this.craftMenuPressed = false;
+    this.weaponSelection = 0;
+    this.modalOpen = false;
+    this.locked = false;
+    this._onKeyDown = (event) => {
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
+      if (event.code === "Space" && !event.repeat) this.jumpPressed = true;
+      if (event.code === "KeyJ" && !event.repeat) {
+        this.attackPressed = true;
+        this.attackHeld = true;
+      }
+      if (event.code === "KeyE" && !event.repeat) this.interactPressed = true;
+      if (event.code === "KeyR" && !event.repeat) this.usePressed = true;
+      if ((event.code === "AltLeft" || event.code === "KeyX") && !event.repeat) this.dodgePressed = true;
+      if (event.code === "KeyC" && !event.repeat) this.buildModePressed = true;
+      if (event.code === "KeyI" && !event.repeat) this.craftMenuPressed = true;
+      if (event.code === "KeyV" && !event.repeat) this.candlePressed = true;
+      if (event.code === "KeyH" && !event.repeat) this.whistlePressed = true;
+      if (event.code === "KeyF" && !event.repeat) this.mountPressed = true;
+      if (event.code === "KeyU" && !event.repeat) this.crouchPressed = true;
+      if (event.code === "KeyT" && !event.repeat) this.aimAssistPressed = true;
+      if (event.code === "KeyG" && !event.repeat) this.hayBaitPressed = true;
+      if (/^Digit[1-9]$/.test(event.code) && !event.repeat) this.weaponSelection = Number(event.code.slice(5));
+      this.keys.add(event.code);
+    };
+    this._onKeyUp = (event) => {
+      if (event.code === "KeyJ") this.attackHeld = false;
+      this.keys.delete(event.code);
+    };
+    this._onBlur = () => {
+      this.keys.clear();
+      this.attackHeld = false;
+      this.aimHeld = false;
+    };
+    this._onPointerMove = (event) => {
+      if (document.pointerLockElement === this.canvas) {
+        this.lookX += event.movementX;
+        this.lookY += event.movementY;
+      }
+    };
+    // roda do mouse: troca de arma; com Shift, zoom da câmera
+    this._onWheel = (event) => {
+      if (event.shiftKey) this.zoomDelta += event.deltaY || event.deltaX;
+      else this.wheelAccum += event.deltaY;
+      event.preventDefault();
+    };
+    this._onClick = () => {
+      if (document.pointerLockElement !== this.canvas && this.canvas.requestPointerLock) this.canvas.requestPointerLock();
+    };
+    this._onPointerDown = (event) => {
+      if (!this.locked || this.modalOpen) return;
+      if (event.button === 0) {
+        this.attackPressed = true;
+        this.attackHeld = true;
+      } else if (event.button === 2) {
+        this.aimHeld = true;
+      }
+    };
+    this._onPointerUp = (event) => {
+      if (event.button === 0) this.attackHeld = false;
+      else if (event.button === 2) this.aimHeld = false;
+    };
+    this._onLockChange = () => {
+      this.locked = document.pointerLockElement === this.canvas;
+      if (!this.locked) {
+        this.attackHeld = false;
+        this.aimHeld = false;
+      }
+      document.dispatchEvent(new CustomEvent("game-pointer-lock", { detail: this.locked }));
+    };
 
-let rightDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
-let dragX = 0;
-let dragY = 0;
-let wheelDelta = 0;
-let pointerX = window.innerWidth / 2;
-let pointerY = window.innerHeight / 2;
-
-function onKeyDown(event) {
-  if (event.repeat) return;
-
-  down.add(event.code);
-  pressed.add(event.code);
-
-  if (event.code === 'Space' || event.code.startsWith('Arrow')) {
-    event.preventDefault();
+    window.addEventListener("keydown", this._onKeyDown, { passive: false });
+    window.addEventListener("keyup", this._onKeyUp);
+    window.addEventListener("blur", this._onBlur);
+    document.addEventListener("pointermove", this._onPointerMove);
+    document.addEventListener("pointerlockchange", this._onLockChange);
+    canvas.addEventListener("click", this._onClick);
+    // mousedown/mouseup disparam para cada botão; pointerdown só para o primeiro,
+    // o que impedia atirar (esquerdo) com o botão de mira (direito) já pressionado.
+    window.addEventListener("mousedown", this._onPointerDown);
+    window.addEventListener("mouseup", this._onPointerUp);
+    canvas.addEventListener("wheel", this._onWheel, { passive: false });
   }
-}
 
-function onKeyUp(event) {
-  down.delete(event.code);
-}
-
-function onMouseDown(event) {
-  pointerX = event.clientX;
-  pointerY = event.clientY;
-
-  if (event.button === 2) {
-    rightDragging = true;
-    lastMouseX = event.clientX;
-    lastMouseY = event.clientY;
-    return;
-  }
-
-  if (event.button !== 0) return;
-
-  down.add('Mouse0');
-  pressed.add('Mouse0');
-}
-
-function onMouseMove(event) {
-  pointerX = event.clientX;
-  pointerY = event.clientY;
-
-  if (!rightDragging) return;
-
-  dragX += event.clientX - lastMouseX;
-  dragY += event.clientY - lastMouseY;
-  lastMouseX = event.clientX;
-  lastMouseY = event.clientY;
-}
-
-function onMouseUp(event) {
-  if (event.button === 2) rightDragging = false;
-  if (event.button === 0) down.delete('Mouse0');
-}
-
-function onWheel(event) {
-  wheelDelta += event.deltaY;
-  event.preventDefault();
-}
-
-function onContextMenu(event) {
-  event.preventDefault();
-}
-
-function onBlur() {
-  down.clear();
-  pressed.clear();
-  rightDragging = false;
-  dragX = 0;
-  dragY = 0;
-  wheelDelta = 0;
-}
-
-window.addEventListener('keydown', onKeyDown);
-window.addEventListener('keyup', onKeyUp);
-window.addEventListener('mousedown', onMouseDown);
-window.addEventListener('mousemove', onMouseMove);
-window.addEventListener('mouseup', onMouseUp);
-window.addEventListener('wheel', onWheel, { passive: false });
-window.addEventListener('contextmenu', onContextMenu);
-window.addEventListener('blur', onBlur);
-
-export const input = {
-  get dragX() {
-    return dragX;
-  },
-  get dragY() {
-    return dragY;
-  },
-  get wheelDelta() {
-    return wheelDelta;
-  },
-  get pointerX() {
-    return pointerX;
-  },
-  get pointerY() {
-    return pointerY;
-  },
   isDown(code) {
-    return down.has(code);
-  },
-  wasPressed(code) {
-    return pressed.has(code);
-  },
-  endFrame() {
-    pressed.clear();
-    dragX = 0;
-    dragY = 0;
-    wheelDelta = 0;
-  },
-};
+    return this.keys.has(code);
+  }
+
+  readMovement(out) {
+    if (this.modalOpen) {
+      out.x = 0;
+      out.z = 0;
+      out.run = false;
+      return out;
+    }
+    const left = this.keys.has("KeyA") || this.keys.has("ArrowLeft");
+    const right = this.keys.has("KeyD") || this.keys.has("ArrowRight");
+    const forward = this.keys.has("KeyW") || this.keys.has("ArrowUp");
+    const back = this.keys.has("KeyS") || this.keys.has("ArrowDown");
+    out.x = Number(right) - Number(left);
+    out.z = Number(forward) - Number(back);
+    const length = Math.hypot(out.x, out.z);
+    if (length > 1) { out.x /= length; out.z /= length; }
+    out.run = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    return out;
+  }
+
+  consumeJumpPressed() {
+    const pressed = this.jumpPressed;
+    this.jumpPressed = false;
+    return pressed;
+  }
+
+  consumeLook(out) {
+    out.x = this.lookX;
+    out.y = this.lookY;
+    this.lookX = 0;
+    this.lookY = 0;
+    return out;
+  }
+
+  consumeZoom() {
+    const delta = this.zoomDelta;
+    this.zoomDelta = 0;
+    return delta;
+  }
+
+  consumeAttackPressed() {
+    const pressed = this.attackPressed && !this.modalOpen;
+    this.attackPressed = false;
+    return pressed;
+  }
+
+  consumeInteractPressed() {
+    const pressed = this.interactPressed;
+    this.interactPressed = false;
+    return pressed;
+  }
+
+  consumeUsePressed() {
+    const pressed = this.usePressed && !this.modalOpen;
+    this.usePressed = false;
+    return pressed;
+  }
+
+  consumeCrouchPressed() {
+    const pressed = this.crouchPressed && !this.modalOpen;
+    this.crouchPressed = false;
+    return pressed;
+  }
+
+  consumeAimAssistPressed() {
+    const pressed = this.aimAssistPressed && !this.modalOpen;
+    this.aimAssistPressed = false;
+    return pressed;
+  }
+
+  consumeHayBaitPressed() {
+    const pressed = this.hayBaitPressed && !this.modalOpen;
+    this.hayBaitPressed = false;
+    return pressed;
+  }
+
+  consumeBuildModePressed() {
+    const pressed = this.buildModePressed && !this.modalOpen;
+    this.buildModePressed = false;
+    return pressed;
+  }
+
+  consumeCraftMenuPressed() {
+    const pressed = this.craftMenuPressed;
+    this.craftMenuPressed = false;
+    return pressed;
+  }
+
+  // -1 (para cima), 0 ou +1 por "clique" da roda
+  consumeWheelStep() {
+    if (this.modalOpen) {
+      this.wheelAccum = 0;
+      return 0;
+    }
+    if (Math.abs(this.wheelAccum) < 40) return 0;
+    const step = this.wheelAccum > 0 ? 1 : -1;
+    this.wheelAccum = 0;
+    return step;
+  }
+
+  consumeCandlePressed() {
+    const pressed = this.candlePressed && !this.modalOpen;
+    this.candlePressed = false;
+    return pressed;
+  }
+
+  consumeWhistlePressed() {
+    const pressed = this.whistlePressed && !this.modalOpen;
+    this.whistlePressed = false;
+    return pressed;
+  }
+
+  consumeMountPressed() {
+    const pressed = this.mountPressed && !this.modalOpen;
+    this.mountPressed = false;
+    return pressed;
+  }
+
+  consumeDodgePressed() {
+    const pressed = this.dodgePressed && !this.modalOpen;
+    this.dodgePressed = false;
+    return pressed;
+  }
+
+  consumeWeaponSelection() {
+    const selection = this.modalOpen ? 0 : this.weaponSelection;
+    this.weaponSelection = 0;
+    return selection;
+  }
+
+  setModalOpen(open) {
+    this.modalOpen = open;
+    if (open) {
+      this.keys.clear();
+      this.attackHeld = false;
+      this.aimHeld = false;
+    }
+  }
+}
