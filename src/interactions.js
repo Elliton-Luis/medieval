@@ -18,7 +18,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=13";
+} from "./rpg.js?v=14";
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
@@ -119,7 +119,17 @@ export class InteractionSystem {
       },
       { id: "close", label: "Fechar menu (I)" },
     ];
-    this.ui.showDialogue("Ofício & Sobrevivência (Camponês)", body, actions);
+    this.ui.showDialogue("Ofício & Sobrevivência (Camponês)", body, actions, {
+      role: "Bancada do Trabalhador",
+      roleKey: "farmer",
+      eyebrow: "CALDERA · CONSTRUÇÃO & OFÍCIO",
+      funds: {
+        coins: this.player.coins,
+        wood: inv.wood,
+        stone: inv.stone,
+        hay: inv.hay,
+      },
+    });
   }
 
   _tryGatherHayBale() {
@@ -221,7 +231,16 @@ export class InteractionSystem {
           label: "Cobrar na marra (use os Punhos [Slot 1] sem matá-lo!)",
         },
       ];
-      this.ui.showDialogue(npc.name, body, actions);
+      this.ui.showDialogue(npc.name, body, actions, {
+        role: npc.title || "Aldeão",
+        roleKey: npc.roleKey,
+        funds: {
+          coins: this.player.coins,
+          wood: PlayerInventory.wood,
+          stone: PlayerInventory.stone,
+          hay: PlayerInventory.hay,
+        },
+      });
       return;
     }
 
@@ -383,7 +402,17 @@ export class InteractionSystem {
         { id: "close", label: "Encerrar conversa" },
       ];
     }
-    this.ui.showDialogue(npc.name, body, actions);
+    this.ui.showDialogue(npc.name, body, actions, {
+      role: npc.title || "Habitante de Caldera",
+      roleKey: npc.roleKey,
+      eyebrow: "CALDERA · CONVERSA & COMÉRCIO",
+      funds: {
+        coins: this.player.coins,
+        wood: PlayerInventory.wood,
+        stone: PlayerInventory.stone,
+        hay: PlayerInventory.hay,
+      },
+    });
   }
 
   _choose(action) {

@@ -45,15 +45,326 @@ canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%
 .loading { position: absolute; z-index: 4; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center; background: #17201b; color: #d7c9a9; font-size: 10px; letter-spacing: .2em; transition: opacity .7s ease; }
 .loading.done { opacity: 0; pointer-events: none; }
 .loading-seal { color: #d2a969; font-size: 32px; animation: breathe 1.6s ease-in-out infinite; }
-.dialogue-panel { position: absolute; z-index: 6; left: 50%; top: 50%; width: min(430px, calc(100vw - 36px)); transform: translate(-50%, -50%); padding: 24px 25px 20px; border: 1px solid #d2a9697a; background: linear-gradient(145deg, #202922f5, #111813f5); box-shadow: 0 18px 80px #0009; pointer-events: auto; }
+/* Painel de Diálogo & Hub de Comércio em 2 Colunas (Estilo RPG / Loja) */
+.dialogue-panel {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: min(880px, calc(100vw - 40px));
+  max-height: calc(100vh - 60px);
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 2px solid #d2a969aa;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #18221bf5, #0c120ef8);
+  box-shadow: 0 24px 90px #000c, 0 0 24px #d2a96933;
+  pointer-events: auto;
+  overflow: hidden;
+}
 .dialogue-panel[hidden] { display: none; }
-.dialogue-panel h2 { margin: 8px 32px 8px 0; font: 24px Georgia, "Times New Roman", serif; color: #eee4cc; }
-.dialogue-panel p { margin: 0 0 18px; color: #d3c8ac; font: 12px/1.65 ui-monospace, monospace; }
-.dialogue-close { position: absolute; top: 9px; right: 12px; border: 0; background: transparent; color: #d3c8ac; font-size: 25px; cursor: pointer; }
-.dialogue-actions { display: grid; gap: 8px; }
-.dialogue-actions button { padding: 10px 12px; border: 1px solid #d2a96955; background: #d2a96915; color: #eee4cc; font: 11px ui-monospace, monospace; text-align: left; cursor: pointer; }
-.dialogue-actions button:hover:not(:disabled) { border-color: #d2a969; background: #d2a9692b; }
-.dialogue-actions button:disabled { opacity: .38; cursor: default; }
+
+.dialogue-layout {
+  display: grid;
+  grid-template-columns: 310px 1fr;
+  min-height: 480px;
+  max-height: min(620px, calc(100vh - 80px));
+}
+
+/* Coluna Esquerda: Lateral Narrativa / NPC */
+.dialogue-sidebar {
+  padding: 24px 22px;
+  background: linear-gradient(180deg, rgba(13, 19, 16, 0.95), rgba(8, 12, 10, 0.98));
+  border-right: 2px solid #d2a96944;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dialogue-speaker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dialogue-portrait {
+  display: block;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  image-rendering: pixelated;
+  transform: scale(1.6);
+  transform-origin: center;
+  margin: 8px 10px 8px 6px;
+  background-image: url("./assets/sprites/kenney-roguelike/roguelikeChar_transparent.png");
+  background-size: 1836px 406px;
+  background-repeat: no-repeat;
+  border: 1px solid #d2a96988;
+  border-radius: 4px;
+  background-color: #17211b;
+  box-shadow: 0 4px 12px #0008;
+}
+
+.dialogue-panel h2 {
+  margin: 0;
+  font: 700 24px/1.15 Georgia, "Times New Roman", serif;
+  color: #fff4d6;
+  text-shadow: 0 2px 4px #000;
+}
+
+.dialogue-role {
+  display: block;
+  margin-top: 4px;
+  color: #d2a969;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.dialogue-narrative {
+  flex: 1;
+  padding: 14px 16px;
+  background: #090e0c99;
+  border: 1px solid #e8e1c91f;
+  border-radius: 6px;
+  overflow-y: auto;
+}
+
+.dialogue-panel p {
+  margin: 0;
+  color: #d8ceb2;
+  font: 14px/1.65 ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.dialogue-player-funds {
+  padding: 12px 14px;
+  background: #111a14;
+  border: 1px solid #d2a96940;
+  border-radius: 6px;
+}
+
+.funds-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: #e0d3ab;
+  margin-bottom: 8px;
+}
+
+.funds-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fund-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #090e0c;
+  border: 1px solid #e8e1c92a;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #e0d8c0;
+}
+.fund-badge.gold {
+  border-color: #f0c43f66;
+  color: #ffe68a;
+}
+.fund-badge .glyph {
+  font-style: normal;
+}
+.fund-badge.gold .glyph {
+  color: #f0c43f;
+}
+
+/* Coluna Direita: Abas & Ações em Grid de Cards */
+.dialogue-main {
+  display: flex;
+  flex-direction: column;
+  background: rgba(16, 24, 19, 0.7);
+  overflow: hidden;
+}
+
+.dialogue-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 16px 20px 0;
+  background: #0a0f0c;
+  border-bottom: 2px solid #d2a96944;
+  overflow-x: auto;
+}
+
+.dialogue-tab {
+  padding: 9px 18px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: #a89f88;
+  font: 700 12px ui-monospace, monospace;
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.dialogue-tab:hover {
+  color: #fff4d6;
+  background: #141f17;
+}
+
+.dialogue-tab.active {
+  color: #ffe39a;
+  background: #18241b;
+  border-color: #d2a96966;
+  border-bottom: 2px solid #18241b;
+  margin-bottom: -2px;
+}
+
+.dialogue-actions-grid {
+  flex: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+/* Card Individual de Compra / Ação */
+.dialogue-card-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d2a96944;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #19251c, #111a13);
+  color: #eee4cc;
+  cursor: pointer;
+  text-align: left;
+  transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
+}
+
+.dialogue-card-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #f0cf7a;
+  background: linear-gradient(180deg, #243528, #16241a);
+  box-shadow: 0 6px 18px #0009, 0 0 12px #f0cf7a22;
+}
+
+.dialogue-card-btn:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.dialogue-card-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 5px;
+  border: 1px solid #d2a96933;
+  background: #0a0f0c;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: #f0cf7a;
+}
+
+.dialogue-card-icon canvas {
+  width: 36px;
+  height: 36px;
+  position: static;
+}
+
+.dialogue-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialogue-card-title {
+  display: block;
+  font: 700 13px Georgia, serif;
+  color: #fff4d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dialogue-card-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #c9bfa4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dialogue-card-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  background: #d2a96924;
+  color: #ffd86b;
+  border: 1px solid #d2a96944;
+}
+
+.dialogue-card-badge.free {
+  background: #2a663844;
+  color: #92e8a6;
+  border-color: #44aa5b66;
+}
+
+.dialogue-card-btn.action-close {
+  grid-column: 1 / -1;
+  justify-content: center;
+  text-align: center;
+  background: #111713;
+  border-color: #6a6352;
+  color: #baa88c;
+  padding: 10px;
+}
+.dialogue-card-btn.action-close:hover {
+  border-color: #d2a969;
+  color: #fff4d6;
+}
+
+.dialogue-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  color: #d3c8ac;
+  font-size: 26px;
+  cursor: pointer;
+  z-index: 7;
+}
+.dialogue-close:hover {
+  color: #fff4d6;
+}
+
+@media (max-width: 768px) {
+  .dialogue-layout {
+    grid-template-columns: 1fr;
+    max-height: 80vh;
+  }
+  .dialogue-sidebar {
+    border-right: none;
+    border-bottom: 2px solid #d2a96944;
+    padding: 16px;
+  }
+}
 .toast { position: absolute; z-index: 5; left: 50%; top: 20%; transform: translate(-50%, -8px); padding: 8px 14px; border: 1px solid #d2a96966; background: #111813df; color: #eee4cc; font-size: 10px; letter-spacing: .05em; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.88); } }

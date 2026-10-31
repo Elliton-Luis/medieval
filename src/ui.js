@@ -1,5 +1,5 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
-import { drawWeaponIcon } from "./weapondata.js?v=13";
+import { drawWeaponIcon } from "./weapondata.js?v=14";
 
 export class GameUI {
   constructor(renderer) {
@@ -25,8 +25,17 @@ export class GameUI {
     this.loading = document.getElementById("loading");
     this.dialoguePanel = document.getElementById("dialogue-panel");
     this.dialogueTitle = document.getElementById("dialogue-title");
+    this.dialogueRole = document.getElementById("dialogue-role");
+    this.dialoguePortrait = document.getElementById("dialogue-portrait");
     this.dialogueBody = document.getElementById("dialogue-body");
     this.dialogueActions = document.getElementById("dialogue-actions");
+    this.dialogueTabs = document.getElementById("dialogue-tabs");
+    this.dialogueCoins = document.getElementById("dialogue-coins");
+    this.dialogueWood = document.getElementById("dialogue-wood");
+    this.dialogueStone = document.getElementById("dialogue-stone");
+    this.dialogueHay = document.getElementById("dialogue-hay");
+    this.dialogueEyebrow = document.getElementById("dialogue-eyebrow");
+    this._dialogueActiveTab = "all";
     this.toast = document.getElementById("toast");
     this.location = document.getElementById("location");
     this.locationLabel = document.getElementById("location-label");
@@ -277,20 +286,191 @@ export class GameUI {
     this.weaponAmmo.textContent = ammoText;
   }
 
-  showDialogue(title, body, actions) {
+  setPlayerInventoryDisplay(coins, wood, stone, hay) {
+    if (this.dialogueCoins) this.dialogueCoins.textContent = String(coins ?? 0);
+    if (this.dialogueWood) this.dialogueWood.textContent = String(wood ?? 0);
+    if (this.dialogueStone) this.dialogueStone.textContent = String(stone ?? 0);
+    if (this.dialogueHay) this.dialogueHay.textContent = String(hay ?? 0);
+  }
+
+  showDialogue(title, body, actions, meta = {}) {
     this.dialogueTitle.textContent = title;
     this.dialogueBody.textContent = body;
+    if (this.dialogueRole) this.dialogueRole.textContent = meta.role || "Cidadão";
+    if (this.dialogueEyebrow) this.dialogueEyebrow.textContent = meta.eyebrow || "CALDERA · CONVERSA";
+
+    if (this.dialoguePortrait) {
+      const frame = PORTRAIT_FRAMES[meta.roleKey] || PORTRAIT_FRAMES.villager;
+      this.dialoguePortrait.style.backgroundPosition = `${-frame.x * 34}px ${-frame.y * 34}px`;
+    }
+
+    if (meta.funds) {
+      this.setPlayerInventoryDisplay(meta.funds.coins, meta.funds.wood, meta.funds.stone, meta.funds.hay);
+    }
+
+    // Categorização inteligente em abas
+    const tabs = [{ id: "all", label: "Tudo" }];
+    const hasShop = actions.some((a) => a.id.startsWith("buy:") || a.id.startsWith("upgrade:") || a.id.startsWith("craft:") || a.id.startsWith("build:") || ["potion", "bread", "hay", "bolts", "arrows", "bombs", "knives", "oil", "candle"].includes(a.id));
+    const hasWork = actions.some((a) => a.id.startsWith("sell:") || a.id.startsWith("train:") || a.id === "repair");
+    const hasMissions = actions.some((a) => a.id.startsWith("mission:"));
+    const hasChurch = actions.some((a) => a.id.startsWith("priest:") || a.id === "blessing" || a.id.startsWith("beggar:"));
+
+    if (hasShop) tabs.push({ id: "shop", label: "Mercadorias" });
+    if (hasWork) tabs.push({ id: "work", label: "Trabalho & Treino" });
+    if (hasMissions) tabs.push({ id: "missions", label: "Missões" });
+    if (hasChurch) tabs.push({ id: "church", label: "Graças & Ofertas" });
+
+    // Renderiza abas se houver mais de uma categoria
+    if (this.dialogueTabs) {
+      this.dialogueTabs.replaceChildren();
+      if (tabs.length > 2) {
+        this.dialogueTabs.hidden = false;
+        if (!tabs.some((t) => t.id === this._dialogueActiveTab)) {
+          this._dialogueActiveTab = "all";
+        }
+        for (const tab of tabs) {
+          const tabBtn = document.createElement("button");
+          tabBtn.type = "button";
+          tabBtn.className = `dialogue-tab ${tab.id === this._dialogueActiveTab ? "active" : ""}`;
+          tabBtn.textContent = tab.label;
+          tabBtn.addEventListener("click", () => {
+            this._dialogueActiveTab = tab.id;
+            this.dialogueTabs.querySelectorAll(".dialogue-tab").forEach((b) => b.classList.remove("active"));
+            tabBtn.classList.add("active");
+            this._renderDialogueActionsGrid(actions);
+          });
+          this.dialogueTabs.append(tabBtn);
+        }
+      } else {
+        this.dialogueTabs.hidden = true;
+        this._dialogueActiveTab = "all";
+      }
+    }
+
+    this._renderDialogueActionsGrid(actions);
+    this.dialoguePanel.hidden = false;
+  }
+
+  _renderDialogueActionsGrid(actions) {
+    if (!this.dialogueActions) return;
     this.dialogueActions.replaceChildren();
+
+    const activeTab = this._dialogueActiveTab || "all";
+
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i];
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = action.label;
-      button.disabled = Boolean(action.disabled);
-      button.addEventListener("click", () => this.onDialogAction?.(action.id));
-      this.dialogueActions.append(button);
+      const isClose = action.id === "close" || action.id === "scripture:close";
+
+      // Filtra por aba ativa (exceto botão de fechar)
+      if (!isClose && activeTab !== "all") {
+        const isShop = action.id.startsWith("buy:") || action.id.startsWith("upgrade:") || action.id.startsWith("craft:") || action.id.startsWith("build:") || ["potion", "bread", "hay", "bolts", "arrows", "bombs", "knives", "oil", "candle"].includes(action.id);
+        const isWork = action.id.startsWith("sell:") || action.id.startsWith("train:") || action.id === "repair";
+        const isMission = action.id.startsWith("mission:");
+        const isChurch = action.id.startsWith("priest:") || action.id === "blessing" || action.id.startsWith("beggar:");
+
+        if (activeTab === "shop" && !isShop) continue;
+        if (activeTab === "work" && !isWork) continue;
+        if (activeTab === "missions" && !isMission) continue;
+        if (activeTab === "church" && !isChurch) continue;
+      }
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = `dialogue-card-btn ${isClose ? "action-close" : ""}`;
+      card.disabled = Boolean(action.disabled);
+
+      // Ícone contextual em canvas ou glifo
+      const iconBox = document.createElement("span");
+      iconBox.className = "dialogue-card-icon";
+
+      let iconGlyph = "✦";
+      let weaponId = null;
+
+      if (action.id.startsWith("buy:")) {
+        weaponId = action.id.split(":")[1];
+      } else if (action.id.startsWith("upgrade:weapon")) {
+        weaponId = "longsword";
+      } else if (action.id.startsWith("upgrade:armor")) {
+        iconGlyph = "🛡";
+      } else if (action.id === "potion") {
+        iconGlyph = "⚗";
+      } else if (action.id === "bread") {
+        iconGlyph = "🍞";
+      } else if (action.id === "hay") {
+        iconGlyph = "🌾";
+      } else if (action.id === "candle" || action.id === "craft:candle") {
+        iconGlyph = "🕯";
+      } else if (action.id === "craft:torch") {
+        iconGlyph = "🔥";
+      } else if (action.id.startsWith("build:house")) {
+        iconGlyph = "🏠";
+      } else if (action.id.startsWith("build:corral")) {
+        iconGlyph = "🐎";
+      } else if (action.id.startsWith("sell:")) {
+        iconGlyph = "📦";
+      } else if (action.id.startsWith("train:")) {
+        iconGlyph = "⚡";
+      } else if (action.id.startsWith("mission:")) {
+        iconGlyph = "📜";
+      } else if (action.id.startsWith("priest:") || action.id === "blessing") {
+        iconGlyph = "✟";
+      } else if (action.id.startsWith("beggar:")) {
+        iconGlyph = "🤲";
+      } else if (isClose) {
+        iconGlyph = "✕";
+      }
+
+      if (weaponId) {
+        const can = document.createElement("canvas");
+        can.width = 46;
+        can.height = 46;
+        drawWeaponIcon(can, weaponId, true);
+        iconBox.append(can);
+      } else {
+        iconBox.textContent = iconGlyph;
+      }
+
+      // Separa o título e detalhes de custo / benefícios (ex: "Nome · 35 moedas")
+      const infoBox = document.createElement("div");
+      infoBox.className = "dialogue-card-info";
+
+      const parts = action.label.split("·");
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "dialogue-card-title";
+      titleSpan.textContent = parts[0]?.trim() || action.label;
+      infoBox.append(titleSpan);
+
+      if (parts.length > 1) {
+        const subSpan = document.createElement("span");
+        subSpan.className = "dialogue-card-sub";
+        subSpan.textContent = parts.slice(1).join(" · ").trim();
+        infoBox.append(subSpan);
+      }
+
+      // Badge visual de moedas / gratuito
+      const rawText = action.label.toLowerCase();
+      let badgeText = null;
+      let isFree = false;
+
+      if (rawText.includes("gratuito") || rawText.includes("grátis")) {
+        badgeText = "GRATUITO";
+        isFree = true;
+      } else {
+        const costMatch = action.label.match(/(\d+)\s*moedas/i);
+        if (costMatch) badgeText = `◈ ${costMatch[1]} MOEDAS`;
+      }
+
+      if (badgeText) {
+        const badge = document.createElement("span");
+        badge.className = `dialogue-card-badge ${isFree ? "free" : ""}`;
+        badge.textContent = badgeText;
+        infoBox.append(badge);
+      }
+
+      card.append(iconBox, infoBox);
+      card.addEventListener("click", () => this.onDialogAction?.(action.id));
+      this.dialogueActions.append(card);
     }
-    this.dialoguePanel.hidden = false;
   }
 
   closeDialogue() {

@@ -81,14 +81,41 @@
       <div id="notice" class="notice">Clique no mundo para capturar o mouse · ESC libera</div>
       <section id="dialogue-panel" class="dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="dialogue-title" hidden>
         <button id="dialogue-close" class="dialogue-close" type="button" aria-label="Fechar">×</button>
-        <span class="eyebrow">CALDERA · CONVERSA</span>
-        <h2 id="dialogue-title">—</h2>
-        <p id="dialogue-body">—</p>
-        <div id="dialogue-actions" class="dialogue-actions"></div>
+        <div class="dialogue-layout">
+          <!-- Coluna Esquerda: Identidade, Avatar, Lore e Status do Jogador -->
+          <aside class="dialogue-sidebar">
+            <span class="eyebrow" id="dialogue-eyebrow">CALDERA · CONVERSA</span>
+            <div class="dialogue-speaker">
+              <span id="dialogue-portrait" class="dialogue-portrait" aria-hidden="true"></span>
+              <div>
+                <h2 id="dialogue-title">—</h2>
+                <small id="dialogue-role" class="dialogue-role">—</small>
+              </div>
+            </div>
+            <div class="dialogue-narrative">
+              <p id="dialogue-body">—</p>
+            </div>
+            <div class="dialogue-player-funds">
+              <span class="funds-label">SUAS PROVISÕES</span>
+              <div class="funds-badges">
+                <span class="fund-badge gold"><i class="glyph">◈</i> <strong id="dialogue-coins">0</strong> moedas</span>
+                <span class="fund-badge"><i class="glyph">♣</i> <strong id="dialogue-wood">0</strong> mad</span>
+                <span class="fund-badge"><i class="glyph">◆</i> <strong id="dialogue-stone">0</strong> ped</span>
+                <span class="fund-badge"><i class="glyph">❖</i> <strong id="dialogue-hay">0</strong> feno</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Coluna Direita: Abas de Categoria e Grid em Cards com Preços -->
+          <section class="dialogue-main">
+            <nav id="dialogue-tabs" class="dialogue-tabs" role="tablist"></nav>
+            <div id="dialogue-actions" class="dialogue-actions-grid" role="tabpanel"></div>
+          </section>
+        </div>
       </section>
       <div id="prompt" class="prompt" hidden></div>
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
-    <script type="module" src="./src/main.js?v=13"></script>
+    <script type="module" src="./src/main.js?v=14"></script>
   </body>
 </html>
