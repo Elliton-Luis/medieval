@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
-import { PlayerStats } from "./rpg.js?v=10";
+import { PlayerStats } from "./rpg.js?v=11";
 
 const ROLL_DURATION = 0.55;
 const ROLL_SPEED = 9.5;
@@ -77,6 +77,13 @@ export class Player {
     this.idleTime = 0;
     this.mounted = null;
     this.crouching = false;
+    this.sitting = false;
+    this.praying = false;
+    this.sittingInChurch = false;
+    this.sitPose = 0;
+    this.prayPose = 0;
+    this.seatYaw = 0;
+    this.prayHealTimer = 0;
     this.invuln = 0;
     this.staggerTimer = 0;
     this.crouchPose = 0;
@@ -228,6 +235,28 @@ export class Player {
     const inputLength = Math.hypot(this.moveX, this.moveZ);
     if (inputLength > 1) { this.moveX /= inputLength; this.moveZ /= inputLength; }
     const hasInput = inputLength > 0.05;
+
+    // Se estiver sentado ou ajoelhado rezando, mover-se (WASD), pular ou rolar levanta o personagem suavemente
+    if (this.sitting || this.praying) {
+      if (hasInput || input.jumpPressed || input.dodgePressed || this.staggerTimer > 0) {
+        this.standUp();
+      } else {
+        this.vx = 0;
+        this.vz = 0;
+        const diffYaw = Math.atan2(Math.sin(this.seatYaw - this.model.rotation.y), Math.cos(this.seatYaw - this.model.rotation.y));
+        this.model.rotation.y += diffYaw * (1 - Math.exp(-14 * dt));
+        if (this.praying) {
+          this.prayHealTimer += dt;
+          if (this.prayHealTimer >= 2.2) {
+            this.prayHealTimer = 0;
+            if (this.health < this.maxHealth) {
+              this.health = Math.min(this.maxHealth, this.health + 1);
+            }
+            this.effects?.play("star", this.x, this.root.position.y + 1.85, this.z, "#ffe48f", 0.9);
+          }
+        }
+      }
+    }
 
     // Rolamento de esquiva: impulso curto, sem controle, com invulnerabilidade.
     if (input.consumeDodgePressed() && !this.blocking && !this.rolling && this.rollCooldown <= 0 && this.grounded && !this.knockedOut) {
@@ -560,6 +589,49 @@ export class Player {
     this.model.scale.y = squash;
     this.model.position.set(0, (this.grounded ? Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.04 : 0) + drop, 0);
 
+    // Animações de Sentar no Banco (sitPose) e Ajoelhar / Rezar (prayPose)
+    this.sitPose += ((this.sitting ? 1 : 0) - this.sitPose) * (1 - Math.exp(-12 * dt));
+    this.prayPose += ((this.praying ? 1 : 0) - this.prayPose) * (1 - Math.exp(-12 * dt));
+
+    if (this.sitPose > 0.01) {
+      const sp = this.sitPose;
+      this.leftLeg.rotation.set(-1.45 * sp, 0, -0.08 * sp);
+      this.rightLeg.rotation.set(-1.45 * sp, 0, 0.08 * sp);
+      this.leftKnee.rotation.x = 1.48 * sp;
+      this.rightKnee.rotation.x = 1.48 * sp;
+      this.leftArm.rotation.set(-0.52 * sp, 0, 0.14 * sp);
+      this.rightArm.rotation.set(-0.52 * sp, 0, -0.14 * sp);
+      this.leftForearm.rotation.x = -0.68 * sp;
+      this.rightForearm.rotation.x = -0.68 * sp;
+      this.model.position.y = -0.34 * sp;
+      this.model.rotation.x = -0.04 * sp;
+      this.cape.rotation.x = -0.03 * sp;
+    }
+
+    if (this.prayPose > 0.01) {
+      const pp = this.prayPose;
+      const prayBreath = Math.sin(this.idleTime * 2.4) * 0.04;
+      if (!this.sitting) {
+        // Ajoelhado diante do altar
+        this.leftLeg.rotation.set(-0.52 * pp, 0, -0.06 * pp);
+        this.rightLeg.rotation.set(-0.52 * pp, 0, 0.06 * pp);
+        this.leftKnee.rotation.x = 2.05 * pp;
+        this.rightKnee.rotation.x = 2.05 * pp;
+        this.model.position.y = -0.44 * pp;
+      }
+      // Mãos unidas em oração à frente do peito e cabeça inclinada em reverência
+      this.leftArm.rotation.set((-0.95 + prayBreath) * pp, 0.42 * pp, 0.38 * pp);
+      this.rightArm.rotation.set((-0.95 + prayBreath) * pp, -0.42 * pp, -0.38 * pp);
+      this.leftForearm.rotation.x = -1.18 * pp;
+      this.rightForearm.rotation.x = -1.18 * pp;
+      this.head.rotation.x = (0.38 + prayBreath * 0.5) * pp;
+      this.model.rotation.x = 0.12 * pp;
+    }
+
+    if (this.handSocket) {
+      this.handSocket.visible = this.prayPose < 0.35 && this.sitPose < 0.65;
+    }
+
     if (this.mounted) {
       // sentado na sela: pernas abertas, tronco inclinado com a velocidade
       this.leftLeg.rotation.set(-1.0, 0, -0.5);
@@ -704,5 +776,57 @@ export class Player {
     this.chestArmor.material.color.set("#bdad78");
     this.chestArmor.material.metalness = 0.68;
     this.chestArmor.material.needsUpdate = true;
+  }
+
+  sitAt(x, z, yaw = 0, isChurchPew = false) {
+    this.x = x;
+    this.z = z;
+    this.vx = 0;
+    this.vz = 0;
+    this.crouching = false;
+    this.blocking = false;
+    this.rolling = false;
+    this.sitting = true;
+    this.praying = false;
+    this.sittingInChurch = Boolean(isChurchPew);
+    this.seatYaw = yaw;
+    this.model.rotation.y = yaw;
+    this.userData.state = "SITTING";
+    this.root.position.set(this.x, this.world.raycastGround(this.x, this.root.position.y, this.z), this.z);
+  }
+
+  startAltarPrayer(x, z, yaw = 0) {
+    this.x = x;
+    this.z = z;
+    this.vx = 0;
+    this.vz = 0;
+    this.crouching = false;
+    this.blocking = false;
+    this.rolling = false;
+    this.sitting = false;
+    this.praying = true;
+    this.sittingInChurch = true;
+    this.prayHealTimer = 0;
+    this.seatYaw = yaw;
+    this.model.rotation.y = yaw;
+    this.userData.state = "PRAYING";
+    this.root.position.set(this.x, this.world.raycastGround(this.x, this.root.position.y, this.z), this.z);
+  }
+
+  toggleSeatPrayer() {
+    if (!this.sitting && !this.praying) return false;
+    this.praying = !this.praying;
+    this.prayHealTimer = 0;
+    this.userData.state = this.praying ? "PRAYING" : "SITTING";
+    return this.praying;
+  }
+
+  standUp() {
+    if (!this.sitting && !this.praying) return;
+    this.sitting = false;
+    this.praying = false;
+    this.sittingInChurch = false;
+    this.userData.state = "IDLE";
+    if (this.handSocket) this.handSocket.visible = true;
   }
 }

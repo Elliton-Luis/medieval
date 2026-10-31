@@ -18,7 +18,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=10";
+} from "./rpg.js?v=11";
 
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
@@ -308,11 +308,23 @@ export class InteractionSystem {
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "priest") {
-      body = message || "Filho, a graça da capela absolve os arrependidos, apazigua a guarda real e purifica o espírito.";
+      body =
+        message ||
+        "Filho, entre na capela: podes sentar nos bancos para meditar, ajoelhar no Altar-Mor, benzer-te na pia de água benta ou tocar o sino da torre.";
       const pBlessing = this._price(35);
+      const healCost = PlayerStats.cha >= 14 ? 0 : this._price(10);
       actions = [
+        {
+          id: "priest:heal",
+          label:
+            healCost === 0
+              ? "Receber Bênção de Cura (Grátis por tua devoção · CAR ≥ 14)"
+              : `Pedir Bênção de Cura (restaura toda a Vitalidade) · ${healCost} moedas`,
+          disabled: this.player.health >= this.player.maxHealth || this.player.coins < healCost,
+        },
         { id: "priest:confess", label: "Confessar pecados / Indulgência (zera Procurado e +2 CAR) · 50 moedas", disabled: this.player.coins < 50 },
         { id: "blessing", label: PlayerEquipment.blessingActive ? "Colar da Bênção · já consagrado" : `Consagrar Colar da Bênção · ${pBlessing} moedas`, disabled: PlayerEquipment.blessingActive || this.player.coins < pBlessing },
+        { id: "priest:guide", label: "Ouvir sermão sobre os mistérios da Igreja" },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "beggar") {
@@ -492,6 +504,22 @@ export class InteractionSystem {
         this.ui.showToast("Colar da Bênção ativo! Chance passiva de reduzir danos pela metade.");
         this._showNPCDialogue("Que este amuleto sagrado proteja seu peito nos momentos de provação.");
       }
+    } else if (action === "priest:heal") {
+      const healCost = PlayerStats.cha >= 14 ? 0 : this._price(10);
+      if (this.player.coins >= healCost && this.player.health < this.player.maxHealth) {
+        this.player.coins -= healCost;
+        PlayerStats.gold = this.player.coins;
+        this.player.health = this.player.maxHealth;
+        syncPlayerStatsToPlayer(this.player, this.ui);
+        this.ui.showToast("Bênção de Cura concedida! Vitalidade totalmente restaurada.");
+        this._showNPCDialogue("Que a luz sagrada restaure o vigor do teu corpo e guarde os teus passos.");
+      }
+      return;
+    } else if (action === "priest:guide") {
+      this._showNPCDialogue(
+        "Dentro da Igreja podes abrir a porta (E), sentar nos bancos e rezar (E), ajoelhar diante do Altar-Mor para restaurar o vigor, benzer-te na pia de água benta, depositar ofertas ou tocar o sino da torre!",
+      );
+      return;
     } else if (action === "priest:confess") {
       if (interactWithPriest(this.player.root.position, this.activeNPC, 50)) {
         this.ui.showToast("Indulgência concedida! Procurado zerado · Carisma +2");

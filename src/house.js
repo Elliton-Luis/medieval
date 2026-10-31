@@ -435,6 +435,7 @@ export function createHouse(scene, world, opts) {
   group.add(table);
   const tableBox = addCollider(tableX - 0.65, tableX + 0.65, tableZ - 0.4, tableZ + 0.4, 0, 0.9, { move: true, shot: true, cam: false });
   registerProp(table, tableBox, "mesa", 3, tableX, tableZ, 0.9);
+  const seats = [];
   for (const sd of [-1, 1]) {
     const bench = new THREE.Group();
     const bz = tableZ + sd * 0.78;
@@ -442,8 +443,16 @@ export function createHouse(scene, world, opts) {
     furnMesh(M.furnWood, 1.15, 0.07, 0.3, 0, 0.45, 0, bench);
     for (const lx of [-0.45, 0.45]) furnMesh(M.furnDark, 0.08, 0.43, 0.26, lx, 0.22, 0, bench);
     group.add(bench);
-    const benchBox = addCollider(tableX - 0.58, tableX + 0.58, bz - 0.16, bz + 0.16, 0, 0.5, { move: true, shot: true, cam: false });
+    const benchBox = addCollider(tableX - 0.58, tableX + 0.58, bz - 0.16, bz + 0.16, 0, 0.5, { move: false, shot: true, cam: false });
     registerProp(bench, benchBox, "banco", 2, tableX, bz, 0.5);
+    const seatW = px(tableX, bz);
+    seats.push({
+      x: seatW.x,
+      z: seatW.z,
+      yaw: ry + (sd > 0 ? Math.PI : 0),
+      isChurchPew: false,
+      label: "E · sentar no banco",
+    });
   }
 
   // estante com potes
@@ -492,7 +501,7 @@ export function createHouse(scene, world, opts) {
     chest: chestState,
     bed: { x: bedWorld.x, z: bedWorld.z, box: bedBox },
     hearth: { x: hw.x, y: floorY + 0.5, z: hw.z },
-    props, colliders, windows, torchSpots, doorFront: doorWorld,
+    props, seats, colliders, windows, torchSpots, doorFront: doorWorld,
     owner: null, burned: false, inside: false, enterCooldown: 0,
     logs,
     // pontos de palha do beiral, usados pelo fogo
@@ -501,3 +510,401 @@ export function createHouse(scene, world, opts) {
   houseObj.contains = (x, z) => x > houseObj.rect.minX && x < houseObj.rect.maxX && z > houseObj.rect.minZ && z < houseObj.rect.maxZ;
   return houseObj;
 }
+
+/**
+ * Cria uma Igreja / Capela totalmente entrável com porta articulada, nave interna,
+ * bancos (pews) para sentar e rezar, altar-mor sagrado, pia de água benta,
+ * corda de sino funcional, caixa de ofertas e atril de escrituras.
+ */
+export function createChurchBuilding(scene, world, opts) {
+  const M = materials();
+  const random = makeRandom((opts.seed || 777) * 2654435761);
+  const turns = ((Math.round((opts.ry || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+  const ry = turns * (Math.PI / 2);
+  const c = [1, 0, -1, 0][turns];
+  const s = [0, 1, 0, -1][turns];
+  const W = 6.8;
+  const D = 9.8;
+  const t = 0.3;
+  const H = 3.85;
+  const pitch = 1.95;
+  const plasterColor = "#e6dac0";
+  const timberColor = "#3d2e22";
+  const roofColor = "#5c4234";
+
+  const toWorld = (lx, lz) => ({ x: opts.x + lx * c + lz * s, z: opts.z - lx * s + lz * c });
+  const worldRect = (x0, x1, z0, z1) => {
+    const a = toWorld(x0, z0);
+    const b = toWorld(x1, z1);
+    return { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minZ: Math.min(a.z, b.z), maxZ: Math.max(a.z, b.z) };
+  };
+
+  let floorY = -Infinity;
+  let minGroundY = Infinity;
+  for (const lx of [-W / 2 - 0.5, 0, W / 2 + 0.5]) {
+    for (const lz of [-D / 2 - 0.6, 0, D / 2 + 1.0]) {
+      const p = toWorld(lx, lz);
+      const h = world.heightAt(p.x, p.z);
+      if (h > floorY) floorY = h;
+      if (h < minGroundY) minGroundY = h;
+    }
+  }
+  floorY += 0.06;
+  const foundationDepth = Math.max(2.8, floorY - minGroundY + 2.2);
+  const footprint = worldRect(-W / 2 - 0.2, W / 2 + 0.2, -D / 2 - 0.2, D / 2 + 0.2);
+  world.floors.push({ ...footprint, y: floorY });
+  const stepFootprint = worldRect(-1.2, 1.2, D / 2, D / 2 + 0.9);
+  world.floors.push({ ...stepFootprint, y: floorY - 0.04 });
+
+  const lists = { stone: [], wood: [], plaster: [], roof: [], ceiling: [], dark: [], glass: [] };
+  const add = (list, w, h, d, x, y, z, color, rot, ao) => lists[list].push(boxGeometry(w, h, d, x, y, z, color, random, rot, ao));
+  const colliders = [];
+  const addCollider = (x0, x1, z0, z1, y0, y1, flags) => {
+    const r = worldRect(x0, x1, z0, z1);
+    const box = world.addBox(r.minX, r.maxX, r.minZ, r.maxZ, floorY + y0, floorY + y1, flags);
+    colliders.push(box);
+    return box;
+  };
+
+  const doorW = 1.36;
+  const doorTop = 2.45;
+  const openings = {
+    front: [{ c: 0, w: doorW, bottom: 0, top: doorTop, type: "door" }],
+    back: [{ c: 0, w: 1.2, bottom: 1.5, top: 3.1, type: "window" }],
+    left: [
+      { c: -2.2, w: 0.85, bottom: 1.2, top: 2.8, type: "window" },
+      { c: 1.2, w: 0.85, bottom: 1.2, top: 2.8, type: "window" },
+    ],
+    right: [
+      { c: -2.2, w: 0.85, bottom: 1.2, top: 2.8, type: "window" },
+      { c: 1.2, w: 0.85, bottom: 1.2, top: 2.8, type: "window" },
+    ],
+  };
+
+  const walls = {
+    front: { axis: "x", fixed: D / 2, out: 1, from: -W / 2, to: W / 2 },
+    back: { axis: "x", fixed: -D / 2, out: -1, from: -W / 2, to: W / 2 },
+    right: { axis: "z", fixed: W / 2, out: 1, from: -D / 2 + t, to: D / 2 - t },
+    left: { axis: "z", fixed: -W / 2, out: -1, from: -D / 2 + t, to: D / 2 - t },
+  };
+
+  const wallBox = (wall, a0, a1, y0, y1, listName, color, extra = 0) => {
+    const mid = wall.fixed - wall.out * (t / 2);
+    const th = t + extra;
+    const center = mid + wall.out * (extra / 2);
+    if (wall.axis === "x") add(listName, a1 - a0, y1 - y0, th, (a0 + a1) / 2, (y0 + y1) / 2, center, color);
+    else add(listName, th, y1 - y0, a1 - a0, center, (y0 + y1) / 2, (a0 + a1) / 2, color);
+  };
+  const wallCollider = (wall, a0, a1, y0, y1, flags) => {
+    const lo = Math.min(wall.fixed, wall.fixed - wall.out * t);
+    const hi = Math.max(wall.fixed, wall.fixed - wall.out * t);
+    if (wall.axis === "x") return addCollider(a0, a1, lo, hi, y0, y1, flags);
+    return addCollider(lo, hi, a0, a1, y0, y1, flags);
+  };
+  const outerBox = (wall, a, y, w, h, depth, offset, listName, color, rot) => {
+    const p = wall.fixed + wall.out * (depth / 2 + offset);
+    if (wall.axis === "x") add(listName, w, h, depth, a, y, p, color, rot, 0.1);
+    else add(listName, depth, h, w, p, y, a, color, rot, 0.1);
+  };
+
+  const wallThick = t + 0.08;
+  addCollider(-W / 2 - 0.12, W / 2 + 0.12, -D / 2 - 0.08, -D / 2 + wallThick, -foundationDepth, H, { move: true, shot: false, cam: true });
+  addCollider(-W / 2 - 0.08, -W / 2 + wallThick, -D / 2 - 0.12, D / 2 + 0.12, -foundationDepth, H, { move: true, shot: false, cam: true });
+  addCollider(W / 2 - wallThick, W / 2 + 0.08, -D / 2 - 0.12, D / 2 + 0.12, -foundationDepth, H, { move: true, shot: false, cam: true });
+  addCollider(-W / 2 - 0.12, -doorW / 2, D / 2 - wallThick, D / 2 + 0.08, -foundationDepth, H, { move: true, shot: false, cam: true });
+  addCollider(doorW / 2, W / 2 + 0.12, D / 2 - wallThick, D / 2 + 0.08, -foundationDepth, H, { move: true, shot: false, cam: true });
+
+  let doorWorld = toWorld(0, D / 2 + 0.3);
+  const windows = [];
+  for (const name of Object.keys(walls)) {
+    const wall = walls[name];
+    const list = openings[name].slice().sort((a, b) => a.c - b.c);
+    const pieces = [];
+    let cursor = wall.from;
+    for (const o of list) {
+      const a0 = o.c - o.w / 2;
+      const a1 = o.c + o.w / 2;
+      if (a0 > cursor) pieces.push([cursor, a0, 0, H, "full"]);
+      if (o.bottom > 0) pieces.push([a0, a1, 0, o.bottom, "below"]);
+      pieces.push([a0, a1, o.top, H, "above"]);
+      cursor = a1;
+    }
+    if (cursor < wall.to) pieces.push([cursor, wall.to, 0, H, "full"]);
+
+    for (const [a0, a1, y0, y1, kind] of pieces) {
+      wallCollider(wall, a0, a1, y0, y1, { move: kind !== "above", shot: true, cam: true });
+      const stoneTop = Math.min(y1, 0.85);
+      if (y0 < 0.85) wallBox(wall, a0, a1, y0, stoneTop, "stone", "#b4aea0", 0.06);
+      if (y1 > 0.85) wallBox(wall, a0, a1, Math.max(y0, 0.85), y1, "plaster", plasterColor);
+    }
+
+    for (const o of list) {
+      const wc = o.c;
+      const jambH = o.top - o.bottom;
+      outerBox(wall, wc - o.w / 2 - 0.08, o.bottom + jambH / 2, 0.15, jambH, 0.12, 0.01, "stone", "#9c9688");
+      outerBox(wall, wc + o.w / 2 + 0.08, o.bottom + jambH / 2, 0.15, jambH, 0.12, 0.01, "stone", "#9c9688");
+      outerBox(wall, wc, o.top + 0.08, o.w + 0.34, 0.16, 0.14, 0.01, "stone", "#9c9688");
+      if (o.type === "window") {
+        const gp = wall.fixed - wall.out * (t / 2);
+        if (wall.axis === "x") add("glass", o.w, jambH, 0.05, wc, o.bottom + jambH / 2, gp, "#ffd88a", null, 0);
+        else add("glass", 0.05, jambH, o.w, gp, o.bottom + jambH / 2, wc, "#ffd88a", null, 0);
+        const wp = wall.axis === "x" ? toWorld(wc, wall.fixed) : toWorld(wall.fixed, wc);
+        windows.push({ x: wp.x, z: wp.z });
+      }
+    }
+  }
+
+  // Fundação de pedra e escadaria frontal da igreja
+  add("stone", W + 0.55, foundationDepth + 0.04, D + 0.55, 0, -foundationDepth / 2 + 0.02, 0, "#969084", null, 0.25);
+  add("stone", 2.4, foundationDepth + 0.14, 0.85, 0, -foundationDepth / 2 + 0.07, D / 2 + 0.45, "#b4aea0", null, 0.12);
+  add("stone", 2.7, foundationDepth - 0.04, 0.65, 0, -foundationDepth / 2 - 0.02, D / 2 + 0.95, "#9c9689", null, 0.18);
+
+  // Piso de pedra polida e vigas do teto
+  add("stone", W - 2 * t, 0.12, D - 2 * t, 0, 0.0, 0, "#b8b1a3", null, 0.05);
+  for (let i = -2; i <= 2; i++) add("ceiling", 0.22, 0.24, W - 2 * t, 0, H - 0.15, i * (D / 6), timberColor, null, 0);
+
+  // Telhado de duas águas (cumeeira ao longo de Z)
+  const ovS = 0.55;
+  const ovF = 0.45;
+  const run = W / 2 + ovS;
+  const rise = pitch + 0.12;
+  const slopeLen = Math.hypot(run, rise);
+  const angle = Math.atan2(rise, run);
+  for (const sd of [-1, 1]) {
+    add("roof", slopeLen + 0.06, 0.18, D + 2 * ovF, sd * (run / 2), H - 0.1 + rise / 2 + 0.02, 0, roofColor, [0, 0, -sd * angle], 0.15);
+  }
+  add("roof", 0.36, 0.2, D + 2 * ovF + 0.1, 0, H + pitch + 0.1, 0, "#473328", null, 0);
+
+  const group = new THREE.Group();
+  group.position.set(opts.x, floorY, opts.z);
+  group.rotation.y = ry;
+  scene.add(group);
+  const meshes = {};
+  const build = (name, material, castShadow = false) => {
+    if (lists[name].length === 0) return null;
+    const merged = mergeGeometries(lists[name].map((g) => (g.index ? g.toNonIndexed() : g)), false);
+    for (const g of lists[name]) g.dispose();
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = false;
+    group.add(mesh);
+    meshes[name] = mesh;
+    return mesh;
+  };
+  build("stone", M.stone, true);
+  build("wood", M.wood, true);
+  build("plaster", M.plaster, true);
+  build("roof", M.tile, true);
+  build("ceiling", M.wood);
+  build("dark", M.dark);
+  build("glass", M.glass);
+
+  // Torre do sino sobre o pórtico frontal (some junto com o telhado ao entrar na igreja)
+  const towerTop = new THREE.Group();
+  towerTop.position.set(0, H + 0.2, D / 2 - 1.35);
+  group.add(towerTop);
+  meshes.towerTop = towerTop;
+  furnMesh(M.stone, 2.75, 4.6, 2.75, 0, 2.3, 0, towerTop);
+  furnMesh(M.furnDark, 3.15, 0.28, 3.15, 0, 4.65, 0, towerTop);
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(2.15, 3.2, 4), M.tile);
+  spire.position.set(0, 6.35, 0);
+  spire.rotation.y = Math.PI / 4;
+  towerTop.add(spire);
+  const goldMat = new THREE.MeshStandardMaterial({ color: "#e6c15c", metalness: 0.65, roughness: 0.35, flatShading: true });
+  furnMesh(goldMat, 0.14, 1.25, 0.14, 0, 8.35, 0, towerTop);
+  furnMesh(goldMat, 0.78, 0.14, 0.14, 0, 8.65, 0, towerTop);
+
+  // Sino articulado dentro do campanário
+  const bellPivot = new THREE.Group();
+  bellPivot.position.set(0, 4.2, 0);
+  towerTop.add(bellPivot);
+  const bellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 0.58, 8), goldMat);
+  bellBody.position.set(0, -0.32, 0);
+  bellPivot.add(bellBody);
+
+  // Porta da igreja articulada
+  const hinge = -doorW / 2;
+  const pivot = new THREE.Group();
+  pivot.position.set(hinge, 0, D / 2 - t / 2);
+  group.add(pivot);
+  furnMesh(M.furnDark, doorW - 0.04, doorTop - 0.05, 0.09, doorW / 2, (doorTop - 0.05) / 2, 0, pivot);
+  for (const y of [0.55, 1.85]) {
+    furnMesh(M.dark, doorW - 0.18, 0.09, 0.12, doorW / 2, y, 0, pivot);
+  }
+  furnMesh(goldMat, 0.1, 0.18, 0.15, doorW - 0.2, 1.15, 0, pivot);
+  const doorBox = addCollider(-doorW / 2 - 0.06, doorW / 2 + 0.06, D / 2 - wallThick, D / 2 + 0.08, -0.2, doorTop, { move: true, shot: true, cam: true });
+  const doorState = { pivot, box: doorBox, open: false, angle: 0, target: 0, x: doorWorld.x, z: doorWorld.z };
+
+  // --- Interior Sagrado da Igreja ---
+  const redCarpetMat = new THREE.MeshStandardMaterial({ color: "#8c2d26", roughness: 0.95, flatShading: true });
+  const whiteClothMat = new THREE.MeshStandardMaterial({ color: "#f2ead7", roughness: 0.9, flatShading: true });
+  const holyWaterMat = new THREE.MeshStandardMaterial({ color: "#6ec5e9", emissive: "#246a8a", emissiveIntensity: 0.45, roughness: 0.25, flatShading: true });
+
+  // Tapete vermelho central até o altar
+  furnMesh(redCarpetMat, 1.35, 0.03, D - 2.6, 0, 0.07, 0.35, group);
+
+  // 4 Bancos compridos de igreja (Pews) com encosto — 8 assentos voltados para o altar
+  const seats = [];
+  const props = [];
+  for (const sideX of [-1.75, 1.75]) {
+    for (const rowZ of [-0.45, 1.45]) {
+      const pew = new THREE.Group();
+      pew.position.set(sideX, 0, rowZ);
+      // Assento, encosto e apoios laterais
+      furnMesh(M.furnDark, 1.85, 0.08, 0.44, 0, 0.46, 0, pew);
+      furnMesh(M.furnWood, 1.85, 0.52, 0.08, 0, 0.74, 0.19, pew);
+      for (const lx of [-0.82, 0.82]) {
+        furnMesh(M.furnDark, 0.1, 0.88, 0.48, lx, 0.44, 0, pew);
+      }
+      group.add(pew);
+      addCollider(sideX - 0.92, sideX + 0.92, rowZ - 0.22, rowZ + 0.22, 0, 0.85, { move: false, shot: true, cam: false });
+
+      for (const offsetSeatX of [-0.45, 0.45]) {
+        const seatWorld = toWorld(sideX + offsetSeatX, rowZ - 0.05);
+        seats.push({
+          x: seatWorld.x,
+          z: seatWorld.z,
+          yaw: ry + Math.PI, // Olhando para o Altar-Mor (-Z local)
+          isChurchPew: true,
+          label: "E · sentar no banco da igreja",
+        });
+      }
+    }
+  }
+
+  // Altar-Mor Sagrado no fundo da nave (-Z)
+  const altarZ = -D / 2 + 1.45;
+  const altarGroup = new THREE.Group();
+  altarGroup.position.set(0, 0, altarZ);
+  // Degrau do presbitério
+  furnMesh(M.stone, 3.6, 0.16, 1.9, 0, 0.08, 0, altarGroup);
+  // Mesa do altar com toalha branca e friso dourado
+  furnMesh(M.stone, 2.2, 0.96, 0.92, 0, 0.56, 0, altarGroup);
+  furnMesh(whiteClothMat, 2.24, 0.32, 0.96, 0, 0.92, 0, altarGroup);
+  furnMesh(goldMat, 1.9, 0.08, 0.98, 0, 0.78, 0, altarGroup);
+  // Cruz Dourada no centro do altar + Cálice + 2 Candelabros acesos
+  furnMesh(goldMat, 0.09, 0.78, 0.09, 0, 1.45, -0.12, altarGroup);
+  furnMesh(goldMat, 0.46, 0.09, 0.09, 0, 1.62, -0.12, altarGroup);
+  furnMesh(goldMat, 0.12, 0.22, 0.12, 0.35, 1.18, 0.08, altarGroup);
+  for (const cx of [-0.72, 0.72]) {
+    furnMesh(goldMat, 0.1, 0.36, 0.1, cx, 1.24, 0, altarGroup);
+    furnMesh(whiteClothMat, 0.06, 0.2, 0.06, cx, 1.5, 0, altarGroup);
+    furnMesh(M.fire, 0.05, 0.09, 0.05, cx, 1.64, 0, altarGroup);
+  }
+  group.add(altarGroup);
+  addCollider(-1.12, 1.12, altarZ - 0.48, altarZ + 0.48, 0, 1.15, { move: true, shot: true, cam: false });
+  const altarPraySpot = toWorld(0, altarZ + 1.05);
+
+  // Pia de Água Benta (entrada à esquerda)
+  const fontX = -2.25;
+  const fontZ = D / 2 - 1.35;
+  const fontGroup = new THREE.Group();
+  fontGroup.position.set(fontX, 0, fontZ);
+  furnMesh(M.stone, 0.42, 0.82, 0.42, 0, 0.41, 0, fontGroup);
+  furnMesh(M.stone, 0.72, 0.22, 0.72, 0, 0.9, 0, fontGroup);
+  furnMesh(holyWaterMat, 0.54, 0.06, 0.54, 0, 1.02, 0, fontGroup);
+  group.add(fontGroup);
+  addCollider(fontX - 0.36, fontX + 0.36, fontZ - 0.36, fontZ + 0.36, 0, 1.05, { move: true, shot: true, cam: false });
+  const holyFontWorld = toWorld(fontX, fontZ);
+
+  // Corda do Sino da Torre (entrada à direita)
+  const ropeX = 2.25;
+  const ropeZ = D / 2 - 1.35;
+  const ropeGroup = new THREE.Group();
+  ropeGroup.position.set(ropeX, 0, ropeZ);
+  furnMesh(M.furnWood, 0.05, H - 0.5, 0.05, 0, (H - 0.5) / 2 + 0.45, 0, ropeGroup);
+  furnMesh(goldMat, 0.14, 0.24, 0.14, 0, 0.52, 0, ropeGroup);
+  group.add(ropeGroup);
+  const bellRopeWorld = toWorld(ropeX, ropeZ);
+
+  // Caixa de Ofertas / Dízimo (próxima ao altar à esquerda)
+  const boxX = -2.25;
+  const boxZ = -D / 2 + 2.55;
+  const offGroup = new THREE.Group();
+  offGroup.position.set(boxX, 0, boxZ);
+  furnMesh(M.furnDark, 0.55, 0.85, 0.48, 0, 0.425, 0, offGroup);
+  furnMesh(goldMat, 0.58, 0.08, 0.5, 0, 0.72, 0, offGroup);
+  group.add(offGroup);
+  addCollider(boxX - 0.28, boxX + 0.28, boxZ - 0.25, boxZ + 0.25, 0, 0.9, { move: true, shot: true, cam: false });
+  const offeringBoxWorld = toWorld(boxX, boxZ);
+
+  // Atril das Escrituras Sagradas (próximo ao altar à direita)
+  const lecX = 2.05;
+  const lecZ = -D / 2 + 2.55;
+  const lecGroup = new THREE.Group();
+  lecGroup.position.set(lecX, 0, lecZ);
+  furnMesh(M.furnDark, 0.18, 1.05, 0.18, 0, 0.52, 0, lecGroup);
+  const desk = furnMesh(M.furnWood, 0.58, 0.08, 0.46, 0, 1.08, 0, lecGroup);
+  desk.rotation.x = 0.35;
+  const book = furnMesh(whiteClothMat, 0.44, 0.05, 0.32, 0, 1.14, 0.02, lecGroup);
+  book.rotation.x = 0.35;
+  group.add(lecGroup);
+  addCollider(lecX - 0.28, lecX + 0.28, lecZ - 0.25, lecZ + 0.25, 0, 1.2, { move: true, shot: true, cam: false });
+  const lecternWorld = toWorld(lecX, lecZ);
+
+  // Estande externo de velas votivas ao lado da porta
+  const standLocal = new THREE.Group();
+  standLocal.position.set(2.35, 0, D / 2 + 0.95);
+  group.add(standLocal);
+  furnMesh(M.stone, 1.0, foundationDepth + 0.04, 0.7, 0, -foundationDepth / 2 + 0.02, 0, standLocal);
+  furnMesh(M.furnWood, 0.8, 0.9, 0.5, 0, 0.45, 0, standLocal);
+  for (const cx of [-0.25, 0, 0.25]) {
+    furnMesh(whiteClothMat, 0.07, 0.22, 0.07, cx, 1.0, 0, standLocal);
+    furnMesh(M.fire, 0.05, 0.06, 0.05, cx, 1.14, 0, standLocal);
+  }
+  addCollider(1.9, 2.8, D / 2 + 0.65, D / 2 + 1.25, -foundationDepth, 1.1, { move: true, shot: true, cam: false });
+
+  const innerX = W / 2 - t;
+  const innerZ = D / 2 - t;
+  const spawn = toWorld(0, D / 2 + 2.6);
+  const stand = toWorld(2.35, D / 2 + 1.65);
+  const torches = [-1.45, 1.45].map((lx) => {
+    const p = toWorld(lx, D / 2 + 0.18);
+    return { x: p.x, y: floorY + 2.15, z: p.z, nx: s, nz: c, post: false };
+  });
+
+  const churchObj = {
+    id: opts.id || `church-${opts.name}`,
+    type: "church",
+    name: opts.name || "Igreja",
+    price: 0,
+    x: opts.x,
+    z: opts.z,
+    ry,
+    floorY,
+    W,
+    D,
+    thatch: false,
+    rect: worldRect(-innerX, innerX, -innerZ, innerZ),
+    outer: footprint,
+    group,
+    meshes,
+    M,
+    door: doorState,
+    chest: { lid: null, opened: true, x: 0, z: 0, box: null, openAmount: 1 },
+    bed: { x: 99999, z: 99999, box: null },
+    hearth: { x: altarPraySpot.x, y: floorY + 1.1, z: altarPraySpot.z },
+    altar: { x: altarPraySpot.x, z: altarPraySpot.z, yaw: ry + Math.PI },
+    holyFont: { x: holyFontWorld.x, z: holyFontWorld.z, cooldown: 0 },
+    bellRope: { x: bellRopeWorld.x, z: bellRopeWorld.z, bellPivot, swingTimer: 0 },
+    offeringBox: { x: offeringBoxWorld.x, z: offeringBoxWorld.z },
+    lectern: { x: lecternWorld.x, z: lecternWorld.z },
+    props,
+    seats,
+    colliders,
+    windows,
+    torchSpots: torches,
+    torches,
+    spawn,
+    stand,
+    doorFront: doorWorld,
+    owner: null,
+    burned: false,
+    inside: false,
+    enterCooldown: 0,
+    thatchSpots: [],
+  };
+  churchObj.contains = (x, z) => x > churchObj.rect.minX && x < churchObj.rect.maxX && z > churchObj.rect.minZ && z < churchObj.rect.maxZ;
+  return churchObj;
+}
+

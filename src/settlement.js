@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { ROADS, VILLAGES } from "./kingdom.js";
-import { makeRandom } from "./utils.js?v=10";
-import { createHouse } from "./house.js?v=10";
+import { makeRandom } from "./utils.js?v=11";
+import { createHouse, createChurchBuilding } from "./house.js?v=11";
 import { createHay } from "./fire.js";
-import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js?v=10";
+import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js?v=11";
 
 const sharedHouseMat = createSharedHouseMaterial();
 const wallMat = sharedHouseMat;
@@ -324,56 +324,37 @@ function createCottage(scene, world, x, z, variant = 0, ry = 0) {
   world.addOrientedBox(x, z, width, depth, ry, baseY - depthY, baseY + 5.6, { move: true, shot: true, cam: true });
 }
 
-function createChurch(scene, world, x, z, ry, name) {
-  const { baseY: y, depthY } = sampleFoundation(world, x, z, ry, 6.8, 10.6);
+function createChurch(scene, world, x, z, ry, name, houses = null) {
+  const church = createChurchBuilding(scene, world, {
+    id: `church-${name.toLowerCase().replace(/\s+/g, "-")}`,
+    name,
+    x,
+    z,
+    ry,
+    seed: Math.round(Math.abs(x * 31 + z * 17)) + 777,
+  });
+  if (houses) houses.push(church);
+  return church;
+}
+
+function createTownBench(scene, world, x, z, ry = 0, label = "E · sentar no banco da praça") {
+  const y = world.heightAt(x, z);
   const group = new THREE.Group();
   group.position.set(x, y, z);
   group.rotation.y = ry;
   scene.add(group);
-  // Fundação de pedra sólida sob a igreja e a torre até o chão
-  addBox(group, stoneMat, 0, -depthY / 2 + 0.2, 0.2, 6.8, depthY + 0.4, 10.4, true);
-  addBox(group, stoneMat, 0, -depthY / 2 + 0.1, 5.4, 2.4, depthY + 0.2, 1.2, true);
-  addBox(group, paleWallMat, 0, 2.2, -0.4, 5.6, 3.8, 8.4, true);
-  const roof = addMesh(group, createGableRoof(), roofMat, 0, 4.1, -0.4, true);
-  roof.scale.set(6 / 5.4, 1.15, 8.8 / 4.4);
-  // torre do sino na frente, onde fica a porta
-  addBox(group, stoneMat, 0, 4.4, 3.6, 2.8, 8.8, 2.8, true);
-  addBox(group, darkTimberMat, 0, 8.6, 3.6, 3.2, 0.3, 3.2);
-  addMesh(group, new THREE.ConeGeometry(2.2, 3.4, 4), roofMat, 0, 10.5, 3.6).rotation.y = Math.PI / 4;
-  addBox(group, darkTimberMat, 0, 12.5, 3.6, 0.12, 1.1, 0.12);
-  addBox(group, darkTimberMat, 0, 12.8, 3.6, 0.7, 0.12, 0.12);
-  addBox(group, ironMat, 0, 7.4, 3.6, 0.9, 1.1, 0.9);
-  addBox(group, darkTimberMat, 0, 1.25, 5.02, 1.3, 2.5, 0.18);
-  for (const side of [-1, 1]) {
-    for (const wz of [-3, -0.4]) addBox(group, warmLightMat, side * 2.82, 2.4, wz, 0.12, 1.3, 0.6);
+  addBox(group, darkTimberMat, 0, 0.44, 0, 1.55, 0.08, 0.42, true);
+  addBox(group, timberMat, 0, 0.72, -0.18, 1.55, 0.48, 0.08, true);
+  for (const lx of [-0.65, 0.65]) {
+    addBox(group, darkTimberMat, lx, 0.22, 0, 0.1, 0.44, 0.38, true);
   }
-  // estande de velas ao lado da porta
-  const standLocal = new THREE.Group();
-  standLocal.position.set(2.3, 0, 5.9);
-  group.add(standLocal);
-  addBox(standLocal, stoneMat, 0, -depthY / 2 + 0.02, 0, 1.0, depthY + 0.04, 0.7, false);
-  addBox(standLocal, timberMat, 0, 0.45, 0, 0.8, 0.9, 0.5, false);
-  for (const cx of [-0.25, 0, 0.25]) {
-    addMesh(standLocal, new THREE.CylinderGeometry(0.04, 0.045, 0.22, 6), clothCreamMat, cx, 1.0, 0);
-    addMesh(standLocal, new THREE.SphereGeometry(0.03, 5, 4), warmLightMat, cx, 1.14, 0);
-  }
-  // Colisores exatos para a nave, torre do sino e estande de velas (sem barreiras invisíveis nas laterais)
-  const navePos = toWorld(x, z, ry, 0, -0.4);
-  world.addOrientedBox(navePos.x, navePos.z, 5.6, 8.4, ry, y - depthY, y + 5.4, { move: true, shot: true, cam: true });
-  const towerPos = toWorld(x, z, ry, 0, 3.6);
-  world.addOrientedBox(towerPos.x, towerPos.z, 2.85, 2.85, ry, y - depthY, y + 11.8, { move: true, shot: true, cam: true });
-  const standBoxPos = toWorld(x, z, ry, 2.3, 5.9);
-  world.addOrientedBox(standBoxPos.x, standBoxPos.z, 0.85, 0.55, ry, y - depthY, y + 1.1, { move: true, shot: true, cam: false });
-
-  const spawn = toWorld(x, z, ry, 0, 7.5);
-  const stand = toWorld(x, z, ry, 2.3, 6.6);
-  const nx = Math.sin(ry);
-  const nz = Math.cos(ry);
-  const torches = [-1.5, 1.5].map((lx) => {
-    const p = toWorld(x, z, ry, lx, 5.12);
-    return { x: p.x, y: y + 2.1, z: p.z, nx, nz, post: false };
-  });
-  return { x, z, name, spawn, stand, torches };
+  return {
+    x,
+    z,
+    yaw: ry,
+    isChurchPew: false,
+    label,
+  };
 }
 
 function createWatchTower(scene, world, x, z) {
@@ -449,7 +430,7 @@ function createVillage(scene, world, village, houses) {
   const churchAngle = startAngle + Math.PI / count;
   const churchX = cx + Math.cos(churchAngle) * 27;
   const churchZ = cz + Math.sin(churchAngle) * 27;
-  points.church = createChurch(scene, world, churchX, churchZ, faceCenter(churchX, churchZ), `Igreja de ${village.name}`);
+  points.church = createChurch(scene, world, churchX, churchZ, faceCenter(churchX, churchZ), `Igreja de ${village.name}`, houses);
 
   return { village, ...points };
 }
@@ -516,9 +497,15 @@ export function createSettlement(scene, world) {
     world.addStaticCollider(x, z, 0.2, 2.4);
     torchSpots.push({ x, y: world.heightAt(x, z) + 2.3, z, nx: 0, nz: 0, post: true });
   };
-  const capitalChurch = createChurch(scene, world, -14, -8, 0, "Igreja de Caldera");
+  const capitalChurch = createChurch(scene, world, -14, -8, 0, "Igreja de Caldera", houses);
   const churches = [capitalChurch, ...villages.map((v) => v.church)];
-  for (const church of churches) torchSpots.push(...church.torches);
+  const wells = [well, ...villages.map((v) => v.well)];
+  const townBenches = [
+    createTownBench(scene, world, 8.2, -14.0, -Math.PI / 2, "E · sentar no banco da praça"),
+    createTownBench(scene, world, 1.8, -14.0, Math.PI / 2, "E · sentar no banco da praça"),
+    createTownBench(scene, world, -9.2, -2.5, 0, "E · sentar no banco do pátio da igreja"),
+    createTownBench(scene, world, -9.5, -21.0, Math.PI / 2, "E · sentar no banco do mercado"),
+  ];
   for (const house of houses) {
     for (const spot of house.torchSpots) torchSpots.push({ ...spot, post: false });
   }
@@ -544,7 +531,7 @@ export function createSettlement(scene, world) {
     if (house.thatch && i % 2 === 0) bale(house.outer.maxX + 1.0, house.outer.minZ + 1.3, i * 0.7);
   });
   const stands = churches.map((c) => c.stand);
-  const settlementData = { blacksmith, market, gate, well, villages, churches, houses, hay, torchSpots, stands };
+  const settlementData = { blacksmith, market, gate, well, wells, townBenches, villages, churches, houses, hay, torchSpots, stands };
   settlementData.cityData = generateCity(104729, scene, sharedHouseMat, world, settlementData);
 
   return settlementData;

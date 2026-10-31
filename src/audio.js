@@ -383,4 +383,40 @@ export class GameAudio {
       osc.stop(now + 2.3);
     }
   }
+
+  // Badalada solene do sino da igreja quando o jogador puxa a corda do campanário.
+  churchBell() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const strike = (delay, baseFreq, ampScale) => {
+      const t = ctx.currentTime + delay;
+      for (const [mult, amp, decay] of [
+        [1.0, 0.42, 3.8],
+        [2.0, 0.28, 3.0],
+        [2.4, 0.22, 2.3],
+        [3.0, 0.14, 1.8],
+        [4.2, 0.09, 1.2],
+      ]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(baseFreq * mult, t);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(amp * ampScale, t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0005, t + decay);
+        osc.connect(gain).connect(this.sfx);
+        osc.start(t);
+        osc.stop(t + decay + 0.08);
+      }
+    };
+    strike(0.0, 196.0, 1.0);
+    strike(1.15, 146.83, 0.85);
+  }
+
+  // Som cristalino da pia de água benta ou do poço.
+  holyWater() {
+    this._burst(0.18, 0.16, "bandpass", 1900, 950);
+    this._tone("sine", 880, 1320, 0.22, 0.14);
+    this._tone("triangle", 1320, 1760, 0.28, 0.1, 0.08);
+  }
 }
