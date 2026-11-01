@@ -344,6 +344,8 @@ export const PlayerInventory = {
   hasQuestItem: false,
   hasDemiurgeRobe: false,
   hasDemiurgeDiary: false,
+  torchColor: "orange",
+  crystals: { green: 0, blue: 0, pink: 0, red: 0, white: 0, purple: 0 },
 
   craftTorch: () => {
     if (PlayerInventory.wood >= 1 && PlayerInventory.hay >= 1) {

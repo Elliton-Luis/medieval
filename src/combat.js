@@ -145,7 +145,7 @@ export class CombatSystem {
       : this.npcs.npcs;
     for (let i = 0; i < candidates.length; i++) {
       const npc = candidates[i];
-      if (!npc.alive || npc.controlled) continue;
+      if (!npc.alive || (npc.controlled && player.mounted === npc)) continue;
       const dx = npc.x - player.x;
       const dz = npc.z - player.z;
       const distance = Math.hypot(dx, dz);
@@ -208,8 +208,13 @@ export class CombatSystem {
       }
     } else if (npc.temporary) {
       if (npc.roleKey === "horse") {
-        if (defeated) addEvil(3, "Morte de animal");
-        else addEvil(1, "Agressão a animal");
+        if (defeated) {
+          addEvil(3, "Morte de animal");
+          spawnLoot(npc.root ? npc.root.position : { x: npc.x, z: npc.z }, 5);
+          this.ui?.showToast?.("✦ Cavalo abatido!");
+        } else {
+          addEvil(1, "Agressão a animal");
+        }
       }
       if (defeated && npc.hostile && npc.roleKey !== "horse") this.npcs.addWantedPoints(0.3);
     } else if (defeated) {

@@ -99,6 +99,8 @@ export class SleepSystem {
           torches: PlayerInventory.torches,
           hasSword: PlayerInventory.hasSword,
           hasDemiurgeDiary: Boolean(PlayerInventory.hasDemiurgeDiary),
+          torchColor: PlayerInventory.torchColor || "orange",
+          crystals: PlayerInventory.crystals || {},
         },
       });
       this.state = "hold";

@@ -259,6 +259,7 @@ export function initCheatMenu(env = {}) {
       PlayerInventory.hasSword = true;
       PlayerInventory.hasDemiurgeRobe = true;
       PlayerInventory.hasDemiurgeDiary = true;
+      PlayerInventory.crystals = { green: 99, blue: 99, pink: 99, red: 99, white: 99, purple: 99 };
       PlayerInventory.wood = 999;
       PlayerInventory.stone = 999;
       PlayerInventory.clay = 999;

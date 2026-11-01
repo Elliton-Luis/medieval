@@ -27,6 +27,49 @@ export class DayNightCycle {
     this._lastMinute = -1;
     this._prevProgress = 0.36;
     this.onNewDay = null;
+
+    // Astro Celeste Fixo no Firmamento (Sol/Lua Primordial sempre visível no mesmo ângulo e direção)
+    this.fixedAstroGroup = new THREE.Group();
+    this.fixedAstroGroup.name = "FixedCelestialAstro";
+
+    // Disco do Astro Celestial com brilho místico
+    const astroGeo = new THREE.SphereGeometry(17, 24, 18);
+    const astroMat = new THREE.MeshBasicMaterial({
+      color: 0xfff0c8,
+      fog: false,
+    });
+    const astroMesh = new THREE.Mesh(astroGeo, astroMat);
+    this.fixedAstroGroup.add(astroMesh);
+
+    // Halo / Corona Etérea luminosa ao redor do astro
+    const haloGeo = new THREE.RingGeometry(18.5, 32.0, 32);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0xffe299,
+      transparent: true,
+      opacity: 0.38,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+    this.fixedAstroGroup.add(haloMesh);
+
+    // Detalhes de crateras e sombras místicas na face da lua/sol
+    const darkSpotMat = new THREE.MeshBasicMaterial({ color: 0xd4ba8a, fog: false });
+    const spots = [
+      { x: -4, y: 5, z: 15.5, r: 3.5 },
+      { x: 5, y: -2, z: 15.8, r: 4.8 },
+      { x: -3, y: -6, z: 15.2, r: 3.2 },
+      { x: 6, y: 6, z: 15.0, r: 2.8 },
+    ];
+    for (const sp of spots) {
+      const spotMesh = new THREE.Mesh(new THREE.CircleGeometry(sp.r, 12), darkSpotMat);
+      spotMesh.position.set(sp.x, sp.y, sp.z);
+      this.fixedAstroGroup.add(spotMesh);
+    }
+
+    if (this.scene) {
+      this.scene.add(this.fixedAstroGroup);
+    }
   }
 
   update(dt, playerX, playerZ, renderer = null) {
@@ -83,6 +126,16 @@ export class DayNightCycle {
       );
       this.sun.target.position.set(sx, 0, sz);
       this.sun.target.updateMatrixWorld();
+    }
+
+    // Atualiza o Astro Celeste Fixo para permanecer sempre no mesmo ângulo e direção relativa ao jogador
+    if (this.fixedAstroGroup) {
+      // Ângulo fixo: Azimute 215° (Sul-Sudoeste), Elevação 32°
+      const fixedX = (playerX ?? 0) - 150.5;
+      const fixedY = 164.0;
+      const fixedZ = (playerZ ?? 0) - 215.3;
+      this.fixedAstroGroup.position.set(fixedX, fixedY, fixedZ);
+      this.fixedAstroGroup.lookAt(playerX ?? 0, 15, playerZ ?? 0);
     }
 
     const totalMinutes = Math.floor(this.progress * 24 * 60);

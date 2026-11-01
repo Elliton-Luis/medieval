@@ -1,0 +1,245 @@
+import * as THREE from "three";
+import { PlayerInventory } from "./rpg.js";
+
+// ============================================================================
+// Catálogo das 6 Cores de Cristais e Tochas Místicas
+// ============================================================================
+export const CRYSTAL_PALETTE = {
+  orange: {
+    id: "orange",
+    name: "Fogo Comum",
+    label: "Laranja",
+    flameHex: "#ff9933",
+    coreHex: "#fff1aa",
+    lightHex: 0xffb45a,
+  },
+  green: {
+    id: "green",
+    name: "Cristal de Esmeralda",
+    label: "Verde",
+    flameHex: "#18ff44",
+    coreHex: "#b8ffcc",
+    lightHex: 0x22ff55,
+  },
+  blue: {
+    id: "blue",
+    name: "Cristal de Safira",
+    label: "Azul",
+    flameHex: "#1188ff",
+    coreHex: "#bee0ff",
+    lightHex: 0x22aaff,
+  },
+  pink: {
+    id: "pink",
+    name: "Cristal de Quartzo Rosa",
+    label: "Rosa",
+    flameHex: "#ff33aa",
+    coreHex: "#ffd6f2",
+    lightHex: 0xff44bb,
+  },
+  red: {
+    id: "red",
+    name: "Cristal de Rubi",
+    label: "Vermelho",
+    flameHex: "#ff1122",
+    coreHex: "#ffb5b8",
+    lightHex: 0xff2233,
+  },
+  white: {
+    id: "white",
+    name: "Cristal de Diamante",
+    label: "Branca",
+    flameHex: "#eaf4ff",
+    coreHex: "#ffffff",
+    lightHex: 0xffffff,
+  },
+  purple: {
+    id: "purple",
+    name: "Cristal de Ametista",
+    label: "Roxo",
+    flameHex: "#aa22ff",
+    coreHex: "#ecc4ff",
+    lightHex: 0xbb33ff,
+  },
+};
+
+export const ACTIVE_CRYSTAL_NODES = [];
+
+// ============================================================================
+// Criação e Spawn de Nós de Cristais no Terreno
+// ============================================================================
+export function spawnCrystalNodes({ scene, world, cityCenter }) {
+  ACTIVE_CRYSTAL_NODES.length = 0;
+  if (!scene || !world) return;
+
+  const cx = cityCenter?.x ?? 0;
+  const cz = cityCenter?.z ?? 0;
+
+  // 18 Nós de Cristais em posições espalhadas pelo reino
+  const nodeDefinitions = [
+    // Verde (Esmeralda)
+    { color: "green", x: cx - 45, z: cz - 75 },
+    { color: "green", x: cx + 115, z: cz + 65 },
+    { color: "green", x: cx - 140, z: cz + 130 },
+    // Azul (Safira)
+    { color: "blue", x: cx + 60, z: cz - 110 },
+    { color: "blue", x: cx - 90, z: cz + 80 },
+    { color: "blue", x: cx + 160, z: cz - 40 },
+    // Rosa (Quartzo Rosa)
+    { color: "pink", x: cx - 120, z: cz - 60 },
+    { color: "pink", x: cx + 80, z: cz + 120 },
+    { color: "pink", x: cx - 50, z: cz + 160 },
+    // Vermelho (Rubi)
+    { color: "red", x: cx + 140, z: cz + 40 },
+    { color: "red", x: cx - 70, z: cz - 130 },
+    { color: "red", x: cx + 30, z: cz + 175 },
+    // Branco (Diamante)
+    { color: "white", x: cx - 150, z: cz - 110 },
+    { color: "white", x: cx + 175, z: cz + 110 },
+    { color: "white", x: cx + 5, z: cz - 165 },
+    // Roxo (Ametista)
+    { color: "purple", x: cx + 105, z: cz - 145 },
+    { color: "purple", x: cx - 165, z: cz + 50 },
+    { color: "purple", x: cx - 30, z: cz - 185 },
+  ];
+
+  for (let i = 0; i < nodeDefinitions.length; i++) {
+    const def = nodeDefinitions[i];
+    const info = CRYSTAL_PALETTE[def.color];
+    const y = world.heightAt(def.x, def.z);
+
+    const group = new THREE.Group();
+    group.position.set(def.x, y, def.z);
+
+    // Material emissivo do cristal
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(info.flameHex),
+      emissive: new THREE.Color(info.flameHex),
+      emissiveIntensity: 1.8,
+      roughness: 0.15,
+      metalness: 0.85,
+      flatShading: true,
+    });
+
+    // 4 Prismas de cristal crescendo do solo
+    const prismGeo = new THREE.ConeGeometry(0.14, 0.75, 5);
+    const angles = [0, 1.4, 2.8, 4.3];
+    const scales = [1.0, 0.75, 0.9, 0.6];
+    const tilts = [0.15, -0.22, 0.18, -0.12];
+
+    for (let p = 0; p < 4; p++) {
+      const prism = new THREE.Mesh(prismGeo, crystalMat);
+      prism.position.set(Math.cos(angles[p]) * 0.22, 0.35 * scales[p], Math.sin(angles[p]) * 0.22);
+      prism.scale.set(scales[p], scales[p], scales[p]);
+      prism.rotation.z = tilts[p];
+      prism.rotation.x = tilts[p] * 0.8;
+      group.add(prism);
+    }
+
+    // Base rochosa escura
+    const baseRock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.38, 0),
+      new THREE.MeshStandardMaterial({ color: 0x333038, roughness: 0.9, flatShading: true })
+    );
+    baseRock.position.set(0, 0.08, 0);
+    baseRock.scale.set(1.2, 0.45, 1.1);
+    group.add(baseRock);
+
+    // Luz pontual brilhante suave da cor do cristal
+    const light = new THREE.PointLight(info.lightHex, 1.8, 8.0, 1.5);
+    light.position.set(0, 0.6, 0);
+    group.add(light);
+
+    scene.add(group);
+
+    ACTIVE_CRYSTAL_NODES.push({
+      id: i,
+      color: def.color,
+      name: info.name,
+      label: info.label,
+      info,
+      x: def.x,
+      y,
+      z: def.z,
+      group,
+      light,
+      collected: false,
+    });
+  }
+}
+
+// ============================================================================
+// Interação e Coleta de Cristais no Solo
+// ============================================================================
+export function checkCrystalNearby(playerPos) {
+  if (!playerPos) return null;
+  const px = playerPos.x ?? playerPos.position?.x ?? 0;
+  const pz = playerPos.z ?? playerPos.position?.z ?? 0;
+
+  for (let i = 0; i < ACTIVE_CRYSTAL_NODES.length; i++) {
+    const node = ACTIVE_CRYSTAL_NODES[i];
+    if (node.collected || !node.group.visible) continue;
+    const dx = node.x - px;
+    const dz = node.z - pz;
+    if (dx * dx + dz * dz < 2.3 * 2.3) {
+      return node;
+    }
+  }
+  return null;
+}
+
+export function collectCrystalNode(node, ui, audio, weapons) {
+  if (!node || node.collected) return false;
+  node.collected = true;
+  node.group.visible = false;
+
+  // Registra no inventário do jogador
+  PlayerInventory.crystals = PlayerInventory.crystals || {
+    green: 0,
+    blue: 0,
+    pink: 0,
+    red: 0,
+    white: 0,
+    purple: 0,
+  };
+  PlayerInventory.crystals[node.color] = (PlayerInventory.crystals[node.color] || 0) + 1;
+
+  // Infunde a Tocha imediatamente com a nova cor coletada
+  applyTorchColor(node.color, weapons);
+
+  if (audio?.coin) audio.coin();
+  ui?.showToast?.(`✦ Coletaste ${node.name}! Tua Tocha agora arde em chama ${node.label.toUpperCase()}!`);
+  return true;
+}
+
+// ============================================================================
+// Aplicação da Cor na Tocha Equipada (Materiais e Luz)
+// ============================================================================
+export function applyTorchColor(colorKey, weapons) {
+  const info = CRYSTAL_PALETTE[colorKey] || CRYSTAL_PALETTE.orange;
+  PlayerInventory.torchColor = info.id;
+
+  if (weapons) {
+    // Altera a cor da luz dinâmica da tocha
+    if (weapons.torchLight) {
+      weapons.torchLight.color.setHex(info.lightHex);
+    }
+
+    // Altera a cor das chamas 3D na mão do jogador
+    const torchModel = weapons.models?.torch;
+    if (torchModel) {
+      torchModel.traverse((child) => {
+        if (child.isMesh && child.geometry?.type === "ConeGeometry") {
+          if (child.material) {
+            // A chama externa recebe a cor vibrante, o cone interno recebe o núcleo claro
+            if (child.scale.x > 0.8 || child.geometry.parameters?.radius > 0.06) {
+              child.material.color.set(info.flameHex);
+            } else {
+              child.material.color.set(info.coreHex);
+            }
+          }
+        }
+      });
+    }
+  }
+}

@@ -816,7 +816,7 @@ export class WeaponSystem {
       : this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
-      if (!npc.alive || npc.controlled) continue;
+      if (!npc.alive || (npc.controlled && this.player.mounted === npc)) continue;
       const dx = npc.x - px;
       const dz = npc.z - pz;
       const dist = Math.hypot(dx, dz);
@@ -886,7 +886,7 @@ export class WeaponSystem {
       : this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
-      if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+      if (!npc.alive || !npc.root.visible || (npc.controlled && this.player.mounted === npc)) continue;
       const zone = segmentHit(npc, prevX, prevY, prevZ, d.x, d.y, d.z, 0.14);
       if (!zone) continue;
       const headshot = zone === "head";
@@ -973,7 +973,7 @@ export class WeaponSystem {
     let hitHead = false;
     for (let i = 0; i < this.npcs.npcs.length; i++) {
       const npc = this.npcs.npcs[i];
-      if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+      if (!npc.alive || !npc.root.visible || (npc.controlled && this.player.mounted === npc)) continue;
       const toNpcX = npc.x - startX;
       const toNpcZ = npc.z - startZ;
       const proj = toNpcX * dirX + toNpcZ * dirZ;
@@ -1460,7 +1460,7 @@ export class WeaponSystem {
       : this.npcs.npcs;
     for (let n = 0; n < npcs.length; n++) {
       const npc = npcs[n];
-      if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+      if (!npc.alive || !npc.root.visible || (npc.controlled && this.player.mounted === npc)) continue;
       const zone = segmentHit(npc, prevX, prevY, prevZ, projectile.x, projectile.y, projectile.z, 0.06);
       if (!zone) continue;
       const headshot = zone === "head";
@@ -1554,7 +1554,7 @@ export class WeaponSystem {
         ? this.npcs.queryNearby(projectile.x, projectile.z, 2.5, this._nearbyNPCs)
         : this.npcs.npcs;
       for (const npc of candidates) {
-        if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+        if (!npc.alive || !npc.root.visible || (npc.controlled && this.player.mounted === npc)) continue;
         if (segmentHit(npc, px, py, pz, projectile.x, projectile.y, projectile.z, 0.15)) {
           hit = true;
           break;
@@ -1584,7 +1584,7 @@ export class WeaponSystem {
       : this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
-      if (!npc.alive || npc.controlled) continue;
+      if (!npc.alive || (npc.controlled && this.player.mounted === npc)) continue;
       const dx = npc.x - x;
       const dz = npc.z - z;
       const distance = Math.hypot(dx, dz);

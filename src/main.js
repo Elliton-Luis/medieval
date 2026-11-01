@@ -31,6 +31,8 @@ import { PauseMenu } from "./pause.js";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
 import { initDemiurgeDiary, updateDemiurgeDiary } from "./demiurgeBook.js";
+import { BeastManager } from "./beasts.js";
+import { spawnCrystalNodes, applyTorchColor } from "./crystals.js";
 import {
   PlayerStats,
   PlayerEquipment,
@@ -268,6 +270,16 @@ const cultistsPool = createCultistsPool(scene, world, effects, combat, 8);
 for (let i = 0; i < cultistsPool.length; i++) {
   npcs.npcs.push(cultistsPool[i]);
 }
+
+// Inicializa Novas Criaturas (Zancudos Sombrios das Alturas & Vorazes Cegos)
+const beasts = new BeastManager({ scene, world, effects, combat, player, npcs, audio });
+if (settlement.well) {
+  beasts.spawnInitialBeasts(settlement.well);
+}
+
+// Inicializa Nós de Cristais Místicos no Terreno (Verde, Azul, Rosa, Vermelho, Branco, Roxo)
+spawnCrystalNodes({ scene, world, cityCenter: settlement.well });
+applyTorchColor(PlayerInventory.torchColor || "orange", weapons);
 npcs.onWantedChange = (level) => ui.setWanted(level);
 npcs.onAlert = (message) => ui.showToast(message);
 
@@ -321,6 +333,9 @@ if (saved) {
     PlayerInventory.torches = saved.stats.torches ?? PlayerInventory.torches;
     PlayerInventory.hasSword = saved.stats.hasSword ?? PlayerInventory.hasSword;
     PlayerInventory.hasDemiurgeDiary = Boolean(saved.stats.hasDemiurgeDiary || saved.hasDemiurgeDiary);
+    PlayerInventory.torchColor = saved.stats.torchColor || "orange";
+    PlayerInventory.crystals = saved.stats.crystals || { green: 0, blue: 0, pink: 0, red: 0, white: 0, purple: 0 };
+    applyTorchColor(PlayerInventory.torchColor, weapons);
   }
   player.coins = saved.coins ?? player.coins;
   PlayerStats.gold = player.coins;
@@ -435,6 +450,7 @@ function frame(now) {
   houses.update(dt, camera, isCutscene);
   fire.update(dt);
   horses.update(dt);
+  beasts.update(dt);
   music.update(elapsed);
   damageFx.update(dt);
   world.updateWind(dt);

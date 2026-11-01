@@ -194,7 +194,8 @@ export class Horse {
   activate(x, z, heading) {
     this.removed = false;
     this.alive = true;
-    this.health = this.maxHealth;
+    this.maxHealth = 6;
+    this.health = 6;
     this.x = x;
     this.z = z;
     this.heading = heading;
@@ -222,6 +223,13 @@ export class Horse {
       material.emissive.set("#000000");
       material.emissiveIntensity = 0;
     }
+    // Registra na Spatial Hash Grid para que armas e projéteis consigam atingi-lo
+    if (this.manager?.npcs?.spatialGrid) {
+      this.manager.npcs.spatialGrid.remove(this);
+      this.manager.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius || 0.85);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+    }
   }
 
   remove() {
@@ -229,6 +237,9 @@ export class Horse {
     this.alive = false;
     this.root.visible = false;
     this.rider = null;
+    if (this.manager?.npcs?.spatialGrid) {
+      this.manager.npcs.spatialGrid.remove(this);
+    }
   }
 
   dismiss() {
@@ -241,19 +252,38 @@ export class Horse {
     this.rear = 0.6;
     this.rearMax = 0.6;
     this._flash = 0.18;
-    if (this.kind === "field") this.flee(this.manager?.player?.x ?? this.x, this.manager?.player?.z ?? this.z, 6);
     this._knockX = directionX;
     this._knockZ = directionZ;
     this._knock = force * 0.6;
-    if (this.health > 0) return false;
+    if (this.effects) {
+      this.effects.play("star", this.x, (this.root?.position?.y || 0) + 1.2, this.z, "#ff3322", 1.4);
+    }
+    if (this.health > 0) {
+      if (this.kind === "field") this.flee(this.manager?.player?.x ?? this.x, this.manager?.player?.z ?? this.z, 6);
+      return false;
+    }
     this.alive = false;
     this.deadTime = 0;
     this.fallSide = directionX >= 0 ? 1 : -1;
     this.speed = 0;
-    // o cavaleiro cai junto
+    if (this.manager?.npcs?.spatialGrid) {
+      this.manager.npcs.spatialGrid.remove(this);
+    }
+    if (this.effects) {
+      this.effects.play("dust", this.x, (this.root?.position?.y || 0) + 0.8, this.z, "#3b2418", 2.4);
+      this.effects.play("star", this.x, (this.root?.position?.y || 0) + 1.1, this.z, "#ff2211", 1.8);
+    }
+    // Desmonta cavaleiro (NPC)
     const rider = this.rider;
     this.rider = null;
-    if (rider && rider.alive) rider.dismount(this);
+    if (rider && rider.alive && rider.dismount) rider.dismount(this);
+
+    // Se o jogador estiver montado neste cavalo, desmonta e cai no chão
+    if (this.manager?.player?.mounted === this) {
+      import("./riding.js").then(({ dismountHorse }) => {
+        dismountHorse(this.manager.player);
+      });
+    }
     return true;
   }
 
@@ -543,6 +573,18 @@ export class Horse {
     this.model.position.y = this.bob;
     const groundY = this.world.horseHeightAt ? this.world.horseHeightAt(this.x, this.z) : this.world.heightAt(this.x, this.z);
     this.root.position.set(this.x, groundY + this.height, this.z);
+
+    // Atualiza célula na Spatial Hash Grid quando o cavalo se desloca
+    if (this.alive && this.manager?.npcs?.spatialGrid) {
+      const curCX = Math.floor(this.x * 0.0625);
+      const curCZ = Math.floor(this.z * 0.0625);
+      if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
+        this.manager.npcs.spatialGrid.remove(this);
+        this.manager.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius || 0.85);
+        this._spatialCX = curCX;
+        this._spatialCZ = curCZ;
+      }
+    }
   }
 
   _updateDead(dt) {

@@ -95,7 +95,7 @@ export class AimSystem {
     const maxDistSq = maxRange * maxRange;
 
     // 1. Target Stickiness: se já temos um alvo travado vivo no alcance e com visão, MANTÉM ELE!
-    if (this.assistTarget && this.assistTarget.alive && this.assistTarget.root?.visible && !this.assistTarget.controlled) {
+    if (this.assistTarget && this.assistTarget.alive && this.assistTarget.root?.visible && !(this.assistTarget.controlled && player.mounted === this.assistTarget)) {
       const curDx = this.assistTarget.x - px;
       const curDz = this.assistTarget.z - pz;
       const curDistSq = curDx * curDx + curDz * curDz;
@@ -116,7 +116,7 @@ export class AimSystem {
 
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
-      if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+      if (!npc.alive || !npc.root.visible || (npc.controlled && player.mounted === npc)) continue;
       const dx = npc.x - px;
       const dz = npc.z - pz;
       const dSq = dx * dx + dz * dz;
@@ -205,7 +205,7 @@ export class AimSystem {
     const npcs = this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
-      if (!npc.alive || !npc.root.visible || npc.controlled) continue;
+      if (!npc.alive || !npc.root.visible || (npc.controlled && player.mounted === npc)) continue;
       const t = rayTarget(npc, ox, oy, oz, dx, dy, dz, start, best);
       if (t >= start && t < best) {
         best = t;

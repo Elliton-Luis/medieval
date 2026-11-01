@@ -31,6 +31,7 @@ import {
   closeDemiurgeDiaryReader,
   isDemiurgeDiaryReaderOpen,
 } from "./demiurgeBook.js";
+import { checkCrystalNearby, collectCrystalNode, applyTorchColor, CRYSTAL_PALETTE } from "./crystals.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
@@ -116,6 +117,7 @@ export class InteractionSystem {
         !this.candle?.interact() &&
         !this.houses?.interact() &&
         !this._tryGatherHayBale() &&
+        !this._tryCollectCrystal() &&
         !this._tryInteractDemiurgeDiary() &&
         !this._tryInteractAltar()
       ) {
@@ -124,6 +126,7 @@ export class InteractionSystem {
     }
     this._checkAltarNearby();
     this._checkDemiurgeDiaryNearby();
+    this._checkCrystalNearby();
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
@@ -186,8 +189,30 @@ export class InteractionSystem {
         label: `Construir Curral de Cavalos (${BUILD_COSTS.CORRAL.wood} Madeira + ${BUILD_COSTS.CORRAL.hay} Feno)`,
         disabled: !canCorral,
       },
-      { id: "close", label: "Fechar menu (I)" },
     ];
+
+    // Opções de Infusão de Cor da Tocha com Cristais Coletados
+    const availableColors = ["orange"];
+    const crys = inv.crystals || {};
+    if (crys.green > 0) availableColors.push("green");
+    if (crys.blue > 0) availableColors.push("blue");
+    if (crys.pink > 0) availableColors.push("pink");
+    if (crys.red > 0) availableColors.push("red");
+    if (crys.white > 0) availableColors.push("white");
+    if (crys.purple > 0) availableColors.push("purple");
+
+    for (const cKey of availableColors) {
+      if (cKey === (inv.torchColor || "orange")) continue;
+      const cInfo = CRYSTAL_PALETTE[cKey];
+      if (cInfo) {
+        actions.push({
+          id: `torch_color:${cKey}`,
+          label: `🔥 Infundir Tocha com Chama ${cInfo.label.toUpperCase()} (${cInfo.name})`,
+        });
+      }
+    }
+
+    actions.push({ id: "close", label: "Fechar menu (I)" });
     this.ui.showDialogue("Ofício & Sobrevivência (Camponês)", body, actions, {
       role: "Bancada do Trabalhador",
       roleKey: "farmer",
@@ -256,6 +281,21 @@ export class InteractionSystem {
     const altar = checkAltarInteraction(this.player.root.position, isNight);
     if (altar) {
       return investigateCultCamp(altar, this.ui, this.audio, this.input);
+    }
+    return false;
+  }
+
+  _checkCrystalNearby() {
+    const node = checkCrystalNearby(this.player.root.position);
+    if (node && !this.ui.dialoguePanel.hidden) {
+      this.ui.setPrompt?.(`✦ ${node.name.toUpperCase()} [E] Coletar Cristal ${node.label}`);
+    }
+  }
+
+  _tryCollectCrystal() {
+    const node = checkCrystalNearby(this.player.root.position);
+    if (node) {
+      return collectCrystalNode(node, this.ui, this.audio, this.weapons);
     }
     return false;
   }
@@ -599,6 +639,15 @@ export class InteractionSystem {
         speech = `«O bandido sorri de soslaio: 'Procuras o livro proibido? Boas moedas pagam essa informação: "${hint}"'»`;
       }
       this._showNPCDialogue(speech);
+      return;
+    }
+
+    if (action.startsWith("torch_color:")) {
+      const color = action.split(":")[1];
+      applyTorchColor(color, this.weapons);
+      const cInfo = CRYSTAL_PALETTE[color];
+      this.ui.showToast(`✦ Tocha infundida com sucesso! Chama ${cInfo ? cInfo.label : color}.`);
+      this._showCraftingMenu(`A chama da tua tocha agora queima em resplendor ${cInfo ? cInfo.label : color}!`);
       return;
     }
 

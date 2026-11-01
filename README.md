@@ -124,6 +124,39 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
   - **Códice V**: Revelação e doutrina do Sol Negro de 3 Olhos.
   - **Códice VI**: Folhas pautadas preservadas para anotações modulares futuras.
 
+## Mortalidade e Dano aos Cavalos
+
+- **Registro na Grade Espacial**: Cavalos selvagens, montarias de guardas e corcéis do mundo são cadastrados dinamicamente na `SpatialHashGrid` e detectados por ataques corpo a corpo, arcos, balestras, mosquete, lanças arremessadas, tochas e explosões de bombas.
+- **Dano e Morte Real**: Cavalos possuem vitalidade finita (6 HP). Ao serem alvejados, reagem com recuo e estrelas de sangue/impacto. Ao zerar a vida, sofrem queda lateral, desmontam cavaleiros NPCs ou derrubam o jogador ao chão (se estiver montado), desativam-se da grade e liberam espólios de couro e carne.
+
+## Variedade de Criaturas Sobrenaturais
+
+- **O Zancudo Sombrio (O Observador das Alturas)**:
+  - Quadrúpede colossal com quatro pernas finíssimas de 16 metros de altura (maiores que as copas das árvores), com torso canino esguio e olhos luminescentes no alto.
+  - Extremamente visível no horizonte e ermos remotos.
+  - De longe (> 38m), fica parado e acompanha o jogador encarando-o continuamente. Quando o jogador se aproxima (< 36m), assusta-se e foge com passadas gigantes e velozes (~14 m/s) por cima da vegetação.
+- **O Voraz Cego (O Humanoide Dentuço)**:
+  - Criatura bípede cadavérica e trêmula sem a parte superior da cabeça: sem olhos, sem testa, ostentando apenas uma bocarra escancarada com mandíbula afiada e dentes triangulares brancos sempre expostos.
+  - Cego a longas distâncias, perambulando errante pelo ambiente.
+  - Ao detectar a aproximação do jogador (<= 9m), entra em frenesi agressivo: projeta o tronco para frente, estica ambos os braços e dispara em arrancada ultrarrápida (12 m/s), desferindo mordidas ferozes corpo a corpo.
+  - Entidade combatível com 5 HP, reagindo a impactos e tombando com drop de moedas e dentes.
+
+## Astro Celeste Fixo no Firmamento
+
+- **Sol / Lua Primordial Imóvel**: Objeto celeste místico com disco luminescente, corona etérea translúcida e marcas de crateras visível permanentemente no céu.
+- Ancorado em ângulo e elevação fixos (azimute 215° Sudoeste, 32° acima do horizonte), acompanhando o horizonte de qualquer ponto do mapa e visível de dia e de noite.
+
+## Cristais Místicos e Infusão de Tochas Coloridas
+
+- **Nós de Cristais no Solo (`E`)**: Cristais prismáticos brilhantes e luminescentes distribuídos pelo terreno em seis variedades:
+  - **Esmeralda**: Chama Verde-Esmeralda (`#18ff44`) e luz verde vibrante (`0x22ff55`).
+  - **Safira**: Chama Azul-Glacial (`#1188ff`) e luz azul radiante (`0x22aaff`).
+  - **Quartzo Rosa**: Chama Rosa-Arcana (`#ff33aa`) e luz carmesim-rosada (`0xff44bb`).
+  - **Rubi**: Chama Vermelho-Infernal (`#ff1122`) e luz escarlate (`0xff2233`).
+  - **Diamante**: Chama Branca de Luz Pura (`#eaf4ff`) e luz branca pura (`0xffffff`).
+  - **Ametista**: Chama Roxa do Vazio / Demiurgo (`#aa22ff`) e luz púrpura mística (`0xbb33ff`).
+- **Infusão Imediata e via Menu de Criação (`I`)**: Coletar um cristal infunde a tocha imediatamente com aquela cor. No menu de criação (`I`), o jogador pode alternar livremente entre qualquer uma das chamas já descobertas, alterando os cones de fogo 3D em mãos e a cor da luz dinâmica `PointLight`.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.
