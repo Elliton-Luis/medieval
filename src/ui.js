@@ -1,6 +1,6 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
 import { drawWeaponIcon } from "./weapondata.js";
-import { PlayerStats } from "./rpg.js";
+import { PlayerStats, getEvilPercent } from "./rpg.js";
 import { CultState } from "./cult.js";
 
 export class GameUI {
@@ -181,9 +181,7 @@ export class GameUI {
     } else {
       this.nearbyCard.hidden = true;
     }
-    const morality = PlayerStats?.morality ?? 0;
-    const apoc = CultState?.apocalypseChance ?? 0;
-    const evilPercent = Math.max(0, Math.min(100, Math.round(Math.max(-morality, apoc))));
+    const evilPercent = getEvilPercent();
     if (this.evilFill) this.evilFill.style.width = `${evilPercent}%`;
     if (this.evilVal) this.evilVal.textContent = `${evilPercent}%`;
     this._frames = 0;

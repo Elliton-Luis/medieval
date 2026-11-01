@@ -1,7 +1,7 @@
 // Montaria: montar com F, galope com inércia, turbo (Shift) com fôlego, saltos (Space),
 // atropelamento, batida em obstáculos e assobio (H) para chamar o cavalo.
 import * as THREE from "three";
-import { PlayerStats, checkWitnesses } from "./rpg.js";
+import { PlayerStats, checkWitnesses, addEvil } from "./rpg.js";
 
 const GALLOP = 13.5;
 const TURBO = 21;
@@ -107,6 +107,7 @@ export class RidingSystem {
     }
     // roubar o cavalo de um NPC é crime se testemunhado
     if (horse.owner && horse.owner.alive) {
+      addEvil(2.5, "Furto de cavalo");
       const owner = horse.owner;
       const witnessed = checkWitnesses(horse.root.position, this.npcs.npcs, undefined, false);
       if (witnessed && (owner.x - horse.x) ** 2 + (owner.z - horse.z) ** 2 < 32 * 32) {

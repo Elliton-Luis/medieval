@@ -140,6 +140,44 @@ export const PlayerStats = {
 };
 
 /**
+ * Retorna o nível de maldade do jogador em porcentagem (0% a 100%).
+ * A escala moral neutra inicial é 0 (Bondade neutra = 50% de maldade).
+ * -100 Morality (Puro Caos/Demiurgo) = 100% Maldade.
+ * +100 Morality (Pura Luz/Santidade) = 0% Maldade.
+ */
+export function getEvilPercent() {
+  const morality = PlayerStats?.morality ?? 0;
+  return Math.max(0, Math.min(100, Math.round(50 - (morality / 2))));
+}
+
+export function addEvil(amount = 2, reason = null) {
+  const currentMorality = PlayerStats.morality ?? 0;
+  PlayerStats.morality = Math.max(-100, Math.min(100, currentMorality - amount * 2));
+
+  // Culto do Demiurgo progride com atos vis
+  CultState?.addApocalypseProgress?.(amount * 0.25);
+
+  const evil = getEvilPercent();
+  const ui = _env.ui || window.__game?.ui;
+  if (reason && ui) {
+    ui.showToast(`🌑 Maldade ${evil}% (+${Math.round(amount)}%) · ${reason}`);
+  }
+  return evil;
+}
+
+export function addGood(amount = 2, reason = null) {
+  const currentMorality = PlayerStats.morality ?? 0;
+  PlayerStats.morality = Math.max(-100, Math.min(100, currentMorality + amount * 2));
+
+  const evil = getEvilPercent();
+  const ui = _env.ui || window.__game?.ui;
+  if (reason && ui) {
+    ui.showToast(`✦ Maldade ${evil}% (-${Math.round(amount)}%) · ${reason}`);
+  }
+  return evil;
+}
+
+/**
  * Atualiza a armadura visualmente sem alocar novos meshes (Zero-GC).
  * Alterna a visibilidade de partes do corpo pré-carregadas.
  */
@@ -213,6 +251,7 @@ export function unlockDemiurgeAttire(player = _env.player, ui = _env.ui, audio =
 export function equipDemiurgeAttire(player = _env.player, ui = _env.ui, audio = _env.audio) {
   PlayerInventory.hasDemiurgeRobe = true;
   PlayerStats.wearingDemiurgeRobe = true;
+  addEvil(10, "Pacto do Demiurgo");
   if (player?.setDemiurgeAttire) {
     player.setDemiurgeAttire(true);
   }
@@ -615,19 +654,19 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
 
   if (wasProvenBandit) {
     // Era um criminoso comprovado (roubou algo)
-    PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + 5);
+    addGood(3, "Bandido abatido");
     if (isWitnessed) {
       PlayerStats.cha += 1; // Herói local, carisma sobe
-      _env.ui?.showToast("Justiça feita! Bandido abatido · +50 moedas · Carisma +1 · Bondade +5");
+      _env.ui?.showToast("Justiça feita! Bandido abatido · +50 moedas · Carisma +1");
     } else {
       // O Crime Perfeito: sem testemunhas, pega o ouro extra mas carisma não sobe nem desce
-      _env.ui?.showToast("Bandido abatido nas sombras · +50 moedas recuperadas · Bondade +5");
+      _env.ui?.showToast("Bandido abatido nas sombras · +50 moedas recuperadas");
     }
     // Dropa o loot extra (50 moedas)
     spawnLoot(deathPos, 50);
   } else {
     // Matou inocente (ou bandido que ainda não havia cometido crime — Falso Herói)
-    PlayerStats.morality = Math.max(-100, (PlayerStats.morality ?? 0) - 10);
+    addEvil(5, "Inocente abatido");
     const cultTier = CultState?.recordSacrifice?.() || 1;
     const sacCount = CultState?.sacrifices || 1;
 
@@ -689,6 +728,9 @@ export function interactWithChest(chest, playerPos, npcs, raycaster = _sharedRay
   if (isWitnessed) {
     PlayerStats.cha = Math.max(1, PlayerStats.cha - 2);
     triggerWantedLevel(1); // Crime menor se pego roubando
+    addEvil(3, "Furto flagrado em baú");
+  } else {
+    addEvil(1, "Furto discreto em baú");
   }
 
   const goldFound = Math.floor(Math.random() * 20) + 10;
@@ -1051,7 +1093,7 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
 
   resetWantedLevel(); // Despista guardas e zera procurado gratuitamente
   PlayerStats.cha = Math.min(20, PlayerStats.cha + 2); // Purifica a alma
-  PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + (voluntaryOffer >= 20 ? 15 : 5));
+  addGood(voluntaryOffer >= 20 ? 8 : 4, "Bênção sacerdotal");
   playChoirSound(); // Efeito sonoro angelical
   if (_env.effects && _env.player) {
     _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
@@ -1079,7 +1121,7 @@ export function interactWithBeggar(playerPos, npcBeggar) {
     PlayerStats.gold -= 5;
     if (_env.player) _env.player.coins = PlayerStats.gold;
     PlayerStats.cha = Math.min(20, PlayerStats.cha + 1);
-    PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + 10);
+    addGood(4, "Esmola a necessitado");
     obj.userData.hasReceivedAlms = true;
     obj.userData.state = "CHEERING"; // NPC comemora
     if (npcEntity) {

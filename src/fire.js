@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { thatchTexture } from "./textures.js";
 import { makeGlowTexture } from "./torches.js";
+import { addEvil } from "./rpg.js";
 
 let hayMaterial = null;
 let burntMaterial = null;
@@ -90,6 +91,7 @@ export class FireSystem {
     this.effects.play("smoke", bale.x, bale.y + 0.6, bale.z, "#8a847a", 1.4);
     if (byPlayer) {
       this.ui.showToast("O feno pegou fogo!");
+      addEvil(1.5, "Incêndio em feno");
       this.npcs.notifyCrime(bale.x, bale.z, 26, null, 0.5);
     }
   }
@@ -179,6 +181,7 @@ export class FireSystem {
       if (f) house.roofFlames.push(f);
     }
     this.ui.showToast("O telhado de palha pegou fogo!");
+    addEvil(3, "Incêndio de habitação");
     this.npcs.notifyCrime(house.x, house.z, 30, null, 0.6);
   }
 

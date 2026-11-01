@@ -8,6 +8,8 @@ import {
   spawnLoot,
   takeDamage,
   syncPlayerStatsToPlayer,
+  addEvil,
+  addGood,
 } from "./rpg.js";
 
 export class CombatSystem {
@@ -167,18 +169,24 @@ export class CombatSystem {
         } else {
           this.ui.showToast("Lobisomem abatido! +35 moedas · Carisma +1");
         }
+        addGood(4, "Fera abatida");
         syncPlayerStatsToPlayer(this.player, this.ui);
       }
     } else if (npc.roleKey === "cultist") {
       // Invasão sobrenatural dos Cátaros: sem testemunhas nem Wanted Level
       if (defeated) {
         PlayerStats.cha += 1;
+        addGood(2, "Cultista abatido");
         syncPlayerStatsToPlayer(this.player, this.ui);
         this.effects.play("dust", npc.x, npc.root.position.y + 1.1, npc.z, "#14141a", 2.6);
         this.effects.play("star", npc.x, npc.root.position.y + 1.2, npc.z, "#8844cc", 1.8);
         this.ui.showToast("✦ O Cultista do Demiurgo desvaneceu em cinzas e névoa negra! Relíquias recuperadas.");
       }
     } else if (npc.temporary) {
+      if (npc.roleKey === "horse") {
+        if (defeated) addEvil(3, "Morte de animal");
+        else addEvil(1, "Agressão a animal");
+      }
       if (defeated && npc.hostile && npc.roleKey !== "horse") this.npcs.addWantedPoints(0.3);
     } else if (defeated) {
       handleNPCDeath(npc.root, this.npcs.npcs);
@@ -186,6 +194,7 @@ export class CombatSystem {
       const data = npc.root?.userData;
       const isProvenBandit = data && data.type === NPC_TYPES.BANDIT && data.hasStolenGems;
       if (!isProvenBandit) {
+        addEvil(1, "Agressão injusta");
         const witnessed = checkWitnesses(npc.root ? npc.root.position : { x: npc.x, y: 0, z: npc.z }, this.npcs.npcs, undefined, false);
         if (witnessed || npc.roleKey === "guard") {
           this.npcs.notifyCrime(npc.x, npc.z, 24, npc, 0.25);

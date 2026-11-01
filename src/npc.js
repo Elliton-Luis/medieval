@@ -4,7 +4,7 @@ import { makeRandom } from "./utils.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js";
-import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js";
+import { NPC_TYPES, NPC_STATES, updateNPCRoutine, addEvil } from "./rpg.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
 import { isOccludedByHouses } from "./houses.js";
 
@@ -1304,6 +1304,7 @@ export class NPCSystem {
   addWantedPoints(points) {
     this.wantedPoints = (this.wantedPoints || 0) + points;
     this.wantedTimer = 30;
+    addEvil(Math.max(0.5, Math.round(points * 2 * 10) / 10));
     const level = Math.min(5, Math.ceil(this.wantedPoints));
     if (level !== this.wanted) {
       const rose = level > this.wanted;
