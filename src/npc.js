@@ -5,6 +5,7 @@ import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js?v=19";
 import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js?v=19";
+import { SpatialHashGrid } from "./spatialGrid.js";
 
 function getDeterministicFleeTarget(npc) {
   const anchors = npc.root?.userData?.anchors;
@@ -284,8 +285,21 @@ export class NPC {
   update(dt, playerX = 0, playerZ = 0) {
     if (this.removed) return;
     if (!this.alive) {
+      if (this.npcSystem?.spatialGrid) this.npcSystem.spatialGrid.remove(this);
       this._updateDead(dt, playerX, playerZ);
       return;
+    }
+
+    // Spatial Hash Grid O(1): atualiza registro celular somente ao cruzar fronteiras de 16m
+    const curCX = Math.floor(this.x * 0.0625);
+    const curCZ = Math.floor(this.z * 0.0625);
+    if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
+      if (this.npcSystem?.spatialGrid) {
+        this.npcSystem.spatialGrid.remove(this);
+        this.npcSystem.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius || 0.4);
+      }
+      this._spatialCX = curCX;
+      this._spatialCZ = curCZ;
     }
     this.animTime += dt;
     if (this._hitStun > 0) {
@@ -1042,6 +1056,8 @@ export class NPCSystem {
     this.isNight = false;
     this.isPlayerLit = true;
     this._wasNight = null;
+    this.spatialGrid = new SpatialHashGrid(16.0);
+    this._candidateNearby = [];
     const smith = settlement.blacksmith;
     const market = settlement.market;
     const gate = settlement.gate;
@@ -1062,6 +1078,9 @@ export class NPCSystem {
         settlement.cityData.assignNpcAnchors(npc.root, cityAnchors, profMap[role] || "houses");
       }
       this.npcs.push(npc);
+      this.spatialGrid.insertCircle(npc, npc.x, npc.z, npc.hitRadius || 0.4);
+      npc._spatialCX = Math.floor(npc.x * 0.0625);
+      npc._spatialCZ = Math.floor(npc.z * 0.0625);
       return npc;
     };
     add("guard", [
@@ -1380,5 +1399,9 @@ export class NPCSystem {
       }
     }
     this.nearest = nearest;
+  }
+
+  queryNearby(x, z, radius = 4.0, outList = this._candidateNearby) {
+    return this.spatialGrid.queryRadius(x, z, radius, outList);
   }
 }

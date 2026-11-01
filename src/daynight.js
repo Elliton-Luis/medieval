@@ -66,16 +66,24 @@ export class DayNightCycle {
     // Ajuste de atmosfera sombria, neblina corrompida e Eclipse Vermelho
     updateAtmosphereDecay(this, this.scene, renderer);
 
-    // a câmera de sombra anda em degraus de 2 m: o mapa não "treme" enquanto o jogador anda
-    const sx = Math.round(playerX / 2) * 2;
-    const sz = Math.round(playerZ / 2) * 2;
-    this.sun.position.set(
-      sx + Math.cos(this.solarAngle) * 48,
-      Math.max(0.18, Math.abs(elevation)) * 58 + 14,
-      sz + Math.sin(this.solarAngle) * 48,
-    );
-    this.sun.target.position.set(sx, 0, sz);
-    this.sun.target.updateMatrixWorld();
+    // Otimização de Sombras Dinâmicas: desliga a sombra à noite profunda para economizar GPU
+    this.sun.castShadow = this.daylight > 0.12;
+
+    // Degraus esparsos de 3m: atualiza a posição da luz ortográfica sem tremores e sem recalculadas milimétricas
+    const sx = Math.round(playerX / 3) * 3;
+    const sz = Math.round(playerZ / 3) * 3;
+    if (this._lastShadowSX !== sx || this._lastShadowSZ !== sz || Math.abs(this.progress - (this._lastShadowProg || 0)) > 0.004) {
+      this._lastShadowSX = sx;
+      this._lastShadowSZ = sz;
+      this._lastShadowProg = this.progress;
+      this.sun.position.set(
+        sx + Math.cos(this.solarAngle) * 48,
+        Math.max(0.18, Math.abs(elevation)) * 58 + 14,
+        sz + Math.sin(this.solarAngle) * 48,
+      );
+      this.sun.target.position.set(sx, 0, sz);
+      this.sun.target.updateMatrixWorld();
+    }
 
     const totalMinutes = Math.floor(this.progress * 24 * 60);
     if (totalMinutes !== this._lastMinute) {

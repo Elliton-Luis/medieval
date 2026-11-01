@@ -37,6 +37,7 @@ export class CombatSystem {
     this.guardCooldown = 0;
     this.armorCooldown = 0;
     this.knockoutTimer = 0;
+    this._candidateNPCs = [];
   }
 
   update(dt) {
@@ -121,8 +122,12 @@ export class CombatSystem {
     if (def.type !== "fists") this.effects.play("slash", player.x + forwardX * 1.3, player.root.position.y + 1.2, player.z + forwardZ * 1.3, color, big ? 2.3 : 1.7);
 
     let hitCount = 0;
-    for (let i = 0; i < this.npcs.npcs.length; i++) {
-      const npc = this.npcs.npcs[i];
+    // Spatial Hash Grid O(1): Testa apenas os NPCs na célula espacial local
+    const candidates = this.npcs.queryNearby
+      ? this.npcs.queryNearby(player.x, player.z, reach + 1.2, this._candidateNPCs)
+      : this.npcs.npcs;
+    for (let i = 0; i < candidates.length; i++) {
+      const npc = candidates[i];
       if (!npc.alive || npc.controlled) continue;
       const dx = npc.x - player.x;
       const dz = npc.z - player.z;

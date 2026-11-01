@@ -68,6 +68,7 @@ export class WeaponSystem {
     this._createTrajectoryDots(scene);
     this._createThrownSpear(scene);
     this._createMusketTracer(scene);
+    this._nearbyNPCs = [];
     this.equip("fists", false);
   }
 
@@ -655,9 +656,12 @@ export class WeaponSystem {
     const pz = this.player.z;
     const py = this.player.root.position.y + 1.1;
 
-    // 1. Verifica NPCs à frente do golpe da tocha
-    for (let i = 0; i < this.npcs.npcs.length; i++) {
-      const npc = this.npcs.npcs[i];
+    // 1. Spatial Hash Grid O(1): Verifica apenas NPCs na célula local à frente do golpe da tocha
+    const npcs = this.npcs.queryNearby
+      ? this.npcs.queryNearby(px, pz, 3.2, this._nearbyNPCs)
+      : this.npcs.npcs;
+    for (let i = 0; i < npcs.length; i++) {
+      const npc = npcs[i];
       if (!npc.alive || npc.controlled) continue;
       const dx = npc.x - px;
       const dz = npc.z - pz;
@@ -722,8 +726,10 @@ export class WeaponSystem {
     d.y += d.vy * dt;
     d.z += d.vz * dt;
 
-    // Verifica colisão com NPCs no trajeto da lança
-    const npcs = this.npcs.npcs;
+    // Verifica colisão com NPCs no trajeto da lança usando Spatial Hash Grid
+    const npcs = this.npcs.queryNearby
+      ? this.npcs.queryNearby(d.x, d.z, 3.0, this._nearbyNPCs)
+      : this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
       if (!npc.alive || !npc.root.visible || npc.controlled) continue;
@@ -1250,7 +1256,9 @@ export class WeaponSystem {
 
   // Retorna true quando o projétil terminou nesta posição.
   _projectileHit(projectile, prevX, prevY, prevZ) {
-    const npcs = this.npcs.npcs;
+    const npcs = this.npcs.queryNearby
+      ? this.npcs.queryNearby(projectile.x, projectile.z, 2.5, this._nearbyNPCs)
+      : this.npcs.npcs;
     for (let n = 0; n < npcs.length; n++) {
       const npc = npcs[n];
       if (!npc.alive || !npc.root.visible || npc.controlled) continue;
@@ -1343,7 +1351,10 @@ export class WeaponSystem {
     const ground = this.world.heightAt(projectile.x, projectile.z);
     if (projectile.y <= ground + 0.15 || this.world.isBlockedAtHeight(projectile.x, projectile.y, projectile.z, 0.18) || projectile.life <= 0) hit = true;
     if (!hit) {
-      for (const npc of this.npcs.npcs) {
+      const candidates = this.npcs.queryNearby
+        ? this.npcs.queryNearby(projectile.x, projectile.z, 2.5, this._nearbyNPCs)
+        : this.npcs.npcs;
+      for (const npc of candidates) {
         if (!npc.alive || !npc.root.visible || npc.controlled) continue;
         if (segmentHit(npc, px, py, pz, projectile.x, projectile.y, projectile.z, 0.15)) {
           hit = true;
@@ -1369,7 +1380,9 @@ export class WeaponSystem {
     this.audio.explosion(Math.hypot(x - this.player.x, z - this.player.z));
 
     let kills = 0;
-    const npcs = this.npcs.npcs;
+    const npcs = this.npcs.queryNearby
+      ? this.npcs.queryNearby(x, z, radius + 0.5, this._nearbyNPCs)
+      : this.npcs.npcs;
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
       if (!npc.alive || npc.controlled) continue;

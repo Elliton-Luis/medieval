@@ -337,8 +337,11 @@ export class World {
       const maxChunkZ = Math.floor((z + padding) / this.chunkSize);
 
       for (let iter = 0; iter < 3; iter++) {
-        for (let i = 0; i < this.staticColliders.length; i++) {
-          const o = this.staticColliders[i];
+        // Spatial Hash Grid O(1): Consulta rápida de obstáculos circulares locais
+        this.spatialGrid.queryRadius(x, z, radius + 2.5, this._nearbyColliders);
+        for (let i = 0; i < this._nearbyColliders.length; i++) {
+          const o = this._nearbyColliders[i];
+          if (o.disabled || o.radius <= 0) continue;
           const dx = x - o.x;
           const dz = z - o.z;
           const minD = radius + o.radius;
@@ -351,30 +354,6 @@ export class World {
               z += dz * push;
             } else {
               x += minD;
-            }
-          }
-        }
-
-        for (let c = 0; c < this.activeChunks.length; c++) {
-          const chunk = this.activeChunks[c];
-          if (chunk.x < minChunkX || chunk.x > maxChunkX || chunk.z < minChunkZ || chunk.z > maxChunkZ) continue;
-          const colliders = chunk.colliders;
-          for (let i = 0; i < colliders.length; i++) {
-            const o = colliders[i];
-            if (o.disabled || o.radius <= 0) continue;
-            const dx = x - o.x;
-            const dz = z - o.z;
-            const minD = radius + o.radius;
-            const dSq = dx * dx + dz * dz;
-            if (dSq < minD * minD) {
-              const d = Math.sqrt(dSq);
-              if (d > 1e-5) {
-                const push = (minD - d) / d;
-                x += dx * push;
-                z += dz * push;
-              } else {
-                x += minD;
-              }
             }
           }
         }
@@ -779,8 +758,21 @@ export class World {
     group.matrixAutoUpdate = false;
     const centerX = (cx + 0.5) * this.chunkSize;
     const centerZ = (cz + 0.5) * this.chunkSize;
-    const { geometry, heights } = this._createTerrainGeometry(cx, cz);
-    const terrain = new THREE.Mesh(geometry, this._terrainMaterial);
+
+    const isInitialSpawn = Math.abs(cx) <= 1 && Math.abs(cz) <= 1;
+    let initialGeometry;
+    let initialHeights = null;
+
+    if (isInitialSpawn || !this._worker) {
+      const result = this._createTerrainGeometry(cx, cz);
+      initialGeometry = result.geometry;
+      initialHeights = result.heights;
+    } else {
+      // Chunks dinâmicos: alocados via Web Worker nativo para Zero-Stutter
+      initialGeometry = new THREE.BufferGeometry();
+    }
+
+    const terrain = new THREE.Mesh(initialGeometry, this._terrainMaterial);
     terrain.receiveShadow = true;
     terrain.frustumCulled = true;
     terrain.matrixAutoUpdate = false;
@@ -799,21 +791,34 @@ export class World {
     }
     group.add(near, far);
     this.scene.add(group);
-    return {
+
+    const chunkData = {
       x: cx,
       z: cz,
       centerX,
       centerZ,
       group,
       terrain,
-      heights,
+      heights: initialHeights,
       near,
       far,
-      bounds: terrain.geometry.boundingSphere,
+      bounds: initialGeometry.boundingSphere || null,
       colliders: decor.colliders,
       shadowMeshes: decor.shadowMeshes,
       instancedMeshes: decor.instancedMeshes,
     };
+
+    if (!isInitialSpawn && this._worker) {
+      this.requestTerrainChunk(cx, cz, ({ geometry, heights }) => {
+        if (!chunkData.terrain) return;
+        chunkData.terrain.geometry.dispose();
+        chunkData.terrain.geometry = geometry;
+        chunkData.heights = heights;
+        chunkData.bounds = geometry.boundingSphere;
+      });
+    }
+
+    return chunkData;
   }
 
   _createTerrainGeometry(cx, cz) {
