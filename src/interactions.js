@@ -188,8 +188,8 @@ export class InteractionSystem {
         id: "build:corral",
         label: `Construir Curral de Cavalos (${BUILD_COSTS.CORRAL.wood} Madeira + ${BUILD_COSTS.CORRAL.hay} Feno)`,
         disabled: !canCorral,
-      },
-    ];
+      }
+    );
 
     // Opções de Infusão de Cor da Tocha com Cristais Coletados
     const availableColors = ["orange"];
