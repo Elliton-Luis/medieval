@@ -236,116 +236,156 @@ export class Player {
     this.demiurgeGroup.name = "DemiurgeAttireGroup";
     this.model.add(this.demiurgeGroup);
 
+    // Paleta Sombria Nobre e Oculta (Estilo Baile Eyes Wide Shut)
     const matBlackRobe = new THREE.MeshStandardMaterial({
-      color: 0x0a0710,
-      roughness: 0.85,
-      metalness: 0.15,
+      color: 0x07050a,
+      roughness: 0.88,
+      metalness: 0.12,
       flatShading: true,
     });
     const matPurpleCloak = new THREE.MeshStandardMaterial({
-      color: 0x2e0d47,
-      roughness: 0.65,
-      metalness: 0.25,
+      color: 0x240838,
+      roughness: 0.72,
+      metalness: 0.2,
       flatShading: true,
     });
     const matCrimsonTrim = new THREE.MeshStandardMaterial({
-      color: 0x820f1e,
-      roughness: 0.6,
-      metalness: 0.25,
+      color: 0x6e0d19,
+      roughness: 0.65,
+      metalness: 0.22,
       flatShading: true,
     });
-    const matGnosticMask = new THREE.MeshStandardMaterial({
-      color: 0xf4ece1,
-      roughness: 0.45,
-      metalness: 0.1,
+    const matAntiqueGold = new THREE.MeshStandardMaterial({
+      color: 0xc8982a,
+      emissive: 0x664408,
+      emissiveIntensity: 0.85,
+      roughness: 0.35,
+      metalness: 0.82,
       flatShading: true,
     });
-    const matGlowEyes = new THREE.MeshBasicMaterial({
+    const matVenetianPorcelain = new THREE.MeshStandardMaterial({
+      color: 0xf2ece4,
+      roughness: 0.28,
+      metalness: 0.15,
+      flatShading: true,
+    });
+    const matVoidBlack = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+    });
+    const matWhiteEyeDot = new THREE.MeshBasicMaterial({
       color: 0xffffff,
     });
 
-    // 1. Túnica/Manto longo esguio cobrindo o peito e descendo até os tornozelos
+    // 1. Túnica Sacerdotal Longa e Reta de Veludo Obsidiana (Sem cantos redondos)
     const dRobe = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.44, 1.45, 8), matBlackRobe);
     dRobe.position.set(0, 0.85, 0.02);
     this.demiurgeGroup.add(dRobe);
 
-    // Listras verticais carmesins no manto
-    const dTrimCenter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.42, 0.02), matCrimsonTrim);
+    // Estola central de seda carmesim com bordas em folha de ouro
+    const dTrimCenter = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.42, 0.03), matCrimsonTrim);
     dTrimCenter.position.set(0, 0.85, 0.23);
+    dTrimCenter.rotation.x = -0.04;
     this.demiurgeGroup.add(dTrimCenter);
 
-    // 2. Capa Imperial Roxa com Forro Vermelho nas costas
-    const dCapeOuter = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.15, 0.035), matPurpleCloak);
-    dCapeOuter.position.set(0, 1.05, -0.22);
-    dCapeOuter.rotation.x = -0.1;
+    for (const sx of [-0.075, 0.075]) {
+      const dGoldTrim = new THREE.Mesh(new THREE.BoxGeometry(0.015, 1.42, 0.033), matAntiqueGold);
+      dGoldTrim.position.set(sx, 0.85, 0.231);
+      dGoldTrim.rotation.x = -0.04;
+      this.demiurgeGroup.add(dGoldTrim);
+    }
+
+    // 2. Capa Cerimonial Roxa Imperial Estruturada com Forro de Seda Carmesim
+    const dCapeOuter = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.25, 0.045), matPurpleCloak);
+    dCapeOuter.position.set(0, 1.05, -0.21);
+    dCapeOuter.rotation.x = -0.06;
     this.demiurgeGroup.add(dCapeOuter);
 
-    const dCapeInner = new THREE.Mesh(new THREE.BoxGeometry(0.52, 1.12, 0.015), matCrimsonTrim);
-    dCapeInner.position.set(0, 1.05, -0.20);
-    dCapeInner.rotation.x = -0.1;
+    const dCapeInner = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.22, 0.02), matCrimsonTrim);
+    dCapeInner.position.set(0, 1.05, -0.19);
+    dCapeInner.rotation.x = -0.06;
     this.demiurgeGroup.add(dCapeInner);
 
-    // Espaldadeiras / Hombreras com pontas góticas e espinhos de obsidiana
+    // Ombreiras de alfaiataria nobre e rígidas (ombros retos e cerimoniais)
     for (const side of [-1, 1]) {
-      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 5), matPurpleCloak);
-      sp.position.set(side * 0.34, 1.50, -0.02);
-      sp.rotation.z = side * 0.52;
-      this.demiurgeGroup.add(sp);
+      const epaulet = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.34), matPurpleCloak);
+      epaulet.position.set(side * 0.32, 1.50, -0.01);
+      epaulet.rotation.z = -side * 0.12;
+      this.demiurgeGroup.add(epaulet);
 
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.32, 4), matCrimsonTrim);
-      spike.position.set(side * 0.44, 1.58, -0.04);
-      spike.rotation.z = side * 0.72;
-      spike.rotation.x = -0.22;
-      this.demiurgeGroup.add(spike);
+      const epauletGold = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.11, 0.345), matAntiqueGold);
+      epauletGold.position.set(side * 0.41, 1.50, -0.01);
+      epauletGold.rotation.z = -side * 0.12;
+      this.demiurgeGroup.add(epauletGold);
     }
 
-    // Bainha inferior pontiaguda e denteada do manto
-    for (let p = 0; p < 6; p++) {
-      const pAngle = (p / 6) * Math.PI * 2;
-      const pointMesh = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.28, 4), p % 2 === 0 ? matPurpleCloak : matCrimsonTrim);
-      pointMesh.position.set(Math.cos(pAngle) * 0.42, 0.14, Math.sin(pAngle) * 0.42);
-      pointMesh.rotation.x = Math.PI; // Ponta apontando para baixo
-      this.demiurgeGroup.add(pointMesh);
+    // Gola alta rígida cerimonial cobrindo o pescoço
+    const collarBack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.30, 0.035), matPurpleCloak);
+    collarBack.position.set(0, 1.66, -0.14);
+    collarBack.rotation.x = 0.12;
+    this.demiurgeGroup.add(collarBack);
+
+    for (const side of [-1, 1]) {
+      const collarWing = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.28, 0.20), matPurpleCloak);
+      collarWing.position.set(side * 0.20, 1.66, -0.04);
+      collarWing.rotation.z = -side * 0.12;
+      this.demiurgeGroup.add(collarWing);
     }
 
-    // 3. Capuz Místico e Máscara Cerimonial na cabeça do jogador
+    // 3. Capuz Místico Geométrico e Máscara Veneziana de Porcelana Oculta (Eyes Wide Shut)
     this.demiurgeHeadGroup = new THREE.Group();
     this.demiurgeHeadGroup.position.set(0, 0.05, 0);
     this.head.add(this.demiurgeHeadGroup);
 
-    // Capuz Sombrio cobrindo a cabeça
-    const dHood = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 7, 0, Math.PI * 2, 0, Math.PI * 0.75), matPurpleCloak);
-    dHood.position.set(0, 0.08, -0.02);
-    this.demiurgeHeadGroup.add(dHood);
+    // Capuz Sombrio facetado e rígido (sem esferas redondas)
+    const dHoodRoof = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.34), matPurpleCloak);
+    dHoodRoof.position.set(0, 0.24, -0.02);
+    this.demiurgeHeadGroup.add(dHoodRoof);
 
-    // Cauda pontiaguda longa na traseira do capuz (Liripipe gótico)
-    const dHoodTail = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.55, 5), matPurpleCloak);
-    dHoodTail.position.set(0, 0.09, -0.28);
-    dHoodTail.rotation.x = -Math.PI * 0.64;
-    this.demiurgeHeadGroup.add(dHoodTail);
+    const dHoodPeak = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.35, 4), matPurpleCloak);
+    dHoodPeak.position.set(0, 0.34, -0.08);
+    dHoodPeak.rotation.x = -0.32;
+    this.demiurgeHeadGroup.add(dHoodPeak);
 
-    // Chifres/espinhos de obsidiana pontudos no capuz
     for (const side of [-1, 1]) {
-      const dHorn = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.38, 4), matCrimsonTrim);
-      dHorn.position.set(side * 0.16, 0.25, -0.08);
-      dHorn.rotation.x = -0.45;
-      dHorn.rotation.z = side * 0.45;
-      this.demiurgeHeadGroup.add(dHorn);
+      const dHoodSide = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.34, 0.30), matPurpleCloak);
+      dHoodSide.position.set(side * 0.16, 0.10, -0.02);
+      this.demiurgeHeadGroup.add(dHoodSide);
     }
 
-    // Máscara cerimonial gótica com bico longo e queixo afilado pontiagudo
-    const dMask = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 5), matGnosticMask);
-    dMask.rotation.x = Math.PI * 0.58;
-    dMask.position.set(0, -0.06, 0.25);
-    this.demiurgeHeadGroup.add(dMask);
+    // Máscara Veneziana de Porcelana e Ouro (Estilo Bauta / Volto do baile de Eyes Wide Shut)
+    const dMaskGroup = new THREE.Group();
+    dMaskGroup.position.set(0, 0.06, 0.16);
 
-    // Olhos brancos brilhantes ameaçadores da máscara
-    for (const sx of [-0.055, 0.055]) {
-      const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), matGlowEyes);
-      eyeSlit.position.set(sx, 0.04, 0.17);
-      eyeSlit.rotation.z = -Math.sign(sx) * 0.2;
-      this.demiurgeHeadGroup.add(eyeSlit);
+    const dMaskFace = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 0.05), matVenetianPorcelain);
+    dMaskGroup.add(dMaskFace);
+
+    // Queixo afiado e angular característico da Bauta veneziana
+    const dMaskChin = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 4), matVenetianPorcelain);
+    dMaskChin.position.set(0, -0.14, 0.038);
+    dMaskChin.rotation.x = Math.PI * 0.95;
+    dMaskGroup.add(dMaskChin);
+
+    // Filigrana dourada na fronte e cume nasal
+    const dMaskForeheadGold = new THREE.Mesh(new THREE.BoxGeometry(0.225, 0.035, 0.055), matAntiqueGold);
+    dMaskForeheadGold.position.set(0, 0.10, 0.002);
+    dMaskGroup.add(dMaskForeheadGold);
+
+    const dMaskNose = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.07), matAntiqueGold);
+    dMaskNose.position.set(0, 0.01, 0.028);
+    dMaskGroup.add(dMaskNose);
+
+    // Órbitas oculares chanfradas e profundas com olhar penetrante
+    for (const sx of [-0.06, 0.06]) {
+      const eyeSocket = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.035), matVoidBlack);
+      eyeSocket.position.set(sx, 0.038, 0.032);
+      dMaskGroup.add(eyeSocket);
+
+      const eyeGlint = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.018), matWhiteEyeDot);
+      eyeGlint.position.set(sx, 0.038, 0.046);
+      dMaskGroup.add(eyeGlint);
     }
+
+    this.demiurgeHeadGroup.add(dMaskGroup);
 
     this.demiurgeGroup.visible = false;
     this.demiurgeHeadGroup.visible = false;

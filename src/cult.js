@@ -12,20 +12,37 @@ const _robeMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 const _maskMat = new THREE.MeshStandardMaterial({
-  color: 0xf4f1e4,
-  roughness: 0.5,
-  metalness: 0.05,
+  color: 0xf2ede4,
+  roughness: 0.32,
+  metalness: 0.12,
+  flatShading: true,
+});
+const _goldMat = new THREE.MeshStandardMaterial({
+  color: 0xc8982a,
+  emissive: 0x553805,
+  emissiveIntensity: 0.7,
+  roughness: 0.35,
+  metalness: 0.85,
+  flatShading: true,
+});
+const _crimsonRibbonMat = new THREE.MeshStandardMaterial({
+  color: 0x6e0d19,
+  roughness: 0.7,
+  metalness: 0.2,
   flatShading: true,
 });
 const _lensMat = new THREE.MeshStandardMaterial({
-  color: 0x07080a,
-  roughness: 0.15,
-  metalness: 0.7,
+  color: 0x050508,
+  roughness: 0.2,
+  metalness: 0.8,
 });
 const _bladeMat = new THREE.MeshStandardMaterial({
   color: 0x222228,
   roughness: 0.35,
   metalness: 0.8,
+});
+const _glintMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
 });
 const _boneMat = new THREE.MeshStandardMaterial({
   color: 0xd8cca8,
@@ -344,7 +361,7 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
 }
 
 // ============================================================================
-// 3. Modelo Anatômico 3D do Cultista Cátaro (Médico da Peste & Capa Longa)
+// 3. Modelo Anatômico 3D do Cultista Cátaro (Estilo Baile Oculto - Eyes Wide Shut)
 // ============================================================================
 export function buildCultistMesh() {
   const root = new THREE.Group();
@@ -354,80 +371,151 @@ export function buildCultistMesh() {
   model.name = "CultistModel";
   root.add(model);
 
-  // Manto preto longo até o chão (esguio e ameaçador)
-  const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.44, 1.55, 10), _robeMat);
+  // Manto preto longo sacerdotal (silhueta austera, reta e sem cantos redondos)
+  const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.44, 1.55, 8), _robeMat);
   robe.position.set(0, 0.8, 0);
   robe.castShadow = true;
   model.add(robe);
 
-  // Capa com capuz cobrindo cabeça e ombros
-  const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.55, 8), _robeMat);
-  mantle.position.set(0, 1.45, -0.02);
-  mantle.castShadow = true;
-  model.add(mantle);
+  // Faixa/Estola cerimonial carmesim descendo pelo centro do peito
+  const stola = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.35, 0.03), _crimsonRibbonMat);
+  stola.position.set(0, 0.75, 0.23);
+  stola.rotation.x = -0.04;
+  model.add(stola);
 
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.21, 9, 7, 0, Math.PI * 2, 0, Math.PI * 0.72), _robeMat);
-  hood.position.set(0, 1.68, 0);
-  model.add(hood);
+  const stolaClasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.04), _goldMat);
+  stolaClasp.position.set(0, 1.38, 0.22);
+  model.add(stolaClasp);
 
-  // Máscara branca de Médico da Peste com bico curvo proeminente
-  const maskFace = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 7), _maskMat);
-  maskFace.position.set(0, 1.66, 0.04);
-  model.add(maskFace);
-
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.46, 6), _maskMat);
-  beak.position.set(0, 1.58, 0.32);
-  beak.rotation.x = Math.PI * 0.58; // Curva levemente para baixo
-  model.add(beak);
-
-  // Lentes escuras sem olhos aparentes
+  // Ombreiras angulares de corte reto (ombros largos e imponentes de cerimônia oculta)
   for (const side of [-1, 1]) {
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.02, 6), _lensMat);
-    lens.position.set(side * 0.065, 1.69, 0.14);
-    lens.rotation.x = Math.PI / 2;
-    lens.rotation.z = side * 0.25;
-    model.add(lens);
+    const epaulet = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.32), _robeMat);
+    epaulet.position.set(side * 0.28, 1.48, 0);
+    epaulet.rotation.z = -side * 0.12;
+    model.add(epaulet);
+
+    const epauletGold = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.10, 0.325), _goldMat);
+    epauletGold.position.set(side * 0.36, 1.48, 0);
+    epauletGold.rotation.z = -side * 0.12;
+    model.add(epauletGold);
   }
 
-  // Mangas pretas longas
-  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.72, 6), _robeMat);
+  // Gola alta rígida cerimonial
+  const collarBack = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.03), _robeMat);
+  collarBack.position.set(0, 1.62, -0.12);
+  collarBack.rotation.x = 0.12;
+  model.add(collarBack);
+
+  // Capuz facetado gótico rígido (sem esferas redondas)
+  const hoodRoof = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.32), _robeMat);
+  hoodRoof.position.set(0, 1.84, 0.02);
+  model.add(hoodRoof);
+
+  const hoodPeak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.32, 4), _robeMat);
+  hoodPeak.position.set(0, 1.94, -0.05);
+  hoodPeak.rotation.x = -0.32;
+  model.add(hoodPeak);
+
+  for (const side of [-1, 1]) {
+    const hoodSide = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.28), _robeMat);
+    hoodSide.position.set(side * 0.15, 1.68, 0.02);
+    model.add(hoodSide);
+  }
+
+  // Máscara Veneziana de Porcelana Oculta (Estilo Baile Eyes Wide Shut - Bauta / Volto)
+  const maskGroup = new THREE.Group();
+  maskGroup.position.set(0, 1.65, 0.10);
+
+  const maskFace = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.23, 0.05), _maskMat);
+  maskGroup.add(maskFace);
+
+  // Queixo afiado geométrico característico da Bauta
+  const maskChin = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.20, 4), _maskMat);
+  maskChin.position.set(0, -0.13, 0.035);
+  maskChin.rotation.x = Math.PI * 0.95;
+  maskGroup.add(maskChin);
+
+  // Filigrana e detalhes dourados nas têmporas
+  const maskBrowGold = new THREE.Mesh(new THREE.BoxGeometry(0.205, 0.03, 0.055), _goldMat);
+  maskBrowGold.position.set(0, 0.09, 0.002);
+  maskGroup.add(maskBrowGold);
+
+  // Órbitas oculares vazadas e profundas com ponto de luz penetrante
+  for (const side of [-1, 1]) {
+    const eyeSocket = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.022, 0.035), _lensMat);
+    eyeSocket.position.set(side * 0.055, 0.035, 0.032);
+    maskGroup.add(eyeSocket);
+
+    const eyeDot = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.018), _glintMat);
+    eyeDot.position.set(side * 0.055, 0.035, 0.046);
+    maskGroup.add(eyeDot);
+  }
+  model.add(maskGroup);
+
+  // Mangas pretas estruturadas com conexão física
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.13), _robeMat);
   armL.position.set(-0.3, 1.25, 0);
   armL.rotation.z = 0.22;
   model.add(armL);
 
-  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.72, 6), _robeMat);
+  const handL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), _robeMat);
+  handL.position.set(-0.34, 0.94, 0.10);
+  model.add(handL);
+
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.13), _robeMat);
   armR.position.set(0.3, 1.25, 0.05);
   armR.rotation.z = -0.22;
   model.add(armR);
 
-  // Tocha com chama vermelha na mão esquerda (os servos que vigiam além dos muros)
+  const handR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), _robeMat);
+  handR.position.set(0.34, 0.94, 0.12);
+  model.add(handR);
+
+  // Tocha Cerimonial de Ferro Forjado na mão esquerda (os servos que vigiam além dos muros)
   const torchGroup = new THREE.Group();
   torchGroup.name = "CultistRedTorch";
   torchGroup.position.set(-0.32, 1.05, 0.16);
 
-  const torchStick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.44, 5), _robeMat);
+  const torchStick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.48, 6), _bladeMat);
   torchStick.position.set(0, 0, 0);
   torchGroup.add(torchStick);
 
+  const torchCage = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), _bladeMat);
+  torchCage.position.set(0, 0.22, 0);
+  torchGroup.add(torchCage);
+
   const torchFlame = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.22, 5), _redTorchMat);
-  torchFlame.position.set(0, 0.24, 0);
+  torchFlame.position.set(0, 0.28, 0);
   torchGroup.add(torchFlame);
 
   const torchLight = new THREE.PointLight(0xff2211, 2.8, 18, 1.8);
-  torchLight.position.set(0, 0.28, 0);
+  torchLight.position.set(0, 0.32, 0);
   torchGroup.add(torchLight);
 
   model.add(torchGroup);
 
-  // Adaga ritual cerimonial na mão direita
-  const daggerHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 5), _robeMat);
-  daggerHandle.position.set(0.34, 0.95, 0.12);
-  model.add(daggerHandle);
+  // Adaga ritual cerimonial na mão direita (obsidiana com guarda e pomo de ouro)
+  const daggerGroup = new THREE.Group();
+  daggerGroup.position.set(0.34, 0.92, 0.12);
 
-  const daggerBlade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.35, 4), _bladeMat);
-  daggerBlade.position.set(0.34, 0.8, 0.12);
+  const daggerGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 5), _bladeMat);
+  daggerGrip.position.set(0, 0, 0);
+  daggerGroup.add(daggerGrip);
+
+  const daggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.025, 0.035), _goldMat);
+  daggerGuard.position.set(0, -0.07, 0);
+  daggerGroup.add(daggerGuard);
+
+  const daggerBlade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.34, 4), _bladeMat);
+  daggerBlade.position.set(0, -0.24, 0);
   daggerBlade.rotation.x = Math.PI;
-  model.add(daggerBlade);
+  daggerGroup.add(daggerBlade);
+
+  const daggerPommel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.035), _goldMat);
+  daggerPommel.position.set(0, 0.08, 0);
+  daggerGroup.add(daggerPommel);
+
+  model.add(daggerGroup);
 
   root.visible = false;
   return { root, model, robe, armL, armR, torchGroup, torchLight };
