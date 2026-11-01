@@ -139,17 +139,27 @@ export class DeathScreen {
     this.black = layer.querySelector(".wasted-black");
   }
 
-  start({ coinsLost = 0, morality = 0 } = {}) {
+  start({ coinsLost = 0, morality = 0, customTitle = null, customSubtitle = null } = {}) {
     if (this.state !== "idle") return;
     this.state = "dying";
     this.time = 0;
     this.scale = 1;
     this._shown = {};
 
-    let messages = DEATH_MESSAGES.NEUTRAL;
-    if (morality >= 20) messages = DEATH_MESSAGES.GOOD;
-    else if (morality <= -20) messages = DEATH_MESSAGES.EVIL;
-    this.subtitle.textContent = messages[Math.floor(Math.random() * messages.length)];
+    if (customTitle && this.title) {
+      this.title.textContent = customTitle;
+    } else if (this.title) {
+      this.title.textContent = "DESFALECIDO";
+    }
+
+    if (customSubtitle && this.subtitle) {
+      this.subtitle.textContent = customSubtitle;
+    } else {
+      let messages = DEATH_MESSAGES.NEUTRAL;
+      if (morality >= 20) messages = DEATH_MESSAGES.GOOD;
+      else if (morality <= -20) messages = DEATH_MESSAGES.EVIL;
+      this.subtitle.textContent = messages[Math.floor(Math.random() * messages.length)];
+    }
 
     this.coins.textContent = coinsLost > 0
       ? `Perdeste ${coinsLost} ${coinsLost === 1 ? "moeda" : "moedas"} de ouro`

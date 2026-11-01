@@ -117,18 +117,21 @@ export const PlayerStats = {
   // Facção
   isTemplar: false,
   hasBrokenVow: false,
+  wearingDemiurgeRobe: false,
 
   // Getters otimizados com penalidade de Voto Quebrado e peso de armadura
   getMaxHp: () => PlayerStats.con * 10,
   getMaxHearts: () => Math.max(3, Math.round(PlayerStats.con * 0.5)),
   getMeleeMult: () => {
     let mult = 1.0 + (PlayerStats.str - 10) * 0.05;
+    if (PlayerStats.wearingDemiurgeRobe) mult += 0.45; // Poder do Demiurgo (+45%)
     if (PlayerStats.hasBrokenVow) mult *= 0.5; // Fraqueza extrema (-50%)
     return mult;
   },
   getHitstunMult: () => Math.max(0.35, 1.0 - (PlayerStats.con - 10) * 0.04),
   getSpeedMult: () => {
     let mult = 1.0 + (PlayerStats.spd - 10) * 0.03;
+    if (PlayerStats.wearingDemiurgeRobe) mult += 0.25; // Leveza espectral (+25%)
     if (PlayerStats.armorLevel === 3) mult -= 0.15; // Armadura pesada deixa 15% mais lento
     if (PlayerStats.hasBrokenVow) mult *= 0.5; // Punição divina (50% mais lento)
     return mult;
@@ -199,6 +202,28 @@ export function takeTemplarVow(player = _env.player, ui = _env.ui, audio = _env.
   return true;
 }
 
+/**
+ * Concede e equipa a Vestimenta Imponente do Demiurgo (Manto, Capa e Máscara).
+ */
+export function unlockDemiurgeAttire(player = _env.player, ui = _env.ui, audio = _env.audio) {
+  PlayerInventory.hasDemiurgeRobe = true;
+  return equipDemiurgeAttire(player, ui, audio);
+}
+
+export function equipDemiurgeAttire(player = _env.player, ui = _env.ui, audio = _env.audio) {
+  PlayerInventory.hasDemiurgeRobe = true;
+  PlayerStats.wearingDemiurgeRobe = true;
+  if (player?.setDemiurgeAttire) {
+    player.setDemiurgeAttire(true);
+  }
+  audio?.choir?.();
+  ui?.showToast?.(
+    "👁️ VESTIMENTA DO DEMIURGO EQUIPADA! Manto negro cerimonial, capa púrpura com forro carmesim e máscara arconte (+5 FOR · +5 CON · +5 CAR · +25% VEL)!"
+  );
+  syncPlayerStatsToPlayer(player, ui);
+  return true;
+}
+
 // Novos Controles Sugeridos:
 // WASD: Mover | Shift: Correr | Espaço: Pular
 // F: Montar/Desmontar | H: Assobiar
@@ -219,6 +244,7 @@ export const PlayerInventory = {
   hasPickaxe: true,
   hasSword: false,
   hasQuestItem: false,
+  hasDemiurgeRobe: false,
 
   craftTorch: () => {
     if (PlayerInventory.wood >= 1 && PlayerInventory.hay >= 1) {

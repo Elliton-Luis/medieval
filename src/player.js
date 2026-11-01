@@ -229,6 +229,98 @@ export class Player {
     makePart(new THREE.ConeGeometry(0.0525, 0.18, 4), brightSteel, this.sword, 0, 1.03, 0, false);
     makePart(new THREE.SphereGeometry(0.04, 6, 5), gold, this.sword, 0, -0.1, 0, false);
 
+    // ========================================================================
+    // Vestimenta Imponente do Demiurgo (Manto Negro, Capa Roxa/Vermelha e Máscara)
+    // ========================================================================
+    this.demiurgeGroup = new THREE.Group();
+    this.demiurgeGroup.name = "DemiurgeAttireGroup";
+    this.model.add(this.demiurgeGroup);
+
+    const matBlackRobe = new THREE.MeshStandardMaterial({
+      color: 0x0a0710,
+      roughness: 0.85,
+      metalness: 0.15,
+      flatShading: true,
+    });
+    const matPurpleCloak = new THREE.MeshStandardMaterial({
+      color: 0x2e0d47,
+      roughness: 0.65,
+      metalness: 0.25,
+      flatShading: true,
+    });
+    const matCrimsonTrim = new THREE.MeshStandardMaterial({
+      color: 0x820f1e,
+      roughness: 0.6,
+      metalness: 0.25,
+      flatShading: true,
+    });
+    const matGnosticMask = new THREE.MeshStandardMaterial({
+      color: 0xf4ece1,
+      roughness: 0.45,
+      metalness: 0.1,
+      flatShading: true,
+    });
+    const matGlowEyes = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+    });
+
+    // 1. Túnica/Manto longo esguio cobrindo o peito e descendo até os tornozelos
+    const dRobe = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.44, 1.45, 8), matBlackRobe);
+    dRobe.position.set(0, 0.85, 0.02);
+    this.demiurgeGroup.add(dRobe);
+
+    // Listras verticais carmesins no manto
+    const dTrimCenter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.42, 0.02), matCrimsonTrim);
+    dTrimCenter.position.set(0, 0.85, 0.23);
+    this.demiurgeGroup.add(dTrimCenter);
+
+    // 2. Capa Imperial Roxa com Forro Vermelho nas costas
+    const dCapeOuter = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.15, 0.035), matPurpleCloak);
+    dCapeOuter.position.set(0, 1.05, -0.22);
+    dCapeOuter.rotation.x = -0.1;
+    this.demiurgeGroup.add(dCapeOuter);
+
+    const dCapeInner = new THREE.Mesh(new THREE.BoxGeometry(0.52, 1.12, 0.015), matCrimsonTrim);
+    dCapeInner.position.set(0, 1.05, -0.20);
+    dCapeInner.rotation.x = -0.1;
+    this.demiurgeGroup.add(dCapeInner);
+
+    // Espaldadeiras / Hombreras com pontas imponentes
+    for (const side of [-1, 1]) {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 5), matPurpleCloak);
+      sp.position.set(side * 0.32, 1.48, -0.02);
+      sp.rotation.z = side * 0.45;
+      this.demiurgeGroup.add(sp);
+    }
+
+    // 3. Capuz Místico e Máscara Cerimonial na cabeça do jogador
+    this.demiurgeHeadGroup = new THREE.Group();
+    this.demiurgeHeadGroup.position.set(0, 0.05, 0);
+    this.head.add(this.demiurgeHeadGroup);
+
+    // Capuz Sombrio cobrindo a cabeça
+    const dHood = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 7, 0, Math.PI * 2, 0, Math.PI * 0.75), matPurpleCloak);
+    dHood.position.set(0, 0.08, -0.02);
+    this.demiurgeHeadGroup.add(dHood);
+
+    // Máscara cerimonial gótica com fendas de bico e queixo afilado
+    const dMask = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.36, 5), matGnosticMask);
+    dMask.rotation.x = Math.PI * 0.52;
+    dMask.position.set(0, -0.04, 0.22);
+    this.demiurgeHeadGroup.add(dMask);
+
+    // Olhos brancos brilhantes ameaçadores da máscara
+    for (const sx of [-0.055, 0.055]) {
+      const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.04), matGlowEyes);
+      eyeSlit.position.set(sx, 0.04, 0.17);
+      eyeSlit.rotation.z = -Math.sign(sx) * 0.2;
+      this.demiurgeHeadGroup.add(eyeSlit);
+    }
+
+    this.demiurgeGroup.visible = false;
+    this.demiurgeHeadGroup.visible = false;
+    this.wearingDemiurgeAttire = false;
+
     // Yaw primeiro, inclinação depois: a postura acompanha o rumo do personagem.
     this.model.rotation.order = "YXZ";
     this.model.rotation.y = Math.PI;
@@ -838,6 +930,27 @@ export class Player {
 
   reinforceArmor() {
     this.setArmorVisuals(Math.min(3, this.armorLevel + 1));
+  }
+
+  setDemiurgeAttire(equipped = true) {
+    this.wearingDemiurgeAttire = Boolean(equipped);
+    if (this.demiurgeGroup) this.demiurgeGroup.visible = this.wearingDemiurgeAttire;
+    if (this.demiurgeHeadGroup) this.demiurgeHeadGroup.visible = this.wearingDemiurgeAttire;
+    if (this.cape) this.cape.visible = !this.wearingDemiurgeAttire;
+    if (this.chestArmor) this.chestArmor.visible = !this.wearingDemiurgeAttire;
+    if (this.head?.children) {
+      for (let i = 0; i < this.head.children.length; i++) {
+        const c = this.head.children[i];
+        if (c !== this.demiurgeHeadGroup) {
+          c.visible = !this.wearingDemiurgeAttire;
+        }
+      }
+    }
+    if (this.effects && this.wearingDemiurgeAttire) {
+      this.effects.play("dust", this.x, this.root.position.y + 1.0, this.z, "#1c0b2c", 2.2);
+      this.effects.play("star", this.x, this.root.position.y + 1.4, this.z, "#a822ee", 1.8);
+      this.effects.play("star", this.x, this.root.position.y + 1.8, this.z, "#ff2233", 1.5);
+    }
   }
 
   sitAt(x, z, yaw = 0, isChurchPew = false) {

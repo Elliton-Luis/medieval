@@ -94,6 +94,8 @@ import {
   updateEclipseLightning,
   updateMessenger,
   DemiurgeModalState,
+  triggerDemiurgeCataclysm,
+  updateDemiurgeCataclysm,
 } from "./decay.js";
 import { initCheatMenu } from "./cheats.js";
 import {
@@ -241,7 +243,7 @@ const { skullsMesh, weaponsMesh } = createCultistCluesMeshes(scene);
 if (settlement.cityData) {
   spawnCultistClues(skullsMesh, weaponsMesh, 88231, settlement.cityData.center, scene, world);
 }
-const cultistsPool = createCultistsPool(scene, world, effects, combat, 4);
+const cultistsPool = createCultistsPool(scene, world, effects, combat, 8);
 for (let i = 0; i < cultistsPool.length; i++) {
   npcs.npcs.push(cultistsPool[i]);
 }
@@ -358,6 +360,7 @@ function frame(now) {
     updateCultistsLifeCycle(cultistsPool, player, npcs.npcs, weapons.firePool, dt, dayNight.isNight, settlement.cityData);
   }
   updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
+  updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig });
   updateMessenger(dt, player, effects, ui, audio, world, input);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay);
   interactions.update(dt);

@@ -740,18 +740,61 @@ export class Werewolf extends NPC {
       return;
     }
 
-    const dx = playerX - this.x;
-    const dz = playerZ - this.z;
-    const distSq = dx * dx + dz * dz;
-    const dist = Math.sqrt(distSq);
+    // Caçada & Massacre de Cavalos, Aldeões e Guardas
+    let preyX = playerX;
+    let preyZ = playerZ;
+    let preyEntity = null; // null = caçando o jogador
+    let preyDist = Math.hypot(playerX - this.x, playerZ - this.z);
+
+    if (this.npcSystem && Array.isArray(this.npcSystem.npcs)) {
+      const list = this.npcSystem.npcs;
+      for (let i = 0; i < list.length; i++) {
+        const other = list[i];
+        if (!other || !other.alive || other.removed || other === this || other.roleKey === "werewolf" || other.userData?.isWerewolf) continue;
+        const ox = other.x ?? other.root?.position?.x ?? 0;
+        const oz = other.z ?? other.root?.position?.z ?? 0;
+        const od = Math.hypot(ox - this.x, oz - this.z);
+        // Presas vulneráveis (cavalos ou aldeões a menos de 35m) ou se estiver mais próximo que o jogador
+        const isHorse = other.name === "Cavalo" || other.roleKey === "horse";
+        if (od < 35 && (od < preyDist || (isHorse && od < 26))) {
+          preyDist = od;
+          preyX = ox;
+          preyZ = oz;
+          preyEntity = other;
+        }
+      }
+    }
+
     const speedMult = this.userData.speedMult || 1.35;
     const baseSpeed = 4.2 * speedMult; // ~5.67 m/s (mais rápido que lobos e guardas)
 
-    // Barreira Mística da Cidade: O lobisomem é banido pelo solo sagrado (exceto durante o Eclipse)
+    // Ataque corpo a corpo a NPCs e Cavalos
+    if (preyEntity) {
+      if (preyDist <= this.meleeRange + 0.4 && this.attackCooldown <= 0) {
+        this.attackCooldown = 0.9;
+        this.swingTimer = 0.35;
+        const strikeDirX = (preyX - this.x) / Math.max(0.001, preyDist);
+        const strikeDirZ = (preyZ - this.z) / Math.max(0.001, preyDist);
+        const killed = preyEntity.takeHit?.(this.meleeDamage, strikeDirX, strikeDirZ, 3.5, 0.5);
+        if (this.effects) {
+          const py = (preyEntity.root ? preyEntity.root.position.y : this.world.heightAt(preyX, preyZ)) + 0.6;
+          this.effects.play("dust", preyX, py, preyZ, "#8b0000", 2.5);
+          this.effects.play("star", preyX, py + 0.3, preyZ, "#550000", 1.8);
+        }
+        if (killed) {
+          this.npcSystem?.onAlert?.(`✦ MASSACRE LUPINO! O Lobisomem estraçalhou ${preyEntity.name || "uma presa"} em poças de sangue!`);
+          import("./cult.js").then(({ CultState }) => {
+            CultState?.addApocalypseProgress?.(2);
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Barreira Mística da Cidade: O lobisomem é banido pelo solo sagrado (exceto durante o Eclipse ou em frenesi)
     let repulseX = 0;
     let repulseZ = 0;
     let repulseForce = 0;
-    if (!WorldDecay.isEclipse && _procEnv.activeCities) {
+    if (!WorldDecay.isEclipse && !preyEntity && _procEnv.activeCities) {
       for (const city of _procEnv.activeCities.values()) {
         if (!city || !city.center) continue;
         const cdx = this.x - city.center.x;
@@ -768,21 +811,29 @@ export class Werewolf extends NPC {
     }
 
     // Calcula direção de perseguição/cerco
-    const think = meleeThink(this, dt, playerX, playerZ);
+    const think = preyEntity ? null : meleeThink(this, dt, playerX, playerZ);
     let moveDirX = 0;
     let moveDirZ = 0;
     let moveSpeed = 0;
 
-    if (repulseForce > 0.05) {
+    if (repulseForce > 0.05 && !preyEntity) {
       // Repelido pela fronteira da cidade: não entra de forma alguma
       const rLen = Math.hypot(repulseX, repulseZ);
       moveDirX = repulseX / Math.max(0.001, rLen);
       moveDirZ = repulseZ / Math.max(0.001, rLen);
       moveSpeed = baseSpeed * 0.95;
+    } else if (preyEntity) {
+      const pdx = preyX - this.x;
+      const pdz = preyZ - this.z;
+      moveDirX = preyDist > 1.8 ? pdx / Math.max(preyDist, 0.001) : 0;
+      moveDirZ = preyDist > 1.8 ? pdz / Math.max(preyDist, 0.001) : 0;
+      moveSpeed = (preyDist > 1.8 ? 1.0 : 0.25) * baseSpeed;
     } else {
-      moveDirX = dist > 2.0 ? dx / Math.max(dist, 0.001) : think.mx;
-      moveDirZ = dist > 2.0 ? dz / Math.max(dist, 0.001) : think.mz;
-      moveSpeed = (dist > 2.0 ? 1.0 : think.speed) * baseSpeed;
+      const dx = playerX - this.x;
+      const dz = playerZ - this.z;
+      moveDirX = preyDist > 2.0 ? dx / Math.max(preyDist, 0.001) : think.mx;
+      moveDirZ = preyDist > 2.0 ? dz / Math.max(preyDist, 0.001) : think.mz;
+      moveSpeed = (preyDist > 2.0 ? 1.0 : think.speed) * baseSpeed;
     }
 
     const mLen = Math.hypot(moveDirX, moveDirZ);
@@ -797,8 +848,10 @@ export class Werewolf extends NPC {
       const diffYaw = Math.atan2(Math.sin(moveYaw - this.model.rotation.y), Math.cos(moveYaw - this.model.rotation.y));
       this.model.rotation.y += diffYaw * (1 - Math.exp(-18 * dt));
     } else {
-      // Quando parado perto do alvo, encara o jogador de frente
-      const targetYaw = Math.atan2(dx, dz);
+      // Quando parado perto do alvo, encara o alvo de frente
+      const faceX = preyX - this.x;
+      const faceZ = preyZ - this.z;
+      const targetYaw = Math.atan2(faceX, faceZ);
       const diffYaw = Math.atan2(Math.sin(targetYaw - this.model.rotation.y), Math.cos(targetYaw - this.model.rotation.y));
       this.model.rotation.y += diffYaw * (1 - Math.exp(-14 * dt));
     }
@@ -825,7 +878,11 @@ export class Werewolf extends NPC {
       this.rightArm.rotation.x = -2.2 + slash * 2.6;
       this.leftArm.rotation.x = -2.0 + slash * 2.4;
     }
-    this.task = repulseForce > 0.05 ? "Banido pela proteção da cidade" : "Caçando na escuridão";
+    this.task = preyEntity
+      ? `Devorando ${preyEntity.name || "presa"} em frenesi sangrento`
+      : repulseForce > 0.05
+      ? "Banido pela proteção da cidade"
+      : "Caçando na escuridão";
   }
 }
 

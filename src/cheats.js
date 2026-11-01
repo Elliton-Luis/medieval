@@ -152,6 +152,9 @@ export function openCheatModal(env) {
         <button class="cheat-btn" data-cheat="armor1">🛡️ Armadura 1 (Couro)</button>
         <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
         <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas / Templário)</button>
+        <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Roupa do Demiurgo (Capa & Máscara)</button>
+        <button class="cheat-btn" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
+        <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem para Massacre</button>
         <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
       </div>
       <p class="cheat-tip">Você também pode executar <code>window.CheatMenu.godMode()</code> diretamente no console.</p>
@@ -195,6 +198,9 @@ export function openCheatModal(env) {
       else if (type === "armor1") window.CheatMenu.equipArmor(1);
       else if (type === "armor2") window.CheatMenu.equipArmor(2);
       else if (type === "armor3") window.CheatMenu.equipArmor(3);
+      else if (type === "demiurgeRobe") window.CheatMenu.giveDemiurgeRobe();
+      else if (type === "apocalypse") window.CheatMenu.triggerApocalypse();
+      else if (type === "spawnWerewolf") window.CheatMenu.spawnWerewolf();
       else if (type === "summonMessenger") window.CheatMenu.summonMessenger();
     });
   });
@@ -318,6 +324,50 @@ export function initCheatMenu(env = {}) {
       env.ui?.showToast?.(`🛡️ CHEAT: Armadura Nível ${lv} (${names[lv]}) equipada!`);
       console.log(`🛡️ CHEAT: Armadura Nível ${lv} equipada`);
       return `Armadura nível ${lv}`;
+    },
+
+    giveDemiurgeRobe() {
+      import("./rpg.js").then(({ unlockDemiurgeAttire }) => {
+        unlockDemiurgeAttire(env.player, env.ui, env.audio);
+      });
+      return "Roupa do Demiurgo equipada";
+    },
+
+    triggerApocalypse() {
+      import("./decay.js").then(({ triggerDemiurgeCataclysm }) => {
+        triggerDemiurgeCataclysm(window.__game || env);
+        env.ui?.showToast?.("☄️ CHEAT: O Mal Final foi invocado! O Demiurgo desce dos céus!");
+        console.log("☄️ CHEAT: Descida do Demiurgo iniciada");
+      });
+      return "Apocalipse iniciado";
+    },
+
+    setApocalypseChance(pct = 100) {
+      import("./cult.js").then(({ CultState }) => {
+        CultState.apocalypseChance = Number(pct);
+        env.ui?.showToast?.(`🌑 Chance do Demiurgo ajustada para ${pct}%`);
+        console.log(`🌑 Chance do Demiurgo: ${pct}%`);
+      });
+      return `Chance ${pct}%`;
+    },
+
+    spawnWerewolf() {
+      if (window.__game?.monstersPool) {
+        const pool = window.__game.monstersPool;
+        const ww = pool.find((m) => !m.visible) || pool[0];
+        if (ww && env.player) {
+          const px = env.player.x;
+          const pz = env.player.z;
+          const py = env.world ? env.world.heightAt(px + 8, pz + 8) : 0;
+          ww.position.set(px + 8, py, pz + 8);
+          ww.x = px + 8;
+          ww.z = pz + 8;
+          ww.visible = true;
+          ww.userData.state = "HUNTING_PLAYER";
+          env.ui?.showToast?.("🐺 CHEAT: Lobisomem invocado para iniciar o massacre!");
+        }
+      }
+      return "Lobisomem invocado";
     },
 
     summonMessenger() {

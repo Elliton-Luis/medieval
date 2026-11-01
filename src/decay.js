@@ -76,7 +76,10 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
   // O mundo atinge o nível máximo de corrupção em ~20 dias
   WorldDecay.decayLevel = Math.min(1.0, WorldDecay.daysPassed * 0.05);
 
-  // Gerenciamento da duração do Eclipse (Opção 1A: dura 1 ciclo diário completo)
+  // Aumenta 5% de chance do Fim dos Tempos a cada dia passado
+  const currentApocalypseChance = CultState?.addApocalypseProgress?.(5) || 0;
+
+  // Gerenciamento da duração do Eclipse e sorteio do Apocalipse
   if (WorldDecay.isEclipse) {
     WorldDecay.eclipseDayRemaining--;
     if (WorldDecay.eclipseDayRemaining <= 0) {
@@ -84,15 +87,19 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
       ui?.showToast?.("✦ O sangue arrefece no horizonte. O Eclipse cessou por ora.");
     }
   } else {
-    // Sorteio do Eclipse na virada da meia-noite (ampliado pelo nível da seita)
-    const cultBonus = CultState ? Math.min(0.35, (CultState.level - 1) * 0.1) : 0;
-    const rollEclipse = Math.random() < (0.05 + cultBonus) || WorldDecay.daysPassed >= 20;
-    if (rollEclipse) {
-      WorldDecay.isEclipse = true;
-      WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo
-      ui?.showToast?.("🌑 O Olho do Demiurgo se abre! O Sol sangra no firmamento!");
-      if (effects && world) {
-        effects.play("star", 0, 10, 0, "#ff2211", 3.0);
+    // Sorteio do Apocalipse do Demiurgo conforme a probabilidade acumulada
+    const rollApocalypse = Math.random() * 100 < currentApocalypseChance;
+    if (rollApocalypse && window.__game) {
+      triggerDemiurgeCataclysm(window.__game);
+    } else {
+      const rollEclipse = Math.random() * 100 < (currentApocalypseChance * 0.6) || WorldDecay.daysPassed >= 16;
+      if (rollEclipse) {
+        WorldDecay.isEclipse = true;
+        WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo
+        ui?.showToast?.("🌑 O Olho do Demiurgo se abre! O Sol sangra no firmamento!");
+        if (effects && world) {
+          effects.play("star", 0, 10, 0, "#ff2211", 3.0);
+        }
       }
     }
   }
@@ -868,6 +875,302 @@ export function updateMessenger(dt, player, effects, ui, audio, world, input = n
     m.root.visible = false;
     if (effects) {
       effects.play("dust", m.x, m.root.position.y + 0.9, m.z, "#16151c", 2.0);
+    }
+  }
+}
+
+// ============================================================================
+// 6. O MAL FINAL: O CATACLISMO DO DEMIURGO E O FIM DA CRIAÇÃO MATERIAL
+// ============================================================================
+
+/**
+ * Modelo dos Anjos Pretos do Vazio com Asas Vermelhas ou Roxas.
+ */
+export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 } = {}) {
+  const root = new THREE.Group();
+  root.name = "DarkAngelRoot";
+
+  const model = new THREE.Group();
+  model.name = "DarkAngelModel";
+  root.add(model);
+
+  const matObsidian = new THREE.MeshStandardMaterial({
+    color: 0x06050a,
+    roughness: 0.85,
+    metalness: 0.2,
+    flatShading: true,
+  });
+  const matWing = new THREE.MeshStandardMaterial({
+    color: wingColor,
+    emissive: wingColor,
+    emissiveIntensity: 2.4,
+    roughness: 0.35,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+  });
+  const matEyes = new THREE.MeshBasicMaterial({
+    color: eyeColor,
+  });
+
+  // Corpo esguio e alto (2.4m)
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.36, 1.9, 7), matObsidian);
+  body.position.set(0, 0.95, 0);
+  model.add(body);
+
+  // Cabeça com capuz sombrio
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 7, 0, Math.PI * 2, 0, Math.PI * 0.75), matObsidian);
+  head.position.set(0, 1.95, 0);
+  model.add(head);
+
+  // Olhos brilhantes na escuridão do capuz
+  for (const sx of [-0.06, 0.06]) {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.05), matEyes);
+    eye.position.set(sx, 1.95, 0.14);
+    model.add(eye);
+  }
+
+  // Grandes Asas Angelicais Sombrias (Esquerda e Direita)
+  const wingGroupL = new THREE.Group();
+  wingGroupL.position.set(-0.18, 1.6, -0.15);
+  for (let i = 0; i < 4; i++) {
+    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.12 - i * 0.02, 0.9 + i * 0.25, 4), matWing);
+    feather.rotation.z = 0.5 + i * 0.28;
+    feather.rotation.x = -0.15;
+    feather.position.set(-0.25 - i * 0.18, 0.3 + i * 0.15, 0);
+    wingGroupL.add(feather);
+  }
+  model.add(wingGroupL);
+
+  const wingGroupR = new THREE.Group();
+  wingGroupR.position.set(0.18, 1.6, -0.15);
+  for (let i = 0; i < 4; i++) {
+    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.12 - i * 0.02, 0.9 + i * 0.25, 4), matWing);
+    feather.rotation.z = -0.5 - i * 0.28;
+    feather.rotation.x = -0.15;
+    feather.position.set(0.25 + i * 0.18, 0.3 + i * 0.15, 0);
+    wingGroupR.add(feather);
+  }
+  model.add(wingGroupR);
+
+  // Luz espectral emitida pelas asas
+  const angelLight = new THREE.PointLight(wingColor, 1.6, 9, 2.0);
+  angelLight.position.set(0, 1.6, 0.3);
+  model.add(angelLight);
+
+  return { root, model, wingGroupL, wingGroupR, angelLight };
+}
+
+/**
+ * Modelo do Olho Colossal do Demiurgo Descendo do Firmamento.
+ */
+export function buildDemiurgeColossalEyeMesh() {
+  const root = new THREE.Group();
+  root.name = "DemiurgeColossalEyeRoot";
+
+  const eyeGroup = new THREE.Group();
+  root.add(eyeGroup);
+
+  const matNebula = new THREE.MeshStandardMaterial({
+    color: 0x14051e,
+    roughness: 0.95,
+    metalness: 0.1,
+  });
+  const matGoldRings = new THREE.MeshStandardMaterial({
+    color: 0xdfa028,
+    emissive: 0x996611,
+    emissiveIntensity: 1.8,
+    roughness: 0.3,
+    metalness: 0.8,
+  });
+  const matIrisPlasma = new THREE.MeshStandardMaterial({
+    color: 0x9922ee,
+    emissive: 0xff2244,
+    emissiveIntensity: 3.5,
+    roughness: 0.2,
+  });
+  const matVoidSlit = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+  });
+
+  // Esfera Celestial do Olho (Diâmetro 16m)
+  const eyeball = new THREE.Mesh(new THREE.SphereGeometry(8.0, 16, 12), matNebula);
+  eyeball.scale.set(1.4, 0.75, 1.0);
+  eyeball.rotation.x = Math.PI / 2;
+  eyeGroup.add(eyeball);
+
+  // Íris de Plasma Cósmica
+  const iris = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.5, 16), matIrisPlasma);
+  iris.position.set(0, -5.8, 0);
+  eyeGroup.add(iris);
+
+  // Pupila de Fenda Abissal Negra
+  const pupil = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 6.2), matVoidSlit);
+  pupil.position.set(0, -6.0, 0);
+  eyeGroup.add(pupil);
+
+  // Halos de Anéis Rúnicos Sagrados Giratórios
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.28, 8, 24), matGoldRings);
+  ring1.rotation.x = Math.PI / 2;
+  eyeGroup.add(ring1);
+
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(12.8, 0.22, 8, 24), matIrisPlasma);
+  ring2.rotation.x = Math.PI / 2 + 0.2;
+  eyeGroup.add(ring2);
+
+  // Feixe de Luz Celestial Devastador (Spotlight voltado para a terra)
+  const spotlight = new THREE.SpotLight(0xff2244, 8.0, 140, Math.PI * 0.32, 0.5, 1.5);
+  spotlight.position.set(0, -4, 0);
+  spotlight.target.position.set(0, -90, 0);
+  eyeGroup.add(spotlight);
+  eyeGroup.add(spotlight.target);
+
+  return { root, eyeGroup, eyeball, ring1, ring2, spotlight };
+}
+
+export const DemiurgeCataclysm = {
+  active: false,
+  timer: 0,
+  angels: [],
+  colossalEye: null,
+  modalShown: false,
+  destroyed: false,
+  env: null,
+};
+
+/**
+ * Inicia o Fim dos Tempos: Descida do Demiurgo à Terra.
+ */
+export function triggerDemiurgeCataclysm(env) {
+  if (DemiurgeCataclysm.active) return;
+  DemiurgeCataclysm.active = true;
+  DemiurgeCataclysm.timer = 0;
+  DemiurgeCataclysm.modalShown = false;
+  DemiurgeCataclysm.destroyed = false;
+  DemiurgeCataclysm.env = env;
+
+  const { scene, player, dayNight, ui, audio } = env;
+
+  WorldDecay.isEclipse = true;
+  if (dayNight) {
+    dayNight.progress = 0.5; // Força Meia-noite do Eclipse
+  }
+
+  ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! O DEMIURGO DESCE À TERRA!");
+  audio?.deathBell?.();
+
+  const px = player?.x ?? 0;
+  const pz = player?.z ?? 0;
+  const py = player?.root?.position?.y ?? 0;
+
+  // Spawna os 8 Anjos Pretos com Asas Vermelhas e Roxas em círculo ao redor do jogador
+  DemiurgeCataclysm.angels = [];
+  const angelCount = 8;
+  for (let i = 0; i < angelCount; i++) {
+    const isPurple = i % 2 === 1;
+    const wingColor = isPurple ? 0xaa22ee : 0xff1a33;
+    const eyeColor = isPurple ? 0xcc44ff : 0xff2222;
+
+    const angelData = buildDarkAngelMesh({ wingColor, eyeColor });
+    const ang = (i / angelCount) * Math.PI * 2;
+    const radius = 9.5;
+    const ax = px + Math.cos(ang) * radius;
+    const az = pz + Math.sin(ang) * radius;
+
+    angelData.root.position.set(ax, py + 48, az);
+    angelData.targetY = py + 0.6;
+    angelData.ang = ang;
+    angelData.radius = radius;
+    angelData.wingPhase = i * 0.8;
+    angelData.root.lookAt(px, py + 1.2, pz);
+
+    if (scene) scene.add(angelData.root);
+    DemiurgeCataclysm.angels.push(angelData);
+  }
+
+  // Spawna o Olho Colossal do Demiurgo nos céus diretamente acima do jogador
+  const eyeData = buildDemiurgeColossalEyeMesh();
+  eyeData.root.position.set(px, py + 95, pz);
+  eyeData.targetY = py + 26;
+  if (scene) scene.add(eyeData.root);
+  DemiurgeCataclysm.colossalEye = eyeData;
+}
+
+/**
+ * Atualiza o Cataclismo a cada frame.
+ */
+export function updateDemiurgeCataclysm(dt, env) {
+  if (!DemiurgeCataclysm.active) return;
+  DemiurgeCataclysm.timer += dt;
+  const t = DemiurgeCataclysm.timer;
+  const { player, cameraRig, effects, audio, deathScreen } = env;
+  const px = player?.x ?? 0;
+  const pz = player?.z ?? 0;
+  const py = player?.root?.position?.y ?? 0;
+
+  // 1. Descida dos anjos e rotação em círculo
+  for (let i = 0; i < DemiurgeCataclysm.angels.length; i++) {
+    const a = DemiurgeCataclysm.angels[i];
+    a.wingPhase += dt * 3.5;
+    a.root.position.y = THREE.MathUtils.lerp(a.root.position.y, a.targetY + Math.sin(a.wingPhase) * 0.18, dt * 1.8);
+    const flap = Math.sin(a.wingPhase) * 0.32;
+    a.wingGroupL.rotation.z = flap;
+    a.wingGroupR.rotation.z = -flap;
+    a.root.lookAt(px, py + 1.2, pz);
+
+    if (Math.random() < 0.08 && effects) {
+      const col = i % 2 === 1 ? "#aa22ee" : "#ff1a33";
+      effects.play("star", a.root.position.x, a.root.position.y + 1.6, a.root.position.z, col, 1.2);
+    }
+  }
+
+  // 2. Descida do Olho Colossal e rotação de anéis
+  if (DemiurgeCataclysm.colossalEye) {
+    const eye = DemiurgeCataclysm.colossalEye;
+    eye.root.position.x = px;
+    eye.root.position.z = pz;
+    eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * 0.85);
+
+    eye.ring1.rotation.z += dt * 0.6;
+    eye.ring2.rotation.z -= dt * 0.9;
+    eye.eyeball.rotation.z += dt * 0.2;
+
+    if (t > 4.0 && cameraRig?.shakeAt) {
+      cameraRig.shakeAt(px, pz, 0.45, px, pz);
+    }
+  }
+
+  // 3. Proclamação Cósmica do Demiurgo
+  if (t >= 7.0 && !DemiurgeCataclysm.modalShown) {
+    DemiurgeCataclysm.modalShown = true;
+    showDemiurgeModal(
+      "«Hei de libertar-vos, meus filhos, do mal da carne em que fostes aprisionados! Eu trago o início da nova vida e o fim irrevogável desta!»",
+      4
+    );
+  }
+
+  // 4. Destruição Total e Game Over (O Mal Final)
+  if (t >= 13.5 && !DemiurgeCataclysm.destroyed) {
+    DemiurgeCataclysm.destroyed = true;
+
+    if (effects) {
+      for (let k = 0; k < 12; k++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = Math.random() * 24;
+        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 4.0);
+        effects.play("star", px + Math.cos(ang) * rad, py + 2, pz + Math.sin(ang) * rad, "#ff2244", 3.2);
+      }
+    }
+    if (audio?.explosion) {
+      audio.explosion(px, pz, 5.0);
+    }
+
+    if (deathScreen) {
+      deathScreen.start({
+        customTitle: "O FIM DA CRIAÇÃO MATERIAL",
+        customSubtitle: "O Demiurgo consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre.",
+        coinsLost: 99999,
+        morality: -100,
+      });
     }
   }
 }

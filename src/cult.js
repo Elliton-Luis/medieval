@@ -65,9 +65,24 @@ export const CultState = {
   speedMultiplier: 1.0,
   damageBonus: 0,
   altarTarget: null,
+  apocalypseChance: 0, // Inicia em 0%, sobe 5% por dia e 2% por má ação
+
+  addApocalypseProgress(amount = 2) {
+    const prev = this.apocalypseChance;
+    this.apocalypseChance = Math.min(100, Math.max(0, this.apocalypseChance + amount));
+    const stepPrev = Math.floor(prev / 25);
+    const stepCurr = Math.floor(this.apocalypseChance / 25);
+    if (stepCurr > stepPrev && this.apocalypseChance >= 25) {
+      window.__game?.ui?.showToast?.(
+        `🌑 O Véu da Criação estremece! Perigo do Fim dos Tempos: ${Math.round(this.apocalypseChance)}%!`
+      );
+    }
+    return this.apocalypseChance;
+  },
 
   recordSacrifice() {
     this.sacrifices++;
+    this.addApocalypseProgress(2);
     if (this.sacrifices >= 10) {
       this.level = 4;
       this.speedMultiplier = 1.75;
@@ -150,8 +165,87 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
   const cx = cityCenter.x ?? 0;
   const cz = cityCenter.z ?? 0;
 
-  // Spawna de 1 a 3 altares rituais ocultos por região
-  for (let i = 0; i < 3; i++) {
+  // 4 Acampamentos Garantidos nas 4 Direções Cardeais fora dos muros da cidade
+  const CARDINAL_OUTPOSTS = [
+    { x: cx, z: cz - 128, name: "Acampamento Cátaro do Norte", dir: "Norte" },
+    { x: cx, z: cz + 128, name: "Acampamento Cátaro do Sul", dir: "Sul" },
+    { x: cx + 128, z: cz, name: "Acampamento Cátaro do Leste", dir: "Leste" },
+    { x: cx - 128, z: cz, name: "Acampamento Cátaro do Oeste", dir: "Oeste" },
+  ];
+
+  for (let c = 0; c < CARDINAL_OUTPOSTS.length; c++) {
+    const out = CARDINAL_OUTPOSTS[c];
+    const oy = world ? world.heightAt(out.x, out.z) : 0;
+    const outpostData = {
+      x: out.x,
+      y: oy,
+      z: out.z,
+      radius: 5.5,
+      inspected: false,
+      name: out.name,
+      lorePrompt: `Acampamento de sentinelas heréticas do ${out.dir}. Tochas rubras ardem em torno da fogueira do Demiurgo.`,
+    };
+    CULT_ALTARS.push(outpostData);
+    if (!CultState.altarTarget) {
+      CultState.altarTarget = outpostData;
+    }
+
+    if (scene) {
+      const campGroup = new THREE.Group();
+      campGroup.position.set(out.x, oy, out.z);
+
+      // Círculo de pedras rituais da fogueira
+      for (let p = 0; p < 8; p++) {
+        const pang = (p / 8) * Math.PI * 2;
+        const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), _altarStoneMat);
+        stone.position.set(Math.cos(pang) * 1.35, 0.12, Math.sin(pang) * 1.35);
+        campGroup.add(stone);
+      }
+
+      // Lenha cruzada
+      for (let l = 0; l < 3; l++) {
+        const logMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.95, 5), _robeMat);
+        logMesh.position.set(0, 0.08, 0);
+        logMesh.rotation.y = (l / 3) * Math.PI;
+        logMesh.rotation.z = Math.PI / 2;
+        campGroup.add(logMesh);
+      }
+
+      // Fogueira de Chama Roxa ritual
+      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.78, 6), _purpleFireMat);
+      purpleFlame.position.set(0, 0.44, 0);
+      campGroup.add(purpleFlame);
+
+      const campfireLight = new THREE.PointLight(0xaa33ff, 2.6, 18, 1.6);
+      campfireLight.position.set(0, 0.7, 0);
+      campGroup.add(campfireLight);
+
+      // Duas Tochas Rubras Cerimoniais fincadas em estacas ao lado do fogo
+      for (const side of [-1.5, 1.5]) {
+        const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.8, 5), _robeMat);
+        stake.position.set(side, 0.9, side * 0.3);
+        campGroup.add(stake);
+
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.35, 5), _redTorchMat);
+        flame.position.set(side, 1.95, side * 0.3);
+        campGroup.add(flame);
+
+        const tLight = new THREE.PointLight(0xff1100, 2.4, 14, 1.8);
+        tLight.position.set(side, 2.05, side * 0.3);
+        campGroup.add(tLight);
+      }
+
+      // Crânios de aviso
+      const skullDeco = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 1), _boneMat);
+      skullDeco.position.set(0.7, 0.14, 0.7);
+      campGroup.add(skullDeco);
+
+      scene.add(campGroup);
+    }
+  }
+
+  // Spawna mais 1 a 2 altares ocultos distantes nos ermos (> 160m)
+  for (let i = 0; i < 2; i++) {
     if (random() > 0.65 && i > 0) continue;
 
     const angle = random() * Math.PI * 2;
@@ -363,16 +457,21 @@ export class Cultist {
     this.isSeated = false;
 
     this.roleKey = "cultist";
-    this.name = "Cultista dos Cátaros";
+    this.name = "Cultista do Demiurgo";
     this.title = "A Ordem do Demiurgo";
     this.alive = true;
-    this.health = 35;
-    this.maxHealth = 35;
+    this.hostile = true;
+    this.health = 24;
+    this.maxHealth = 24;
+    this.meleeDamage = 2;
+    this.meleeRange = 2.2;
     this.task = "Vigiando a fogueira dos ermos com tocha rubra";
 
     this.x = 0;
     this.z = 0;
     this.floatPhase = Math.random() * Math.PI * 2;
+    this._spellTimer = 0;
+    this._attackTimer = 0;
 
     this.userData = {
       type: "CULTIST",
@@ -455,14 +554,14 @@ export class Cultist {
       this.effects.play("star", this.x, this.root.position.y + 1.3, this.z, "#8844cc", 1.5);
     }
 
-    // Se alvejado à distância ou morto, desfaz-se em cinzas e névoa negra imediatamente
-    if (this.health <= 0 || amount >= 8) {
+    if (this.health <= 0) {
       this.vanish(true);
       return true;
     }
 
-    // Se atingido de raspão, entra em fuga espectral acelerada
-    this.userData.state = "VANISHING";
+    // Se alvejado, passa ao ataque frontal imediato
+    this.userData.state = "ATTACKING";
+    this.setSeatedPose(false);
     return false;
   }
 
@@ -476,11 +575,15 @@ export class Cultist {
     if (this.effects) {
       this.effects.play("dust", this.x, this.root.position.y + 0.9, this.z, "#14141a", 2.8);
       this.effects.play("dust", this.x, this.root.position.y + 1.6, this.z, "#221a2c", 2.2);
+      this.effects.play("star", this.x, this.root.position.y + 1.2, this.z, "#8844cc", 2.0);
     }
 
     if (dropRelic) {
-      // Drop raro de relíquia conforme Opção A escolhida
-      spawnLoot(this.root.position, 40);
+      spawnLoot(this.root.position, 45);
+      // Chance alta de dropar a Roupa/Manto do Demiurgo ao derrotar cultistas
+      import("./rpg.js").then(({ unlockDemiurgeAttire }) => {
+        unlockDemiurgeAttire();
+      }).catch(() => {});
     }
   }
 
@@ -491,55 +594,82 @@ export class Cultist {
     const px = player?.x ?? player?.position?.x ?? 0;
     const pz = player?.z ?? player?.position?.z ?? 0;
 
-    const dx = this.x - px;
-    const dz = this.z - pz;
-    const distToPlayerSq = dx * dx + dz * dz;
+    const toPlayerX = px - this.x;
+    const toPlayerZ = pz - this.z;
+    const distToPlayerSq = toPlayerX * toPlayerX + toPlayerZ * toPlayerZ;
+    const distToPlayer = Math.sqrt(distToPlayerSq);
 
-    // 1. Furtividade: Se o cultista estiver acampado ou em patrulha e o jogador se aproximar (< 22m), eles se assustam e fogem
-    if (this.userData.state === "CAMPING") {
-      if (distToPlayerSq < 484) {
-        this.userData.state = "VANISHING";
+    // 1. Deteção & Combate Real: se o jogador se aproximar de 20m, o cultista se levanta e ATACA!
+    if (distToPlayer <= 20) {
+      if (this.userData.state === "CAMPING") {
+        this.userData.state = "ATTACKING";
         this.setSeatedPose(false);
+        this.task = "Em combate pela glória do Demiurgo";
         if (this.effects) {
           this.effects.play("dust", this.x, this.root.position.y + 0.5, this.z, "#1e1d24", 1.8);
-          this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#ff2211", 1.5);
+          this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#a822ee", 1.8);
         }
-      } else {
-        // Permanece sentado ao redor da fogueira com a tocha vermelha ardendo
-        if (this.torchLight) {
-          this.torchLight.intensity = 1.3 + Math.sin(time * 0.008 + this.floatPhase) * 0.35;
-        }
-        return;
       }
-    } else if (distToPlayerSq < 625 && this.userData.state !== "VANISHING") {
-      this.userData.state = "VANISHING";
-      this.setSeatedPose(false);
-      if (this.effects) {
-        this.effects.play("dust", this.x, this.root.position.y + 0.6, this.z, "#1e1d24", 1.4);
-      }
+    } else if (distToPlayer > 36 && this.userData.state === "ATTACKING") {
+      // Retorna para o acampamento
+      this.userData.state = "CAMPING";
+      this.setSeatedPose(true);
+      return;
     }
 
-    if (this.userData.state === "VANISHING") {
-      this.setSeatedPose(false);
-      // Corre para a neblina na direção oposta ao jogador (acelerado pelo poder da seita)
-      const currentFlee = CULTIST_FLEE_SPEED * (CultState.speedMultiplier || 1.0);
-      const awayLen = Math.hypot(dx, dz) || 1;
-      const stepX = (dx / awayLen) * (currentFlee * dt);
-      const stepZ = (dz / awayLen) * (currentFlee * dt);
-      this.x += stepX;
-      this.z += stepZ;
-
-      const targetYaw = Math.atan2(dx, dz);
-      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.12);
-
-      // Flutuação mística ao deslizar
-      const ground = this.world ? this.world.heightAt(this.x, this.z) : 0;
-      this.root.position.set(this.x, ground + 0.06 + Math.sin(this.floatPhase) * 0.04, this.z);
-
-      // Se afastou o suficiente (> 38m = 1444), desfaz-se na névoa completamente
-      if (distToPlayerSq > 1444) {
-        this.vanish(false);
+    if (this.userData.state === "CAMPING") {
+      // Permanece sentado ao redor da fogueira com a tocha vermelha ardendo
+      if (this.torchLight) {
+        this.torchLight.intensity = 1.3 + Math.sin(time * 0.008 + this.floatPhase) * 0.35;
       }
+      return;
+    }
+
+    if (this.userData.state === "ATTACKING") {
+      this.setSeatedPose(false);
+      const d = Math.max(0.001, distToPlayer);
+
+      // Encarar o jogador
+      const targetYaw = Math.atan2(toPlayerX, toPlayerZ);
+      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.15);
+
+      // Ataque à distância: Conjura centelhas místicas do vazio (entre 3.5m e 16m)
+      this._spellTimer = (this._spellTimer || 0) + dt;
+      if (d >= 3.5 && d <= 16 && this._spellTimer > 2.6) {
+        this._spellTimer = 0;
+        if (this.effects) {
+          this.effects.play("star", this.x + Math.sin(targetYaw) * 0.8, this.root.position.y + 1.4, this.z + Math.cos(targetYaw) * 0.8, "#a822ee", 1.5);
+          this.effects.play("star", px, (player?.root?.position?.y ?? 0) + 1.2, pz, "#ff2233", 1.2);
+        }
+        if (this.combat?.hurtPlayer && Math.random() < 0.65) {
+          this.combat.hurtPlayer(1 + (CultState.damageBonus || 0), this.x, this.z, { weapon: "cult_magic", knock: 2.0 });
+        }
+      }
+
+      // Ataque corpo a corpo: Golpe com a Adaga Sacrificial quando <= 2.2m
+      this._attackTimer = (this._attackTimer || 0) + dt;
+      if (d <= 2.2 && this._attackTimer > 1.1) {
+        this._attackTimer = 0;
+        if (this.armR) this.armR.rotation.x = -2.2;
+        if (this.combat?.hurtPlayer) {
+          this.combat.hurtPlayer(2 + (CultState.damageBonus || 0), this.x, this.z, { weapon: "dagger", knock: 3.2 });
+        }
+        if (this.effects) {
+          this.effects.play("glint", px, (player?.root?.position?.y ?? 0) + 1.2, pz, "#ff2211", 1.2);
+        }
+      } else if (this.armR && this.armR.rotation.x < -0.3) {
+        this.armR.rotation.x += dt * 5.0;
+      }
+
+      // Perseguição do jogador
+      if (d > 2.0) {
+        const cultSpeed = (CULTIST_SPEED + 1.5) * (CultState.speedMultiplier || 1.0);
+        this.x += (toPlayerX / d) * (cultSpeed * dt);
+        this.z += (toPlayerZ / d) * (cultSpeed * dt);
+      }
+
+      const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+      this.root.position.set(this.x, groundY + 0.05 + Math.sin(this.floatPhase) * 0.04, this.z);
       return;
     }
 
@@ -601,7 +731,7 @@ export class Cultist {
 // ============================================================================
 // 5. Pool e Gerenciador de Cultistas (Noite e Névoa fora dos muros)
 // ============================================================================
-export function createCultistsPool(scene, world, effects, combat, count = 4) {
+export function createCultistsPool(scene, world, effects, combat, count = 8) {
   const pool = [];
   for (let i = 0; i < count; i++) {
     const c = new Cultist(scene, world, effects, combat);
@@ -613,46 +743,37 @@ export function createCultistsPool(scene, world, effects, combat, count = 4) {
 let _cultistCheckTimer = 0;
 
 /**
- * Atualiza o ciclo de vida dos Cátaros (Apenas à Noite e longe da cidade).
+ * Atualiza o ciclo de vida dos Cultistas do Demiurgo fora dos muros.
  */
 export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt, isNight, cityData) {
   if (!Array.isArray(cultistsPool) || !player) return;
 
   const time = performance.now();
 
-  // Se amanheceu (!isNight), todos os cultistas ativos somem na névoa
-  if (!isNight) {
-    for (let i = 0; i < cultistsPool.length; i++) {
-      const c = cultistsPool[i];
-      if (c.root.visible) c.vanish(false);
-    }
-    return;
-  }
-
-  // Avalia acampamento ao redor da fogueira próxima a altares a cada 1.5 segundos
+  // Avalia acampamentos fora das muralhas a cada 1.0 segundo
   _cultistCheckTimer += dt;
-  if (_cultistCheckTimer > 1.5) {
+  if (_cultistCheckTimer > 1.0) {
     _cultistCheckTimer = 0;
 
     const px = player.x ?? player.position?.x ?? 0;
     const pz = player.z ?? player.position?.z ?? 0;
 
-    // Procura altar no raio de 30 a 95 metros do jogador
     for (let a = 0; a < CULT_ALTARS.length; a++) {
       const altar = CULT_ALTARS[a];
       const adx = altar.x - px;
       const adz = altar.z - pz;
       const aDistSq = adx * adx + adz * adz;
 
-      // Se o jogador estiver entre 30m e 95m de um altar e houver slots no pool
-      if (aDistSq >= 900 && aDistSq <= 9025) {
-        const availableCultists = cultistsPool.filter((c) => !c.root.visible);
-        if (availableCultists.length >= 2) {
-          const spawnCount = Math.min(availableCultists.length, 3);
-          for (let s = 0; s < spawnCount; s++) {
-            availableCultists[s].spawnAtCamp(altar, s, spawnCount);
+      // Se o jogador estiver em um raio de até 140m do acampamento
+      if (aDistSq <= 19600) {
+        const activeHere = cultistsPool.filter(
+          (c) => c.root.visible && c.userData.anchor && c.userData.anchor.distanceToSquared(altar) < 25
+        );
+        if (activeHere.length < 2) {
+          const available = cultistsPool.find((c) => !c.root.visible);
+          if (available) {
+            available.spawnAtCamp(altar, activeHere.length, 2);
           }
-          break;
         }
       }
     }
