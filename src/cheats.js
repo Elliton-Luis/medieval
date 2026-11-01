@@ -301,6 +301,7 @@ export function openCheatModal(env) {
         <button class="cheat-tab-btn" data-tab="crystals">💎 Cristais & Tochas</button>
         <button class="cheat-tab-btn" data-tab="ammo">🏹 Consumíveis & Munição</button>
         <button class="cheat-tab-btn" data-tab="weapons">⚔️ Arsenal & Armaduras</button>
+        <button class="cheat-tab-btn" data-tab="spawns">🐾 Spawns & Criaturas</button>
         <button class="cheat-tab-btn" data-tab="events">⚡ Poderes & Eventos</button>
       </div>
 
@@ -446,7 +447,47 @@ export function openCheatModal(env) {
           </div>
         </div>
 
-        <!-- ABA 6: EVENTOS & PODERES -->
+        <!-- ABA 6: SPAWNS DE ENTIDADES (MONSTROS, NPCS & CAVALOS) -->
+        <div class="cheat-tab-content" id="tab-spawns">
+          <div style="font-size:12px; font-weight:700; color:#c792ea; margin-bottom:6px; letter-spacing:1px; text-transform:uppercase;">
+            🐺 Monstros, Abominações & Seita Cátara
+          </div>
+          <div class="cheat-grid" style="margin-bottom:14px;">
+            <button class="cheat-btn" data-cheat="spawn_werewolf">🐺 Lobisomem (Werewolf)</button>
+            <button class="cheat-btn" data-cheat="spawn_gulur">🦒 Gulur (Colosso de 16m)</button>
+            <button class="cheat-btn" data-cheat="spawn_necron">💀 Necron (Cego Devorador)</button>
+            <button class="cheat-btn" data-cheat="spawn_hexoculus">👁️ Hexoculus (6 Olhos)</button>
+            <button class="cheat-btn" data-cheat="spawn_polyphonia">🐍 Polyphonia (Múltiplas Bocas)</button>
+            <button class="cheat-btn" data-cheat="spawn_cultist">🌑 Cultista Cátaro (Servo)</button>
+            <button class="cheat-btn" data-cheat="summonCultLeader">👑 Grão-Mestre Morvath</button>
+            <button class="cheat-btn" data-cheat="summonMessenger">👁️ Mensageiro do Demiurgo</button>
+          </div>
+
+          <div style="font-size:12px; font-weight:700; color:#ffcb6b; margin-bottom:6px; letter-spacing:1px; text-transform:uppercase;">
+            🐎 Cavalos & Montarias
+          </div>
+          <div class="cheat-grid" style="margin-bottom:14px;">
+            <button class="cheat-btn" data-cheat="spawn_horse_wild">🐎 Cavalo Selvagem (Ágil)</button>
+            <button class="cheat-btn" data-cheat="spawn_horse_tame">🐎 Cavalo com Sela (Domesticado)</button>
+            <button class="cheat-btn" data-cheat="spawn_horse_thoroughbred">🦄 Puro-Sangue Real</button>
+          </div>
+
+          <div style="font-size:12px; font-weight:700; color:#c3e88d; margin-bottom:6px; letter-spacing:1px; text-transform:uppercase;">
+            🧑 Cidadãos, Ofícios & Guardas (NPCs)
+          </div>
+          <div class="cheat-grid">
+            <button class="cheat-btn" data-cheat="spawn_npc_guard">🛡️ Guarda Real da Patrulha</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_smith">🔨 Ferreiro / Armeiro</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_merchant">⚖️ Mercador de Caldera</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_priest">✝️ Padre / Sacerdote</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_farmer">🌾 Camponês / Agricultor</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_villager">🧑 Aldeão / Habitante</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_beggar">🪙 Mendigo Solicitante</button>
+            <button class="cheat-btn" data-cheat="spawn_npc_bandit">🗡️ Bandido dos Ermos</button>
+          </div>
+        </div>
+
+        <!-- ABA 7: EVENTOS & PODERES -->
         <div class="cheat-tab-content" id="tab-events">
           <div class="cheat-grid">
             <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
@@ -649,7 +690,56 @@ function _handleCheatAction(type) {
       window.CheatMenu.triggerApocalypse();
       break;
     case "spawnWerewolf":
+    case "spawn_werewolf":
       window.CheatMenu.spawnWerewolf();
+      break;
+    case "spawn_gulur":
+      window.CheatMenu.spawnGulur();
+      break;
+    case "spawn_necron":
+      window.CheatMenu.spawnNecron();
+      break;
+    case "spawn_hexoculus":
+      window.CheatMenu.spawnHexoculus();
+      break;
+    case "spawn_polyphonia":
+      window.CheatMenu.spawnPolyphonia();
+      break;
+    case "spawn_cultist":
+      window.CheatMenu.spawnCultist();
+      break;
+    case "spawn_horse_wild":
+      window.CheatMenu.spawnHorse(true, false, "Cavalo Selvagem");
+      break;
+    case "spawn_horse_tame":
+      window.CheatMenu.spawnHorse(false, false, "Cavalo de Sela");
+      break;
+    case "spawn_horse_thoroughbred":
+      window.CheatMenu.spawnHorse(false, true, "Puro-Sangue Real");
+      break;
+    case "spawn_npc_guard":
+      window.CheatMenu.spawnNPC("guard");
+      break;
+    case "spawn_npc_smith":
+      window.CheatMenu.spawnNPC("smith");
+      break;
+    case "spawn_npc_merchant":
+      window.CheatMenu.spawnNPC("merchant");
+      break;
+    case "spawn_npc_priest":
+      window.CheatMenu.spawnNPC("priest");
+      break;
+    case "spawn_npc_farmer":
+      window.CheatMenu.spawnNPC("farmer");
+      break;
+    case "spawn_npc_villager":
+      window.CheatMenu.spawnNPC("villager");
+      break;
+    case "spawn_npc_beggar":
+      window.CheatMenu.spawnNPC("beggar");
+      break;
+    case "spawn_npc_bandit":
+      window.CheatMenu.spawnNPC("villager", true);
       break;
     case "summonMessenger":
       window.CheatMenu.summonMessenger();
@@ -1392,6 +1482,147 @@ export function initCheatMenu(env = {}) {
         console.log("👁️ CHEAT: Líder da Seita Cátara invocado:", leader);
       });
       return "Líder da Seita Cátara invocado";
+    },
+
+    spawnGulur() {
+      import("./beasts.js").then(({ Gulur }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 12;
+        const sz = pz + Math.cos(ang) * 12;
+        const g = new Gulur(env.scene, env.world, env.effects, env.combat, p, env.npcs, sx, sz);
+        g.root.visible = true;
+        if (window.__game?.beasts) window.__game.beasts.walkers.push(g);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(g)) env.npcs.npcs.push(g);
+        env.effects?.play?.("star", sx, (env.world ? env.world.heightAt(sx, sz) : 0) + 12, sz, "#ffea00", 3.0);
+        env.ui?.showToast?.("🦒 CHEAT: Gulur (Colosso de 16m) invocado nos ermos!");
+        console.log("🦒 CHEAT: Gulur invocado:", g);
+      });
+      return "Gulur invocado";
+    },
+
+    spawnNecron() {
+      import("./beasts.js").then(({ Necron }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 4.5;
+        const sz = pz + Math.cos(ang) * 4.5;
+        const n = new Necron(env.scene, env.world, env.effects, env.combat, p, env.npcs, sx, sz);
+        n.root.visible = true;
+        if (window.__game?.beasts) window.__game.beasts.biters.push(n);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(n)) env.npcs.npcs.push(n);
+        env.effects?.play?.("dust", sx, env.world ? env.world.heightAt(sx, sz) : 0, sz, "#332222", 2.2);
+        env.ui?.showToast?.("💀 CHEAT: Necron (O Cego Devorador) invocado!");
+        console.log("💀 CHEAT: Necron invocado:", n);
+      });
+      return "Necron invocado";
+    },
+
+    spawnHexoculus() {
+      import("./beasts.js").then(({ Hexoculus }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 5.0;
+        const sz = pz + Math.cos(ang) * 5.0;
+        const h = new Hexoculus(env.scene, env.world, env.effects, env.combat, p, env.npcs, sx, sz);
+        h.root.visible = true;
+        if (window.__game?.beasts) window.__game.beasts.hexoculusList.push(h);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(h)) env.npcs.npcs.push(h);
+        env.effects?.play?.("star", sx, (env.world ? env.world.heightAt(sx, sz) : 0) + 2.5, sz, "#aa22ff", 2.5);
+        env.ui?.showToast?.("👁️ CHEAT: Hexoculus (Observador dos 6 Olhos) invocado!");
+        console.log("👁️ CHEAT: Hexoculus invocado:", h);
+      });
+      return "Hexoculus invocado";
+    },
+
+    spawnPolyphonia() {
+      import("./beasts.js").then(({ Polyphonia }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 4.5;
+        const sz = pz + Math.cos(ang) * 4.5;
+        const poly = new Polyphonia(env.scene, env.world, env.effects, env.combat, p, env.npcs, sx, sz);
+        poly.root.visible = true;
+        if (window.__game?.beasts) window.__game.beasts.polyphoniaList.push(poly);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(poly)) env.npcs.npcs.push(poly);
+        env.effects?.play?.("star", sx, (env.world ? env.world.heightAt(sx, sz) : 0) + 1.2, sz, "#cc1122", 2.2);
+        env.ui?.showToast?.("🐍 CHEAT: Polyphonia (Fauce Múltipla) invocada!");
+        console.log("🐍 CHEAT: Polyphonia invocada:", poly);
+      });
+      return "Polyphonia invocada";
+    },
+
+    spawnCultist() {
+      import("./cult.js").then(({ Cultist }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 4.0;
+        const sz = pz + Math.cos(ang) * 4.0;
+        const c = new Cultist(env.scene, env.world, env.effects, env.combat);
+        const sy = env.world ? env.world.heightAt(sx, sz) : 0;
+        c.spawnAt({ x: sx, y: sy, z: sz });
+        if (env.cultistsPool) env.cultistsPool.push(c);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(c)) env.npcs.npcs.push(c);
+        env.effects?.play?.("dust", sx, sy + 0.8, sz, "#1a0822", 2.8);
+        env.ui?.showToast?.("🌑 CHEAT: Cultista Cátaro do Demiurgo invocado!");
+        console.log("🌑 CHEAT: Cultista invocado:", c);
+      });
+      return "Cultista invocado";
+    },
+
+    spawnHorse(wild = false, isMissionHorse = false, name = null) {
+      const hm = env.horses || window.__game?.horses;
+      if (!hm) return "HorseManager não disponível";
+      const p = env.player || window.__game?.player;
+      const px = p.x ?? p.position?.x ?? 0;
+      const pz = p.z ?? p.position?.z ?? 0;
+      const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+      const sx = px + Math.sin(ang) * 4.2;
+      const sz = pz + Math.cos(ang) * 4.2;
+      const horse = hm.spawnHorse(sx, sz, {
+        wild,
+        stay: !wild,
+        isMissionHorse,
+        name: name || (wild ? "Cavalo Selvagem" : "Cavalo Doméstico"),
+      });
+      if (horse) {
+        env.audio?.coin?.();
+        env.effects?.play?.("dust", sx, env.world ? env.world.heightAt(sx, sz) : 0, sz, "#735c46", 2.0);
+        env.ui?.showToast?.(`🐎 CHEAT: ${horse.name} invocado! [F] para montar.`);
+        console.log("🐎 CHEAT: Cavalo invocado:", horse);
+      }
+      return horse;
+    },
+
+    spawnNPC(roleKey = "villager", isBandit = false) {
+      import("./npc.js").then(({ NPC }) => {
+        const p = env.player || window.__game?.player;
+        const px = p.x ?? p.position?.x ?? 0;
+        const pz = p.z ?? p.position?.z ?? 0;
+        const ang = p.heading || (p.model ? p.model.rotation.y : 0);
+        const sx = px + Math.sin(ang) * 3.5;
+        const sz = pz + Math.cos(ang) * 3.5;
+        const path = [{ x: sx, z: sz }, { x: sx + 2, z: sz + 2 }];
+        const workPoint = { x: sx, z: sz };
+        const appearance = isBandit ? { isBandit: true, name: "Bandido dos Ermos", title: "Ladrão Fora-da-Lei" } : {};
+        const n = new NPC(env.scene, env.world, roleKey, path, workPoint, appearance, env.effects);
+        if (env.npcs?.npcs && !env.npcs.npcs.includes(n)) env.npcs.npcs.push(n);
+        if (env.npcs?.spatialGrid) env.npcs.spatialGrid.insert(n, sx, sz);
+        env.effects?.play?.("dust", sx, env.world ? env.world.heightAt(sx, sz) : 0, sz, "#554433", 1.8);
+        env.ui?.showToast?.(`🧑 CHEAT: ${n.name} (${n.title}) invocado perante ti! [E] para interagir.`);
+        console.log(`🧑 CHEAT: NPC (${roleKey}) invocado:`, n);
+      });
+      return `${roleKey} invocado`;
     },
   };
 

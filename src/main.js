@@ -303,6 +303,8 @@ initCheatMenu({
   deathScreen,
   monstersPool,
   cultistsPool,
+  horses,
+  beasts,
   firePool: weapons.firePool,
 });
 

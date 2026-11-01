@@ -228,14 +228,16 @@ Acesso total e irrestrito a todos os recursos, itens, munições, poderes e even
     - Conceder ferramentas de trabalho (Machado e Picareta).
     - Conceder o livro profano do Demiurgo (*O Tractatus de Carcere*) para leitura com a tecla `L`.
     - Vestir o traje completo do Culto do Demiurgo (Manto e Máscara com chifres).
-  - **Poderes, Moralidade & Eventos**:
+  - **Spawns de Criaturas, NPCs & Cavalos (`tab-spawns`)**:
+    - **Monstros & Feras**: Lobisomem, Gulur (Colosso de 16m), Necron (Devorador Cego), Hexoculus (6 Olhos), Polyphonia (Fauce Múltipla), Cultista Cátaro, Morvath (Líder da Seita) e Mensageiro do Demiurgo.
+    - **Cavalos**: Cavalo Selvagem, Cavalo com Sela (Domesticado) e Puro-Sangue Real.
+    - **NPCs Cidadãos**: Guarda Real, Ferreiro, Mercador, Padre, Camponês, Aldeão, Mendigo e Bandido dos Ermos.
+    - Comandos via console: `window.CheatMenu.spawnGulur()`, `window.CheatMenu.spawnNecron()`, `window.CheatMenu.spawnHexoculus()`, `window.CheatMenu.spawnPolyphonia()`, `window.CheatMenu.spawnCultist()`, `window.CheatMenu.spawnHorse(wild, isMission, name)` e `window.CheatMenu.spawnNPC(roleKey, isBandit)`.
+  - **Poderes, Moralidade & Eventos (`tab-events`)**:
     - Modo Deus (vida infinita e invulnerabilidade).
     - Super Velocidade (2.5x).
     - Perdoar todos os pecados, zerar procurado e restaurar o Voto Templário.
     - Exterminar inimigos e feras próximos.
-    - Invocar Lobisomem nos ermos.
-    - Invocar o Mensageiro do Demiurgo.
-    - Invocar o Líder da Seita Cátara (Morvath, o Perfeito).
     - Disparar o Final Bom (*Ira Dei* / Triunfo Sagrado).
     - Disparar o Mal Final (*Apocalipse* / Descida do Demiurgo).
 
