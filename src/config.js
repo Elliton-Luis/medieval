@@ -3,7 +3,7 @@ export const CONFIG = Object.freeze({
   chunkSize: 64,
   chunkSegments: 20,
   activeChunkRadius: 3,
-  chunkUnloadRadius: 3.8,
+  chunkUnloadRadius: 4.5,
   viewDistance: 120,
   lodDistance: 40,
   fogDensity: 0.0165,

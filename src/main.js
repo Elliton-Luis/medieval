@@ -256,16 +256,34 @@ for (let i = 0; i < cultistsPool.length; i++) {
 npcs.onWantedChange = (level) => ui.setWanted(level);
 npcs.onAlert = (message) => ui.showToast(message);
 
-// Inicializa Sistema de Cheats (window.CheatMenu e tecla POTATO)
-initCheatMenu({ scene, world, player, npcs, ui, audio, effects, weapons, combat });
+// Inicializa Sistema de Cheats (window.CheatMenu e tecla POTATO) com todos os subsistemas
+initCheatMenu({
+  scene,
+  world,
+  player,
+  npcs,
+  ui,
+  audio,
+  effects,
+  weapons,
+  combat,
+  renderer,
+  dayNight,
+  hemisphere,
+  settlement,
+  camera,
+  cameraRig,
+  deathScreen,
+  monstersPool,
+  cultistsPool,
+  firePool: weapons.firePool,
+});
 
 dayNight.onNewDay = () => {
   triggerDailyDecayCycle(world, npcs.npcs, horses.horses, ui, scene, effects);
 };
 
-if (new URLSearchParams(location.search).has("debug")) {
-  window.__game = { HolyEndingState, triggerDeusVultEnding, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
-}
+window.__game = { HolyEndingState, triggerDeusVultEnding, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 
 const saved = loadGame();
 if (saved) {

@@ -712,17 +712,27 @@ export class World {
     const cdz = this._camDir.z;
 
     const shadowRadiusSq = (SHADOW_RADIUS + this.chunkSize * 0.5) * (SHADOW_RADIUS + this.chunkSize * 0.5);
+    const camX = camera.position.x;
+    const camZ = camera.position.z;
+    const safeRadiusSq = 56 * 56; // Raio seguro cobrindo o chunk atual sob o jogador e câmera (chunkSize=64)
+
     for (let i = 0; i < this.activeChunks.length; i++) {
       const chunk = this.activeChunks[i];
       const toChunkX = chunk.centerX - x;
       const toChunkZ = chunk.centerZ - z;
       const distanceSq = toChunkX * toChunkX + toChunkZ * toChunkZ;
 
-      // Culling ATRÁS DO PLAYER:
-      // O usuário: "renderize só imediatamente atrás do player, o longe não"
-      // Se o chunk estiver atrás do jogador (dot < -12.0) e além do raio imediato de 16m: CORTA!
-      const dot = toChunkX * cdx + toChunkZ * cdz;
-      if (dot < -12.0 && distanceSq > 16 * 16) {
+      const toCamX = chunk.centerX - camX;
+      const toCamZ = chunk.centerZ - camZ;
+      const distToCamSq = toCamX * toCamX + toCamZ * toCamZ;
+
+      const inFrustum = this._frustum.intersectsSphere(chunk.bounds);
+
+      // Culling ATRÁS DA CÂMERA E DO JOGADOR:
+      // O chão imediatamente sob e ao redor da câmera/jogador (<= 56m) NUNCA some.
+      // Chunks distantes além do raio imediato que estejam atrás do campo de visão da câmera são descartados.
+      const dotCam = toCamX * cdx + toCamZ * cdz;
+      if (dotCam < -30.0 && distToCamSq > safeRadiusSq && distanceSq > safeRadiusSq && !inFrustum) {
         chunk.group.visible = false;
         chunk.near.visible = false;
         chunk.far.visible = false;
@@ -733,13 +743,12 @@ export class World {
       }
 
       const inShadowRange = distanceSq < shadowRadiusSq;
-      const inFrustum = this._frustum.intersectsSphere(chunk.bounds);
       const visible = distanceSq < this.viewDistanceSq && (inShadowRange || inFrustum);
       chunk.group.visible = visible;
       chunk.near.visible = visible && distanceSq < this.lodDistanceSq;
       chunk.far.visible = visible && distanceSq >= this.lodDistanceSq;
       for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-        chunk.shadowMeshes[s].castShadow = inShadowRange && (dot >= -4.0 || distanceSq <= 16 * 16);
+        chunk.shadowMeshes[s].castShadow = inShadowRange && (dotCam >= -10.0 || distToCamSq <= safeRadiusSq);
       }
     }
   }

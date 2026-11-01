@@ -216,17 +216,20 @@ export function initCheatMenu(env = {}) {
   window.CheatMenu = {
     godMode() {
       if (env.player) {
-        env.player.maxHealth = 9999;
-        env.player.health = 9999;
+        env.player.godMode = !env.player.godMode;
+        env.player.maxHealth = Math.max(10, env.player.maxHealth);
+        env.player.health = env.player.maxHealth;
+        env.player.potions = 4;
       }
-      PlayerStats.con = 999;
-      PlayerStats.hp = 9999;
-      PlayerStats.maxHp = 9999;
+      PlayerStats.con = 20;
+      PlayerStats.hp = PlayerStats.getMaxHp();
+      PlayerStats.maxHp = PlayerStats.getMaxHp();
       syncPlayerStatsToPlayer(env.player, env.ui);
       env.audio?.choir?.();
-      env.ui?.showToast?.("⚡ CHEAT: Modo Deus ATIVADO (Vitalidade Máxima)!");
-      console.log("⚡ CHEAT: Modo Deus ON - Vida infinita");
-      return "God Mode ON";
+      const status = env.player?.godMode ? "ATIVADO (Invencível)" : "DESATIVADO";
+      env.ui?.showToast?.(`⚡ CHEAT: Modo Deus ${status}!`);
+      console.log(`⚡ CHEAT: Modo Deus ${status}`);
+      return `God Mode ${status}`;
     },
 
     giveAllWeapons() {
@@ -310,7 +313,26 @@ export function initCheatMenu(env = {}) {
               n.userData?.type === "CULTIST" ||
               n.hostile)
           ) {
-            n.takeHit?.(999, 0, 0, 2);
+            try {
+              if (typeof n.takeHit === "function") {
+                n.takeHit(999, 0, 0, 2);
+              } else if (typeof n.takeDamage === "function") {
+                n.takeDamage(999);
+              } else if (typeof n.vanish === "function") {
+                n.vanish(true);
+              }
+              count++;
+            } catch (err) {
+              console.warn("killAllEnemies warn:", err);
+            }
+          }
+        }
+      }
+      const pool = env.monstersPool || window.__game?.monstersPool;
+      if (Array.isArray(pool)) {
+        for (const m of pool) {
+          if (m && m.visible) {
+            m.visible = false;
             count++;
           }
         }
@@ -340,6 +362,8 @@ export function initCheatMenu(env = {}) {
         triggerDeusVultEnding(window.__game || env);
         env.ui?.showToast?.("✝️ CHEAT: A Ira de Deus foi invocada! Triunfo Católico!");
         console.log("✝️ CHEAT: Ira Dei / Triunfo Sagrado iniciado");
+      }).catch((err) => {
+        console.error("Erro no final sagrado:", err);
       });
       return "Ira Dei iniciada";
     },
@@ -349,6 +373,8 @@ export function initCheatMenu(env = {}) {
         triggerDemiurgeCataclysm(window.__game || env);
         env.ui?.showToast?.("☄️ CHEAT: O Mal Final foi invocado! O Demiurgo desce dos céus!");
         console.log("☄️ CHEAT: Descida do Demiurgo iniciada");
+      }).catch((err) => {
+        console.error("Erro no apocalipse:", err);
       });
       return "Apocalipse iniciado";
     },
@@ -363,8 +389,8 @@ export function initCheatMenu(env = {}) {
     },
 
     spawnWerewolf() {
-      if (window.__game?.monstersPool) {
-        const pool = window.__game.monstersPool;
+      const pool = env.monstersPool || window.__game?.monstersPool;
+      if (pool && pool.length > 0) {
         const ww = pool.find((m) => !m.visible) || pool[0];
         if (ww && env.player) {
           const px = env.player.x;
@@ -377,6 +403,8 @@ export function initCheatMenu(env = {}) {
           ww.userData.state = "HUNTING_PLAYER";
           env.ui?.showToast?.("🐺 CHEAT: Lobisomem invocado para iniciar o massacre!");
         }
+      } else {
+        env.ui?.showToast?.("🐺 Nenhum lobisomem disponível no momento!");
       }
       return "Lobisomem invocado";
     },

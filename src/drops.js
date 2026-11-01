@@ -20,9 +20,43 @@ const LOOT = {
   merchant: { coins: [8, 14], items: [["gem", 0.7], ["potion", 0.25]] },
   smith: { coins: [5, 9], items: [["bolts", 0.4]] },
   guard: { coins: [4, 8], items: [["bolts", 0.4], ["arrows", 0.4], ["potion", 0.12]], weapons: [["spear", 0.2], ["shortsword", 0.1], ["axe", 0.1], ["dagger", 0.08]] },
-  cultist: { coins: [18, 35], items: [["gem", 0.75], ["potion", 0.5]], weapons: [["dagger", 0.4], ["shortsword", 0.2]] },
+  cultist: { coins: [25, 50], items: [["parchment", 0.95], ["relic", 0.75], ["gem", 0.6], ["potion", 0.45]], weapons: [["dagger", 0.4], ["shortsword", 0.2]] },
   werewolf: { coins: [25, 45], items: [["gem", 0.8]] },
 };
+
+let _loreScrollIndex = 0;
+const CULT_LORE_FRAGMENTS = [
+  {
+    title: "TRATADO GNÓSTICO · I",
+    sub: "O Engano da Criação & A Prisão da Carne",
+    tier: 1,
+    text: "«Escrito em tinta cor de cinza e vinho: O Deus do Céu criou o reino invisível das almas puras, mas o Senhor deste Mundo — o Demiurgo, o Arconte Cego — forjou a matéria e trancafiou os espíritos na carne corruptível. A Igreja venera o carcereiro sem saber. Quem morre na ilusão da carne permanece aprisionado; quem quebra as amarras pelo fogo e pelo caos, contempla a verdadeira luz.»",
+  },
+  {
+    title: "TRATADO GNÓSTICO · II",
+    sub: "Os Quatro Altares dos Ermos",
+    tier: 2,
+    text: "«Nossos acampamentos foram fincados nos quatro cantos dos ermos de Caldera, a mais de duzentos passos das muralhas corruptas da cidade. Mantemos fogueiras de chama roxa e tochas carmesins. As sentinelas aguardam em vigília. Quando o sangue dos inocentes correr farto, o Olho que tudo vê descenderá dos céus para consumar a Grande Purificação.»",
+  },
+  {
+    title: "TRATADO GNÓSTICO · III",
+    sub: "O Olho Celestial & As Asas Negras",
+    tier: 3,
+    text: "«Não temas as feras da noite nem os lobisomens que rondam a escuridão: eles são apenas os primeiros arautos do massacre necessário. Antes do Arconte Supremo descer, anjos com asas de sangue e olhos violetas rodearão o centro da terra. A cidade inteira será reduzida a cinzas sagradas para que a nova vida comece.»",
+  },
+  {
+    title: "TRATADO GNÓSTICO · IV",
+    sub: "O Julgamento & A Espada Sagrada",
+    tier: 4,
+    text: "«Cuidado com os Cavaleiros Templários da Igreja! Se um guerreiro mantiver seus votos intactos e erguer o estandarte sagrado, a Ira de Deus poderá rasgar o céu em luz dourada, cravando a espada celestial no altar da igreja e banindo nossos irmãos pelo fogo do julgamento. A batalha entre a Luz e o Vazio nunca cessa.»",
+  },
+  {
+    title: "TRATADO GNÓSTICO · V",
+    sub: "As Vestes do Mensageiro do Demiurgo",
+    tier: 5,
+    text: "«Aquele que derrotar os sacerdotes das cinzas ou provar seu desapego pela carne será coroado com as Vestimentas do Demiurgo: a capa pontiaguda de púrpura e ébano e a máscara com chifres do Arconte. Com elas, o guerreiro torna-se veloz como o vento e letal como a lâmina do destino.»",
+  },
+];
 
 const ITEMS = {
   bread: { name: "Pão", geometry: () => new THREE.BoxGeometry(0.36, 0.17, 0.2), color: "#a5703a", emissive: "#000000", lift: 0.1 },
@@ -34,6 +68,8 @@ const ITEMS = {
   knives: { name: "Facas de arremesso", geometry: () => new THREE.BoxGeometry(0.3, 0.05, 0.1), color: "#cfd4cf", emissive: "#000000", lift: 0.08 },
   oil: { name: "Pote de óleo", geometry: () => new THREE.SphereGeometry(0.15, 7, 5), color: "#a65c3c", emissive: "#000000", lift: 0.14 },
   potion: { name: "Poção", geometry: () => new THREE.CylinderGeometry(0.09, 0.13, 0.26, 7), color: "#69c46d", emissive: "#2c8a3a", lift: 0.14 },
+  parchment: { name: "Pergaminho Herético do Demiurgo", geometry: () => new THREE.CylinderGeometry(0.05, 0.05, 0.35, 6), color: "#f3dfb5", emissive: "#9933cc", lift: 0.12 },
+  relic: { name: "Relíquia Negra do Demiurgo", geometry: () => new THREE.OctahedronGeometry(0.18, 0), color: "#4a126d", emissive: "#c0392b", lift: 0.15 },
 };
 
 const ITEM_KINDS = Object.keys(ITEMS);
@@ -392,6 +428,22 @@ export class DropSystem {
           player.coins += 12;
           this.ui.showToast(`${WEAPONS_BY_ID[id].name} vendida · +12 moedas`);
         }
+        break;
+      }
+      case "parchment": {
+        const loreIndex = _loreScrollIndex % CULT_LORE_FRAGMENTS.length;
+        _loreScrollIndex++;
+        const lore = CULT_LORE_FRAGMENTS[loreIndex];
+        import("./decay.js").then(({ showDemiurgeModal }) => {
+          showDemiurgeModal(lore.text, lore.tier, null, null, lore.title, lore.sub);
+        }).catch(() => {});
+        player.coins += 15;
+        this.ui.showToast("📜 Pergaminho Cátaro lido · Revelação Gnóstica (+15 Ouro)");
+        break;
+      }
+      case "relic": {
+        player.coins += 40;
+        this.ui.showToast("🔮 Relíquia Negra do Demiurgo recolhida (+40 Ouro)");
         break;
       }
       default:

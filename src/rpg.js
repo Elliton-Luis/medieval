@@ -2124,8 +2124,8 @@ function _buildPlayerTorchPostMesh() {
   flame.position.set(0.48, 3.48, 0);
   group.add(flame);
 
-  // Luz dinâmica da tocha construída
-  const torchLight = new THREE.PointLight(0xffaa44, 2.2, 14, 1.8);
+  // Luz dinâmica da tocha construída (dobrada)
+  const torchLight = new THREE.PointLight(0xffaa44, 4.4, 28, 1.8);
   torchLight.position.set(0.48, 3.55, 0);
   torchLight.castShadow = false;
   group.add(torchLight);
@@ -2173,8 +2173,8 @@ function _buildPlayerCampfireMesh() {
   flame.position.set(0, 0.38, 0);
   group.add(flame);
 
-  // Luz suave da fogueira
-  const fireLight = new THREE.PointLight(0xff8833, 2.4, 16, 1.8);
+  // Luz suave da fogueira (dobrada)
+  const fireLight = new THREE.PointLight(0xff8833, 4.8, 32, 1.8);
   fireLight.position.set(0, 0.55, 0);
   group.add(fireLight);
 

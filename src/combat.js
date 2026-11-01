@@ -213,7 +213,7 @@ export class CombatSystem {
   // Ponto único de dano ao jogador: aqui o escudo bloqueia o que vem pela frente.
   hurtPlayer(amount, fromX, fromZ, options = {}) {
     const player = this.player;
-    if (player.health <= 0 || player.rolling || player.knockedOut || player.invuln > 0) return "ignored";
+    if (player.health <= 0 || player.rolling || player.knockedOut || player.invuln > 0 || player.godMode) return "ignored";
     const dx = player.x - fromX;
     const dz = player.z - fromZ;
     const inverse = 1 / Math.max(0.001, Math.hypot(dx, dz));

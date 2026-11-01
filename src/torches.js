@@ -75,8 +75,8 @@ export function setupGuardTorch(guard, isNight, torchPool) {
       if (torch) {
         torch.visible = true;
         torch.color.setHex(0xff9944);
-        torch.intensity = 4.8;
-        torch.distance = 32.0;
+        torch.intensity = 9.6;
+        torch.distance = 64.0;
         torch.decay = 1.6;
         torch.castShadow = false; // Preserva GPU integrada
 
@@ -180,7 +180,7 @@ export function makeGlowTexture(inner = "255,200,120") {
   return texture;
 }
 
-const MAX_LIGHTS = 4;
+const MAX_LIGHTS = 8;
 const EMBERS = 90;
 const _sortByDist = (a, b) => a.d - b.d;
 
@@ -198,7 +198,7 @@ export class TorchSystem {
     this.glow = makeGlowTexture();
     this.lights = [];
     for (let i = 0; i < MAX_LIGHTS; i++) {
-      const light = new THREE.PointLight("#ffb060", 0, 45.0, 1.8);
+      const light = new THREE.PointLight("#ffb060", 0, 90.0, 1.8);
       configureDistantLight(light);
       light.userData.source = null;
       scene.add(light);
@@ -208,7 +208,7 @@ export class TorchSystem {
     // Pool fixo de 8 PointLights para as tochas dos guardas (nunca aloca no loop)
     this.guardTorchPool = [];
     for (let i = 0; i < GUARD_TORCH_POOL_SIZE; i++) {
-      const guardLight = new THREE.PointLight(0xff8833, 2.2, 24.0, 2.0);
+      const guardLight = new THREE.PointLight(0xff8833, 4.4, 48.0, 2.0);
       guardLight.castShadow = false;
       guardLight.visible = false;
       this.guardTorchPool.push(guardLight);
@@ -415,7 +415,7 @@ export class TorchSystem {
       const light = this.lights[i];
       const source = light.userData.source;
       const flicker = source ? 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase) : 1;
-      const target = source ? (source.kind === "hearth" ? 28 : 45) * flicker : 0;
+      const target = source ? (source.kind === "hearth" ? 56 : 90) * flicker : 0;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
       if (source) light.position.set(source.x, source.y + 0.2, source.z);
     }
@@ -468,7 +468,7 @@ export class Candle {
     this.hand = new THREE.Vector3();
     this.time = 0;
 
-    this.light = new THREE.PointLight("#ffb866", 0, 9, 2);
+    this.light = new THREE.PointLight("#ffb866", 0, 22, 2);
     scene.add(this.light);
     this.mesh = new THREE.Group();
     const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.2, 7), new THREE.MeshStandardMaterial({ color: "#efe4c8", roughness: 1 }));
@@ -476,7 +476,7 @@ export class Candle {
     const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.04, 4), new THREE.MeshStandardMaterial({ color: "#222" }));
     wick.position.y = 0.22;
     this.flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: torches.glow, color: "#ffd08a", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.flame.scale.set(0.2, 0.28, 1);
+    this.flame.scale.set(0.35, 0.48, 1);
     this.flame.position.y = 0.3;
     this.mesh.add(wax, wick, this.flame);
     this.mesh.position.set(0, -0.3, 0.1);
@@ -578,8 +578,8 @@ export class Candle {
       this.player.leftForearm.getWorldPosition(this.hand);
       const flicker = 0.82 + 0.18 * Math.sin(this.time * 14) + 0.08 * Math.sin(this.time * 31);
       this.light.position.set(this.hand.x, this.hand.y + 0.45, this.hand.z);
-      this.light.intensity += (7 * flicker - this.light.intensity) * (1 - Math.exp(-12 * dt));
-      this.flame.scale.set(0.2 * flicker, 0.3 * flicker, 1);
+      this.light.intensity += (14 * flicker - this.light.intensity) * (1 - Math.exp(-12 * dt));
+      this.flame.scale.set(0.35 * flicker, 0.48 * flicker, 1);
       if (Math.floor(this.time * 2) !== this._lastTick) {
         this._lastTick = Math.floor(this.time * 2);
         this._sync();

@@ -165,12 +165,12 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
   const cx = cityCenter.x ?? 0;
   const cz = cityCenter.z ?? 0;
 
-  // 4 Acampamentos Garantidos nas 4 Direções Cardeais fora dos muros da cidade
+  // 4 Acampamentos Garantidos nas 4 Direções Cardeais bem afastados da cidade e das vilas (> 210m nos ermos)
   const CARDINAL_OUTPOSTS = [
-    { x: cx, z: cz - 128, name: "Acampamento Cátaro do Norte", dir: "Norte" },
-    { x: cx, z: cz + 128, name: "Acampamento Cátaro do Sul", dir: "Sul" },
-    { x: cx + 128, z: cz, name: "Acampamento Cátaro do Leste", dir: "Leste" },
-    { x: cx - 128, z: cz, name: "Acampamento Cátaro do Oeste", dir: "Oeste" },
+    { x: cx + 35, z: cz - 225, name: "Acampamento Cátaro do Ermo Norte", dir: "Norte" },
+    { x: cx - 45, z: cz + 220, name: "Acampamento Cátaro da Floresta Sul", dir: "Sul" },
+    { x: cx + 225, z: cz + 50, name: "Acampamento Cátaro dos Montes Leste", dir: "Leste" },
+    { x: cx - 225, z: cz - 45, name: "Acampamento Cátaro do Vale Oeste", dir: "Oeste" },
   ];
 
   for (let c = 0; c < CARDINAL_OUTPOSTS.length; c++) {
@@ -180,7 +180,7 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       x: out.x,
       y: oy,
       z: out.z,
-      radius: 5.5,
+      radius: 6.5,
       inspected: false,
       name: out.name,
       lorePrompt: `Acampamento de sentinelas heréticas do ${out.dir}. Tochas rubras ardem em torno da fogueira do Demiurgo.`,
@@ -211,16 +211,16 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         campGroup.add(logMesh);
       }
 
-      // Fogueira de Chama Roxa ritual
-      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.78, 6), _purpleFireMat);
-      purpleFlame.position.set(0, 0.44, 0);
+      // Fogueira de Chama Roxa ritual (Luz dobrada)
+      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.92, 6), _purpleFireMat);
+      purpleFlame.position.set(0, 0.52, 0);
       campGroup.add(purpleFlame);
 
-      const campfireLight = new THREE.PointLight(0xaa33ff, 2.6, 18, 1.6);
-      campfireLight.position.set(0, 0.7, 0);
+      const campfireLight = new THREE.PointLight(0xaa33ff, 5.2, 36, 1.6);
+      campfireLight.position.set(0, 0.8, 0);
       campGroup.add(campfireLight);
 
-      // Duas Tochas Rubras Cerimoniais fincadas em estacas ao lado do fogo
+      // Duas Tochas Rubras Cerimoniais fincadas em estacas ao lado do fogo (Luz dobrada)
       for (const side of [-1.5, 1.5]) {
         const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.8, 5), _robeMat);
         stake.position.set(side, 0.9, side * 0.3);
@@ -230,7 +230,7 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         flame.position.set(side, 1.95, side * 0.3);
         campGroup.add(flame);
 
-        const tLight = new THREE.PointLight(0xff1100, 2.4, 14, 1.8);
+        const tLight = new THREE.PointLight(0xff1100, 4.8, 28, 1.8);
         tLight.position.set(side, 2.05, side * 0.3);
         campGroup.add(tLight);
       }
@@ -244,12 +244,12 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
     }
   }
 
-  // Spawna mais 1 a 2 altares ocultos distantes nos ermos (> 160m)
+  // Spawna mais 1 a 2 altares ocultos distantes nos ermos (> 220m)
   for (let i = 0; i < 2; i++) {
     if (random() > 0.65 && i > 0) continue;
 
     const angle = random() * Math.PI * 2;
-    const dist = 160 + random() * 120;
+    const dist = 220 + random() * 100;
     const ax = cx + Math.cos(angle) * dist;
     const az = cz + Math.sin(angle) * dist;
     const ay = world ? world.heightAt(ax, az) : 0;
@@ -295,7 +295,7 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       purpleFlame.position.set(0, 0.42, 0);
       altarGroup.add(purpleFlame);
 
-      const campfireLight = new THREE.PointLight(0xaa33ff, 2.4, 16, 1.6);
+      const campfireLight = new THREE.PointLight(0xaa33ff, 4.8, 32, 1.6);
       campfireLight.position.set(0, 0.65, 0);
       altarGroup.add(campfireLight);
 
@@ -413,7 +413,7 @@ export function buildCultistMesh() {
   torchFlame.position.set(0, 0.24, 0);
   torchGroup.add(torchFlame);
 
-  const torchLight = new THREE.PointLight(0xff2211, 1.4, 9, 1.8);
+  const torchLight = new THREE.PointLight(0xff2211, 2.8, 18, 1.8);
   torchLight.position.set(0, 0.28, 0);
   torchGroup.add(torchLight);
 
@@ -495,8 +495,8 @@ export class Cultist {
     }
   }
 
-  takeHit(damage, fromX, fromZ, options = {}) {
-    return this.takeDamage(damage);
+  takeDamage(amount) {
+    return this.takeHit(amount, 0, 0, 1.0, 0);
   }
 
   setSeatedPose(isSeated) {
@@ -802,8 +802,8 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
       const adz = altar.z - pz;
       const aDistSq = adx * adx + adz * adz;
 
-      // Se o jogador estiver em um raio de até 140m do acampamento
-      if (aDistSq <= 19600) {
+      // Ativa o acampamento herético apenas se o jogador estiver nos ermos a <= 55m do local
+      if (aDistSq <= 3025) {
         const activeHere = cultistsPool.filter(
           (c) => c.root.visible && c.userData.anchor && c.userData.anchor.distanceToSquared(altar) < 25
         );

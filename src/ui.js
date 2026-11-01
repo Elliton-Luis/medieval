@@ -417,8 +417,15 @@ export class GameUI {
     const key = `${health}/${maxHealth}`;
     if (key !== this._lastHearts) {
       this._lastHearts = key;
-      if (this.healthNum) this.healthNum.textContent = `${Math.max(0, health)}/${maxHealth}`;
-      this.health.innerHTML = "♥".repeat(Math.max(0, health)) + `<span class="lost">${"♥".repeat(Math.max(0, maxHealth - health))}</span>`;
+      const safeH = Math.max(0, Math.floor(health));
+      const safeMax = Math.max(1, Math.floor(maxHealth));
+      if (this.healthNum) this.healthNum.textContent = `${safeH}/${safeMax}`;
+      if (safeMax <= 20) {
+        this.health.innerHTML = "♥".repeat(safeH) + `<span class="lost">${"♥".repeat(Math.max(0, safeMax - safeH))}</span>`;
+      } else {
+        const heartsDisplay = Math.min(20, safeH);
+        this.health.innerHTML = "♥".repeat(heartsDisplay) + ` <span style="color:#ffcc44;font-size:12px;font-weight:700;">+${safeH - heartsDisplay}</span>`;
+      }
     }
     this.coins.textContent = String(coins);
     this.potions.textContent = String(potions);

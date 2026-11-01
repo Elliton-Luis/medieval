@@ -350,7 +350,7 @@ function _injectDemiurgeStyles() {
   document.head.appendChild(style);
 }
 
-export function showDemiurgeModal(message, level = 1, onDismiss, input = null) {
+export function showDemiurgeModal(message, level = 1, onDismiss, input = null, customTitle = null, customSubtitle = null) {
   _injectDemiurgeStyles();
 
   DemiurgeModalState.isOpen = true;
@@ -371,17 +371,20 @@ export function showDemiurgeModal(message, level = 1, onDismiss, input = null) {
     document.body.appendChild(_demiurgeModalEl);
   }
 
+  const titleText = customTitle || "SUSSURRO DO DEMIURGO";
+  const subText = customSubtitle || `Mensageiro das Cinzas · Seita Cátara (Nível ${level})`;
+
   _demiurgeModalEl.innerHTML = `
     <div class="demiurge-parchment" role="dialog" aria-modal="true">
       <button class="demiurge-close-btn" id="demiurge-btn-close" aria-label="Fechar mensagem">✕</button>
       <div class="demiurge-seal">👁️</div>
       <div class="demiurge-header">
-        <h2 class="demiurge-title">SUSSURRO DO DEMIURGO</h2>
-        <span class="demiurge-subtitle">Mensageiro das Cinzas · Seita Cátara (Nível ${level})</span>
+        <h2 class="demiurge-title">${titleText}</h2>
+        <span class="demiurge-subtitle">${subText}</span>
       </div>
       <div class="demiurge-body">${message}</div>
       <div class="demiurge-footer">
-        <button class="demiurge-confirm-btn" id="demiurge-btn-confirm">ACEITAR O DESTINO [ESC]</button>
+        <button class="demiurge-confirm-btn" id="demiurge-btn-confirm">GUARDAR ESCRITURA [ESC]</button>
       </div>
     </div>
   `;
