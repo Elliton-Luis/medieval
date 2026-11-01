@@ -3,6 +3,7 @@ import { CONFIG } from "./config.js";
 import { hash2, makeRandom, terrainHeight } from "./utils.js";
 import { TreeKit } from "./trees.js";
 import { VILLAGES, PLATEAU_INNER, PLATEAU_OUTER, isKingdomClear, setVillageBaseHeights, villageBaseHeight } from "./kingdom.js";
+import { SpatialHashGrid } from "./spatialGrid.js";
 
 const COLORS = {
   grassA: new THREE.Color("#526c43"),
@@ -34,6 +35,12 @@ export class World {
     this._boxGrid = new Map();
     this._boxScratch = [];
     this._boxStamp = 0;
+    this.spatialGrid = new SpatialHashGrid(16.0);
+    this._nearbyColliders = [];
+    this._worker = null;
+    this._workerJobId = 0;
+    this._workerCallbacks = new Map();
+    this._initTerrainWorker();
     this.floors = [];
     this.centerX = Number.NaN;
     this.centerZ = Number.NaN;
@@ -73,6 +80,53 @@ export class World {
       height += (villageBaseHeight(i) - height) * blend;
     }
     return height;
+  }
+
+  _initTerrainWorker() {
+    try {
+      this._worker = new Worker(new URL("./terrainWorker.js", import.meta.url), { type: "module" });
+      this._worker.onmessage = (e) => {
+        const { id, positions, colors, heights, indices } = e.data;
+        const cb = this._workerCallbacks.get(id);
+        if (cb) {
+          this._workerCallbacks.delete(id);
+          cb({ positions, colors, heights, indices });
+        }
+      };
+    } catch (_) {
+      this._worker = null;
+    }
+  }
+
+  requestTerrainChunk(cx, cz, callback) {
+    if (!this._worker) {
+      callback(this._createTerrainGeometry(cx, cz));
+      return;
+    }
+
+    const id = ++this._workerJobId;
+    this._workerCallbacks.set(id, ({ positions, colors, heights, indices }) => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      callback({ geometry, heights });
+    });
+
+    const villageHeights = VILLAGES.map((_, i) => villageBaseHeight(i));
+    this._worker.postMessage({
+      id,
+      cx,
+      cz,
+      segments: CONFIG.chunkSegments,
+      chunkSize: this.chunkSize,
+      seed: this.seed,
+      villages: VILLAGES,
+      villageHeights,
+      floors: this.floors,
+    });
   }
 
   heightAt(x, z) {
@@ -193,6 +247,11 @@ export class World {
           for (let i = 0; i < chunk.instancedMeshes.length; i++) {
             chunk.instancedMeshes[i].dispose();
           }
+          if (chunk.colliders) {
+            for (let i = 0; i < chunk.colliders.length; i++) {
+              this.spatialGrid.remove(chunk.colliders[i]);
+            }
+          }
           this.chunks.delete(key);
         }
       }
@@ -239,32 +298,17 @@ export class World {
   }
 
   isBlockedAt(x, z, radius) {
-    for (let i = 0; i < this.staticColliders.length; i++) {
-      const obstacle = this.staticColliders[i];
+    // Spatial Hash Grid O(1): Testa apenas obstáculos locais na célula de 16m e vizinhas imediatas
+    this.spatialGrid.queryRadius(x, z, radius + 2.5, this._nearbyColliders);
+    for (let i = 0; i < this._nearbyColliders.length; i++) {
+      const obstacle = this._nearbyColliders[i];
+      if (obstacle.disabled || obstacle.radius <= 0) continue;
       const dx = x - obstacle.x;
       const dz = z - obstacle.z;
       const minDistance = radius + obstacle.radius;
       if (dx * dx + dz * dz < minDistance * minDistance) return true;
     }
     if (this._hitsBoxMove(x, z, radius)) return true;
-    const padding = radius + 1.6;
-    const minChunkX = Math.floor((x - padding) / this.chunkSize);
-    const maxChunkX = Math.floor((x + padding) / this.chunkSize);
-    const minChunkZ = Math.floor((z - padding) / this.chunkSize);
-    const maxChunkZ = Math.floor((z + padding) / this.chunkSize);
-    for (let c = 0; c < this.activeChunks.length; c++) {
-      const chunk = this.activeChunks[c];
-      if (chunk.x < minChunkX || chunk.x > maxChunkX || chunk.z < minChunkZ || chunk.z > maxChunkZ) continue;
-      const colliders = chunk.colliders;
-      for (let i = 0; i < colliders.length; i++) {
-        const obstacle = colliders[i];
-        if (obstacle.disabled || obstacle.radius <= 0) continue;
-        const dx = x - obstacle.x;
-        const dz = z - obstacle.z;
-        const minDistance = radius + obstacle.radius;
-        if (dx * dx + dz * dz < minDistance * minDistance) return true;
-      }
-    }
     return false;
   }
 
@@ -669,35 +713,23 @@ export class World {
   }
 
   addStaticCollider(x, z, radius, height = 8) {
-    this.staticColliders.push({ x, z, radius, top: this.heightAt(x, z) + height });
+    const col = { x, z, radius, top: this.heightAt(x, z) + height };
+    this.staticColliders.push(col);
+    this.spatialGrid.insertCircle(col, x, z, radius);
   }
 
-  // Colisão levando a altura em conta: usada por projéteis e pela mira.
+  // Colisão levando a altura em conta: acelerada pelo Spatial Hash Grid O(1)
   isBlockedAtHeight(x, y, z, radius) {
-    for (let i = 0; i < this.staticColliders.length; i++) {
-      const obstacle = this.staticColliders[i];
-      if (y > obstacle.top) continue;
+    this.spatialGrid.queryRadius(x, z, radius + 2.5, this._nearbyColliders);
+    for (let i = 0; i < this._nearbyColliders.length; i++) {
+      const obstacle = this._nearbyColliders[i];
+      if (obstacle.disabled || obstacle.radius <= 0 || y > obstacle.top) continue;
       const dx = x - obstacle.x;
       const dz = z - obstacle.z;
       const minDistance = radius + obstacle.radius;
       if (dx * dx + dz * dz < minDistance * minDistance) return true;
     }
     if (this._hitsBoxShot(x, y, z, radius)) return true;
-    const cx = Math.floor(x / this.chunkSize);
-    const cz = Math.floor(z / this.chunkSize);
-    for (let c = 0; c < this.activeChunks.length; c++) {
-      const chunk = this.activeChunks[c];
-      if (Math.abs(chunk.x - cx) > 1 || Math.abs(chunk.z - cz) > 1) continue;
-      const colliders = chunk.colliders;
-      for (let i = 0; i < colliders.length; i++) {
-        const obstacle = colliders[i];
-        if (obstacle.disabled || obstacle.radius <= 0 || y > obstacle.top) continue;
-        const dx = x - obstacle.x;
-        const dz = z - obstacle.z;
-        const minDistance = radius + obstacle.radius;
-        if (dx * dx + dz * dz < minDistance * minDistance) return true;
-      }
-    }
     return false;
   }
 
@@ -761,6 +793,10 @@ export class World {
     const decor = this._createDecorations(cx, cz);
     for (let i = 0; i < decor.nearMeshes.length; i++) near.add(decor.nearMeshes[i]);
     for (let i = 0; i < decor.farMeshes.length; i++) far.add(decor.farMeshes[i]);
+    for (let i = 0; i < decor.colliders.length; i++) {
+      const c = decor.colliders[i];
+      this.spatialGrid.insertCircle(c, c.x, c.z, c.radius);
+    }
     group.add(near, far);
     this.scene.add(group);
     return {

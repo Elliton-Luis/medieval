@@ -120,8 +120,8 @@ renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 setupAtmosphere(scene, renderer);
 renderer.shadowMap.enabled = true;
-// PCF com raio de desfoque: sombras suaves (o PCFSoft ignora shadow.radius)
-renderer.shadowMap.type = THREE.PCFShadowMap;
+// PCFSoft com mapa de sombra 512x512 para altíssimo desempenho em GPUs integradas
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.id = "world-canvas";
 renderer.domElement.tabIndex = 0;
 renderer.domElement.setAttribute("aria-label", "Clique para capturar o mouse e controlar a câmera");
@@ -133,16 +133,16 @@ scene.add(hemisphere);
 const sun = new THREE.DirectionalLight("#ffe1ae", 1.5);
 sun.position.set(35, 65, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -SHADOW_RADIUS;
-sun.shadow.camera.right = SHADOW_RADIUS;
-sun.shadow.camera.top = SHADOW_RADIUS;
-sun.shadow.camera.bottom = -SHADOW_RADIUS;
+sun.shadow.mapSize.set(512, 512); // Otimizado: 512x512 reduz fillrate em 75%
+const SHADOW_BOUNDS = 32; // Frustum culling ortográfico de 32m focado no jogador
+sun.shadow.camera.left = -SHADOW_BOUNDS;
+sun.shadow.camera.right = SHADOW_BOUNDS;
+sun.shadow.camera.top = SHADOW_BOUNDS;
+sun.shadow.camera.bottom = -SHADOW_BOUNDS;
 sun.shadow.camera.near = 5;
-sun.shadow.camera.far = 160;
-sun.shadow.radius = 3.5;
-sun.shadow.bias = -0.0004;
-sun.shadow.normalBias = 0.05;
+sun.shadow.camera.far = 120;
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.04;
 scene.add(sun);
 scene.add(sun.target);
 

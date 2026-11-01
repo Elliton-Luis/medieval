@@ -5,6 +5,7 @@ import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { WorldDecay } from "./decay.js?v=19";
+import { mergeBufferGeometries } from "./mergeUtils.js";
 
 // ============================================================================
 // 1. Sistema de Seed (PRNG Mulberry32) e Texturas Procedurais de Baixo Custo
@@ -280,24 +281,16 @@ export function generateCity(
     }
   }
 
-  // Instancia todos os prédios procedurais em um único InstancedMesh usando `houseMaterial`
+  // Condensação Estática: Funde todas as 20 casas e telhados em 1 único Mesh de 1 Draw Call
   if (scene && placedBuildings.length > 0) {
     const bWidth = 5.6;
     const bDepth = 4.8;
     const bHeight = 3.8;
     const bFound = 3.2;
     const bGeo = new THREE.BoxGeometry(bWidth, bHeight + bFound, bDepth);
-    const bMesh = new THREE.InstancedMesh(bGeo, houseMaterial, placedBuildings.length);
-    bMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    bMesh.castShadow = true;
-    bMesh.receiveShadow = true;
-
-    // Telhados em prisma também compartilhando `houseMaterial` (apenas +1 draw call para todos os telhados!)
     const roofGeo = new THREE.ConeGeometry(4.1, 2.1, 4);
-    const roofMesh = new THREE.InstancedMesh(roofGeo, houseMaterial, placedBuildings.length);
-    roofMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    roofMesh.castShadow = true;
-    roofMesh.receiveShadow = true;
+
+    const geometriesToMerge = [];
 
     for (let i = 0; i < placedBuildings.length; i++) {
       const b = placedBuildings[i];
@@ -315,17 +308,23 @@ export function generateCity(
       const baseY = maxH + 0.05;
       const scaleW = b.type === "tavern" ? 1.18 : b.type === "blacksmith" ? 1.1 : 1.0;
 
+      // Base da construção transformada
+      const baseClone = bGeo.clone();
       _dummy.position.set(b.x, baseY + (bHeight - bFound) * 0.5, b.z);
       _dummy.rotation.set(0, b.ry, 0);
       _dummy.scale.set(scaleW, 1, scaleW);
       _dummy.updateMatrix();
-      bMesh.setMatrixAt(i, _dummy.matrix);
+      baseClone.applyMatrix4(_dummy.matrix);
+      geometriesToMerge.push(baseClone);
 
+      // Telhado em prisma transformado
+      const roofClone = roofGeo.clone();
       _dummy.position.set(b.x, baseY + bHeight + 0.95, b.z);
       _dummy.rotation.set(0, b.ry + Math.PI / 4, 0);
       _dummy.scale.set(scaleW, 1, scaleW);
       _dummy.updateMatrix();
-      roofMesh.setMatrixAt(i, _dummy.matrix);
+      roofClone.applyMatrix4(_dummy.matrix);
+      geometriesToMerge.push(roofClone);
 
       if (world) {
         world.addOrientedBox(
@@ -340,8 +339,21 @@ export function generateCity(
         );
       }
     }
-    bMesh.instanceMatrix.needsUpdate = true;
-    roofMesh.instanceMatrix.needsUpdate = true;
+
+    const mergedHousesGeometry = mergeBufferGeometries(geometriesToMerge);
+    for (let g = 0; g < geometriesToMerge.length; g++) {
+      geometriesToMerge[g].dispose();
+    }
+    bGeo.dispose();
+    roofGeo.dispose();
+
+    if (mergedHousesGeometry) {
+      const unifiedHousesMesh = new THREE.Mesh(mergedHousesGeometry, houseMaterial);
+      unifiedHousesMesh.castShadow = true;
+      unifiedHousesMesh.receiveShadow = true;
+      unifiedHousesMesh.name = "UnifiedCityHouses";
+      scene.add(unifiedHousesMesh);
+    }
     scene.add(bMesh);
     scene.add(roofMesh);
   }
