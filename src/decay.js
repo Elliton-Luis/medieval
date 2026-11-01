@@ -1167,33 +1167,146 @@ export function buildDemiurgeColossalEyeMesh() {
 /**
  * Olho do Firmamento para espalhar pela abóbada celeste.
  */
-export function buildFirmamentEyeMesh(color = 0xff1144) {
+// Banner dramático na tela para o Apocalipse
+let _heIsComingEl = null;
+
+const HE_IS_COMING_CSS = `
+#demiurge-he-is-coming {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.0s cubic-bezier(0.16, 1, 0.3, 1);
+  background: radial-gradient(circle at center, rgba(32, 2, 8, 0.8) 0%, rgba(2, 0, 4, 0.94) 100%);
+  text-align: center;
+  padding: 20px;
+}
+#demiurge-he-is-coming.show {
+  opacity: 1;
+}
+.he-is-coming-title {
+  font-family: "Cinzel Decorative", "Almendra", Georgia, serif;
+  font-size: clamp(52px, 12vw, 136px);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #ff1133;
+  text-shadow: 0 0 35px #ff0022, 0 0 85px #880011, 0 6px 18px #000;
+  margin: 0;
+  text-transform: uppercase;
+  line-height: 1.05;
+  animation: dread-pulse 1.8s ease-in-out infinite;
+}
+.he-is-coming-sub {
+  font-family: Georgia, serif;
+  font-size: clamp(16px, 2.8vw, 30px);
+  font-style: italic;
+  letter-spacing: 0.22em;
+  color: #f7b2c0;
+  text-shadow: 0 0 20px rgba(255, 20, 60, 0.7);
+  margin-top: 18px;
+}
+@keyframes dread-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.06); filter: brightness(1.35); }
+}
+`;
+
+function _injectHeIsComingStyles() {
+  if (document.getElementById("he-is-coming-styles")) return;
+  const style = document.createElement("style");
+  style.id = "he-is-coming-styles";
+  style.textContent = HE_IS_COMING_CSS;
+  document.head.appendChild(style);
+}
+
+function _showHeIsComingBanner() {
+  _injectHeIsComingStyles();
+  if (!_heIsComingEl) {
+    _heIsComingEl = document.createElement("div");
+    _heIsComingEl.id = "demiurge-he-is-coming";
+    _heIsComingEl.innerHTML = `
+      <h1 class="he-is-coming-title">ELE ESTÁ VINDO</h1>
+      <p class="he-is-coming-sub">O ARCONTE SUPREMO DESPERTOU DO ABISMO</p>
+    `;
+    document.body.appendChild(_heIsComingEl);
+  }
+  requestAnimationFrame(() => {
+    _heIsComingEl?.classList.add("show");
+  });
+}
+
+function _hideHeIsComingBanner() {
+  if (_heIsComingEl) {
+    _heIsComingEl.classList.remove("show");
+    setTimeout(() => {
+      _heIsComingEl?.remove();
+      _heIsComingEl = null;
+    }, 1200);
+  }
+}
+
+/**
+ * Olho do Firmamento colossal com pupila reptiliana vertical pontiaguda.
+ */
+export function buildFirmamentEyeMesh(color = 0xff1144, width = 15, height = 8.5) {
   const root = new THREE.Group();
+  root.name = "FirmamentReptilianEye";
+
   const matOuter = new THREE.MeshStandardMaterial({
-    color: 0x14051a,
-    emissive: 0x22051e,
-    roughness: 0.5,
+    color: 0x0c0314,
+    emissive: 0x1a031e,
+    roughness: 0.6,
   });
   const matIris = new THREE.MeshBasicMaterial({ color });
   const matSlit = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
-  const eyeBody = new THREE.Mesh(new THREE.SphereGeometry(2.4, 12, 10), matOuter);
-  eyeBody.scale.set(1.5, 0.7, 1.0);
+  // 1. Corpo/Esclera amendoada colossal
+  const eyeBody = new THREE.Mesh(new THREE.SphereGeometry(width * 0.45, 16, 12), matOuter);
+  eyeBody.scale.set(1.5, 0.72, 0.45);
+  eyeBody.position.z = 0.5;
   root.add(eyeBody);
 
-  const iris = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 12), matIris);
-  iris.position.set(0, -1.5, 0);
+  // 2. Íris predadora brilhante voltada para -Z
+  const iris = new THREE.Mesh(new THREE.CircleGeometry(width * 0.38, 24), matIris);
+  iris.position.z = -0.15;
+  iris.rotation.y = Math.PI; // Face voltada para -Z
   root.add(iris);
 
-  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 1.8), matSlit);
-  slit.position.set(0, -1.6, 0);
-  root.add(slit);
+  // 3. Pupila Reptiliana Vertical Pontiaguda (tapered vertical slit)
+  const slitGroup = new THREE.Group();
+  slitGroup.position.z = -0.22;
 
-  const pLight = new THREE.PointLight(color, 2.5, 35, 1.8);
-  pLight.position.set(0, -2, 0);
+  // Centro da fenda
+  const slitCenter = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.08, height * 0.38), matSlit);
+  slitCenter.rotation.y = Math.PI;
+  slitGroup.add(slitCenter);
+
+  // Ponta superior da fenda reptiliana
+  const slitTop = new THREE.Mesh(new THREE.ConeGeometry(width * 0.04, height * 0.35, 4), matSlit);
+  slitTop.position.y = height * 0.35;
+  slitTop.rotation.y = Math.PI * 0.25;
+  slitGroup.add(slitTop);
+
+  // Ponta inferior da fenda reptiliana
+  const slitBottom = new THREE.Mesh(new THREE.ConeGeometry(width * 0.04, height * 0.35, 4), matSlit);
+  slitBottom.position.y = -height * 0.35;
+  slitBottom.rotation.z = Math.PI;
+  slitBottom.rotation.y = Math.PI * 0.25;
+  slitGroup.add(slitBottom);
+
+  root.add(slitGroup);
+
+  // 4. Luz mística que ilumina a terra
+  const pLight = new THREE.PointLight(color, 4.2, 85, 1.8);
+  pLight.position.set(0, 0, -1.5);
   root.add(pLight);
 
-  return { root, eyeBody, iris, pLight };
+  return { root, eyeBody, iris, slit: slitGroup, pLight };
 }
 
 export const DemiurgeCataclysm = {
@@ -1204,6 +1317,9 @@ export const DemiurgeCataclysm = {
   colossalEye: null,
   shockwave: null,
   lastDescentSound: 0,
+  bannerShown: false,
+  eyesOpened: false,
+  descentStarted: false,
   groundImpactDone: false,
   modalShown: false,
   destroyed: false,
@@ -1218,6 +1334,9 @@ export function triggerDemiurgeCataclysm(env) {
   DemiurgeCataclysm.active = true;
   DemiurgeCataclysm.timer = 0;
   DemiurgeCataclysm.lastDescentSound = 0;
+  DemiurgeCataclysm.bannerShown = false;
+  DemiurgeCataclysm.eyesOpened = false;
+  DemiurgeCataclysm.descentStarted = false;
   DemiurgeCataclysm.groundImpactDone = false;
   DemiurgeCataclysm.modalShown = false;
   DemiurgeCataclysm.destroyed = false;
@@ -1230,7 +1349,7 @@ export function triggerDemiurgeCataclysm(env) {
     dayNight.progress = 0.5; // Meia-noite do Eclipse
   }
 
-  ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! O DEMIURGO DESCE À TERRA!");
+  ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! OS ANJOS MALIGNOS DESCEM!");
   audio?.demiurgeDescent?.();
   audio?.deathBell?.();
 
@@ -1238,7 +1357,12 @@ export function triggerDemiurgeCataclysm(env) {
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
 
-  // 1. Spawna os Anjos Pretos com Asas Vermelhas e Roxas em círculo
+  // Trava controle do jogador para contemplação
+  if (player) {
+    player.knockedOut = true;
+  }
+
+  // 1. Spawna os Anjos Pretos com Asas Vermelhas e Roxas em círculo ao redor do jogador
   DemiurgeCataclysm.angels = [];
   const angelCount = 8;
   for (let i = 0; i < angelCount; i++) {
@@ -1263,29 +1387,65 @@ export function triggerDemiurgeCataclysm(env) {
     DemiurgeCataclysm.angels.push(angelData);
   }
 
-  // 2. Spawna 14 Olhos do Firmamento espalhados por todo o céu vigiando a terra
+  // 2. Spawna 42 Olhos Colossais com Pupilas Reptilianas cobrindo todo o céu
   DemiurgeCataclysm.firmamentEyes = [];
-  for (let k = 0; k < 14; k++) {
-    const skyAng = (k / 14) * Math.PI * 2 + (k % 2) * 0.2;
-    const dist = 45 + (k % 3) * 15;
-    const eyX = px + Math.cos(skyAng) * dist;
-    const eyZ = pz + Math.sin(skyAng) * dist;
-    const eyY = py + 42 + (k % 4) * 12;
+  const colors = [0xff1133, 0xffaa00, 0xee11ee, 0xffcc00, 0xff0022, 0xaa00ee];
 
-    const eyeColor = k % 2 === 0 ? 0xff1133 : 0xaa22ee;
-    const fEye = buildFirmamentEyeMesh(eyeColor);
+  // Domo Zenite (Topo do Céu): 6 olhos colossais
+  for (let k = 0; k < 6; k++) {
+    const ang = (k / 6) * Math.PI * 2;
+    const dist = 32 + (k % 2) * 12;
+    const eyX = px + Math.cos(ang) * dist;
+    const eyZ = pz + Math.sin(ang) * dist;
+    const eyY = py + 85 + (k % 3) * 16;
+
+    const fEye = buildFirmamentEyeMesh(colors[k % colors.length], 20, 11);
     fEye.root.position.set(eyX, eyY, eyZ);
-    fEye.root.lookAt(px, py + 1.0, pz);
-    fEye.root.rotation.x += Math.PI / 2;
+    fEye.root.lookAt(px, py + 1.6, pz);
+    fEye.root.visible = false;
 
     if (scene) scene.add(fEye.root);
     DemiurgeCataclysm.firmamentEyes.push(fEye);
   }
 
-  // 3. Spawna o Olho Colossal do Demiurgo nos céus
+  // Domo Médio: 16 olhos colossais
+  for (let k = 0; k < 16; k++) {
+    const ang = (k / 16) * Math.PI * 2 + 0.15;
+    const dist = 65 + (k % 3) * 18;
+    const eyX = px + Math.cos(ang) * dist;
+    const eyZ = pz + Math.sin(ang) * dist;
+    const eyY = py + 55 + (k % 4) * 14;
+
+    const fEye = buildFirmamentEyeMesh(colors[(k + 1) % colors.length], 16, 9);
+    fEye.root.position.set(eyX, eyY, eyZ);
+    fEye.root.lookAt(px, py + 1.6, pz);
+    fEye.root.visible = false;
+
+    if (scene) scene.add(fEye.root);
+    DemiurgeCataclysm.firmamentEyes.push(fEye);
+  }
+
+  // Domo do Horizonte: 20 olhos colossais
+  for (let k = 0; k < 20; k++) {
+    const ang = (k / 20) * Math.PI * 2;
+    const dist = 100 + (k % 3) * 25;
+    const eyX = px + Math.cos(ang) * dist;
+    const eyZ = pz + Math.sin(ang) * dist;
+    const eyY = py + 30 + (k % 4) * 12;
+
+    const fEye = buildFirmamentEyeMesh(colors[(k + 2) % colors.length], 14, 8);
+    fEye.root.position.set(eyX, eyY, eyZ);
+    fEye.root.lookAt(px, py + 1.6, pz);
+    fEye.root.visible = false;
+
+    if (scene) scene.add(fEye.root);
+    DemiurgeCataclysm.firmamentEyes.push(fEye);
+  }
+
+  // 3. Spawna o Olho Colossal do Demiurgo nos altos céus
   const eyeData = buildDemiurgeColossalEyeMesh();
-  eyeData.root.position.set(px, py + 115, pz);
-  eyeData.targetY = py + 0.8; // Destino: colisão e choque direto contra o solo!
+  eyeData.root.position.set(px, py + 180, pz);
+  eyeData.targetY = py + 0.8;
   if (scene) scene.add(eyeData.root);
   DemiurgeCataclysm.colossalEye = eyeData;
 
@@ -1306,28 +1466,28 @@ export function triggerDemiurgeCataclysm(env) {
 }
 
 /**
- * Atualiza o Cataclismo a cada frame.
+ * Atualiza o Cataclismo a cada frame com progressão cinematográfica dramática.
  */
 export function updateDemiurgeCataclysm(dt, env) {
   if (!DemiurgeCataclysm.active) return;
   DemiurgeCataclysm.timer += dt;
   const t = DemiurgeCataclysm.timer;
-  const { player, cameraRig, effects, audio, deathScreen } = env;
+  const { player, cameraRig, effects, audio } = env;
   const px = player?.x ?? 0;
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
 
-  // Rugido contínuo da descida a cada 2.5s
-  if (t - DemiurgeCataclysm.lastDescentSound >= 2.5 && !DemiurgeCataclysm.groundImpactDone) {
+  // Rugido contínuo da descida a cada 3.0s
+  if (t - DemiurgeCataclysm.lastDescentSound >= 3.0 && !DemiurgeCataclysm.groundImpactDone) {
     DemiurgeCataclysm.lastDescentSound = t;
     audio?.demiurgeDescent?.();
   }
 
-  // 1. Descida e animação dos anjos negros
+  // 1. Descida e movimentação dos anjos negros em círculo
   for (let i = 0; i < DemiurgeCataclysm.angels.length; i++) {
     const a = DemiurgeCataclysm.angels[i];
-    a.wingPhase += dt * 3.8;
-    a.root.position.y = THREE.MathUtils.lerp(a.root.position.y, a.targetY + Math.sin(a.wingPhase) * 0.2, dt * 1.8);
+    a.wingPhase += dt * 3.4;
+    a.root.position.y = THREE.MathUtils.lerp(a.root.position.y, a.targetY + Math.sin(a.wingPhase) * 0.2, dt * 1.5);
     const flap = Math.sin(a.wingPhase) * 0.35;
     a.wingGroupL.rotation.z = flap;
     a.wingGroupR.rotation.z = -flap;
@@ -1340,92 +1500,128 @@ export function updateDemiurgeCataclysm(dt, env) {
     }
   }
 
-  // 2. Olhos do firmamento pulsando na abóbada celeste
-  for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
-    const fEye = DemiurgeCataclysm.firmamentEyes[k];
-    const pulse = 1.0 + Math.sin(t * 3.0 + k) * 0.35;
-    fEye.pLight.intensity = 2.5 * pulse;
+  // FASE 2 (t = 3.5s a 6.5s): Aparece enorme na tela "ELE ESTÁ VINDO"
+  if (t >= 3.5 && !DemiurgeCataclysm.bannerShown) {
+    DemiurgeCataclysm.bannerShown = true;
+    _showHeIsComingBanner();
+    audio?.deathBell?.();
+    if (cameraRig?.shakeAt) {
+      cameraRig.shakeAt(px, pz, 0.6, px, pz);
+    }
   }
 
-  // 3. Descida do Olho Colossal e choque direto com o chão
-  if (DemiurgeCataclysm.colossalEye) {
-    const eye = DemiurgeCataclysm.colossalEye;
-    eye.root.position.x = px;
-    eye.root.position.z = pz;
+  // FASE 3 (t = 6.5s a 16.5s — 10 SEGUNDOS COMPLETOS DE OLHOS REPTILIANOS):
+  // Esconde o banner e revela os 42 olhos cobrindo todo o céu, fitando o jogador
+  if (t >= 6.5 && !DemiurgeCataclysm.eyesOpened) {
+    DemiurgeCataclysm.eyesOpened = true;
+    _hideHeIsComingBanner();
+    for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
+      const fEye = DemiurgeCataclysm.firmamentEyes[k];
+      fEye.root.visible = true;
+    }
+    audio?.demiurgeDescent?.();
+    if (cameraRig?.shakeAt) {
+      cameraRig.shakeAt(px, pz, 0.8, px, pz);
+    }
+  }
 
-    // Velocidade de descida acelerando conforme se aproxima
-    const descentSpeed = THREE.MathUtils.clamp(0.6 + t * 0.15, 0.6, 2.8);
-    eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * descentSpeed);
+  // Atualização frame a frame dos Olhos Reptilianos no Céu
+  if (DemiurgeCataclysm.eyesOpened) {
+    for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
+      const fEye = DemiurgeCataclysm.firmamentEyes[k];
+      // Todos os olhos acompanham e olham diretamente para o jogador!
+      fEye.root.lookAt(px, py + 1.6, pz);
 
-    eye.ring1.rotation.z += dt * 0.8;
-    eye.ring2.rotation.z -= dt * 1.1;
-    eye.eyeball.rotation.z += dt * 0.3;
+      // Pupila reptiliana dilata e pulsa organicamente
+      const pulse = 1.0 + Math.sin(t * 2.8 + k * 0.7) * 0.35;
+      if (fEye.slit) {
+        fEye.slit.scale.x = 0.85 + Math.sin(t * 3.0 + k) * 0.45;
+      }
+      if (fEye.pLight) {
+        fEye.pLight.intensity = 3.8 * pulse;
+      }
+    }
+  }
 
-    // Tremores de terra crescentes conforme o Olho desce
-    if (t > 3.0 && cameraRig?.shakeAt) {
-      const shakeAmt = THREE.MathUtils.clamp(0.25 + (t - 3.0) * 0.18, 0.25, 1.8);
-      cameraRig.shakeAt(px, pz, shakeAmt, px, pz);
+  // FASE 4 (t >= 16.5s): Após 10 segundos com os olhos no céu, o Demiurgo desce com fúria total
+  if (t >= 16.5) {
+    if (!DemiurgeCataclysm.descentStarted) {
+      DemiurgeCataclysm.descentStarted = true;
+      audio?.demiurgeDescent?.();
+      audio?.deathBell?.();
     }
 
-    // Impacto do Olho no solo (t >= 11.2s ou proximidade imediata)
-    if ((t >= 11.2 || eye.root.position.y <= py + 2.5) && !DemiurgeCataclysm.groundImpactDone) {
-      DemiurgeCataclysm.groundImpactDone = true;
-      audio?.colossalImpact?.();
-      audio?.explosion?.(px, pz, 10.0);
+    if (DemiurgeCataclysm.colossalEye) {
+      const eye = DemiurgeCataclysm.colossalEye;
+      eye.root.position.x = px;
+      eye.root.position.z = pz;
 
+      // Velocidade de descida acelerando até o chão
+      const fallProgress = (t - 16.5);
+      const descentSpeed = THREE.MathUtils.clamp(0.8 + fallProgress * 0.45, 0.8, 4.2);
+      eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * descentSpeed);
+
+      eye.ring1.rotation.z += dt * 1.4;
+      eye.ring2.rotation.z -= dt * 1.8;
+      eye.eyeball.rotation.z += dt * 0.6;
+
+      // Tremores de terra crescentes conforme o Olho cai
       if (cameraRig?.shakeAt) {
-        cameraRig.shakeAt(px, pz, 2.4, px, pz);
+        const shakeAmt = THREE.MathUtils.clamp(0.4 + fallProgress * 0.35, 0.4, 2.8);
+        cameraRig.shakeAt(px, pz, shakeAmt, px, pz);
       }
 
-      // Ativa onda de choque terrestre
-      if (DemiurgeCataclysm.shockwave) {
-        DemiurgeCataclysm.shockwave.visible = true;
-        DemiurgeCataclysm.shockwave.material.opacity = 0.95;
-      }
+      // Impacto Colossal do Demiurgo no solo (t >= 21.0s ou proximidade do solo)
+      if ((t >= 21.0 || eye.root.position.y <= py + 2.5) && !DemiurgeCataclysm.groundImpactDone) {
+        DemiurgeCataclysm.groundImpactDone = true;
+        audio?.colossalImpact?.();
+        audio?.explosion?.(px, pz, 15.0);
 
-      // Erupção maciça de 35 plumas de poeira e chamas cósmicas
-      if (effects) {
-        for (let k = 0; k < 35; k++) {
-          const ang = Math.random() * Math.PI * 2;
-          const rad = Math.random() * 28;
-          const dustColor = k % 2 === 0 ? "#ff1144" : "#220533";
-          effects.play("dust", px + Math.cos(ang) * rad, py + 0.5, pz + Math.sin(ang) * rad, dustColor, 5.0);
-          effects.play("star", px + Math.cos(ang) * rad, py + 1.5, pz + Math.sin(ang) * rad, "#ff2244", 3.8);
+        if (cameraRig?.shakeAt) {
+          cameraRig.shakeAt(px, pz, 3.5, px, pz);
+        }
+
+        // Ativa onda de choque devastadora
+        if (DemiurgeCataclysm.shockwave) {
+          DemiurgeCataclysm.shockwave.visible = true;
+          DemiurgeCataclysm.shockwave.material.opacity = 0.98;
+        }
+
+        // Erupção de 50 plumas de poeira e chamas cósmicas
+        if (effects) {
+          for (let k = 0; k < 50; k++) {
+            const ang = Math.random() * Math.PI * 2;
+            const rad = Math.random() * 35;
+            const dustColor = k % 2 === 0 ? "#ff1144" : "#220533";
+            effects.play("dust", px + Math.cos(ang) * rad, py + 0.5, pz + Math.sin(ang) * rad, dustColor, 6.0);
+            effects.play("star", px + Math.cos(ang) * rad, py + 1.5, pz + Math.sin(ang) * rad, "#ff2244", 4.2);
+          }
         }
       }
-    }
 
-    // Expansão da onda de choque no chão
-    if (DemiurgeCataclysm.groundImpactDone && DemiurgeCataclysm.shockwave && DemiurgeCataclysm.shockwave.visible) {
-      const sw = DemiurgeCataclysm.shockwave;
-      sw.scale.x += dt * 28.0;
-      sw.scale.y += dt * 28.0;
-      sw.material.opacity = Math.max(0, sw.material.opacity - dt * 0.7);
+      // Expansão da onda de choque no chão
+      if (DemiurgeCataclysm.groundImpactDone && DemiurgeCataclysm.shockwave && DemiurgeCataclysm.shockwave.visible) {
+        const sw = DemiurgeCataclysm.shockwave;
+        sw.scale.x += dt * 38.0;
+        sw.scale.y += dt * 38.0;
+        sw.material.opacity = Math.max(0, sw.material.opacity - dt * 0.6);
+      }
     }
   }
 
-  // 4. Proclamação Cósmica do Demiurgo
-  if (t >= 7.0 && !DemiurgeCataclysm.modalShown) {
-    DemiurgeCataclysm.modalShown = true;
-    showDemiurgeModal(
-      "«Hei de libertar-vos, meus filhos, do mal da carne em que fostes aprisionados! Eu trago o início da nova vida e o fim irrevogável desta!»",
-      4
-    );
-  }
-
-  // 5. Destruição Total e Fim do Jogo
-  if (t >= 13.5 && !DemiurgeCataclysm.destroyed) {
+  // FASE 5 (t >= 24.0s): Fim definitivo do jogo e abertura da tela de vitória do Mal
+  if (t >= 24.0 && !DemiurgeCataclysm.destroyed) {
     DemiurgeCataclysm.destroyed = true;
 
     if (effects) {
-      for (let k = 0; k < 16; k++) {
+      for (let k = 0; k < 20; k++) {
         const ang = Math.random() * Math.PI * 2;
-        const rad = Math.random() * 32;
-        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 4.5);
+        const rad = Math.random() * 40;
+        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 5.0);
       }
     }
 
-    // Fim definitivo do jogo: não há mais terra, a criação material ruiu
+    // Fim definitivo do jogo: a matéria ruiu
     showVictoryEndingModal({
       type: "DEMIURGE",
       title: "O FIM DA CRIAÇÃO MATERIAL",
