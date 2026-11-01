@@ -74,10 +74,10 @@ export function setupGuardTorch(guard, isNight, torchPool) {
       const torch = torchPool.find((l) => !l.visible);
       if (torch) {
         torch.visible = true;
-        torch.color.setHex(0xff8833);
-        torch.intensity = 2.2;
-        torch.distance = 24.0;
-        torch.decay = 2.0;
+        torch.color.setHex(0xff9944);
+        torch.intensity = 4.8;
+        torch.distance = 32.0;
+        torch.decay = 1.6;
         torch.castShadow = false; // Preserva GPU integrada
 
         guard.add(torch);
@@ -415,7 +415,7 @@ export class TorchSystem {
       const light = this.lights[i];
       const source = light.userData.source;
       const flicker = source ? 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase) : 1;
-      const target = source ? (source.kind === "hearth" ? 22 : 30) * flicker : 0;
+      const target = source ? (source.kind === "hearth" ? 28 : 45) * flicker : 0;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
       if (source) light.position.set(source.x, source.y + 0.2, source.z);
     }

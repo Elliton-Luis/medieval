@@ -146,8 +146,8 @@ export class WeaponSystem {
     }
     for (const model of Object.values(this.models)) model.visible = false;
 
-    // Luz dinâmica da tocha empunhada pelo jogador (THREE.PointLight de 18m com cintilação)
-    this.torchLight = new THREE.PointLight("#ff9d3a", 0, 18.0, 1.6);
+    // Luz dinâmica da tocha empunhada pelo jogador (THREE.PointLight de 32m com brilho e alcance aumentados)
+    this.torchLight = new THREE.PointLight("#ffb45a", 0, 32.0, 1.3);
     this.torchLight.castShadow = false;
     this.torchLight.position.set(0, 0.78, 0);
     if (this.models.torch) {
@@ -310,8 +310,8 @@ export class WeaponSystem {
     if (this.torchLight) {
       const isTorchActive = this.currentId === "torch" && !dead;
       if (isTorchActive) {
-        // Cintilação suave de chama de tocha (~2.2 a 2.6 de intensidade)
-        this.torchLight.intensity = 2.4 + Math.sin(now * 0.012) * 0.25 + Math.cos(now * 0.027) * 0.15;
+        // Cintilação viva com alto brilho (~7.2 a 8.2 de intensidade)
+        this.torchLight.intensity = 7.5 + Math.sin(now * 0.012) * 0.45 + Math.cos(now * 0.027) * 0.3;
       } else {
         this.torchLight.intensity = 0;
       }
