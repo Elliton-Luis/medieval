@@ -218,7 +218,7 @@ initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs });
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
 pause.onPlayIntro = () => {
-  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight });
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music });
 };
 const damageFx = new DamageFx({ container: gameRoot, audio, player });
 combat.damageFx = damageFx;
@@ -288,7 +288,7 @@ if (saved) {
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {
-  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight });
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music });
 }
 
 function resize() {

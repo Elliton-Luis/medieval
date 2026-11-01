@@ -17,6 +17,7 @@ const FILES = {
   town: "audio/town.mp3",
   wanted: "audio/wanted.mp3",
   chase: "audio/chase.mp3",
+  tense: "audio/tense.mp3",
 };
 const CHASE_FALLBACK = "audio/tense.mp3";
 const FADE = 2;
@@ -42,6 +43,7 @@ export class MusicDirector {
     this.indoor = false;
     this.chaseUrl = FILES.chase;
     this.time = 0;
+    this.override = null;
     audio.onUnlock.push(() => this.start());
     if (audio.context) this.start();
   }
@@ -101,6 +103,19 @@ export class MusicDirector {
     this.current = next;
   }
 
+  setOverride(key) {
+    this.override = key;
+    if (key) {
+      this.context = key;
+      this.pending = null;
+      this._switchTo(key);
+    } else {
+      this.context = this._detect();
+      this.pending = null;
+      this._switchTo(this.context);
+    }
+  }
+
   _detect() {
     const wanted = this.npcs.wanted;
     if (wanted >= 4) return "chase";
@@ -155,6 +170,13 @@ export class MusicDirector {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = 0.4;
+    if (this.override) {
+      if (this.context !== this.override) {
+        this.context = this.override;
+        this._switchTo(this.override);
+      }
+      return;
+    }
     const wanted = this._detect();
     if (wanted === this.context) {
       this.pending = null;
