@@ -110,6 +110,11 @@ import {
 } from "./holyEnding.js";
 import { initCheatMenu } from "./cheats.js";
 import {
+  initFixedGhostTowns,
+  updateGhostTownAtmosphere,
+  ActiveGhostTowns,
+} from "./ghostTowns.js";
+import {
   GameState,
   startIntroSequence,
   updateIntroSequence,
@@ -247,6 +252,7 @@ if (settlement.cityData) {
   activeCities.set("0_0", settlement.cityData);
 }
 initProceduralEnv({ scene, world, npcs, activeCities });
+initFixedGhostTowns(scene, world);
 initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio, damageFx, weapons, candle, horses, settlement, activeCities });
 setMeleeEnv({ npcs, combat, effects });
 const director = new EnemyDirector(scene, world, npcs, effects, explosions, audio);
@@ -291,7 +297,7 @@ dayNight.onNewDay = () => {
   triggerDailyDecayCycle(world, npcs.npcs, horses.horses, ui, scene, effects);
 };
 
-window.__game = { getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+window.__game = { ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
 const saved = loadGame();
@@ -390,6 +396,7 @@ function frame(now) {
   world.updateAround(player.x, player.z);
   world.respawnResources(now);
   updateWorldChunks(player.root.position, activeCities, sharedHouseMaterial);
+  updateGhostTownAtmosphere(player.root.position, ui, dt);
   riding.update(dt, cameraRig.yaw);
   player.update(dt, input, world, cameraRig.yaw, aim);
   ui.setStealth(player.crouching);

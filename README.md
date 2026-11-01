@@ -77,6 +77,19 @@ Cada arma tem dano, alcance, velocidade, peso (afeta a velocidade de movimento),
 
 A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do primeiro clique: `town.mp3` nas vilas, `explore.mp3` no mundo aberto, `DST-GrassLands.mp3` nas planícies longe das vilas, `forest_2.ogg` dentro da floresta, `wanted.mp3` com procurado 1–3 e `chase.mp3` com procurado 4–5 (se esse arquivo não existir, toca `tense.mp3`). Dentro de casa o volume cai.
 
+## Cidades Fantasma e Ruínas de Guerra
+
+- Cidades arruinadas geradas deterministicamente por seeds ao redor da capital (Norvânia, Cairn, Valdor, Oakhaven) e em regiões procedurais remotas.
+- Muralhas destruídas com fendas de invasão e montes de escombros de alvenaria.
+- Casas semidemoronadas, vigas calcinadas e telhados colapsados, sem tochas e sem habitantes.
+- Cenário de massacre bélico: crânios humanos e ossadas no solo, espadas quebradas caídas ou cravadas na terra, flechas cravadas nas paredes e vigas, e poças de sangue seco no chão e nos muros.
+- Atmosfera de entrada notificada via toast imersivo.
+
+## Cataclismo do Demiurgo e Sol Negro de 3 Olhos
+
+- **Firmamento de Olhos Reptilianos**: 42 olhos esféricos 3D cobrem os céus (esclera branca com veias ramificadas, nervo óptico e músculos retro-oculares). Cada olho acompanha ativamente o jogador com `lookAt` em tempo real durante 10 segundos antes do impacto.
+- **O Demiurgo como Sol Negro**: Ser cósmico amorfo de matéria escura pulsante, anéis de acreção concêntricos, corona de espículas carmesins e a Tríade Maldita (três olhos demoníacos de esclera ensanguentada e pupilas verticais fenda de crocodilo) que descem dos céus causando tremores catastróficos e destruição total da terra.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

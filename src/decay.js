@@ -1078,90 +1078,172 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
  * Modelo do Olho Colossal do Demiurgo Descendo do Firmamento.
  * Altamente visível, colossal (24m), com plasma, coroa solar e halos astrais.
  */
+/**
+ * O Demiurgo: Um ser amorfo sem forma, um Sol Negro colossal de 3 Olhos Malignos.
+ */
 export function buildDemiurgeColossalEyeMesh() {
   const root = new THREE.Group();
-  root.name = "DemiurgeColossalEyeRoot";
+  root.name = "DemiurgeBlackSunRoot";
 
-  const eyeGroup = new THREE.Group();
-  root.add(eyeGroup);
+  const blackSunGroup = new THREE.Group();
+  root.add(blackSunGroup);
 
-  const matSclera = new THREE.MeshStandardMaterial({
-    color: 0x220516,
-    emissive: 0x44081c,
-    emissiveIntensity: 1.2,
-    roughness: 0.6,
-    metalness: 0.2,
+  // 1. Materiais do Sol Negro e Vazio Abissal
+  const matVoidCore = new THREE.MeshBasicMaterial({
+    color: 0x010002, // Absorção abissal total de luz
   });
-  const matGoldRings = new THREE.MeshStandardMaterial({
-    color: 0xffb833,
-    emissive: 0xcc7700,
-    emissiveIntensity: 2.5,
-    roughness: 0.2,
-    metalness: 0.9,
-  });
-  const matIrisPlasma = new THREE.MeshStandardMaterial({
-    color: 0xff1144,
-    emissive: 0xff0033,
-    emissiveIntensity: 4.8,
-    roughness: 0.15,
-  });
-  const matCorona = new THREE.MeshBasicMaterial({
-    color: 0xaa11ff,
+
+  const matDarkPlasma = new THREE.MeshStandardMaterial({
+    color: 0x16021f,
+    emissive: 0x2e0238,
+    emissiveIntensity: 1.8,
+    roughness: 0.9,
     transparent: true,
-    opacity: 0.75,
+    opacity: 0.92,
+    flatShading: true,
+  });
+
+  const matCoronaCrimson = new THREE.MeshBasicMaterial({
+    color: 0x880018,
+    transparent: true,
+    opacity: 0.85,
     side: THREE.DoubleSide,
   });
-  const matVoidSlit = new THREE.MeshBasicMaterial({
-    color: 0x000000,
+
+  const matCoronaViolet = new THREE.MeshBasicMaterial({
+    color: 0x3d005e,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
   });
 
-  // Esfera Celestial do Olho Colossal (Diâmetro 24m)
-  const eyeball = new THREE.Mesh(new THREE.SphereGeometry(12.0, 24, 18), matSclera);
-  eyeball.scale.set(1.4, 0.8, 1.1);
-  eyeball.rotation.x = Math.PI / 2;
-  eyeGroup.add(eyeball);
+  const matScleraTrio = new THREE.MeshStandardMaterial({
+    color: 0xf0ebe1,
+    emissive: 0x3d0408,
+    emissiveIntensity: 0.45,
+    roughness: 0.35,
+  });
 
-  // Íris de Plasma Cósmica Flamejante
-  const iris = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 0.6, 24), matIrisPlasma);
-  iris.position.set(0, -9.2, 0);
-  eyeGroup.add(iris);
+  const matIrisTrio = new THREE.MeshStandardMaterial({
+    color: 0xff0025,
+    emissive: 0xdd001a,
+    emissiveIntensity: 3.8,
+    roughness: 0.15,
+  });
 
-  // Coroa de Espículas e Prominências Cósmicas
-  for (let i = 0; i < 16; i++) {
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3.8, 4), matCorona);
-    const ang = (i / 16) * Math.PI * 2;
-    spike.position.set(Math.cos(ang) * 7.5, -9.0, Math.sin(ang) * 7.5);
-    spike.rotation.z = Math.cos(ang) * 0.9;
-    spike.rotation.x = Math.sin(ang) * 0.9;
-    eyeGroup.add(spike);
+  const matSlitBlack = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+  // 2. Núcleo Amorfo do Sol Negro (diâmetro ~28m)
+  const coreMesh = new THREE.Mesh(new THREE.SphereGeometry(14.0, 24, 18), matVoidCore);
+  blackSunGroup.add(coreMesh);
+
+  // Nuvens e massas de matéria escura amorfa pulsante orbitando o núcleo
+  const amorphousBlobs = [];
+  for (let b = 0; b < 7; b++) {
+    const blob = new THREE.Mesh(new THREE.DodecahedronGeometry(10.5 + (b % 3) * 1.8, 1), matDarkPlasma);
+    const ang = (b / 7) * Math.PI * 2;
+    blob.position.set(Math.cos(ang) * 6.5, (b % 2 === 0 ? 3.5 : -3.5), Math.sin(ang) * 6.5);
+    blob.rotation.set(b * 0.7, b * 1.2, b * 0.5);
+    blackSunGroup.add(blob);
+    amorphousBlobs.push(blob);
   }
 
-  // Pupila Abissal de Fenda Negra
-  const pupil = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 9.8), matVoidSlit);
-  pupil.position.set(0, -9.5, 0);
-  eyeGroup.add(pupil);
+  // 3. Coroa de Espículas e Prominências Cósmicas Flamejantes
+  const coronaSpikes = [];
+  for (let i = 0; i < 24; i++) {
+    const ang = (i / 24) * Math.PI * 2;
+    const spikeH = 11.0 + (i % 4) * 3.5;
+    const spike = new THREE.Mesh(
+      new THREE.ConeGeometry(1.4, spikeH, 4),
+      i % 2 === 0 ? matCoronaCrimson : matCoronaViolet
+    );
+    spike.position.set(Math.cos(ang) * 17.0, -1.5, Math.sin(ang) * 17.0);
+    spike.rotation.z = Math.cos(ang) * 1.2;
+    spike.rotation.x = Math.sin(ang) * 1.2;
+    blackSunGroup.add(spike);
+    coronaSpikes.push(spike);
+  }
 
-  // Anéis Rúnicos Sagrados Giratórios
-  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(15.5, 0.45, 10, 36), matGoldRings);
-  ring1.rotation.x = Math.PI / 2;
-  eyeGroup.add(ring1);
+  // Anéis de acreção de sombra gravitacional
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(20.5, 0.75, 8, 36), matCoronaCrimson);
+  ring1.rotation.x = Math.PI * 0.45;
+  blackSunGroup.add(ring1);
 
-  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(18.8, 0.35, 10, 36), matIrisPlasma);
-  ring2.rotation.x = Math.PI / 2 + 0.25;
-  eyeGroup.add(ring2);
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(24.5, 0.65, 8, 36), matCoronaViolet);
+  ring2.rotation.x = -Math.PI * 0.42;
+  ring2.rotation.y = 0.35;
+  blackSunGroup.add(ring2);
 
-  // Feixe de Luz Celestial Devastador e Ponto de Luz Intensa
-  const spotlight = new THREE.SpotLight(0xff1133, 14.0, 180, Math.PI * 0.42, 0.4, 1.2);
-  spotlight.position.set(0, -6, 0);
-  spotlight.target.position.set(0, -110, 0);
-  eyeGroup.add(spotlight);
-  eyeGroup.add(spotlight.target);
+  // 4. OS 3 OLHOS MALIGNOS DO DEMIURGO (Dispostos em Tríade Demoníaca olhando para o Jogador)
+  function createDemonEye(eyeRadius) {
+    const eyeRoot = new THREE.Group();
 
-  const eyeLight = new THREE.PointLight(0xff2255, 8.0, 120, 1.6);
-  eyeLight.position.set(0, -8, 0);
-  eyeGroup.add(eyeLight);
+    // Globo ocular esférico branco leitosa com veias
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius, 20, 14), matScleraTrio);
+    eyeRoot.add(ball);
 
-  return { root, eyeGroup, eyeball, ring1, ring2, spotlight, eyeLight };
+    // Íris de sangue cósmica voltada para o pólo +Z
+    const irisR = eyeRadius * 0.52;
+    const irisMesh = new THREE.Mesh(new THREE.CircleGeometry(irisR, 24), matIrisTrio);
+    irisMesh.position.set(0, 0, eyeRadius * 0.96);
+    eyeRoot.add(irisMesh);
+
+    // Pupila de crocodilo / réptil vertical pontiaguda
+    const slitShape = new THREE.Shape();
+    const sw = irisR * 0.22;
+    const sh = irisR * 1.4;
+    slitShape.moveTo(0, sh * 0.5);
+    slitShape.lineTo(sw * 0.5, 0);
+    slitShape.lineTo(0, -sh * 0.5);
+    slitShape.lineTo(-sw * 0.5, 0);
+    slitShape.closePath();
+
+    const pupilMesh = new THREE.Mesh(new THREE.ShapeGeometry(slitShape), matSlitBlack);
+    pupilMesh.position.set(0, 0, eyeRadius * 0.98);
+    eyeRoot.add(pupilMesh);
+
+    return eyeRoot;
+  }
+
+  // 1) Olho Central Inferior (Olho Alfa Colossal)
+  const eyeCenter = createDemonEye(5.8);
+  eyeCenter.position.set(0, -6.5, 12.8);
+  eyeCenter.rotation.x = -0.25; // Apontado para baixo em direção à terra/jogador
+  blackSunGroup.add(eyeCenter);
+
+  // 2) Olho Superior Esquerdo
+  const eyeLeft = createDemonEye(4.2);
+  eyeLeft.position.set(-7.5, 4.2, 10.8);
+  eyeLeft.rotation.x = -0.28;
+  eyeLeft.rotation.y = 0.32;
+  blackSunGroup.add(eyeLeft);
+
+  // 3) Olho Superior Direito
+  const eyeRight = createDemonEye(4.2);
+  eyeRight.position.set(7.5, 4.2, 10.8);
+  eyeRight.rotation.x = -0.28;
+  eyeRight.rotation.y = -0.32;
+  blackSunGroup.add(eyeRight);
+
+  // Ponto de luz e feixe gravitacional devastador do Sol Negro
+  const sunLight = new THREE.PointLight(0xff0028, 10.0, 160, 1.5);
+  sunLight.position.set(0, -6, 8);
+  blackSunGroup.add(sunLight);
+
+  return {
+    root,
+    blackSunGroup,
+    coreMesh,
+    amorphousBlobs,
+    coronaSpikes,
+    ring1,
+    ring2,
+    eyeCenter,
+    eyeLeft,
+    eyeRight,
+    sunLight,
+    eyeball: coreMesh,
+  };
 }
 
 /**
@@ -1253,60 +1335,131 @@ function _hideHeIsComingBanner() {
 /**
  * Olho do Firmamento colossal com pupila reptiliana vertical pontiaguda.
  */
-export function buildFirmamentEyeMesh(color = 0xff1144, width = 15, height = 8.5) {
+/**
+ * Olho do Firmamento colossal esférico, com esclera branca ensanguentada,
+ * veias vermelhas, músculos retro-oculares e íris de crocodilo voltada diretamente para o Player.
+ */
+export function buildFirmamentEyeMesh(color = 0xd91624, radius = 9) {
   const root = new THREE.Group();
   root.name = "FirmamentReptilianEye";
 
-  const matOuter = new THREE.MeshStandardMaterial({
-    color: 0x0c0314,
-    emissive: 0x1a031e,
-    roughness: 0.6,
+  // Esclera branca leitosa orgânica com leve tonalidade ensanguentada
+  const matSclera = new THREE.MeshStandardMaterial({
+    color: 0xedebe4,
+    emissive: 0x28060a,
+    emissiveIntensity: 0.35,
+    roughness: 0.35,
+    metalness: 0.05,
   });
-  const matIris = new THREE.MeshBasicMaterial({ color });
-  const matSlit = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
-  // 1. Corpo/Esclera amendoada colossal
-  const eyeBody = new THREE.Mesh(new THREE.SphereGeometry(width * 0.45, 16, 12), matOuter);
-  eyeBody.scale.set(1.5, 0.72, 0.45);
-  eyeBody.position.z = 0.5;
-  root.add(eyeBody);
+  // Íris de crocodilo carmesim / plasma cósmico
+  const matIris = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: 0xaa0e1a,
+    emissiveIntensity: 3.2,
+    roughness: 0.2,
+  });
 
-  // 2. Íris predadora brilhante voltada para -Z
-  const iris = new THREE.Mesh(new THREE.CircleGeometry(width * 0.38, 24), matIris);
-  iris.position.z = -0.15;
-  iris.rotation.y = Math.PI; // Face voltada para -Z
+  // Pupila de réptil fenda negra profunda
+  const matPupil = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+  // Veias sanguíneas na esclera
+  const matVein = new THREE.MeshBasicMaterial({ color: 0x990011 });
+
+  // Músculos e feixes retro-oculares arrancados
+  const matMuscle = new THREE.MeshStandardMaterial({
+    color: 0x5e0810,
+    emissive: 0x2a0306,
+    roughness: 0.85,
+    metalness: 0.1,
+  });
+
+  // 1. Globo Ocular Esférico Completo Tridimensional (não é achatado nem disco)
+  const eyeBall = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 18), matSclera);
+  root.add(eyeBall);
+
+  // 2. Veias vermelhas ramificadas sobre a esclera
+  for (let v = 0; v < 8; v++) {
+    const vAngle = (v / 8) * Math.PI * 2;
+    const veinCurve = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06 * radius, 0.02 * radius, radius * 1.1, 4),
+      matVein
+    );
+    veinCurve.position.set(
+      Math.cos(vAngle) * radius * 0.75,
+      Math.sin(vAngle) * radius * 0.75,
+      radius * 0.2
+    );
+    veinCurve.rotation.z = vAngle + 0.3;
+    veinCurve.rotation.x = 0.5;
+    root.add(veinCurve);
+  }
+
+  // 3. Músculos Retro-Oculares e Nervo Óptico (estendendo-se para trás em -Z)
+  const opticNerve = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 0.22, radius * 0.35, radius * 1.6, 8),
+    matMuscle
+  );
+  opticNerve.position.set(0, 0, -radius * 1.1);
+  opticNerve.rotation.x = Math.PI / 2;
+  root.add(opticNerve);
+
+  const muscleOffsets = [
+    [0, radius * 0.7, -radius * 0.8],
+    [0, -radius * 0.7, -radius * 0.8],
+    [radius * 0.7, 0, -radius * 0.8],
+    [-radius * 0.7, 0, -radius * 0.8],
+  ];
+  for (let m = 0; m < muscleOffsets.length; m++) {
+    const mPos = muscleOffsets[m];
+    const muscle = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.12, radius * 0.18, radius * 1.2, 5),
+      matMuscle
+    );
+    muscle.position.set(mPos[0], mPos[1], mPos[2]);
+    muscle.rotation.x = Math.PI / 2 + (mPos[1] !== 0 ? Math.sign(mPos[1]) * 0.25 : 0);
+    muscle.rotation.y = mPos[0] !== 0 ? Math.sign(mPos[0]) * 0.25 : 0;
+    root.add(muscle);
+  }
+
+  // 4. ÍRIS VERMELHA DE CROCODILO NO PÓLO FRONTAL (+Z, voltada para o Player)
+  const irisRadius = radius * 0.48;
+  const iris = new THREE.Mesh(new THREE.CircleGeometry(irisRadius, 32), matIris);
+  iris.position.set(0, 0, radius * 0.97);
   root.add(iris);
 
-  // 3. Pupila Reptiliana Vertical Pontiaguda (tapered vertical slit)
+  // Anel de transição da íris
+  const irisRing = new THREE.Mesh(
+    new THREE.RingGeometry(irisRadius * 0.88, irisRadius * 1.02, 32),
+    new THREE.MeshBasicMaterial({ color: 0x220004 })
+  );
+  irisRing.position.set(0, 0, radius * 0.98);
+  root.add(irisRing);
+
+  // 5. PUPILA DE CROCODILO / RÉPTIL: Fenda vertical negra pontiaguda no centro
   const slitGroup = new THREE.Group();
-  slitGroup.position.z = -0.22;
+  slitGroup.position.set(0, 0, radius * 0.99);
 
-  // Centro da fenda
-  const slitCenter = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.08, height * 0.38), matSlit);
-  slitCenter.rotation.y = Math.PI;
-  slitGroup.add(slitCenter);
+  const slitWidth = irisRadius * 0.18;
+  const slitHeight = irisRadius * 1.35;
 
-  // Ponta superior da fenda reptiliana
-  const slitTop = new THREE.Mesh(new THREE.ConeGeometry(width * 0.04, height * 0.35, 4), matSlit);
-  slitTop.position.y = height * 0.35;
-  slitTop.rotation.y = Math.PI * 0.25;
-  slitGroup.add(slitTop);
+  const slitShape = new THREE.Shape();
+  slitShape.moveTo(0, slitHeight * 0.5);
+  slitShape.lineTo(slitWidth * 0.5, 0);
+  slitShape.lineTo(0, -slitHeight * 0.5);
+  slitShape.lineTo(-slitWidth * 0.5, 0);
+  slitShape.closePath();
 
-  // Ponta inferior da fenda reptiliana
-  const slitBottom = new THREE.Mesh(new THREE.ConeGeometry(width * 0.04, height * 0.35, 4), matSlit);
-  slitBottom.position.y = -height * 0.35;
-  slitBottom.rotation.z = Math.PI;
-  slitBottom.rotation.y = Math.PI * 0.25;
-  slitGroup.add(slitBottom);
-
+  const slitMesh = new THREE.Mesh(new THREE.ShapeGeometry(slitShape), matPupil);
+  slitGroup.add(slitMesh);
   root.add(slitGroup);
 
-  // 4. Luz mística que ilumina a terra
-  const pLight = new THREE.PointLight(color, 4.2, 85, 1.8);
-  pLight.position.set(0, 0, -1.5);
+  // Luz incandescente avermelhada que emana da íris em direção ao solo (+Z)
+  const pLight = new THREE.PointLight(color, 4.5, 95, 1.8);
+  pLight.position.set(0, 0, radius * 1.1);
   root.add(pLight);
 
-  return { root, eyeBody, iris, slit: slitGroup, pLight };
+  return { root, eyeBall, iris, slit: slitGroup, pLight, radius };
 }
 
 export const DemiurgeCataclysm = {
@@ -1564,6 +1717,19 @@ export function updateDemiurgeCataclysm(dt, env) {
       eye.ring1.rotation.z += dt * 1.4;
       eye.ring2.rotation.z -= dt * 1.8;
       eye.eyeball.rotation.z += dt * 0.6;
+
+      if (eye.blackSunGroup) {
+        eye.blackSunGroup.rotation.y += dt * 0.45;
+        eye.blackSunGroup.rotation.z = Math.sin(t * 1.5) * 0.08;
+      }
+      if (eye.coronaSpikes) {
+        for (let s = 0; s < eye.coronaSpikes.length; s++) {
+          eye.coronaSpikes[s].rotation.z += dt * (s % 2 === 0 ? 0.3 : -0.3);
+        }
+      }
+      if (eye.sunLight) {
+        eye.sunLight.intensity = 8.0 + Math.sin(t * 8.0) * 4.0;
+      }
 
       // Tremores de terra crescentes conforme o Olho cai
       if (cameraRig?.shakeAt) {

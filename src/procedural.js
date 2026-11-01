@@ -6,6 +6,7 @@ import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { WorldDecay } from "./decay.js";
 import { mergeBufferGeometries } from "./mergeUtils.js";
+import { generateGhostTown } from "./ghostTowns.js";
 
 // ============================================================================
 // 1. Sistema de Seed (PRNG Mulberry32) e Texturas Procedurais de Baixo Custo
@@ -458,13 +459,27 @@ export function updateWorldChunks(playerPos, activeCities, houseMaterial = creat
         const regionSeed = 12345 + rx * 1000 + rz;
         const random = createSeededRandom(regionSeed);
 
-        // 30% de chance de ter uma vila/cidade naquela região
-        if (random() < 0.3) {
+        // 30% de chance de ter uma vila/cidade viva naquela região
+        const roll = random();
+        if (roll < 0.3) {
           const offsetX = (random() - 0.5) * 200;
           const offsetZ = (random() - 0.5) * 200;
           const cityCenter = new THREE.Vector3(rx * 500 + offsetX, 0, rz * 500 + offsetZ);
 
           activeCities.set(regionId, generateCity(regionSeed, cityCenter, houseMaterial));
+        } else if (roll < 0.55 && (rx !== 0 || rz !== 0)) {
+          // 25% de chance de gerar uma Cidade Fantasma arruinada pela guerra
+          const offsetX = (random() - 0.5) * 220;
+          const offsetZ = (random() - 0.5) * 220;
+          const ghostTownConfig = {
+            name: `Ruínas Devastadas do Setor [${rx}, ${rz}]`,
+            x: rx * 500 + offsetX,
+            z: rz * 500 + offsetZ,
+            seed: regionSeed,
+            radius: 54,
+          };
+          const ghostTown = generateGhostTown(ghostTownConfig, _procEnv.scene, _procEnv.world);
+          activeCities.set(regionId, { ghostTown, center: ghostTown.center });
         } else {
           activeCities.set(regionId, null); // Marca como vazio para não checar de novo
         }
