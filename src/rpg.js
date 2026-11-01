@@ -100,21 +100,104 @@ export function getHayFromPool() {
 // 2. Sistema de Atributos do Jogador (PlayerStats) e Inventário de Camponês
 // ============================================================================
 export const PlayerStats = {
+  // Atributos base
   str: 10, // Dano corpo a corpo e capacidade de carga
-  con: 10, // Vida máxima e resistência a hitstun
+  con: 10, // Vida máxima (CON * 10) e resistência a hitstun
   cha: 10, // Preços (-2% por ponto acima de 10) e tolerância a crimes menores
   spd: 10, // Multiplicador de velocidade e estamina
+
+  // Status dinâmico
+  hp: 100,
+  maxHp: 100,
+  armorLevel: 0, // 0: Camponês, 1: Couro, 2: Malha, 3: Placas
   gold: 0,
   hay: 0,
   morality: 0, // -100 (Caos/Demiurgo) a +100 (Luz/Bondade)
 
+  // Facção
+  isTemplar: false,
+  hasBrokenVow: false,
+
+  // Getters otimizados com penalidade de Voto Quebrado e peso de armadura
   getMaxHp: () => PlayerStats.con * 10,
   getMaxHearts: () => Math.max(3, Math.round(PlayerStats.con * 0.5)),
-  getMeleeMult: () => 1.0 + (PlayerStats.str - 10) * 0.05,
+  getMeleeMult: () => {
+    let mult = 1.0 + (PlayerStats.str - 10) * 0.05;
+    if (PlayerStats.hasBrokenVow) mult *= 0.5; // Fraqueza extrema (-50%)
+    return mult;
+  },
   getHitstunMult: () => Math.max(0.35, 1.0 - (PlayerStats.con - 10) * 0.04),
-  getSpeedMult: () => 1.0 + (PlayerStats.spd - 10) * 0.03,
+  getSpeedMult: () => {
+    let mult = 1.0 + (PlayerStats.spd - 10) * 0.03;
+    if (PlayerStats.armorLevel === 3) mult -= 0.15; // Armadura pesada deixa 15% mais lento
+    if (PlayerStats.hasBrokenVow) mult *= 0.5; // Punição divina (50% mais lento)
+    return mult;
+  },
   getPriceMult: () => Math.max(0.5, 1.0 - (PlayerStats.cha - 10) * 0.02),
 };
+
+/**
+ * Atualiza a armadura visualmente sem alocar novos meshes (Zero-GC).
+ * Alterna a visibilidade de partes do corpo pré-carregadas.
+ */
+export function equipArmor(level, player = _env.player) {
+  const safeLevel = Math.max(0, Math.min(3, Math.round(level)));
+  PlayerStats.armorLevel = safeLevel;
+  if (player?.setArmorVisuals) {
+    player.setArmorVisuals(safeLevel);
+  }
+  // 0: 0% | 1: 20% couro | 2: 40% malha | 3: 65% placas
+  PlayerEquipment.armorNegationChance = [0.0, 0.20, 0.40, 0.65][safeLevel] || 0.0;
+  return safeLevel;
+}
+
+/**
+ * Consome uma refeição reforçada na taverna.
+ * Recupera toda a vida e aumenta organicamente a Constituição (+1 CON = +10 HP).
+ */
+export function consumeHeartyMeal(player = _env.player, ui = _env.ui, audio = _env.audio) {
+  const cost = 15;
+  const currentGold = player?.coins ?? PlayerStats.gold;
+  if (currentGold < cost) {
+    ui?.showToast?.("Moedas insuficientes para a refeição farta da taverna!");
+    return false;
+  }
+  if (player) player.coins -= cost;
+  PlayerStats.gold = Math.max(0, currentGold - cost);
+  PlayerInventory.gold = PlayerStats.gold;
+
+  // Aumento orgânico permanente de Constituição (+1 CON = +10 HP máx)
+  PlayerStats.con += 1;
+  PlayerStats.hp = PlayerStats.getMaxHp();
+  if (player) {
+    player.maxHealth = PlayerStats.getMaxHearts();
+    player.health = player.maxHealth;
+  }
+  syncPlayerStatsToPlayer(player, ui);
+  audio?.potion?.();
+  ui?.showToast?.(
+    `✦ Banquete da Taverna consumido! +1 Constituição permanente (${PlayerStats.con} CON · ${PlayerStats.getMaxHp()} HP) e vida totalmente restaurada!`
+  );
+  return true;
+}
+
+/**
+ * Juramento da Ordem dos Cavaleiros Templários na Igreja (exige Carisma >= 15).
+ */
+export function takeTemplarVow(player = _env.player, ui = _env.ui, audio = _env.audio) {
+  if (PlayerStats.cha < 15) {
+    ui?.showToast?.("A Ordem dos Templários exige no mínimo 15 de Carisma para o Juramento!");
+    return false;
+  }
+  PlayerStats.isTemplar = true;
+  PlayerStats.hasBrokenVow = false;
+  equipArmor(3, player);
+  audio?.choir?.();
+  ui?.showToast?.(
+    "⚔️ Fizeste o Sagrado Juramento dos Templários! Armadura de Placas Completa concedida. Guarda a pureza de teus atos!"
+  );
+  return true;
+}
 
 // Novos Controles Sugeridos:
 // WASD: Mover | Shift: Correr | Espaço: Pular
@@ -521,6 +604,18 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
     PlayerStats.morality = Math.max(-100, (PlayerStats.morality ?? 0) - 10);
     const cultTier = CultState?.recordSacrifice?.() || 1;
     const sacCount = CultState?.sacrifices || 1;
+
+    // Quebra do Juramento Templário
+    if (PlayerStats.isTemplar && !PlayerStats.hasBrokenVow) {
+      PlayerStats.hasBrokenVow = true;
+      _env.ui?.showToast(
+        "⚠️ VOTO TEMPLÁRIO QUEBRADO! A ira divina cai sobre ti: 50% de lentidão e fraqueza de ataque! Elimine uma fera nas matas para se redimir!"
+      );
+      if (_env.effects) {
+        _env.effects.play("dust", deathPos.x, deathPos.y + 1.2, deathPos.z, "#33080c", 2.6);
+        _env.effects.play("star", deathPos.x, deathPos.y + 1.5, deathPos.z, "#ff2200", 2.0);
+      }
+    }
 
     if (isWitnessed) {
       PlayerStats.cha = Math.max(1, PlayerStats.cha - 5);

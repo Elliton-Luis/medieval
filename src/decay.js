@@ -206,6 +206,193 @@ export function updateEclipseLightning(playerPos, dt, effects, audio, damageFx, 
 // 5. O Mensageiro de Cinzas: Karma Cátaro (Opção 3A)
 // ============================================================================
 let _messengerNPC = null;
+let _demiurgeModalEl = null;
+
+const DEMIURGE_MODAL_CSS = `
+#demiurge-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 4, 12, 0.88);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  font-family: "Cinzel", "Cinzel Decorative", Georgia, serif;
+}
+#demiurge-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.demiurge-parchment {
+  background: linear-gradient(175deg, #1c1322 0%, #0d0a14 100%);
+  border: 2px solid #8e2a36;
+  border-radius: 6px;
+  box-shadow: 0 0 35px rgba(180, 20, 40, 0.45), inset 0 0 25px rgba(0, 0, 0, 0.85);
+  padding: 30px 36px;
+  max-width: 640px;
+  width: 90%;
+  color: #e6dbcb;
+  position: relative;
+  animation: demiurge-fade-in 0.35s ease-out;
+}
+@keyframes demiurge-fade-in {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1.0); opacity: 1; }
+}
+.demiurge-seal {
+  font-size: 34px;
+  text-align: center;
+  color: #ff3344;
+  text-shadow: 0 0 14px rgba(255, 50, 70, 0.7);
+  margin-bottom: 6px;
+}
+.demiurge-header {
+  text-align: center;
+  border-bottom: 1px solid rgba(142, 42, 54, 0.5);
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+.demiurge-title {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: #ff4d5a;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+}
+.demiurge-subtitle {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: #9e9188;
+  margin-top: 4px;
+}
+.demiurge-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  background: rgba(142, 42, 54, 0.15);
+  border: 1px solid #8e2a36;
+  color: #ff7777;
+  font-size: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.demiurge-close-btn:hover {
+  background: #8e2a36;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 50, 70, 0.8);
+}
+.demiurge-body {
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: #d6c9b8;
+  font-style: italic;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  margin-bottom: 24px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 16px;
+  border-radius: 4px;
+  border-left: 3px solid #8e2a36;
+}
+.demiurge-footer {
+  display: flex;
+  justify-content: center;
+}
+.demiurge-confirm-btn {
+  background: linear-gradient(180deg, #361017 0%, #20070b 100%);
+  border: 1px solid #a82e42;
+  color: #ffc4c4;
+  padding: 10px 24px;
+  font-size: 13.5px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  box-shadow: 0 0 12px rgba(168, 46, 66, 0.3);
+}
+.demiurge-confirm-btn:hover {
+  background: #50131e;
+  border-color: #ff4d64;
+  color: #fff;
+  box-shadow: 0 0 18px rgba(255, 77, 100, 0.6);
+}
+`;
+
+function _injectDemiurgeStyles() {
+  if (document.getElementById("demiurge-modal-styles")) return;
+  const style = document.createElement("style");
+  style.id = "demiurge-modal-styles";
+  style.textContent = DEMIURGE_MODAL_CSS;
+  document.head.appendChild(style);
+}
+
+export function showDemiurgeModal(message, level = 1, onDismiss) {
+  _injectDemiurgeStyles();
+
+  if (!_demiurgeModalEl) {
+    _demiurgeModalEl = document.createElement("div");
+    _demiurgeModalEl.id = "demiurge-modal-overlay";
+    document.body.appendChild(_demiurgeModalEl);
+  }
+
+  _demiurgeModalEl.innerHTML = `
+    <div class="demiurge-parchment" role="dialog" aria-modal="true">
+      <button class="demiurge-close-btn" id="demiurge-btn-close" aria-label="Fechar mensagem">✕</button>
+      <div class="demiurge-seal">👁️</div>
+      <div class="demiurge-header">
+        <h2 class="demiurge-title">SUSSURRO DO DEMIURGO</h2>
+        <span class="demiurge-subtitle">Mensageiro das Cinzas · Seita Cátara (Nível ${level})</span>
+      </div>
+      <div class="demiurge-body">${message}</div>
+      <div class="demiurge-footer">
+        <button class="demiurge-confirm-btn" id="demiurge-btn-confirm">ACEITAR O DESTINO [ESC]</button>
+      </div>
+    </div>
+  `;
+
+  _demiurgeModalEl.classList.add("active");
+
+  const close = () => {
+    if (!_demiurgeModalEl.classList.contains("active")) return;
+    _demiurgeModalEl.classList.remove("active");
+    window.removeEventListener("keydown", onKeyDown);
+    if (document.pointerLockElement === null && window.__purisCanvas) {
+      // Reativa captura suave se necessário
+    }
+    if (typeof onDismiss === "function") {
+      onDismiss();
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Escape" || e.code === "Escape" || e.key === "Enter" || e.code === "Space") {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+
+  const btnClose = _demiurgeModalEl.querySelector("#demiurge-btn-close");
+  const btnConfirm = _demiurgeModalEl.querySelector("#demiurge-btn-confirm");
+  btnClose?.addEventListener("click", (e) => { e.stopPropagation(); close(); });
+  btnConfirm?.addEventListener("click", (e) => { e.stopPropagation(); close(); });
+  _demiurgeModalEl.addEventListener("click", (e) => {
+    if (e.target === _demiurgeModalEl) close();
+  });
+}
 
 function _ensureMessenger(scene) {
   if (_messengerNPC || !scene) return _messengerNPC;
@@ -319,23 +506,23 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
       }
 
       const message = pool[Math.floor(Math.random() * pool.length)];
-      ui?.showToast?.(`✦ MENSAGEIRO DOS CÁTAROS: ${message}`);
       if (audio?.hit) audio.hit(false);
 
-      // Marca o Altar Ritual fora dos muros no Minimap e com Pilar de Luz
-      if (m.isEvilMessage) {
-        const altar = CultState?.altarTarget || (CULT_ALTARS && CULT_ALTARS[0]);
-        if (altar) {
-          spawnWaypointMarker({ x: altar.x, y: altar.y, z: altar.z });
-          window.setTimeout(() => {
+      // Exibe a Profecia em Modal Gótico escuro que só fecha no ESC ou botão [X]
+      showDemiurgeModal(message, level, () => {
+        // Marca o Altar Ritual fora dos muros no Minimap e com Pilar de Luz
+        if (m.isEvilMessage) {
+          const altar = CultState?.altarTarget || (CULT_ALTARS && CULT_ALTARS[0]);
+          if (altar) {
+            spawnWaypointMarker({ x: altar.x, y: altar.y, z: altar.z });
             ui?.showToast?.(
               `✦ SANTUÁRIO DO DEMIURGO: O Altar nas matas do norte foi marcado em sua bússola! (Seita Nível ${level})`
             );
-          }, 1400);
+          }
         }
-      }
+      });
 
-      // Desfaz-se em cinzas e névoa negra após a mensagem
+      // Desfaz-se em cinzas e névoa negra após entregar a profecia
       if (effects) {
         effects.play("dust", m.x, gy + 0.9, m.z, "#16151c", 2.6);
         effects.play("star", m.x, gy + 1.2, m.z, "#7722bb", 1.8);

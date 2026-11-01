@@ -40,7 +40,12 @@ const _altarStoneMat = new THREE.MeshStandardMaterial({
 const _purpleFireMat = new THREE.MeshStandardMaterial({
   color: 0x9933cc,
   emissive: 0x7711aa,
-  emissiveIntensity: 2.2,
+  emissiveIntensity: 2.5,
+});
+const _redTorchMat = new THREE.MeshStandardMaterial({
+  color: 0xff2211,
+  emissive: 0xff1100,
+  emissiveIntensity: 2.8,
 });
 
 const _tempVec = new THREE.Vector3();
@@ -174,32 +179,36 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       const altarGroup = new THREE.Group();
       altarGroup.position.set(ax, ay, az);
 
-      // Círculo de pedras escuras
-      for (let p = 0; p < 7; p++) {
-        const pang = (p / 7) * Math.PI * 2;
-        const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), _altarStoneMat);
-        stone.position.set(Math.cos(pang) * 1.6, 0.14, Math.sin(pang) * 1.6);
+      // Círculo de pedras escuras da fogueira
+      for (let p = 0; p < 8; p++) {
+        const pang = (p / 8) * Math.PI * 2;
+        const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22, 0), _altarStoneMat);
+        stone.position.set(Math.cos(pang) * 1.3, 0.12, Math.sin(pang) * 1.3);
         altarGroup.add(stone);
       }
 
-      // Pedra central de sacrifício
-      const slab = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.75, 0.42, 7), _altarStoneMat);
-      slab.position.set(0, 0.21, 0);
-      slab.castShadow = true;
-      altarGroup.add(slab);
+      // Troncos de lenha cruzados na fogueira
+      for (let l = 0; l < 3; l++) {
+        const logMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.95, 5), _robeMat);
+        logMesh.position.set(0, 0.08, 0);
+        logMesh.rotation.y = (l / 3) * Math.PI;
+        logMesh.rotation.z = Math.PI / 2;
+        altarGroup.add(logMesh);
+      }
 
-      // Vela ritual negra com chama roxa mística
-      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.35, 5), _robeMat);
-      candle.position.set(0, 0.58, 0);
-      altarGroup.add(candle);
-
-      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 5), _purpleFireMat);
-      purpleFlame.position.set(0, 0.82, 0);
+      // Fogueira de Chama Roxa ritual mística
+      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.74, 6), _purpleFireMat);
+      purpleFlame.position.set(0, 0.42, 0);
       altarGroup.add(purpleFlame);
 
-      const altarLight = new THREE.PointLight(0xaa44ee, 1.8, 12, 1.8);
-      altarLight.position.set(0, 0.95, 0);
-      altarGroup.add(altarLight);
+      const campfireLight = new THREE.PointLight(0xaa33ff, 2.4, 16, 1.6);
+      campfireLight.position.set(0, 0.65, 0);
+      altarGroup.add(campfireLight);
+
+      // Crânios de aviso ao redor da fogueira
+      const skullDeco = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 1), _boneMat);
+      skullDeco.position.set(0.65, 0.12, 0.65);
+      altarGroup.add(skullDeco);
 
       scene.add(altarGroup);
     }
@@ -297,6 +306,25 @@ export function buildCultistMesh() {
   armR.rotation.z = -0.22;
   model.add(armR);
 
+  // Tocha com chama vermelha na mão esquerda (os servos que vigiam além dos muros)
+  const torchGroup = new THREE.Group();
+  torchGroup.name = "CultistRedTorch";
+  torchGroup.position.set(-0.32, 1.05, 0.16);
+
+  const torchStick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.44, 5), _robeMat);
+  torchStick.position.set(0, 0, 0);
+  torchGroup.add(torchStick);
+
+  const torchFlame = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.22, 5), _redTorchMat);
+  torchFlame.position.set(0, 0.24, 0);
+  torchGroup.add(torchFlame);
+
+  const torchLight = new THREE.PointLight(0xff2211, 1.4, 9, 1.8);
+  torchLight.position.set(0, 0.28, 0);
+  torchGroup.add(torchLight);
+
+  model.add(torchGroup);
+
   // Adaga ritual cerimonial na mão direita
   const daggerHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 5), _robeMat);
   daggerHandle.position.set(0.34, 0.95, 0.12);
@@ -308,7 +336,7 @@ export function buildCultistMesh() {
   model.add(daggerBlade);
 
   root.visible = false;
-  return { root, model };
+  return { root, model, robe, armL, armR, torchGroup, torchLight };
 }
 
 // ============================================================================
@@ -324,9 +352,15 @@ export class Cultist {
     this.effects = effects;
     this.combat = combat;
 
-    const { root, model } = buildCultistMesh();
+    const { root, model, robe, armL, armR, torchGroup, torchLight } = buildCultistMesh();
     this.root = root;
     this.model = model;
+    this.robe = robe;
+    this.armL = armL;
+    this.armR = armR;
+    this.torchGroup = torchGroup;
+    this.torchLight = torchLight;
+    this.isSeated = false;
 
     this.roleKey = "cultist";
     this.name = "Cultista dos Cátaros";
@@ -334,7 +368,7 @@ export class Cultist {
     this.alive = true;
     this.health = 35;
     this.maxHealth = 35;
-    this.task = "Manipulando as sombras do ecossistema";
+    this.task = "Vigiando a fogueira dos ermos com tocha rubra";
 
     this.x = 0;
     this.z = 0;
@@ -342,7 +376,7 @@ export class Cultist {
 
     this.userData = {
       type: "CULTIST",
-      state: "PATROL",
+      state: "CAMPING",
       anchor: new THREE.Vector3(),
       nextActionTime: 0,
       vanishTimer: 0,
@@ -350,6 +384,46 @@ export class Cultist {
     };
 
     if (scene) scene.add(root);
+  }
+
+  setSeatedPose(isSeated) {
+    this.isSeated = Boolean(isSeated);
+    if (this.isSeated) {
+      this.model.position.y = -0.42;
+      if (this.robe) this.robe.scale.set(1.24, 0.62, 1.24);
+      if (this.armL) this.armL.rotation.set(-0.62, 0, 0.28);
+      if (this.torchGroup) this.torchGroup.position.set(-0.28, 0.62, 0.22);
+    } else {
+      this.model.position.y = 0;
+      if (this.robe) this.robe.scale.set(1, 1, 1);
+      if (this.armL) this.armL.rotation.set(0, 0, 0.22);
+      if (this.torchGroup) this.torchGroup.position.set(-0.32, 1.05, 0.16);
+    }
+  }
+
+  spawnAtCamp(anchorPos, seatIndex = 0, totalSeats = 3) {
+    this.alive = true;
+    this.health = this.maxHealth;
+    const angle = (seatIndex / Math.max(1, totalSeats)) * Math.PI * 2 + 0.4;
+    this.x = anchorPos.x + Math.cos(angle) * 2.3;
+    this.z = anchorPos.z + Math.sin(angle) * 2.3;
+    this.userData.anchor.copy(anchorPos);
+    this.userData.state = "CAMPING";
+    this.userData.nextActionTime = performance.now() + 8000;
+    this.userData.isDead = false;
+
+    // Encarando a fogueira no centro do altar
+    const targetYaw = Math.atan2(anchorPos.x - this.x, anchorPos.z - this.z);
+    this.model.rotation.y = targetYaw;
+
+    const y = this.world ? this.world.heightAt(this.x, this.z) : anchorPos.y;
+    this.root.position.set(this.x, y, this.z);
+    this.setSeatedPose(true);
+    this.root.visible = true;
+
+    if (this.effects) {
+      this.effects.play("dust", this.x, y + 0.35, this.z, "#1c1b22", 1.2);
+    }
   }
 
   spawnAt(anchorPos) {
@@ -364,6 +438,7 @@ export class Cultist {
 
     const y = this.world ? this.world.heightAt(this.x, this.z) : anchorPos.y;
     this.root.position.set(this.x, y, this.z);
+    this.setSeatedPose(false);
     this.root.visible = true;
 
     if (this.effects) {
@@ -420,15 +495,32 @@ export class Cultist {
     const dz = this.z - pz;
     const distToPlayerSq = dx * dx + dz * dz;
 
-    // 1. Furtividade: Se o jogador chegar muito perto (< 25m = 625), o cultista tenta fugir/sumir
-    if (distToPlayerSq < 625 && this.userData.state !== "VANISHING") {
+    // 1. Furtividade: Se o cultista estiver acampado ou em patrulha e o jogador se aproximar (< 22m), eles se assustam e fogem
+    if (this.userData.state === "CAMPING") {
+      if (distToPlayerSq < 484) {
+        this.userData.state = "VANISHING";
+        this.setSeatedPose(false);
+        if (this.effects) {
+          this.effects.play("dust", this.x, this.root.position.y + 0.5, this.z, "#1e1d24", 1.8);
+          this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#ff2211", 1.5);
+        }
+      } else {
+        // Permanece sentado ao redor da fogueira com a tocha vermelha ardendo
+        if (this.torchLight) {
+          this.torchLight.intensity = 1.3 + Math.sin(time * 0.008 + this.floatPhase) * 0.35;
+        }
+        return;
+      }
+    } else if (distToPlayerSq < 625 && this.userData.state !== "VANISHING") {
       this.userData.state = "VANISHING";
+      this.setSeatedPose(false);
       if (this.effects) {
         this.effects.play("dust", this.x, this.root.position.y + 0.6, this.z, "#1e1d24", 1.4);
       }
     }
 
     if (this.userData.state === "VANISHING") {
+      this.setSeatedPose(false);
       // Corre para a neblina na direção oposta ao jogador (acelerado pelo poder da seita)
       const currentFlee = CULTIST_FLEE_SPEED * (CultState.speedMultiplier || 1.0);
       const awayLen = Math.hypot(dx, dz) || 1;
@@ -438,7 +530,7 @@ export class Cultist {
       this.z += stepZ;
 
       const targetYaw = Math.atan2(dx, dz);
-      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.1);
+      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.12);
 
       // Flutuação mística ao deslizar
       const ground = this.world ? this.world.heightAt(this.x, this.z) : 0;
@@ -509,7 +601,7 @@ export class Cultist {
 // ============================================================================
 // 5. Pool e Gerenciador de Cultistas (Noite e Névoa fora dos muros)
 // ============================================================================
-export function createCultistsPool(scene, world, effects, combat, count = 2) {
+export function createCultistsPool(scene, world, effects, combat, count = 4) {
   const pool = [];
   for (let i = 0; i < count; i++) {
     const c = new Cultist(scene, world, effects, combat);
@@ -537,7 +629,7 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
     return;
   }
 
-  // Avalia spawn próximo a altares a cada 1.5 segundos
+  // Avalia acampamento ao redor da fogueira próxima a altares a cada 1.5 segundos
   _cultistCheckTimer += dt;
   if (_cultistCheckTimer > 1.5) {
     _cultistCheckTimer = 0;
@@ -545,18 +637,21 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
     const px = player.x ?? player.position?.x ?? 0;
     const pz = player.z ?? player.position?.z ?? 0;
 
-    // Procura altar no raio de 35 a 90 metros do jogador
+    // Procura altar no raio de 30 a 95 metros do jogador
     for (let a = 0; a < CULT_ALTARS.length; a++) {
       const altar = CULT_ALTARS[a];
       const adx = altar.x - px;
       const adz = altar.z - pz;
       const aDistSq = adx * adx + adz * adz;
 
-      // Se o jogador estiver entre 35m e 90m de um altar e houver slot no pool
-      if (aDistSq >= 1225 && aDistSq <= 8100) {
-        const availableCultist = cultistsPool.find((c) => !c.root.visible);
-        if (availableCultist && Math.random() < 0.5) {
-          availableCultist.spawnAt(altar);
+      // Se o jogador estiver entre 30m e 95m de um altar e houver slots no pool
+      if (aDistSq >= 900 && aDistSq <= 9025) {
+        const availableCultists = cultistsPool.filter((c) => !c.root.visible);
+        if (availableCultists.length >= 2) {
+          const spawnCount = Math.min(availableCultists.length, 3);
+          for (let s = 0; s < spawnCount; s++) {
+            availableCultists[s].spawnAtCamp(altar, s, spawnCount);
+          }
           break;
         }
       }

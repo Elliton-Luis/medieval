@@ -5,6 +5,9 @@ import {
   BUILD_COSTS,
   MissionState,
   buyUpgrade,
+  equipArmor,
+  consumeHeartyMeal,
+  takeTemplarVow,
   interactWithPriest,
   interactWithBeggar,
   dropHayBait,
@@ -18,7 +21,7 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=19";
+} from "./rpg.js?v=20";
 import { checkAltarInteraction } from "./cult.js?v=19";
 
 const CULTIST_RUMORS = [
@@ -330,7 +333,13 @@ export class InteractionSystem {
       const pBombs = this._price(15);
       const pTrainCha = this._price(16);
       const pBlessing = this._price(35);
+      const pMeal = this._price(15);
       actions = [
+        {
+          id: "tavern:meal",
+          label: `Banquete Reforçado da Taverna (+1 CON permanente e Cura Total) · ${pMeal} moedas`,
+          disabled: this.player.coins < pMeal,
+        },
         {
           id: "mission:deliver",
           label: "✦ Missão: Entrega de Suprimentos (+30 moedas, +2 CAR)",
@@ -373,6 +382,15 @@ export class InteractionSystem {
         message ||
         "A paz esteja convosco, viajante. Na Casa do Pai, as bênçãos e o perdão dos céus são sempre dons gratuitos da graça divina para todos os corações contritos.";
       actions = [
+        {
+          id: "priest:templar_vow",
+          label: PlayerStats.isTemplar
+            ? (PlayerStats.hasBrokenVow
+                ? "⚠️ VOTO TEMPLÁRIO QUEBRADO (Abata um lobisomem nos ermos para purificar)"
+                : "✦ Cavaleiro da Ordem dos Templários (Juramento Sagrado Ativo)")
+            : "⚔ Juramento dos Cavaleiros Templários (Exige Carisma 15 · Concede Armadura de Placas)",
+          disabled: PlayerStats.isTemplar || PlayerStats.cha < 15,
+        },
         {
           id: "priest:heal",
           label: "Receber Bênção de Cura dos Enfermos (Sempre Gratuito · Restaura Vitalidade)",
@@ -602,10 +620,21 @@ export class InteractionSystem {
 
     if (action === "upgrade:armor" && nextArmor) {
       if (buyUpgrade("ARMOR", nextArmor.cost, nextArmor.chance)) {
+        equipArmor(Math.min(3, (PlayerStats.armorLevel || 0) + 1), this.player);
         const pct = Math.round(PlayerEquipment.armorNegationChance * 100);
-        this.ui.showToast(`Armadura aprimorada: ${pct}% de chance de anular golpes!`);
-        this._showNPCDialogue(`Placas temperadas! Agora tens ${pct}% de chance de defletir qualquer golpe sem sofrer dano.`);
+        this.ui.showToast(`Armadura Nível ${PlayerStats.armorLevel} forjada: ${pct}% de deflexão de golpes!`);
+        this._showNPCDialogue(`Placas temperadas! Agora tens Armadura Nível ${PlayerStats.armorLevel} com ${pct}% de chance de defletir qualquer golpe sem sofrer dano.`);
       }
+    } else if (action === "tavern:meal") {
+      if (consumeHeartyMeal(this.player, this.ui, this.audio)) {
+        this._showNPCDialogue("Um banquete farto e suculento! Sente a vitalidade e constituição renovadas.");
+      }
+      return;
+    } else if (action === "priest:templar_vow") {
+      if (takeTemplarVow(this.player, this.ui, this.audio)) {
+        this._showNPCDialogue("«Non nobis, Domine, non nobis, sed nomini tuo da gloriam!» Que a espada da retidão e tua Armadura de Placas sirvam aos céus. Não cometas pecados contra inocentes!");
+      }
+      return;
     } else if (action === "upgrade:weapon") {
       if (buyUpgrade("WEAPON", pWeaponUp)) {
         this.ui.showToast(`Armas aprimoradas para Nível ${PlayerEquipment.weaponLevel}!`);

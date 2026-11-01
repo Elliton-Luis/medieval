@@ -152,8 +152,17 @@ export class CombatSystem {
       if (defeated) {
         PlayerStats.cha += 1;
         spawnLoot(npc.root ? npc.root.position : { x: npc.x, z: npc.z }, 35);
+        if (PlayerStats.isTemplar && PlayerStats.hasBrokenVow) {
+          PlayerStats.hasBrokenVow = false;
+          this.ui?.showToast?.("✦ O sangue da fera das trevas expiou tua culpa! Teu voto de Templário foi restaurado pelos céus!");
+          if (this.effects) {
+            this.effects.play("star", this.player.x, this.player.root.position.y + 1.8, this.player.z, "#ffe48f", 2.5);
+          }
+          this.audio?.choir?.();
+        } else {
+          this.ui.showToast("Lobisomem abatido! +35 moedas · Carisma +1");
+        }
         syncPlayerStatsToPlayer(this.player, this.ui);
-        this.ui.showToast("Lobisomem abatido! +35 moedas · Carisma +1");
       }
     } else if (npc.roleKey === "cultist") {
       // Invasão sobrenatural dos Cátaros: sem testemunhas nem Wanted Level

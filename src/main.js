@@ -93,7 +93,8 @@ import {
   triggerDailyDecayCycle,
   updateEclipseLightning,
   updateMessenger,
-} from "./decay.js?v=19";
+} from "./decay.js?v=20";
+import { initCheatMenu } from "./cheats.js?v=20";
 import {
   GameState,
   startIntroSequence,
@@ -239,12 +240,15 @@ const { skullsMesh, weaponsMesh } = createCultistCluesMeshes(scene);
 if (settlement.cityData) {
   spawnCultistClues(skullsMesh, weaponsMesh, 88231, settlement.cityData.center, scene, world);
 }
-const cultistsPool = createCultistsPool(scene, world, effects, combat, 2);
+const cultistsPool = createCultistsPool(scene, world, effects, combat, 4);
 for (let i = 0; i < cultistsPool.length; i++) {
   npcs.npcs.push(cultistsPool[i]);
 }
 npcs.onWantedChange = (level) => ui.setWanted(level);
 npcs.onAlert = (message) => ui.showToast(message);
+
+// Inicializa Sistema de Cheats (window.CheatMenu e tecla POTATO)
+initCheatMenu({ scene, world, player, npcs, ui, audio, effects, weapons, combat });
 
 dayNight.onNewDay = () => {
   triggerDailyDecayCycle(world, npcs.npcs, horses.horses, ui, scene, effects);

@@ -127,40 +127,75 @@ export class Player {
       12,
     ).scale(1.04, 1.0, 0.76);
     this.chestArmor = makePart(plate, steel, this.model, 0, 0.82, 0.015);
-    makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), gold, this.model, 0, 1.3, 0.175, false);
-    makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), gold, this.model, 0, 1.38, 0.17, false);
+    this.chestArmor.name = "PlateArmor";
+    const chestCross1 = makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), gold, this.model, 0, 1.3, 0.175, false);
+    const chestCross2 = makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), gold, this.model, 0, 1.38, 0.17, false);
+
+    // Colete de Couro rústico (Nível 1)
+    const leatherJerkin = makePart(new THREE.CylinderGeometry(0.21, 0.23, 0.44, 12), leather, this.model, 0, 1.15, 0);
+    leatherJerkin.scale.z = 0.78;
+    leatherJerkin.name = "LeatherArmor";
 
     // Ombreiras sólidas anatômicas
+    const pauldronsList = [];
     for (const arm of [this.leftArm, this.rightArm]) {
       const pauldron = makePart(new THREE.SphereGeometry(0.1, 10, 8), darkSteel, arm, 0, 0.02, 0);
       pauldron.scale.set(1.22, 0.9, 1.1);
-      makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), steel, arm, 0, -0.04, 0);
+      const pauldronEdge = makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), steel, arm, 0, -0.04, 0);
+      pauldronsList.push(pauldron, pauldronEdge);
     }
     const belt = makePart(new THREE.CylinderGeometry(0.21, 0.21, 0.07, 12), leather, this.model, 0, 0.84, 0);
     belt.scale.z = 0.78;
-    makePart(new THREE.BoxGeometry(0.08, 0.07, 0.035), gold, this.model, 0, 0.84, 0.17, false);
-    // Túnica e saia de placas integrada
+    const buckle = makePart(new THREE.BoxGeometry(0.08, 0.07, 0.035), gold, this.model, 0, 0.84, 0.17, false);
+
+    // Túnica camponesa e tabardo heráldico
     const skirt = makePart(new THREE.CylinderGeometry(0.2, 0.28, 0.32, 12), cloth, this.model, 0, 0.66, 0);
     skirt.scale.z = 0.76;
-    makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), heraldry, this.model, 0, 0.6, 0.19, false);
+    skirt.name = "Tunic";
+    const heraldicTabard = makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), heraldry, this.model, 0, 0.6, 0.19, false);
 
     // Placas de perna / grevas
+    const greavesList = [];
     for (const knee of [this.leftKnee, this.rightKnee]) {
-      makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), steel, knee, 0, -0.19, 0.06, false);
-      makePart(new THREE.SphereGeometry(0.068, 8, 6), darkSteel, knee, 0, 0, 0.035);
+      const greave = makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), steel, knee, 0, -0.19, 0.06, false);
+      const kneecap = makePart(new THREE.SphereGeometry(0.068, 8, 6), darkSteel, knee, 0, 0, 0.035);
+      greavesList.push(greave, kneecap);
     }
-    // Braçadeiras protetoras contínuas
+    // Braçadeiras protetoras / cota de malha nos antebraços
+    const vambracesList = [];
     for (const fore of [this.leftForearm, this.rightForearm]) {
-      makePart(new THREE.CylinderGeometry(0.055, 0.048, 0.18, 9), darkSteel, fore, 0, -0.15, 0);
+      const vambrace = makePart(new THREE.CylinderGeometry(0.055, 0.048, 0.18, 9), darkSteel, fore, 0, -0.15, 0);
+      vambracesList.push(vambrace);
     }
 
     // Elmo Cavaleiresco medieval com cota de malha / camal no pescoço
     const head = this.head;
-    makePart(new THREE.CylinderGeometry(0.12, 0.15, 0.18, 10), darkSteel, head, 0, -0.1, 0); // Camal cobrindo o pescoço
-    makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), steel, head, 0, 0.035, -0.005);
-    makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), darkSteel, head, 0, 0.075, 0);
-    makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), steel, head, 0, -0.01, 0.132, false); // Nasal bar
-    makePart(new THREE.ConeGeometry(0.035, 0.22, 4), heraldry, head, 0, 0.2, -0.06, false); // Penacho de crista
+    const camail = makePart(new THREE.CylinderGeometry(0.12, 0.15, 0.18, 10), darkSteel, head, 0, -0.1, 0); // Camal de malha
+    camail.name = "Chainmail";
+    const helmDome = makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), steel, head, 0, 0.035, -0.005);
+    const helmRim = makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), darkSteel, head, 0, 0.075, 0);
+    const nasalBar = makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), steel, head, 0, -0.01, 0.132, false);
+    const plume = makePart(new THREE.ConeGeometry(0.035, 0.22, 4), heraldry, head, 0, 0.2, -0.06, false);
+
+    // Estrutura modular de armaduras (Zero-GC: apenas altera visible = true/false)
+    this.armorPieces = {
+      tunic: [skirt, belt, buckle],
+      leather: [leatherJerkin],
+      chainmail: [camail, ...vambracesList],
+      plate: [
+        this.chestArmor,
+        chestCross1,
+        chestCross2,
+        ...pauldronsList,
+        ...greavesList,
+        helmDome,
+        helmRim,
+        nasalBar,
+        plume,
+        heraldicTabard,
+      ],
+    };
+    this.setArmorVisuals(0); // Inicia como Camponês (apenas túnica)
 
     // Escudo no antebraço esquerdo: o grupo contra-gira o braço para a face ficar sempre para a frente.
     this.shield = new THREE.Group();
@@ -779,11 +814,30 @@ export class Player {
     this.attackKind = kind;
   }
 
+  setArmorVisuals(level = 0) {
+    this.armorLevel = Math.max(0, Math.min(3, Math.round(level)));
+    const showLeather = this.armorLevel === 1;
+    const showChain = this.armorLevel >= 2;
+    const showPlate = this.armorLevel >= 3;
+
+    if (this.armorPieces) {
+      if (this.armorPieces.tunic) {
+        for (const p of this.armorPieces.tunic) if (p) p.visible = true;
+      }
+      if (this.armorPieces.leather) {
+        for (const p of this.armorPieces.leather) if (p) p.visible = showLeather;
+      }
+      if (this.armorPieces.chainmail) {
+        for (const p of this.armorPieces.chainmail) if (p) p.visible = showChain;
+      }
+      if (this.armorPieces.plate) {
+        for (const p of this.armorPieces.plate) if (p) p.visible = showPlate;
+      }
+    }
+  }
+
   reinforceArmor() {
-    this.armorLevel = Math.min(1, this.armorLevel + 1);
-    this.chestArmor.material.color.set("#bdad78");
-    this.chestArmor.material.metalness = 0.68;
-    this.chestArmor.material.needsUpdate = true;
+    this.setArmorVisuals(Math.min(3, this.armorLevel + 1));
   }
 
   sitAt(x, z, yaw = 0, isChurchPew = false) {
