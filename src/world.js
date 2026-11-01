@@ -703,7 +703,7 @@ export class World {
     return false;
   }
 
-  updateVisibility(camera, x, z) {
+  updateVisibility(camera, x, z, isCutscene = false) {
     camera.updateMatrixWorld();
     this._projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._projectionView);
@@ -721,6 +721,17 @@ export class World {
       const toChunkX = chunk.centerX - x;
       const toChunkZ = chunk.centerZ - z;
       const distanceSq = toChunkX * toChunkX + toChunkZ * toChunkZ;
+
+      // Durante cutscenes: desativa filtros de descarte para garantir visual cinematográfico impecável sem glitches
+      if (isCutscene) {
+        chunk.group.visible = true;
+        chunk.near.visible = distanceSq < this.lodDistanceSq * 1.5;
+        chunk.far.visible = distanceSq >= this.lodDistanceSq * 1.5;
+        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
+          chunk.shadowMeshes[s].castShadow = true;
+        }
+        continue;
+      }
 
       const toCamX = chunk.centerX - camX;
       const toCamZ = chunk.centerZ - camZ;

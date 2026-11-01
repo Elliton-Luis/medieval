@@ -517,7 +517,7 @@ export class Player {
         const target = Math.atan2(this.vx, this.vz);
         const difference = Math.atan2(Math.sin(target - before), Math.cos(target - before));
         this.model.rotation.y += difference * (1 - Math.exp(-20 * dt));
-        this.walkPhase += dt * (running ? 12 : 9) * this.speedRatio;
+        this.walkPhase += dt * (running ? 14 : 9) * this.speedRatio;
       }
       turnRate = Math.atan2(Math.sin(this.model.rotation.y - before), Math.cos(this.model.rotation.y - before)) / Math.max(dt, 0.001);
     }
@@ -546,7 +546,8 @@ export class Player {
     const air = !this.grounded;
     this.crouchPose += ((this.crouching ? 1 : 0) - this.crouchPose) * (1 - Math.exp(-12 * dt));
     const cp = this.crouchPose;
-    const stride = Math.sin(this.walkPhase) * s * (running ? 0.82 : 0.6);
+    const stride = Math.sin(this.walkPhase) * s * (running ? 1.22 : 0.62);
+    const armSwing = Math.sin(this.walkPhase) * s * (running ? 1.15 : 0.62);
     const idle = 1 - Math.min(1, s * 4);
     const breath = Math.sin(this.idleTime * 1.9);
     const sway = Math.sin(this.idleTime * 0.7);
@@ -554,16 +555,21 @@ export class Player {
     // Reseta explicitamente Y e Z das pernas a cada frame fora da montaria para nunca travar na pose RIDING
     this.leftLeg.rotation.set(stride, 0, 0);
     this.rightLeg.rotation.set(-stride, 0, 0);
-    this.leftArm.rotation.x = -stride * 0.8 + (running ? 0.3 : 0);
-    this.rightArm.rotation.x = stride * 0.8 - (running ? 0.2 : 0);
-    this.leftArm.rotation.y = 0;
-    this.rightArm.rotation.y = 0;
-    this.leftArm.rotation.z = -0.03 * breath * idle;
-    this.rightArm.rotation.z = 0.03 * breath * idle;
 
-    // Postura: inclinação para a frente com a velocidade e balanço nas curvas.
-    let lean = s * (running ? 0.2 : 0.09);
-    let bank = Math.max(-0.16, Math.min(0.16, -turnRate * 0.014 * s));
+    // Braços e antebraços com bombeamento atlético e cotovelos flexionados na corrida
+    if (running && s > 0.25) {
+      this.leftArm.rotation.set(-armSwing * 0.95 + 0.32, 0, -0.12);
+      this.rightArm.rotation.set(armSwing * 0.95 - 0.22, 0, 0.12);
+      this.leftForearm.rotation.x = -0.9 - Math.max(0, -armSwing) * 0.42;
+      this.rightForearm.rotation.x = -0.9 - Math.max(0, armSwing) * 0.42;
+    } else {
+      this.leftArm.rotation.set(-stride * 0.75, 0, -0.03 * breath * idle);
+      this.rightArm.rotation.set(stride * 0.75, 0, 0.03 * breath * idle);
+    }
+
+    // Postura: inclinação atlética para a frente na corrida (~19 graus / 0.33 rad) e balanço nas curvas.
+    let lean = s * (running ? 0.33 : 0.1);
+    let bank = Math.max(-0.2, Math.min(0.2, -turnRate * 0.016 * s));
     let squash = 1;
     let drop = -0.22 * cp;
     lean += 0.3 * cp;
@@ -623,7 +629,12 @@ export class Player {
 
     const melee = this.aimStyle === "melee";
     const carrying = !posing && this.attackTimer <= 0 && !air;
-    bendJoints(this, stride, stride, air ? 0.35 : 0);
+    bendJoints(this, stride, armSwing, air ? 0.35 : 0);
+    if (running && s > 0.25 && !air) {
+      // Flexão acentuada do joelho traseiro para kickback atlético na corrida real
+      this.leftKnee.rotation.x = Math.max(0.08, Math.max(0, -stride) * 1.55 + Math.max(0, stride) * 0.35);
+      this.rightKnee.rotation.x = Math.max(0.08, Math.max(0, stride) * 1.55 + Math.max(0, -stride) * 0.35);
+    }
     if (cp > 0.015) {
       // agachado: coxas para a frente e joelhos dobrados
       this.leftLeg.rotation.x -= 0.85 * cp;
@@ -749,10 +760,11 @@ export class Player {
     }
     this.handSocket.rotation.x += (socket - this.handSocket.rotation.x) * (1 - Math.exp(-22 * dt));
 
+    const runBob = running ? Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.075 : Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.035;
     this.model.rotation.x = lean;
-    this.model.rotation.z = bank;
+    this.model.rotation.z = bank + (running ? Math.sin(this.walkPhase) * s * 0.035 : 0);
     this.model.scale.y = squash;
-    this.model.position.set(0, (this.grounded ? Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.04 : 0) + drop, 0);
+    this.model.position.set(0, (this.grounded ? runBob : 0) + drop, 0);
 
     // Animações de Sentar no Banco (sitPose) e Ajoelhar / Rezar (prayPose)
     this.sitPose += ((this.sitting ? 1 : 0) - this.sitPose) * (1 - Math.exp(-12 * dt));

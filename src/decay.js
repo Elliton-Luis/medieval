@@ -919,7 +919,7 @@ export function updateMessenger(dt, player, effects, ui, audio, world, input = n
 // ============================================================================
 
 /**
- * Modelo dos Anjos Pretos do Vazio com Asas Vermelhas ou Roxas.
+ * Modelo aprimorado dos Anjos Pretos do Vazio com Asas Carmesins ou Roxas e Foice Cerimonial.
  */
 export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 } = {}) {
   const root = new THREE.Group();
@@ -930,73 +930,117 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
   root.add(model);
 
   const matObsidian = new THREE.MeshStandardMaterial({
-    color: 0x06050a,
-    roughness: 0.85,
-    metalness: 0.2,
+    color: 0x050409,
+    roughness: 0.82,
+    metalness: 0.35,
     flatShading: true,
   });
   const matWing = new THREE.MeshStandardMaterial({
     color: wingColor,
     emissive: wingColor,
-    emissiveIntensity: 2.4,
-    roughness: 0.35,
-    metalness: 0.1,
+    emissiveIntensity: 2.8,
+    roughness: 0.3,
+    metalness: 0.15,
     side: THREE.DoubleSide,
   });
   const matEyes = new THREE.MeshBasicMaterial({
     color: eyeColor,
   });
+  const matPupilDot = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+  });
+  const matBlade = new THREE.MeshStandardMaterial({
+    color: 0x110d18,
+    emissive: wingColor,
+    emissiveIntensity: 1.4,
+    metalness: 0.9,
+    roughness: 0.2,
+  });
 
-  // Corpo esguio e alto (2.4m)
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.36, 1.9, 7), matObsidian);
-  body.position.set(0, 0.95, 0);
+  // Manto/Corpo espectral esguio e imponente (2.6m de altura)
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.42, 2.1, 8), matObsidian);
+  body.position.set(0, 1.05, 0);
   model.add(body);
 
-  // Cabeça com capuz sombrio
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 7, 0, Math.PI * 2, 0, Math.PI * 0.75), matObsidian);
-  head.position.set(0, 1.95, 0);
+  // Capuz sombrio pontiagudo
+  const cowl = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 6), matObsidian);
+  cowl.position.set(0, 2.25, -0.05);
+  cowl.rotation.x = -0.22;
+  model.add(cowl);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 7), matObsidian);
+  head.position.set(0, 2.05, 0);
   model.add(head);
 
-  // Olhos brilhantes na escuridão do capuz
-  for (const sx of [-0.06, 0.06]) {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.05), matEyes);
-    eye.position.set(sx, 1.95, 0.14);
-    model.add(eye);
+  // Chifres curvos de obsidiana projetando-se do capuz
+  for (const sx of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.45, 5), matObsidian);
+    horn.position.set(sx * 0.16, 2.32, -0.02);
+    horn.rotation.z = -sx * 0.55;
+    horn.rotation.x = -0.3;
+    model.add(horn);
   }
 
-  // Grandes Asas Angelicais Sombrias (Esquerda e Direita)
+  // Olhos penetrantes com pupila branca pontual no centro
+  for (const sx of [-0.07, 0.07]) {
+    const eyeSocket = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.04), matEyes);
+    eyeSocket.position.set(sx, 2.05, 0.18);
+    model.add(eyeSocket);
+
+    const pupilDot = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.01), matPupilDot);
+    pupilDot.position.set(sx, 2.05, 0.202);
+    model.add(pupilDot);
+  }
+
+  // Grandes Asas Angelicais de 5 camadas cada
   const wingGroupL = new THREE.Group();
-  wingGroupL.position.set(-0.18, 1.6, -0.15);
-  for (let i = 0; i < 4; i++) {
-    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.12 - i * 0.02, 0.9 + i * 0.25, 4), matWing);
-    feather.rotation.z = 0.5 + i * 0.28;
-    feather.rotation.x = -0.15;
-    feather.position.set(-0.25 - i * 0.18, 0.3 + i * 0.15, 0);
+  wingGroupL.position.set(-0.2, 1.7, -0.16);
+  for (let i = 0; i < 5; i++) {
+    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.13 - i * 0.018, 1.05 + i * 0.28, 4), matWing);
+    feather.rotation.z = 0.55 + i * 0.26;
+    feather.rotation.x = -0.18;
+    feather.position.set(-0.28 - i * 0.22, 0.35 + i * 0.18, 0);
     wingGroupL.add(feather);
   }
   model.add(wingGroupL);
 
   const wingGroupR = new THREE.Group();
-  wingGroupR.position.set(0.18, 1.6, -0.15);
-  for (let i = 0; i < 4; i++) {
-    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.12 - i * 0.02, 0.9 + i * 0.25, 4), matWing);
-    feather.rotation.z = -0.5 - i * 0.28;
-    feather.rotation.x = -0.15;
-    feather.position.set(0.25 + i * 0.18, 0.3 + i * 0.15, 0);
+  wingGroupR.position.set(0.2, 1.7, -0.16);
+  for (let i = 0; i < 5; i++) {
+    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.13 - i * 0.018, 1.05 + i * 0.28, 4), matWing);
+    feather.rotation.z = -0.55 - i * 0.26;
+    feather.rotation.x = -0.18;
+    feather.position.set(0.28 + i * 0.22, 0.35 + i * 0.18, 0);
     wingGroupR.add(feather);
   }
   model.add(wingGroupR);
 
-  // Luz espectral emitida pelas asas
-  const angelLight = new THREE.PointLight(wingColor, 1.6, 9, 2.0);
-  angelLight.position.set(0, 1.6, 0.3);
+  // Foice do Vazio cerimonial portada na mão direita
+  const scytheGroup = new THREE.Group();
+  scytheGroup.position.set(0.38, 1.1, 0.15);
+  scytheGroup.rotation.z = 0.3;
+  scytheGroup.rotation.y = -0.4;
+
+  const haft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.5, 6), matObsidian);
+  scytheGroup.add(haft);
+
+  const scytheBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.75, 0.22), matBlade);
+  scytheBlade.position.set(0.18, 1.15, 0);
+  scytheBlade.rotation.z = -1.15;
+  scytheGroup.add(scytheBlade);
+  model.add(scytheGroup);
+
+  // Luz espectral emitida pelo anjo
+  const angelLight = new THREE.PointLight(wingColor, 2.2, 12, 1.8);
+  angelLight.position.set(0, 1.7, 0.4);
   model.add(angelLight);
 
-  return { root, model, wingGroupL, wingGroupR, angelLight };
+  return { root, model, wingGroupL, wingGroupR, angelLight, scytheGroup };
 }
 
 /**
  * Modelo do Olho Colossal do Demiurgo Descendo do Firmamento.
+ * Altamente visível, colossal (24m), com plasma, coroa solar e halos astrais.
  */
 export function buildDemiurgeColossalEyeMesh() {
   const root = new THREE.Group();
@@ -1005,68 +1049,126 @@ export function buildDemiurgeColossalEyeMesh() {
   const eyeGroup = new THREE.Group();
   root.add(eyeGroup);
 
-  const matNebula = new THREE.MeshStandardMaterial({
-    color: 0x14051e,
-    roughness: 0.95,
-    metalness: 0.1,
+  const matSclera = new THREE.MeshStandardMaterial({
+    color: 0x220516,
+    emissive: 0x44081c,
+    emissiveIntensity: 1.2,
+    roughness: 0.6,
+    metalness: 0.2,
   });
   const matGoldRings = new THREE.MeshStandardMaterial({
-    color: 0xdfa028,
-    emissive: 0x996611,
-    emissiveIntensity: 1.8,
-    roughness: 0.3,
-    metalness: 0.8,
+    color: 0xffb833,
+    emissive: 0xcc7700,
+    emissiveIntensity: 2.5,
+    roughness: 0.2,
+    metalness: 0.9,
   });
   const matIrisPlasma = new THREE.MeshStandardMaterial({
-    color: 0x9922ee,
-    emissive: 0xff2244,
-    emissiveIntensity: 3.5,
-    roughness: 0.2,
+    color: 0xff1144,
+    emissive: 0xff0033,
+    emissiveIntensity: 4.8,
+    roughness: 0.15,
+  });
+  const matCorona = new THREE.MeshBasicMaterial({
+    color: 0xaa11ff,
+    transparent: true,
+    opacity: 0.75,
+    side: THREE.DoubleSide,
   });
   const matVoidSlit = new THREE.MeshBasicMaterial({
     color: 0x000000,
   });
 
-  // Esfera Celestial do Olho (Diâmetro 16m)
-  const eyeball = new THREE.Mesh(new THREE.SphereGeometry(8.0, 16, 12), matNebula);
-  eyeball.scale.set(1.4, 0.75, 1.0);
+  // Esfera Celestial do Olho Colossal (Diâmetro 24m)
+  const eyeball = new THREE.Mesh(new THREE.SphereGeometry(12.0, 24, 18), matSclera);
+  eyeball.scale.set(1.4, 0.8, 1.1);
   eyeball.rotation.x = Math.PI / 2;
   eyeGroup.add(eyeball);
 
-  // Íris de Plasma Cósmica
-  const iris = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.5, 16), matIrisPlasma);
-  iris.position.set(0, -5.8, 0);
+  // Íris de Plasma Cósmica Flamejante
+  const iris = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 0.6, 24), matIrisPlasma);
+  iris.position.set(0, -9.2, 0);
   eyeGroup.add(iris);
 
-  // Pupila de Fenda Abissal Negra
-  const pupil = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 6.2), matVoidSlit);
-  pupil.position.set(0, -6.0, 0);
+  // Coroa de Espículas e Prominências Cósmicas
+  for (let i = 0; i < 16; i++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3.8, 4), matCorona);
+    const ang = (i / 16) * Math.PI * 2;
+    spike.position.set(Math.cos(ang) * 7.5, -9.0, Math.sin(ang) * 7.5);
+    spike.rotation.z = Math.cos(ang) * 0.9;
+    spike.rotation.x = Math.sin(ang) * 0.9;
+    eyeGroup.add(spike);
+  }
+
+  // Pupila Abissal de Fenda Negra
+  const pupil = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 9.8), matVoidSlit);
+  pupil.position.set(0, -9.5, 0);
   eyeGroup.add(pupil);
 
-  // Halos de Anéis Rúnicos Sagrados Giratórios
-  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.28, 8, 24), matGoldRings);
+  // Anéis Rúnicos Sagrados Giratórios
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(15.5, 0.45, 10, 36), matGoldRings);
   ring1.rotation.x = Math.PI / 2;
   eyeGroup.add(ring1);
 
-  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(12.8, 0.22, 8, 24), matIrisPlasma);
-  ring2.rotation.x = Math.PI / 2 + 0.2;
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(18.8, 0.35, 10, 36), matIrisPlasma);
+  ring2.rotation.x = Math.PI / 2 + 0.25;
   eyeGroup.add(ring2);
 
-  // Feixe de Luz Celestial Devastador (Spotlight voltado para a terra)
-  const spotlight = new THREE.SpotLight(0xff2244, 8.0, 140, Math.PI * 0.32, 0.5, 1.5);
-  spotlight.position.set(0, -4, 0);
-  spotlight.target.position.set(0, -90, 0);
+  // Feixe de Luz Celestial Devastador e Ponto de Luz Intensa
+  const spotlight = new THREE.SpotLight(0xff1133, 14.0, 180, Math.PI * 0.42, 0.4, 1.2);
+  spotlight.position.set(0, -6, 0);
+  spotlight.target.position.set(0, -110, 0);
   eyeGroup.add(spotlight);
   eyeGroup.add(spotlight.target);
 
-  return { root, eyeGroup, eyeball, ring1, ring2, spotlight };
+  const eyeLight = new THREE.PointLight(0xff2255, 8.0, 120, 1.6);
+  eyeLight.position.set(0, -8, 0);
+  eyeGroup.add(eyeLight);
+
+  return { root, eyeGroup, eyeball, ring1, ring2, spotlight, eyeLight };
+}
+
+/**
+ * Olho do Firmamento para espalhar pela abóbada celeste.
+ */
+export function buildFirmamentEyeMesh(color = 0xff1144) {
+  const root = new THREE.Group();
+  const matOuter = new THREE.MeshStandardMaterial({
+    color: 0x14051a,
+    emissive: 0x22051e,
+    roughness: 0.5,
+  });
+  const matIris = new THREE.MeshBasicMaterial({ color });
+  const matSlit = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+  const eyeBody = new THREE.Mesh(new THREE.SphereGeometry(2.4, 12, 10), matOuter);
+  eyeBody.scale.set(1.5, 0.7, 1.0);
+  root.add(eyeBody);
+
+  const iris = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 12), matIris);
+  iris.position.set(0, -1.5, 0);
+  root.add(iris);
+
+  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 1.8), matSlit);
+  slit.position.set(0, -1.6, 0);
+  root.add(slit);
+
+  const pLight = new THREE.PointLight(color, 2.5, 35, 1.8);
+  pLight.position.set(0, -2, 0);
+  root.add(pLight);
+
+  return { root, eyeBody, iris, pLight };
 }
 
 export const DemiurgeCataclysm = {
   active: false,
   timer: 0,
   angels: [],
+  firmamentEyes: [],
   colossalEye: null,
+  shockwave: null,
+  lastDescentSound: 0,
+  groundImpactDone: false,
   modalShown: false,
   destroyed: false,
   env: null,
@@ -1079,6 +1181,8 @@ export function triggerDemiurgeCataclysm(env) {
   if (DemiurgeCataclysm.active) return;
   DemiurgeCataclysm.active = true;
   DemiurgeCataclysm.timer = 0;
+  DemiurgeCataclysm.lastDescentSound = 0;
+  DemiurgeCataclysm.groundImpactDone = false;
   DemiurgeCataclysm.modalShown = false;
   DemiurgeCataclysm.destroyed = false;
   DemiurgeCataclysm.env = env;
@@ -1087,17 +1191,18 @@ export function triggerDemiurgeCataclysm(env) {
 
   WorldDecay.isEclipse = true;
   if (dayNight) {
-    dayNight.progress = 0.5; // Força Meia-noite do Eclipse
+    dayNight.progress = 0.5; // Meia-noite do Eclipse
   }
 
   ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! O DEMIURGO DESCE À TERRA!");
+  audio?.demiurgeDescent?.();
   audio?.deathBell?.();
 
   const px = player?.x ?? 0;
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
 
-  // Spawna os 8 Anjos Pretos com Asas Vermelhas e Roxas em círculo ao redor do jogador
+  // 1. Spawna os Anjos Pretos com Asas Vermelhas e Roxas em círculo
   DemiurgeCataclysm.angels = [];
   const angelCount = 8;
   for (let i = 0; i < angelCount; i++) {
@@ -1107,7 +1212,7 @@ export function triggerDemiurgeCataclysm(env) {
 
     const angelData = buildDarkAngelMesh({ wingColor, eyeColor });
     const ang = (i / angelCount) * Math.PI * 2;
-    const radius = 9.5;
+    const radius = 10.5;
     const ax = px + Math.cos(ang) * radius;
     const az = pz + Math.sin(ang) * radius;
 
@@ -1122,12 +1227,46 @@ export function triggerDemiurgeCataclysm(env) {
     DemiurgeCataclysm.angels.push(angelData);
   }
 
-  // Spawna o Olho Colossal do Demiurgo nos céus diretamente acima do jogador
+  // 2. Spawna 14 Olhos do Firmamento espalhados por todo o céu vigiando a terra
+  DemiurgeCataclysm.firmamentEyes = [];
+  for (let k = 0; k < 14; k++) {
+    const skyAng = (k / 14) * Math.PI * 2 + (k % 2) * 0.2;
+    const dist = 45 + (k % 3) * 15;
+    const eyX = px + Math.cos(skyAng) * dist;
+    const eyZ = pz + Math.sin(skyAng) * dist;
+    const eyY = py + 42 + (k % 4) * 12;
+
+    const eyeColor = k % 2 === 0 ? 0xff1133 : 0xaa22ee;
+    const fEye = buildFirmamentEyeMesh(eyeColor);
+    fEye.root.position.set(eyX, eyY, eyZ);
+    fEye.root.lookAt(px, py + 1.0, pz);
+    fEye.root.rotation.x += Math.PI / 2;
+
+    if (scene) scene.add(fEye.root);
+    DemiurgeCataclysm.firmamentEyes.push(fEye);
+  }
+
+  // 3. Spawna o Olho Colossal do Demiurgo nos céus
   const eyeData = buildDemiurgeColossalEyeMesh();
-  eyeData.root.position.set(px, py + 95, pz);
-  eyeData.targetY = py + 26;
+  eyeData.root.position.set(px, py + 115, pz);
+  eyeData.targetY = py + 0.8; // Destino: colisão e choque direto contra o solo!
   if (scene) scene.add(eyeData.root);
   DemiurgeCataclysm.colossalEye = eyeData;
+
+  // 4. Cria anel de onda de choque no solo para o impacto
+  const shockMat = new THREE.MeshBasicMaterial({
+    color: 0xff2244,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const shockGeom = new THREE.RingGeometry(0.5, 3.0, 32);
+  const shockMesh = new THREE.Mesh(shockGeom, shockMat);
+  shockMesh.rotation.x = -Math.PI / 2;
+  shockMesh.position.set(px, py + 0.25, pz);
+  shockMesh.visible = false;
+  if (scene) scene.add(shockMesh);
+  DemiurgeCataclysm.shockwave = shockMesh;
 }
 
 /**
@@ -1142,39 +1281,94 @@ export function updateDemiurgeCataclysm(dt, env) {
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
 
-  // 1. Descida dos anjos e rotação em círculo
+  // Rugido contínuo da descida a cada 2.5s
+  if (t - DemiurgeCataclysm.lastDescentSound >= 2.5 && !DemiurgeCataclysm.groundImpactDone) {
+    DemiurgeCataclysm.lastDescentSound = t;
+    audio?.demiurgeDescent?.();
+  }
+
+  // 1. Descida e animação dos anjos negros
   for (let i = 0; i < DemiurgeCataclysm.angels.length; i++) {
     const a = DemiurgeCataclysm.angels[i];
-    a.wingPhase += dt * 3.5;
-    a.root.position.y = THREE.MathUtils.lerp(a.root.position.y, a.targetY + Math.sin(a.wingPhase) * 0.18, dt * 1.8);
-    const flap = Math.sin(a.wingPhase) * 0.32;
+    a.wingPhase += dt * 3.8;
+    a.root.position.y = THREE.MathUtils.lerp(a.root.position.y, a.targetY + Math.sin(a.wingPhase) * 0.2, dt * 1.8);
+    const flap = Math.sin(a.wingPhase) * 0.35;
     a.wingGroupL.rotation.z = flap;
     a.wingGroupR.rotation.z = -flap;
+    a.scytheGroup.rotation.x = Math.sin(a.wingPhase * 0.5) * 0.15;
     a.root.lookAt(px, py + 1.2, pz);
 
-    if (Math.random() < 0.08 && effects) {
+    if (Math.random() < 0.1 && effects) {
       const col = i % 2 === 1 ? "#aa22ee" : "#ff1a33";
-      effects.play("star", a.root.position.x, a.root.position.y + 1.6, a.root.position.z, col, 1.2);
+      effects.play("star", a.root.position.x, a.root.position.y + 1.6, a.root.position.z, col, 1.4);
     }
   }
 
-  // 2. Descida do Olho Colossal e rotação de anéis
+  // 2. Olhos do firmamento pulsando na abóbada celeste
+  for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
+    const fEye = DemiurgeCataclysm.firmamentEyes[k];
+    const pulse = 1.0 + Math.sin(t * 3.0 + k) * 0.35;
+    fEye.pLight.intensity = 2.5 * pulse;
+  }
+
+  // 3. Descida do Olho Colossal e choque direto com o chão
   if (DemiurgeCataclysm.colossalEye) {
     const eye = DemiurgeCataclysm.colossalEye;
     eye.root.position.x = px;
     eye.root.position.z = pz;
-    eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * 0.85);
 
-    eye.ring1.rotation.z += dt * 0.6;
-    eye.ring2.rotation.z -= dt * 0.9;
-    eye.eyeball.rotation.z += dt * 0.2;
+    // Velocidade de descida acelerando conforme se aproxima
+    const descentSpeed = THREE.MathUtils.clamp(0.6 + t * 0.15, 0.6, 2.8);
+    eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * descentSpeed);
 
-    if (t > 4.0 && cameraRig?.shakeAt) {
-      cameraRig.shakeAt(px, pz, 0.45, px, pz);
+    eye.ring1.rotation.z += dt * 0.8;
+    eye.ring2.rotation.z -= dt * 1.1;
+    eye.eyeball.rotation.z += dt * 0.3;
+
+    // Tremores de terra crescentes conforme o Olho desce
+    if (t > 3.0 && cameraRig?.shakeAt) {
+      const shakeAmt = THREE.MathUtils.clamp(0.25 + (t - 3.0) * 0.18, 0.25, 1.8);
+      cameraRig.shakeAt(px, pz, shakeAmt, px, pz);
+    }
+
+    // Impacto do Olho no solo (t >= 11.2s ou proximidade imediata)
+    if ((t >= 11.2 || eye.root.position.y <= py + 2.5) && !DemiurgeCataclysm.groundImpactDone) {
+      DemiurgeCataclysm.groundImpactDone = true;
+      audio?.colossalImpact?.();
+      audio?.explosion?.(px, pz, 10.0);
+
+      if (cameraRig?.shakeAt) {
+        cameraRig.shakeAt(px, pz, 2.4, px, pz);
+      }
+
+      // Ativa onda de choque terrestre
+      if (DemiurgeCataclysm.shockwave) {
+        DemiurgeCataclysm.shockwave.visible = true;
+        DemiurgeCataclysm.shockwave.material.opacity = 0.95;
+      }
+
+      // Erupção maciça de 35 plumas de poeira e chamas cósmicas
+      if (effects) {
+        for (let k = 0; k < 35; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const rad = Math.random() * 28;
+          const dustColor = k % 2 === 0 ? "#ff1144" : "#220533";
+          effects.play("dust", px + Math.cos(ang) * rad, py + 0.5, pz + Math.sin(ang) * rad, dustColor, 5.0);
+          effects.play("star", px + Math.cos(ang) * rad, py + 1.5, pz + Math.sin(ang) * rad, "#ff2244", 3.8);
+        }
+      }
+    }
+
+    // Expansão da onda de choque no chão
+    if (DemiurgeCataclysm.groundImpactDone && DemiurgeCataclysm.shockwave && DemiurgeCataclysm.shockwave.visible) {
+      const sw = DemiurgeCataclysm.shockwave;
+      sw.scale.x += dt * 28.0;
+      sw.scale.y += dt * 28.0;
+      sw.material.opacity = Math.max(0, sw.material.opacity - dt * 0.7);
     }
   }
 
-  // 3. Proclamação Cósmica do Demiurgo
+  // 4. Proclamação Cósmica do Demiurgo
   if (t >= 7.0 && !DemiurgeCataclysm.modalShown) {
     DemiurgeCataclysm.modalShown = true;
     showDemiurgeModal(
@@ -1183,26 +1377,22 @@ export function updateDemiurgeCataclysm(dt, env) {
     );
   }
 
-  // 4. Destruição Total e Game Over (O Mal Final)
+  // 5. Destruição Total e Fim do Jogo
   if (t >= 13.5 && !DemiurgeCataclysm.destroyed) {
     DemiurgeCataclysm.destroyed = true;
 
     if (effects) {
-      for (let k = 0; k < 12; k++) {
+      for (let k = 0; k < 16; k++) {
         const ang = Math.random() * Math.PI * 2;
-        const rad = Math.random() * 24;
-        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 4.0);
-        effects.play("star", px + Math.cos(ang) * rad, py + 2, pz + Math.sin(ang) * rad, "#ff2244", 3.2);
+        const rad = Math.random() * 32;
+        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 4.5);
       }
-    }
-    if (audio?.explosion) {
-      audio.explosion(px, pz, 5.0);
     }
 
     if (deathScreen) {
       deathScreen.start({
         customTitle: "O FIM DA CRIAÇÃO MATERIAL",
-        customSubtitle: "O Demiurgo consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre.",
+        customSubtitle: "O Demiurgo colidiu contra a terra e consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre.",
         coinsLost: 99999,
         morality: -100,
       });

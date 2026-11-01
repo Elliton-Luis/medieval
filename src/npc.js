@@ -1304,7 +1304,7 @@ export class NPCSystem {
     this.onWantedChange?.(0);
   }
 
-  update(dt, playerX, playerZ, isNight = false, isPlayerLit = true, timeOfDay = 12) {
+  update(dt, playerX, playerZ, isNight = false, isPlayerLit = true, timeOfDay = 12, isCutscene = false) {
     const clampedDt = Math.min(dt, 0.05);
     this.playerX = playerX;
     this.playerZ = playerZ;
@@ -1367,6 +1367,13 @@ export class NPCSystem {
       const dz = playerZ - npc.z;
       const distanceSq = dx * dx + dz * dz;
       npc.distanceSq = distanceSq;
+
+      // Em cutscenes: desativa filtros de culling para que todos os NPCs apareçam com fidelidade absoluta
+      if (isCutscene) {
+        if (!npc.removed && npc.alive) npc.root.visible = true;
+        if (npc.alive && !npc.temporary) npc.update(clampedDt, playerX, playerZ);
+        continue;
+      }
 
       // 1. Culling ATRÁS DO PLAYER:
       // O usuário: "renderize só imediatamente atrás do player, o longe não"

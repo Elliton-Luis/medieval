@@ -127,7 +127,7 @@ export class HouseSystem {
     this.npcs.notifyCrime(owner.x, owner.z, 18, null, severity);
   }
 
-  update(dt, camera = null) {
+  update(dt, camera = null, isCutscene = false) {
     if (camera) this.camera = camera;
     const activeCam = this.camera;
     const player = this.player;
@@ -215,6 +215,14 @@ export class HouseSystem {
         if (house.bellRope.bellPivot) {
           house.bellRope.bellPivot.rotation.x = Math.sin(house.bellRope.swingTimer * 7.5) * 0.55 * (house.bellRope.swingTimer / 4.5);
         }
+      }
+
+      // Em cutscenes: desativa todos os filtros de culling de casas e interiores para zero glitches visuais
+      if (isCutscene) {
+        if (!house.group.visible) house.group.visible = true;
+        if (house.interior && !house.interior.visible) house.interior.visible = true;
+        house.door.angle += (house.door.target - house.door.angle) * (1 - Math.exp(-9 * dt));
+        continue;
       }
 
       const dx = player.x - house.x;

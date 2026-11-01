@@ -492,4 +492,38 @@ export class GameAudio {
       osc.stop(t + 1.85);
     }
   }
+
+  // Som contínuo de rugido e vento abissal da descida do Olho do Demiurgo
+  demiurgeDescent() {
+    if (!this.context) return;
+    // Rugido descendente de baixa frequência
+    this._tone("sawtooth", 140, 28, 2.2, 0.65);
+    this._tone("triangle", 80, 22, 2.6, 0.85);
+    this._burst(2.0, 0.7, "lowpass", 420, 90);
+  }
+
+  // Impacto cataclísmico do Olho Colossal chocando contra a terra
+  colossalImpact() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const t = ctx.currentTime;
+    // Sub-bass quake
+    this._tone("sawtooth", 120, 15, 3.5, 1.0);
+    this._tone("sine", 85, 12, 4.0, 1.0);
+    this._burst(3.2, 0.95, "lowpass", 380, 40);
+    this._burst(1.2, 0.8, "bandpass", 800, 180);
+    // Acorde dissonante do cataclismo
+    for (const f of [55, 77.78, 110, 155.56]) {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(f, t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.0);
+      osc.connect(gain).connect(this.sfx);
+      osc.start(t);
+      osc.stop(t + 3.1);
+    }
+  }
 }

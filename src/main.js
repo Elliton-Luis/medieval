@@ -353,11 +353,13 @@ function frame(now) {
   const isPaused = pause.open || isDemiurge || isReading || isBuildMenu;
   const dt = isPaused ? 0 : Math.min(elapsed, CONFIG.maxDelta) * deathScreen.timeScale;
 
+  const isCutscene = Boolean(GameState.isIntroPlaying || DemiurgeCataclysm.active || HolyEndingState.active);
+
   if (GameState.isIntroPlaying) {
     updateIntroSequence(dt, player, camera, world, audio, effects, ui);
     world.updateAround(player.x, player.z);
     effects.update(dt);
-    world.updateVisibility(camera, player.x, player.z);
+    world.updateVisibility(camera, player.x, player.z, true);
     dayNight.update(dt, player.x, player.z);
     renderer.render(scene, camera);
     if (!hasRendered) {
@@ -385,9 +387,9 @@ function frame(now) {
   }
   updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
   updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig });
-  updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig });
+  updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig, player, effects });
   updateMessenger(dt, player, effects, ui, audio, world, input);
-  npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay);
+  npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay, isCutscene);
   interactions.update(dt);
   combat.update(dt);
   updateMissionProgress(player.root, dt);
@@ -402,7 +404,7 @@ function frame(now) {
   director.update(dt, player);
   torches.update(dt, player);
   candle.update(dt, player.mounted ? player.mounted.speed : 0);
-  houses.update(dt, camera);
+  houses.update(dt, camera, isCutscene);
   fire.update(dt);
   horses.update(dt);
   music.update(elapsed);
@@ -414,7 +416,7 @@ function frame(now) {
   minimap.update(dt, player, cameraRig.yaw, npcs, npcs.wanted);
   explosions.update(dt);
   effects.update(dt);
-  world.updateVisibility(camera, player.x, player.z);
+  world.updateVisibility(camera, player.x, player.z, isCutscene);
   const clock = dayNight.update(dt, player.x, player.z);
   renderer.render(scene, camera);
   ui.update(dt, clock, world.activeChunks.length, npcs.nearest, player.x, player.z);
