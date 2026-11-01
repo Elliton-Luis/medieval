@@ -48,6 +48,24 @@ const _tornClothMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
+const _pupilMat = new THREE.MeshBasicMaterial({
+  color: 0x050403,
+});
+
+const _boneSpineMat = new THREE.MeshStandardMaterial({
+  color: 0xd0c4a4,
+  roughness: 0.85,
+  metalness: 0.08,
+  flatShading: true,
+});
+
+const _bloodDriedMat = new THREE.MeshStandardMaterial({
+  color: 0x48080c,
+  roughness: 0.75,
+  metalness: 0.15,
+  flatShading: true,
+});
+
 // ============================================================================
 // 1. Gulur: O Colosso dos Ermos (Quadrúpede Gigante de Pernas Finas - Olhos Amarelos)
 // ============================================================================
@@ -74,6 +92,7 @@ export class Gulur {
     this.roleKey = "gulur";
     this.deadTime = 0;
     this._inGrid = false;
+    this._groundY = 0;
 
     this.root = new THREE.Group();
     this.root.name = "Gulur";
@@ -89,6 +108,22 @@ export class Gulur {
     const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 3.8), _shadowBodyMat);
     torsoMesh.castShadow = true;
     this.bodyGroup.add(torsoMesh);
+
+    // Crista de espinhos ósseos afiados ao longo da espinha dorsal
+    for (let s = 0; s < 6; s++) {
+      const spine = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.65, 4), _boneSpineMat);
+      spine.position.set(0, 0.75, 1.4 - s * 0.55);
+      spine.rotation.x = -0.35;
+      this.bodyGroup.add(spine);
+    }
+
+    // Tiras de tecido negro rasgado e esfarrapado pendentes dos flancos
+    for (let t = 0; t < 4; t++) {
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 0.35), _tornClothMat);
+      flap.position.set((t % 2 === 0 ? 0.8 : -0.8), -0.6, 0.8 - Math.floor(t / 2) * 1.2);
+      flap.rotation.z = (t % 2 === 0 ? 0.15 : -0.15);
+      this.bodyGroup.add(flap);
+    }
 
     // Caixa torácica esguia / flancos
     const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.8), _shadowBodyMat);
@@ -115,7 +150,18 @@ export class Gulur {
     snoutMesh.position.set(0, 0.85, -1.7);
     this.neck.add(snoutMesh);
 
-    // Olhos Amarelos Brilhantes e Penetrantes no topo da cabeça
+    // Mandíbula inferior com presas aterradoras
+    const jawMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.22, 0.85), _shadowBodyMat);
+    jawMesh.position.set(0, 0.55, -1.65);
+    this.neck.add(jawMesh);
+    for (let f of [-0.18, 0.18]) {
+      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.22, 4), _teethMat);
+      fang.position.set(f, 0.68, -1.9);
+      fang.rotation.x = Math.PI;
+      this.neck.add(fang);
+    }
+
+    // Olhos Amarelos Brilhantes com Fendas de Pupila Predatória Negra
     const eyeGeo = new THREE.SphereGeometry(0.12, 6, 5);
     const leftEye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
     leftEye.position.set(0.38, 1.15, -1.35);
@@ -125,12 +171,18 @@ export class Gulur {
     rightEye.position.set(-0.38, 1.15, -1.35);
     this.neck.add(rightEye);
 
+    for (const eyeMesh of [leftEye, rightEye]) {
+      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.05), _pupilMat);
+      pupil.position.set(0, 0, 0.11);
+      eyeMesh.add(pupil);
+    }
+
     // Pequena luz pontual amarela etérea que emana dos olhos no alto
     this.eyeLight = new THREE.PointLight(0xffea00, 2.5, 18.0, 1.6);
     this.eyeLight.position.set(0, 1.2, -1.5);
     this.neck.add(this.eyeLight);
 
-    // 4 Pernas Finas Colossais (16 metros de altura cada)
+    // 4 Pernas Finas Colossais (16 metros de altura cada) com Esporões Ósseos
     this.legs = [];
     const legOffsets = [
       { x: 0.75, z: -1.3 }, // Dianteira Direita
@@ -149,13 +201,18 @@ export class Gulur {
       upper.position.set(0, -4.1, 0);
       legRoot.add(upper);
 
-      // Articulação do joelho alto
+      // Articulação do joelho alto com esporão ósseo
       const kneeGroup = new THREE.Group();
       kneeGroup.position.set(0, -8.2, 0);
       legRoot.add(kneeGroup);
 
       const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.11, 5, 4), _thinLegMat);
       kneeGroup.add(kneeJoint);
+
+      const kneeSpur = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.35, 4), _boneSpineMat);
+      kneeSpur.position.set(0, 0, -0.16);
+      kneeSpur.rotation.x = -Math.PI / 2.2;
+      kneeGroup.add(kneeSpur);
 
       // Canela inferior finíssima até o solo
       const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.035, 8.2, 5), _thinLegMat);
@@ -165,8 +222,8 @@ export class Gulur {
       this.legs.push({ legRoot, kneeGroup, upper, lower });
     }
 
-    const groundY = this.world ? this.world.heightAt(x, z) : 0;
-    this.root.position.set(x, groundY, z);
+    this._groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this.root.position.set(x, this._groundY, z);
     scene.add(this.root);
   }
 
@@ -251,10 +308,10 @@ export class Gulur {
     const pz = this.player.z ?? 0;
     const dx = px - this.x;
     const dz = pz - this.z;
-    const dist = Math.hypot(dx, dz);
+    const distSq = dx * dx + dz * dz;
 
-    // Se o jogador estiver longe (> 36m): o Gulur fica parado ou dando passos lentos e ENCARA fixamente com olhos amarelos
-    if (dist > 36) {
+    // Se o jogador estiver longe (> 36m, distSq > 1296): o Gulur fica parado ou dando passos lentos e ENCARA fixamente com olhos amarelos
+    if (distSq > 1296) {
       if (this.fleeTimer > 0) {
         this.fleeTimer -= dt;
       } else {
@@ -297,8 +354,10 @@ export class Gulur {
       }
     }
 
-    const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
-    this.root.position.set(this.x, groundY, this.z);
+    if (this._groundY === undefined || this.speed > 0.1) {
+      this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
 
     // Atualização celular na Spatial Hash Grid
     if (this.npcs?.spatialGrid && this._inGrid) {
@@ -357,48 +416,79 @@ export class Necron {
     torso.castShadow = true;
     this.model.add(torso);
 
+    // Costelas salientes e vértebras visíveis sob a pele esticada
+    for (let r = 0; r < 4; r++) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.26), _boneSpineMat);
+      rib.position.set(0, 0.82 + r * 0.12, 0.01);
+      this.model.add(rib);
+    }
+
     // Farrapos rasgados no tronco e cintura
     const rag = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.28), _tornClothMat);
     rag.position.set(0, 0.75, 0.02);
     this.model.add(rag);
 
-    // CABEÇA ASSUSTADORA: SEM TOPO, SEM OLHOS, APENAS A BOCA COM DENTES EXPOSTOS
+    // CABEÇA ASSUSTADORA: SEM TOPO, SEM OLHOS, APENAS A BOCA COM DUPLA CAMADA DE DENTES EXPOSTOS
     this.headGroup = new THREE.Group();
     this.headGroup.position.set(0, 1.38, -0.12);
     this.model.add(this.headGroup);
 
-    // Mandíbula inferior e base do queixo
+    // Mandíbula inferior e base do queixo cadavérico
     const jawBase = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.38), _paleSkinMat);
     jawBase.position.set(0, 0, 0);
     this.headGroup.add(jawBase);
 
-    // Interior vermelho-escuro da boca escancarada
+    // Borda da boca com manchas de sangue seco e putrefação
+    const rimStain = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.40), _bloodDriedMat);
+    rimStain.position.set(0, 0.08, 0);
+    this.headGroup.add(rimStain);
+
+    // Interior carmesim-profundo da boca escancarada
     const mouthCavity = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.30), _mouthInteriorMat);
     mouthCavity.position.set(0, 0.04, -0.02);
     this.headGroup.add(mouthCavity);
 
-    // Dentes triangulares afiados brancos visíveis ao redor de toda a boca
-    for (let d = 0; d < 10; d++) {
-      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.12, 4), _teethMat);
-      const angle = (d / 10) * Math.PI * 2;
-      tooth.position.set(Math.cos(angle) * 0.14, 0.10, Math.sin(angle) * 0.14 - 0.02);
+    // 1ª CAMADA EXTERNA: Dentes triangulares afiados brancos visíveis ao redor de toda a borda
+    for (let d = 0; d < 12; d++) {
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.13, 4), _teethMat);
+      const angle = (d / 12) * Math.PI * 2;
+      tooth.position.set(Math.cos(angle) * 0.14, 0.11, Math.sin(angle) * 0.14 - 0.02);
       tooth.rotation.x = Math.PI;
       this.headGroup.add(tooth);
     }
 
-    // Braços esguios
+    // 2ª CAMADA INTERNA: Fileira concêntrica de dentes ósseos afiados e desiguais
+    for (let d2 = 0; d2 < 8; d2++) {
+      const innerTooth = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.09, 4), _boneSpineMat);
+      const angle2 = (d2 / 8) * Math.PI * 2 + 0.2;
+      innerTooth.position.set(Math.cos(angle2) * 0.09, 0.08, Math.sin(angle2) * 0.09 - 0.02);
+      innerTooth.rotation.x = Math.PI;
+      this.headGroup.add(innerTooth);
+    }
+
+    // Braços esguios com dedos em agulha alongados
     this.arms = [];
     const armGeo = new THREE.BoxGeometry(0.12, 0.75, 0.12);
 
-    const leftArm = new THREE.Mesh(armGeo, _paleSkinMat);
-    leftArm.position.set(0.28, 1.25, -0.1);
-    this.model.add(leftArm);
-    this.arms.push(leftArm);
+    for (const s of [1, -1]) {
+      const armGroup = new THREE.Group();
+      armGroup.position.set(s * 0.28, 1.25, -0.1);
 
-    const rightArm = new THREE.Mesh(armGeo, _paleSkinMat);
-    rightArm.position.set(-0.28, 1.25, -0.1);
-    this.model.add(rightArm);
-    this.arms.push(rightArm);
+      const armMesh = new THREE.Mesh(armGeo, _paleSkinMat);
+      armMesh.position.set(0, -0.32, 0);
+      armGroup.add(armMesh);
+
+      // Três garras/dedos longos em forma de agulha cadavérica
+      for (let f = 0; f < 3; f++) {
+        const finger = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.22, 4), _boneSpineMat);
+        finger.position.set((f - 1) * 0.035, -0.72, 0.04);
+        finger.rotation.x = Math.PI * 0.85;
+        armGroup.add(finger);
+      }
+
+      this.model.add(armGroup);
+      this.arms.push(armGroup);
+    }
 
     // Pernas trêmulas
     this.legs = [];
@@ -415,6 +505,7 @@ export class Necron {
     this.legs.push(rightLeg);
 
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this._groundY = groundY;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
@@ -503,10 +594,10 @@ export class Necron {
     const py = (this.player.root?.position?.y || 0);
     const dx = px - this.x;
     const dz = pz - this.z;
-    const dist = Math.hypot(dx, dz);
+    const distSq = dx * dx + dz * dz;
 
-    // O Necron fica esperando; SÓ ATACA QUANDO O PLAYER ESTÁ MUITO PERTO (<= 7.5m)
-    if (dist <= 7.5) {
+    // O Necron fica esperando; SÓ ATACA QUANDO O PLAYER ESTÁ MUITO PERTO (<= 7.5m, distSq <= 56.25)
+    if (distSq <= 56.25) {
       this.state = "charging";
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 8.0);
@@ -519,9 +610,10 @@ export class Necron {
         this.arms[i].rotation.x = -1.45 + Math.sin(performance.now() * 0.02) * 0.15;
       }
       this.model.rotation.x = 0.32;
+      this.headGroup.rotation.z = 0;
 
-      // Ataque de mordida feroz corpo a corpo (<= 2.2m)
-      if (dist <= 2.2) {
+      // Ataque de mordida feroz corpo a corpo (<= 2.2m, distSq <= 4.84)
+      if (distSq <= 4.84) {
         this.speed = 1.8; // Desacelera para infligir a mordida sem atravessar o corpo
         if (this.attackCooldown <= 0) {
           this.attackCooldown = 0.95;
@@ -540,11 +632,18 @@ export class Necron {
       this.speed = 0; // Imóvel esperando a presa
       this.model.rotation.x = 0.08;
 
-      // Movimentos sutis de respiração e postura atenta ouvindo a noite
-      const breath = Math.sin(performance.now() * 0.0035) * 0.06;
+      // Movimentos sutis de respiração com espasmos e tremores nervosos no pescoço
+      const now = performance.now();
+      const breath = Math.sin(now * 0.0035) * 0.06;
+      const twitch = Math.sin(now * 0.006) > 0.93 ? (Math.sin(now * 0.035) * 0.22) : 0;
+
       this.headGroup.rotation.x = breath;
+      this.headGroup.rotation.z = twitch;
+      this.headGroup.rotation.y = twitch * 0.75;
+
       for (let i = 0; i < this.arms.length; i++) {
         this.arms[i].rotation.x = -0.15 + breath * 0.5;
+        this.arms[i].rotation.z = (i === 0 ? 1 : -1) * (0.05 + Math.abs(twitch) * 0.4);
       }
     }
 
@@ -562,8 +661,10 @@ export class Necron {
       this.legs[1].rotation.x = 0;
     }
 
-    const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
-    this.root.position.set(this.x, groundY, this.z);
+    if (this._groundY === undefined || this.speed > 0.05) {
+      this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
 
     // Atualização celular na Spatial Hash Grid
     if (this.npcs?.spatialGrid && this._inGrid) {
@@ -644,7 +745,15 @@ export class Hexoculus {
     headMesh.rotation.x = Math.PI;
     this.headGroup.add(headMesh);
 
-    // 6 OLHOS AMARELOS INCANDESCENTES alinhados em duas colunas verticais
+    // Crista de chifres ósseos occipitais projetando-se para trás
+    for (let h = 0; h < 3; h++) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.38, 4), _boneSpineMat);
+      horn.position.set(0, 0.22 - h * 0.18, -0.15 - h * 0.05);
+      horn.rotation.x = -Math.PI * 0.35;
+      this.headGroup.add(horn);
+    }
+
+    // 6 OLHOS AMARELOS INCANDESCENTES alinhados em duas colunas verticais com pupilas de fenda negra
     this.eyes = [];
     const eyeGeo = new THREE.SphereGeometry(0.055, 6, 5);
     const eyePositions = [
@@ -657,8 +766,19 @@ export class Hexoculus {
     ];
 
     for (let e = 0; e < 6; e++) {
+      // Órbita ocular sombria rebaixada
+      const socketMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.04), _shadowBodyMat);
+      socketMesh.position.set(eyePositions[e].x, eyePositions[e].y, eyePositions[e].z - 0.02);
+      this.headGroup.add(socketMesh);
+
       const eye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
       eye.position.set(eyePositions[e].x, eyePositions[e].y, eyePositions[e].z);
+
+      // Fenda de pupila vertical preta
+      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.08, 0.03), _pupilMat);
+      pupil.position.set(0, 0, 0.045);
+      eye.add(pupil);
+
       this.headGroup.add(eye);
       this.eyes.push(eye);
     }
@@ -667,6 +787,14 @@ export class Hexoculus {
     this.eyeLight = new THREE.PointLight(0xffea00, 3.2, 14, 1.6);
     this.eyeLight.position.set(0, 0.05, 0.2);
     this.headGroup.add(this.eyeLight);
+
+    // Tiras de manto sombrio fantasmagórico pendentes dos ombros
+    for (let sh = 0; sh < 4; sh++) {
+      const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.85, 0.18), _tornClothMat);
+      shroud.position.set((sh % 2 === 0 ? 0.32 : -0.32), 2.1 - Math.floor(sh / 2) * 0.3, -0.05);
+      shroud.rotation.z = (sh % 2 === 0 ? 0.15 : -0.15);
+      this.model.add(shroud);
+    }
 
     // Braços esguios e longos com garras afiadas
     this.arms = [];
@@ -708,6 +836,7 @@ export class Hexoculus {
     }
 
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this._groundY = groundY;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
@@ -793,14 +922,20 @@ export class Hexoculus {
     const py = (this.player.root?.position?.y || 0);
     const dx = px - this.x;
     const dz = pz - this.z;
-    const dist = Math.hypot(dx, dz);
+    const distSq = dx * dx + dz * dz;
 
-    // Efeito pulsante e cintilante dos 6 olhos
-    const pulse = 1.0 + Math.sin(performance.now() * 0.008) * 0.25;
+    // Efeito pulsante e cintilante assíncrono dos 6 olhos
+    const now = performance.now();
+    const pulse = 1.0 + Math.sin(now * 0.008) * 0.25;
     if (this.eyeLight) this.eyeLight.intensity = 2.8 * pulse;
 
-    // Se estiver a <= 18m, encara o jogador e persegue em passos espectrais
-    if (dist <= 18) {
+    for (let i = 0; i < this.eyes.length; i++) {
+      const pScale = 1.0 + Math.sin(now * 0.008 + i * 1.05) * 0.16;
+      this.eyes[i].scale.set(pScale, pScale, pScale);
+    }
+
+    // Se estiver a <= 18m (distSq <= 324), encara o jogador e persegue em passos espectrais
+    if (distSq <= 324) {
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 6.0);
       this.model.rotation.y = this.heading;
@@ -814,8 +949,8 @@ export class Hexoculus {
         this.effects.play("star", this.x, this.root.position.y + 2.6, this.z, "#aa22ff", 1.4);
       }
 
-      // Golpe com as garras afiadas (<= 2.4m)
-      if (dist <= 2.4) {
+      // Golpe com as garras afiadas (<= 2.4m, distSq <= 5.76)
+      if (distSq <= 5.76) {
         this.speed = 1.2;
         if (this.attackCooldown <= 0) {
           this.attackCooldown = 1.1;
@@ -831,7 +966,7 @@ export class Hexoculus {
     } else {
       // Vagando lentamente na névoa noturna
       this.speed = THREE.MathUtils.lerp(this.speed, 1.8, dt * 2.0);
-      this.heading += (Math.sin(performance.now() * 0.0006) * 0.04);
+      this.heading += (Math.sin(now * 0.0006) * 0.04);
       this.model.rotation.y = this.heading;
     }
 
@@ -840,15 +975,17 @@ export class Hexoculus {
       this.x += Math.sin(this.heading) * step;
       this.z += Math.cos(this.heading) * step;
 
-      const legCycle = performance.now() * 0.008 * this.speed;
+      const legCycle = now * 0.008 * this.speed;
       this.legs[0].rotation.x = Math.sin(legCycle) * 0.55;
       this.legs[1].rotation.x = -Math.sin(legCycle) * 0.55;
       this.arms[0].rotation.x = -Math.sin(legCycle) * 0.45;
       this.arms[1].rotation.x = Math.sin(legCycle) * 0.45;
     }
 
-    const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
-    this.root.position.set(this.x, groundY, this.z);
+    if (this._groundY === undefined || this.speed > 0.05) {
+      this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
 
     if (this.npcs?.spatialGrid && this._inGrid) {
       const curCX = Math.floor(this.x * 0.0625);
@@ -906,6 +1043,14 @@ export class Polyphonia {
       segMesh.castShadow = true;
       this.model.add(segMesh);
       this.segments.push(segMesh);
+
+      // Cristas de espinhos ósseos na coluna dorsal do segmento
+      for (let sp = 0; sp < 2; sp++) {
+        const spine = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.25, 4), _boneSpineMat);
+        spine.position.set(0, 0.15 - sp * 0.2, 0.22);
+        spine.rotation.x = Math.PI * 0.5;
+        segMesh.add(spine);
+      }
     }
 
     // Braços emaciados de rastejamento anterior
@@ -918,8 +1063,9 @@ export class Polyphonia {
       this.arms.push(arm);
     }
 
-    // TRÊS CABEÇAS / FAUCES DENTADAS CANIBAIS (SEM OLHOS)
+    // TRÊS CABEÇAS / FAUCES DENTADAS CANIBAIS (SEM OLHOS) COM LÍNGUAS BÍFIDAS
     this.mouths = [];
+    this.tongues = [];
     const mouthConfigs = [
       { x: 0, y: 1.55, z: 0.15, scale: 1.0, rx: 0 }, // Central
       { x: -0.25, y: 1.35, z: 0.05, scale: 0.75, rx: 0.25, rz: 0.35 }, // Lateral esquerda
@@ -939,9 +1085,20 @@ export class Polyphonia {
       const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.32), _paleSkinMat);
       mGroup.add(jaw);
 
+      // Manchas de sangue seco e secreção em torno da boca
+      const bloodRim = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.34), _bloodDriedMat);
+      bloodRim.position.set(0, 0.09, 0);
+      mGroup.add(bloodRim);
+
       const cavity = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.16, 0.24), _mouthInteriorMat);
       cavity.position.set(0, 0.02, 0.04);
       mGroup.add(cavity);
+
+      // Língua bífida escura e ameaçadora que se projeta da garganta
+      const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.26), _mouthInteriorMat);
+      tongue.position.set(0, 0.01, 0.16);
+      mGroup.add(tongue);
+      this.tongues.push(tongue);
 
       // Dentes afiados triangulares
       for (let t = 0; t < 8; t++) {
@@ -956,6 +1113,7 @@ export class Polyphonia {
     }
 
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this._groundY = groundY;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
@@ -1041,11 +1199,20 @@ export class Polyphonia {
     const py = (this.player.root?.position?.y || 0);
     const dx = px - this.x;
     const dz = pz - this.z;
-    const dist = Math.hypot(dx, dz);
+    const distSq = dx * dx + dz * dz;
 
-    // Movimentação das múltiplas mandíbulas canibais
-    for (let m = 0; m < this.mouths.length; m++) {
-      this.mouths[m].rotation.x = Math.sin(performance.now() * 0.01 + m * 1.5) * 0.22;
+    const now = performance.now();
+
+    // Movimentação independente e ameaçadora das múltiplas mandíbulas canibais
+    if (this.mouths.length >= 3) {
+      this.mouths[0].rotation.x = Math.sin(now * 0.012) * 0.28;
+      this.mouths[1].rotation.x = 0.25 + Math.sin(now * 0.016 + 1.2) * 0.22;
+      this.mouths[2].rotation.x = 0.25 + Math.cos(now * 0.014 + 2.4) * 0.22;
+    }
+
+    // Projeção rápida e trêmula das línguas bífidas
+    for (let t = 0; t < this.tongues.length; t++) {
+      this.tongues[t].position.z = 0.16 + Math.sin(now * 0.024 + t * 1.8) * 0.06;
     }
 
     // Ondulação dos segmentos serpentiformes
@@ -1053,7 +1220,7 @@ export class Polyphonia {
       this.segments[s].position.x = Math.sin(this.slitherPhase + s * 0.8) * 0.14;
     }
 
-    if (dist <= 14) {
+    if (distSq <= 196) { // <= 14m
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 7.5);
       this.model.rotation.y = this.heading;
@@ -1061,7 +1228,7 @@ export class Polyphonia {
       // Dispara em bote rápido
       this.speed = THREE.MathUtils.lerp(this.speed, 8.2, dt * 5.0);
 
-      if (dist <= 2.2) {
+      if (distSq <= 4.84) { // <= 2.2m
         this.speed = 1.4;
         if (this.attackCooldown <= 0) {
           this.attackCooldown = 0.85;
@@ -1077,7 +1244,7 @@ export class Polyphonia {
     } else {
       // Rastejamento suave
       this.speed = THREE.MathUtils.lerp(this.speed, 2.2, dt * 2.0);
-      this.heading += Math.sin(performance.now() * 0.0008) * 0.05;
+      this.heading += Math.sin(now * 0.0008) * 0.05;
       this.model.rotation.y = this.heading;
     }
 
@@ -1087,8 +1254,10 @@ export class Polyphonia {
       this.z += Math.cos(this.heading) * step;
     }
 
-    const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
-    this.root.position.set(this.x, groundY, this.z);
+    if (this._groundY === undefined || this.speed > 0.05) {
+      this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
 
     if (this.npcs?.spatialGrid && this._inGrid) {
       const curCX = Math.floor(this.x * 0.0625);

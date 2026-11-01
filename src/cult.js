@@ -1577,6 +1577,7 @@ export class CultLeader {
 }
 
 export let ACTIVE_CULT_LEADER = null;
+let _cachedHugeCamp = null;
 
 export function summonCultLeader(player, scene, world, effects, combat) {
   const p = player || window.__game?.player;
@@ -1649,8 +1650,11 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
     return;
   }
 
-  // 3. Atualiza e spawna o Líder da Seita Cátara no Acampamento Enorme à noite
-  const hugeCamp = CULT_ALTARS.find((a) => a.hasLeader && a.tier === "huge");
+  // 3. Atualiza e spawna o Líder da Seita Cátara no Acampamento Enorme à noite (otimizado com cache)
+  if (!_cachedHugeCamp) {
+    _cachedHugeCamp = CULT_ALTARS.find((a) => a.hasLeader && a.tier === "huge") || null;
+  }
+  const hugeCamp = _cachedHugeCamp;
   if (hugeCamp) {
     if (!ACTIVE_CULT_LEADER && window.__game?.scene) {
       ACTIVE_CULT_LEADER = new CultLeader(

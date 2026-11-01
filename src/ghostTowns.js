@@ -626,11 +626,18 @@ export function initFixedGhostTowns(scene, world) {
   return ActiveGhostTowns;
 }
 
+let _atmosphereTimer = 0;
+
 /**
  * Atualiza checagem de proximidade e atmosfera de Cidades Fantasma para o jogador.
+ * Otimizado com throttle de 0.25s para aliviar o loop de renderização a 60 FPS.
  */
 export function updateGhostTownAtmosphere(playerPos, ui, dt = 0.5) {
   if (!playerPos || ActiveGhostTowns.length === 0) return;
+
+  _atmosphereTimer += dt;
+  if (_atmosphereTimer < 0.25) return;
+  _atmosphereTimer = 0;
 
   const px = playerPos.x ?? 0;
   const pz = playerPos.z ?? 0;
