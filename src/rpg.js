@@ -27,7 +27,16 @@ const _env = {
   ui: null,
   effects: null,
   audio: null,
+  weapons: null,
+  candle: null,
+  horses: null,
+  settlement: null,
 };
+
+export function setRpgEnv(env) {
+  if (!env) return;
+  Object.assign(_env, env);
+}
 
 // Pool pré-alocado de meshes de feno (Zero-GC ao largar iscas no cenário)
 const HAY_POOL_SIZE = 8;
@@ -162,6 +171,17 @@ export function addEvil(amount = 2, reason = null) {
   if (reason && ui) {
     ui.showToast(`🌑 Maldade ${evil}% (+${Math.round(amount)}%) · ${reason}`);
   }
+
+  // O Mensageiro do Demiurgo se manifesta após atos hediondos ou quando a corrupção aumenta
+  if (amount >= 2.5 || evil >= 60) {
+    const player = _env.player || window.__game?.player;
+    const scene = _env.scene || window.__game?.scene;
+    const world = _env.world || window.__game?.world;
+    if (player && scene) {
+      triggerCultistMessenger(player, scene, world, true);
+    }
+  }
+
   return evil;
 }
 

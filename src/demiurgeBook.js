@@ -158,13 +158,16 @@ export function checkDemiurgeDiaryNearby(playerPos) {
 export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
   if (!checkDemiurgeDiaryNearby(playerPos)) return false;
 
-  import("./decay.js").then(({ showDemiurgeModal, addEvil }) => {
+  import("./decay.js").then(({ showDemiurgeModal, addEvil, triggerCultistMessenger }) => {
     showDemiurgeModal(
       `<p style="margin-bottom:12px;font-size:1.02em;line-height:1.6">«O mundo que tocais não é a obra do Pai Celestial, mas a forja imperfeita do Demiurgo cego. Cada rocha talhada, cada carne mortal que adoece e apodrece foi concebida para aprisionar a centelha do fogo eterno em grilhões de barro e dor.»</p>
       <p style="margin-bottom:12px;font-size:1.02em;line-height:1.6">«Quando a lua for tragada pelo sangue do Eclipse, os servos das sombras descerão dos ermos. Nenhuma muralha de pedra deterá a ruína daqueles que recusam a verdade: a matéria há de retornar ao pó, e o espírito acordará para o abismo primordial.»</p>
       <p style="color:#e88a38;font-size:0.92em;margin-top:14px;border-top:1px dashed #662211;padding-top:10px">✦ Ao folhear as páginas manchadas de cinzas, sentes a corrupção afagar tua alma. (+10% Maldade · +1 Carisma Oculto)</p>`,
       2,
-      () => {},
+      () => {
+        // Ao fechar a leitura do diário, o Mensageiro do Demiurgo é invocado nas sombras
+        triggerCultistMessenger();
+      },
       input,
       "DIÁRIO DOS DEMIURGOS",
       "Códice Proibido dos Arcontes · Tomo Cátaro das Trevas"

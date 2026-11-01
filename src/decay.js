@@ -698,13 +698,14 @@ export function buildDemiurgeMessengerMesh() {
   return {
     root,
     model,
-    robe,
-    cape,
+    robe: robeCore,
+    cape: capeBack,
     armL,
     armR,
-    orb,
-    sealLight,
-    eyeGlow,
+    orb: eyeEmblem,
+    sealLight: scepterLight,
+    scepterLight,
+    eyeGlow: scepterLight,
     particles,
     pPositions,
     pAngles,
@@ -715,13 +716,20 @@ export function buildDemiurgeMessengerMesh() {
 }
 
 function _ensureMessenger(scene) {
-  if (_messengerNPC || !scene) return _messengerNPC;
+  const activeScene = scene || window.__game?.scene;
+  if (!activeScene) return _messengerNPC;
+  if (_messengerNPC) {
+    if (_messengerNPC.root.parent !== activeScene) {
+      activeScene.add(_messengerNPC.root);
+    }
+    return _messengerNPC;
+  }
 
   const meshData = buildDemiurgeMessengerMesh();
   const { root, model } = meshData;
   root.name = "CultistMessenger";
   root.visible = false;
-  scene.add(root);
+  activeScene.add(root);
 
   _messengerNPC = {
     ...meshData,
@@ -743,21 +751,25 @@ function _ensureMessenger(scene) {
  * Disparado ao cometer um crime hediondo ou ato virtuoso.
  */
 export function triggerCultistMessenger(player, scene, world, isEvilAction = true) {
-  if (!player || !scene) return;
-  const messenger = _ensureMessenger(scene);
+  const activePlayer = player || window.__game?.player;
+  const activeScene = scene || window.__game?.scene;
+  const activeWorld = world || window.__game?.world;
+
+  if (!activePlayer || !activeScene) return;
+  const messenger = _ensureMessenger(activeScene);
   if (!messenger || messenger.visible) return; // Não sobrepõe mensageiros
 
-  const px = player.x ?? player.position?.x ?? 0;
-  const py = player.root?.position?.y ?? 0;
-  const pz = player.z ?? player.position?.z ?? 0;
-  const rotY = player.model?.rotation?.y ?? 0;
+  const px = activePlayer.x ?? activePlayer.root?.position?.x ?? 0;
+  const py = activePlayer.root?.position?.y ?? 0;
+  const pz = activePlayer.z ?? activePlayer.root?.position?.z ?? 0;
+  const rotY = activePlayer.model?.rotation?.y ?? 0;
 
-  // Spawna a ~11 metros com leve desvio para surgir no campo visual do jogador
+  // Spawna a ~11 metros à frente do jogador no seu campo visual
   const spawnAngle = rotY + (Math.random() < 0.5 ? 0.35 : -0.35);
   _spawnVec.set(Math.sin(spawnAngle) * 11, 0, Math.cos(spawnAngle) * 11);
   const mx = px + _spawnVec.x;
   const mz = pz + _spawnVec.z;
-  const my = world ? world.heightAt(mx, mz) : py;
+  const my = activeWorld ? activeWorld.heightAt(mx, mz) : py;
 
   messenger.x = mx;
   messenger.z = mz;
