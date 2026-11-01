@@ -528,6 +528,61 @@ export const DEMIURGE_DIARY_PAGES = [
       </div>
     `,
   },
+  {
+    id: 21,
+    chapter: "SACRAMENTO OCULTO · FRAGMENTO MALDITO",
+    title: "O Sacrifício Final",
+    origin: "Recuperado nas cinzas das vilas arruinadas",
+    stateLabel: "Estado: Folha rasgada, encharcada em tinta vermelha estourada",
+    isTorn: true,
+    pageType: "page21_final_sacrifice",
+    svg: `
+      <svg viewBox="0 0 320 220" class="diary-illustration-svg" style="width:100%;max-height:190px;">
+        <defs>
+          <radialGradient id="inkBurst" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#b30015"/>
+            <stop offset="40%" stop-color="#73000f"/>
+            <stop offset="75%" stop-color="#3d0006"/>
+            <stop offset="100%" stop-color="#140002"/>
+          </radialGradient>
+        </defs>
+        <!-- Fundo vermelho-sangue caótico simulando caneta de tinta estourada e manchas espirradas -->
+        <rect x="0" y="0" width="320" height="220" fill="url(#inkBurst)" opacity="0.95" rx="6"/>
+        <!-- Respingo violento de tinta vermelha -->
+        <path d="M 160 110 Q 130 50 160 30 Q 190 70 230 40 Q 210 90 270 100 Q 220 120 240 170 Q 180 140 160 190 Q 140 140 80 170 Q 100 120 50 100 Q 110 90 90 40 Q 130 70 160 110 Z" fill="#e6001a" opacity="0.85"/>
+        <circle cx="85" cy="45" r="7" fill="#80000a"/>
+        <circle cx="245" cy="55" r="9" fill="#99000d"/>
+        <circle cx="265" cy="155" r="11" fill="#8a000c"/>
+        <circle cx="65" cy="165" r="8" fill="#7a000a"/>
+        <circle cx="160" cy="20" r="6" fill="#cc0016"/>
+        <!-- Gotas e respingos pontilhados -->
+        <g fill="#ff1a30" opacity="0.9">
+          <circle cx="130" cy="55" r="3"/>
+          <circle cx="195" cy="65" r="2.5"/>
+          <circle cx="210" cy="135" r="4"/>
+          <circle cx="115" cy="145" r="3.5"/>
+          <circle cx="175" cy="175" r="2.8"/>
+          <circle cx="95" cy="90" r="3.2"/>
+          <circle cx="230" cy="95" r="4.2"/>
+        </g>
+        <!-- Garrancho do título emergindo da mancha de sangue -->
+        <text x="160" y="118" text-anchor="middle" font-family="'Cinzel', Georgia, serif" font-size="19" font-weight="bold" fill="#ffffff" letter-spacing="3" filter="drop-shadow(0px 0px 6px #000)">
+          O SACRIFÍCIO FINAL
+        </text>
+        <line x1="60" y1="130" x2="260" y2="130" stroke="#000000" stroke-width="2.5" opacity="0.8"/>
+      </svg>
+    `,
+    html: `
+      <div class="diary-torn-fragment" style="background: rgba(140, 10, 20, 0.25); border: 2px dashed #991a24; padding: 18px; border-radius: 6px;">
+        <h2 style="color: #ff3344; text-shadow: 0 0 10px rgba(255, 30, 30, 0.8); margin: 0 0 10px 0; text-align: center; letter-spacing: 3px;">
+          O SACRIFÍCIO FINAL
+        </h2>
+        <div style="color: #f7b2b8; font-style: italic; font-size: 14.5px; line-height: 1.7; text-align: center;">
+          [A folha está quase completamente destruída, empapada por um espesso estouro de tinta vermelha que parece ter explodido contra o pergaminho. Apenas o título permanece visível entre as marcas de garras e fuligem.]
+        </div>
+      </div>
+    `,
+  },
 ];
 
 // ============================================================================
@@ -870,6 +925,30 @@ function _renderCurrentPage() {
   indicator.textContent = `Página ${_currentReadingPage + 1} de ${DEMIURGE_DIARY_PAGES.length}`;
   prevBtn.disabled = _currentReadingPage === 0;
   nextBtn.disabled = _currentReadingPage === DEMIURGE_DIARY_PAGES.length - 1;
+
+  const isDiscovered = !PlayerInventory.discoveredBookPages || PlayerInventory.discoveredBookPages.includes(page.id);
+
+  if (!isDiscovered) {
+    viewport.innerHTML = `
+      <div class="diary-parchment-sheet diary-torn-page" style="background: #190c0a; border: 2px dashed #7a221a; padding: 28px 22px;">
+        <div class="diary-chapter-label" style="color: #b05040;">${page.chapter}</div>
+        <h2 class="diary-page-heading" style="color: #ea4d3d; text-shadow: 0 0 10px rgba(220, 50, 40, 0.4);">[PÁGINA RITUAL ARRANCADA]</h2>
+        <div class="diary-state-badge" style="color: #9c6c5a;">
+          Folha ausente do códice · Restam marcas de unhas e cera negra
+        </div>
+        <div style="border: 1px dashed rgba(200, 60, 50, 0.5); padding: 26px 20px; border-radius: 8px; margin: 26px 0; background: rgba(30, 8, 8, 0.7); text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 12px;">🩸</div>
+          <p style="font-size: 15.5px; color: #e8a89c; margin-bottom: 14px; font-style: italic; line-height: 1.6;">
+            Esta folha do Tractatus foi arrancada violentamente do tomo pelos servos de Rex Mundi.
+          </p>
+          <p style="font-size: 13.5px; color: #ba796c; line-height: 1.6;">
+            Investigue os <strong>acampamentos dos servos do demiurgo</strong> durante a noite ou vasculhe os escombros das <strong>cidades fantasmas devastadas</strong> para recuperar esta folha ritual perdida.
+          </p>
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   if (page.id === 2) _hasReadPage2 = true;
   if (page.id === 19) _hasReadPage19 = true;

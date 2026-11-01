@@ -900,12 +900,13 @@ export function initCheatMenu(env = {}) {
 
     giveDemiurgeDiary() {
       PlayerInventory.hasDemiurgeDiary = true;
+      PlayerInventory.discoveredBookPages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
       import("./demiurgeBook.js").then((book) => {
         book.setDemiurgeDiaryCollected?.(true);
       }).catch((e) => console.warn(e));
       syncPlayerStatsToPlayer(env.player, env.ui);
       env.audio?.choir?.();
-      env.ui?.showToast?.("📖 CHEAT: Códice do Demiurgo (O Tractatus de Carcere) recebido! Tecla L para ler.");
+      env.ui?.showToast?.("📖 CHEAT: Códice do Demiurgo (O Tractatus de Carcere) completo recebido! Tecla L para ler.");
       return "Diário do Demiurgo entregue";
     },
 
@@ -951,6 +952,7 @@ export function initCheatMenu(env = {}) {
       PlayerInventory.hasSword = true;
       PlayerInventory.hasDemiurgeRobe = true;
       PlayerInventory.hasDemiurgeDiary = true;
+      PlayerInventory.discoveredBookPages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
       PlayerInventory.crystals = { green: 99, blue: 99, pink: 99, red: 99, white: 99, purple: 99 };
       PlayerInventory.wood = 999;
       PlayerInventory.stone = 999;

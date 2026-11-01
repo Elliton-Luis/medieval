@@ -166,7 +166,20 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
   - **Rubi**: Chama Vermelho-Infernal (`#ff1122`) e luz escarlate (`0xff2233`).
   - **Diamante**: Chama Branca de Luz Pura (`#eaf4ff`) e luz branca pura (`0xffffff`).
   - **Ametista**: Chama Roxa do Vazio / Demiurgo (`#aa22ff`) e luz púrpura mística (`0xbb33ff`).
-- **Infusão Imediata e via Menu de Criação (`I`)**: Coletar um cristal infunde a tocha imediatamente com aquela cor. No menu de criação (`I`), o jogador pode alternar livremente entre qualquer uma das chamas já descobertas, alterando os cones de fogo 3D em mãos e a cor da luz dinâmica `PointLight`.
+- **Infusão Imediata e via Menu de Criação (`I`)**: Coletar um cristal infunde a tocha imediatamente com aquela cor. No menu de criação (`I`), o jogador visualiza apenas o ícone de chama e o nome limpo da cor (`🔥 Verde`, `🔥 Azul`, `🔥 Rosa`, `🔥 Vermelho`, `🔥 Branco`, `🔥 Roxo`), alterando os cones de fogo 3D em mãos e a cor da luz dinâmica `PointLight`.
+- **Tochas Fincadas com Cor Fiel**: Ao fincar a tocha no chão ou em paredes com o clique esquerdo (`_tryPlaceHeldItem`), a tocha posicionada mantém exatamente a mesma cor da chama e da luz dinâmica `PointLight` da tocha que o jogador segurava na mão.
+
+## Criaturas Noturnas dos Ermos
+
+- **Comportamento Estritamente Noturno**: Feras e horrores heréticos só surgem e agem durante a noite, sumindo ao alvorecer.
+- **Zancudo Sombrio (`TallWalker`)**: Quadrúpede esguio e gigantesco com pernas longas e finas que superam a copa das árvores. Possui **olhos amarelos luminescentes** (`0xffea00`) com brilho visível na escuridão. Existem de 2 a 3 deles simultaneamente rondando os ermos durante a noite; encaram o jogador fixamente à distância e fogem em passos largos e silenciosos se você tentar se aproximar.
+- **Voraz Cego (`BlindBiter`)**: Humanoide cego e grotesco sem a parte superior da cabeça, com mandíbula dilatada e dentes pontiagudos sempre à mostra. Spawna aleatoriamente pelos ermos à noite. Corre velozmente com os braços esticados para frente ao detectar a presença do jogador, causando mordidas com dano físico real (2.0 por ataque) e morrendo ao receber golpes corpo-a-corpo ou disparos, soltando moedas e sumindo com efeito de poeira e impacto.
+
+## O Tomo do Demiurgo (*Tractatus de Carcere*) e Páginas Perdidas
+
+- **Coleta no Mundo (`E` ou `L`)**: O jogador **não começa com o livro**. O tomo do barro repousa oculto pelo mapa e também pode ser desenterrado ao vasculhar as cidades fantasmas devastadas ou investigar acampamentos heréticos.
+- **Páginas Arrancadas e Fragmentos Misteriosos**: As páginas de revelações profundas (páginas 7, 11, 16, 19 e a folha rasgada manchada de tinta vermelha *"O Sacrifício Final"*) iniciam ausentes do códice.
+- **Investigação em Cidades Fantasmas e Acampamentos Noturnos**: Vasculhar os escombros das praças arruinadas de cidades fantasmas ou investigar anotações nos acampamentos dos servos do demiurgo à noite restaura as páginas faltantes, preenchendo as ilustrações e textos profanos no leitor do tomo (`L`).
 
 ## Menu de Cheats e Central de Recursos (`POTATO`, `Esc` ou Console)
 

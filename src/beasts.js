@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { spawnLoot } from "./rpg.js";
+import { spawnLoot, addGood } from "./rpg.js";
 
 // ============================================================================
-// Materiais Otimizados para as Novas Criaturas (Zero-GC)
+// Materiais Otimizados para as Criaturas Sobrenaturais (Zero-GC)
 // ============================================================================
 const _shadowBodyMat = new THREE.MeshStandardMaterial({
   color: 0x18171c,
@@ -18,8 +18,10 @@ const _thinLegMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
-const _glowingEyeMat = new THREE.MeshBasicMaterial({
-  color: 0xff4433,
+// Olhos amarelos brilhantes do Bicho Altão (Zancudo Sombrio)
+const _glowingYellowEyeMat = new THREE.MeshBasicMaterial({
+  color: 0xffea00,
+  toneMapped: false,
 });
 
 const _paleSkinMat = new THREE.MeshStandardMaterial({
@@ -47,7 +49,7 @@ const _tornClothMat = new THREE.MeshStandardMaterial({
 });
 
 // ============================================================================
-// 1. O Zancudo Sombrio (Quadrúpede Gigante de Pernas Finas - Maior que as Árvores)
+// 1. O Zancudo Sombrio (Quadrúpede Gigante de Pernas Finas - Olhos Amarelos)
 // ============================================================================
 export class TallWalker {
   constructor(scene, world, effects, player, x, z) {
@@ -59,7 +61,7 @@ export class TallWalker {
     this.z = z;
     this.speed = 0;
     this.heading = 0;
-    this.state = "idle"; // "idle" | "staring" | "fleeing"
+    this.state = "idle";
     this.fleeTimer = 0;
     this.stepPhase = 0;
     this.alive = true;
@@ -68,6 +70,7 @@ export class TallWalker {
 
     this.root = new THREE.Group();
     this.root.name = "TallWalker";
+    this.root.visible = false; // Começa invisível até ser noite
 
     // Torso quadrúpede no topo (a 16m de altura, acima das copas das árvores)
     this.bodyGroup = new THREE.Group();
@@ -99,90 +102,86 @@ export class TallWalker {
     headMesh.position.set(0, 0.95, -0.95);
     this.neck.add(headMesh);
 
-    const snoutMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 1.0), _shadowBodyMat);
-    snoutMesh.position.set(0, 0.8, -1.9);
+    // Focinho esguio
+    const snoutMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.9), _shadowBodyMat);
+    snoutMesh.position.set(0, 0.85, -1.7);
     this.neck.add(snoutMesh);
 
-    // Orelhas eretas e pontiagudas
-    for (const side of [-0.25, 0.25]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.6, 4), _shadowBodyMat);
-      ear.position.set(side, 1.45, -0.7);
-      ear.rotation.x = -0.15;
-      this.neck.add(ear);
+    // Olhos Amarelos Brilhantes e Penetrantes no topo da cabeça
+    const eyeGeo = new THREE.SphereGeometry(0.12, 6, 5);
+    const leftEye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
+    leftEye.position.set(0.38, 1.15, -1.35);
+    this.neck.add(leftEye);
 
-      // Olhos vermelhos brilhantes encarando
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), _glowingEyeMat);
-      eye.position.set(side * 1.1, 1.0, -1.35);
-      this.neck.add(eye);
-    }
+    const rightEye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
+    rightEye.position.set(-0.38, 1.15, -1.35);
+    this.neck.add(rightEye);
 
-    // Cauda fina e longa caindo no vazio
-    const tailMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 4.2, 5), _thinLegMat);
-    tailMesh.position.set(0, -1.8, 2.1);
-    tailMesh.rotation.x = 0.25;
-    this.bodyGroup.add(tailMesh);
+    // Pequena luz pontual amarela etérea que emana dos olhos no alto
+    this.eyeLight = new THREE.PointLight(0xffea00, 2.5, 18.0, 1.6);
+    this.eyeLight.position.set(0, 1.2, -1.5);
+    this.neck.add(this.eyeLight);
 
-    // 4 Pernas Finíssimas e Colossais (16 metros de altura cada)
+    // 4 Pernas Finas Colossais (16 metros de altura cada)
     this.legs = [];
     const legOffsets = [
-      { x: -0.85, z: -1.4 }, // Dianteira Esquerda
-      { x: 0.85, z: -1.4 },  // Dianteira Direita
-      { x: -0.75, z: 1.5 },  // Traseira Esquerda
-      { x: 0.75, z: 1.5 },   // Traseira Direita
+      { x: 0.75, z: -1.3 }, // Dianteira Direita
+      { x: -0.75, z: -1.3 }, // Dianteira Esquerda
+      { x: 0.75, z: 1.3 }, // Traseira Direita
+      { x: -0.75, z: 1.3 }, // Traseira Esquerda
     ];
 
     for (let i = 0; i < 4; i++) {
-      const off = legOffsets[i];
       const legRoot = new THREE.Group();
-      legRoot.position.set(off.x, 16.2, off.z);
-      this.root.add(legRoot);
+      legRoot.position.set(legOffsets[i].x, 0, legOffsets[i].z);
+      this.bodyGroup.add(legRoot);
 
-      // Parte superior da perna fina (haste longa)
-      const upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 8.5, 6), _thinLegMat);
-      upperLeg.position.set(0, -4.2, 0);
-      legRoot.add(upperLeg);
+      // Coxa superior finíssima
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 8.2, 5), _thinLegMat);
+      upper.position.set(0, -4.1, 0);
+      legRoot.add(upper);
 
-      // Joelho / Articulação fina
-      const joint = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), _shadowBodyMat);
-      joint.position.set(0, -8.4, 0);
-      legRoot.add(joint);
+      // Articulação do joelho alto
+      const kneeGroup = new THREE.Group();
+      kneeGroup.position.set(0, -8.2, 0);
+      legRoot.add(kneeGroup);
 
-      // Parte inferior da perna descendo até o solo
-      const lowerLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.045, 8.2, 5), _thinLegMat);
-      lowerLeg.position.set(0, -12.4, 0);
-      legRoot.add(lowerLeg);
+      const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.11, 5, 4), _thinLegMat);
+      kneeGroup.add(kneeJoint);
 
-      // Pata fina pontiaguda no solo
-      const hoof = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 5), _shadowBodyMat);
-      hoof.position.set(0, -16.4, 0);
-      legRoot.add(hoof);
+      // Canela inferior finíssima até o solo
+      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.035, 8.2, 5), _thinLegMat);
+      lower.position.set(0, -4.1, 0);
+      kneeGroup.add(lower);
 
-      this.legs.push({ legRoot, upperLeg, lowerLeg });
+      this.legs.push({ legRoot, kneeGroup, upper, lower });
     }
 
-    const groundY = world ? world.heightAt(x, z) : 0;
+    const groundY = this.world ? this.world.heightAt(x, z) : 0;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
   }
 
-  update(dt) {
-    if (!this.alive || !this.player) return;
+  update(dt, isNight = false) {
+    // Só aparece estritamente à noite
+    if (!isNight) {
+      if (this.root.visible) this.root.visible = false;
+      return;
+    }
+    if (!this.root.visible) this.root.visible = true;
 
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
     const dx = px - this.x;
     const dz = pz - this.z;
-    const distSq = dx * dx + dz * dz;
-    const dist = Math.sqrt(distSq);
+    const dist = Math.hypot(dx, dz);
 
-    // 1. Reação ao Jogador:
-    // Se o jogador estiver longe (> 38m): o Zancudo fica parado ou dando passos lentos e ENCARA fixamente o jogador
+    // Se o jogador estiver longe (> 36m): o Zancudo fica parado ou dando passos lentos e ENCARA fixamente com olhos amarelos
     if (dist > 36) {
       if (this.fleeTimer > 0) {
         this.fleeTimer -= dt;
       } else {
         this.state = "staring";
-        // Encarar o jogador suavemente lá do alto
         const targetYaw = Math.atan2(dx, dz);
         this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 1.8);
         this.root.rotation.y = this.heading;
@@ -193,22 +192,18 @@ export class TallWalker {
       this.state = "fleeing";
       this.fleeTimer = 6.0;
 
-      // Direção oposta ao jogador
       const fleeYaw = Math.atan2(-dx, -dz);
       this.heading = THREE.MathUtils.lerp(this.heading, fleeYaw, dt * 3.5);
       this.root.rotation.y = this.heading;
-
-      // Velocidade altíssima de fuga por cima das árvores (~14 m/s)
       this.speed = THREE.MathUtils.lerp(this.speed, 14.5, dt * 4.0);
     }
 
-    // 2. Movimentação e Animação das Pernas Gigantes
+    // Movimentação e Animação das Pernas Gigantes
     if (this.speed > 0.1) {
       const step = this.speed * dt;
       this.x += Math.sin(this.heading) * step;
       this.z += Math.cos(this.heading) * step;
 
-      // Ciclo de passada elegante das 4 pernas longas
       this.stepPhase += dt * (this.speed * 0.45);
       const phases = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
 
@@ -218,7 +213,6 @@ export class TallWalker {
       }
       this.bodyGroup.position.y = 16.2 + Math.abs(Math.sin(this.stepPhase * 2)) * 0.45;
     } else {
-      // Parado encarando: sutil respiração e olhar
       this.bodyGroup.position.y = 16.2 + Math.sin(performance.now() * 0.002) * 0.15;
       this.neck.rotation.x = Math.sin(performance.now() * 0.0015) * 0.08;
       for (let i = 0; i < 4; i++) {
@@ -246,19 +240,20 @@ export class BlindBiter {
     this.z = z;
     this.speed = 0;
     this.heading = Math.random() * Math.PI * 2;
-    this.state = "wandering"; // "wandering" | "charging" | "attacking" | "dead"
+    this.state = "wandering";
     this.wanderTimer = 2.0;
-    this.attackTimer = 0;
+    this.attackCooldown = 0;
     this.alive = true;
     this.health = 5;
     this.maxHealth = 5;
-    this.hitRadius = 0.5;
+    this.hitRadius = 0.6;
     this.roleKey = "blind_biter";
     this.name = "Voraz Cego";
     this.deadTime = 0;
 
     this.root = new THREE.Group();
     this.root.name = "BlindBiter";
+    this.root.visible = false; // Começa invisível de dia
     this.root.userData = { entity: this, type: "MONSTER" };
 
     this.model = new THREE.Group();
@@ -267,7 +262,7 @@ export class BlindBiter {
     // Torso cadavérico esguio e curvado
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.72, 0.24), _paleSkinMat);
     torso.position.set(0, 0.95, 0);
-    torso.rotation.x = 0.22; // Curvado para frente
+    torso.rotation.x = 0.22;
     torso.castShadow = true;
     this.model.add(torso);
 
@@ -299,131 +294,156 @@ export class BlindBiter {
       tooth.rotation.x = Math.PI;
       this.headGroup.add(tooth);
     }
-    // Dentes inferiores proeminentes
-    for (let d = 0; d < 8; d++) {
-      const toothLow = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.11, 4), _teethMat);
-      const angle = (d / 8) * Math.PI * 2;
-      toothLow.position.set(Math.cos(angle) * 0.13, -0.02, Math.sin(angle) * 0.13 - 0.02);
-      this.headGroup.add(toothLow);
-    }
 
-    // Braços com mãos em garras
+    // Braços esguios esticados para frente
     this.arms = [];
-    for (const side of [-1, 1]) {
-      const armGroup = new THREE.Group();
-      armGroup.position.set(side * 0.26, 1.25, 0);
-      this.model.add(armGroup);
+    const armGeo = new THREE.BoxGeometry(0.12, 0.75, 0.12);
 
-      const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.75, 0.12), _paleSkinMat);
-      armMesh.position.set(0, -0.32, 0);
-      armGroup.add(armMesh);
+    const leftArm = new THREE.Mesh(armGeo, _paleSkinMat);
+    leftArm.position.set(0.28, 1.25, -0.1);
+    this.model.add(leftArm);
+    this.arms.push(leftArm);
 
-      // Garras pontiagudas
-      const claws = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 4), _teethMat);
-      claws.position.set(0, -0.76, 0);
-      claws.rotation.x = Math.PI;
-      armGroup.add(claws);
+    const rightArm = new THREE.Mesh(armGeo, _paleSkinMat);
+    rightArm.position.set(-0.28, 1.25, -0.1);
+    this.model.add(rightArm);
+    this.arms.push(rightArm);
 
-      this.arms.push(armGroup);
-    }
-
-    // Pernas finas humanas
+    // Pernas trêmulas
     this.legs = [];
-    for (const side of [-1, 1]) {
-      const legMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.72, 0.14), _paleSkinMat);
-      legMesh.position.set(side * 0.14, 0.36, 0);
-      this.model.add(legMesh);
-      this.legs.push(legMesh);
-    }
+    const legGeo = new THREE.BoxGeometry(0.14, 0.75, 0.14);
 
-    const groundY = world ? world.heightAt(x, z) : 0;
+    const leftLeg = new THREE.Mesh(legGeo, _paleSkinMat);
+    leftLeg.position.set(0.14, 0.4, 0.05);
+    this.model.add(leftLeg);
+    this.legs.push(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeo, _paleSkinMat);
+    rightLeg.position.set(-0.14, 0.4, 0.05);
+    this.model.add(rightLeg);
+    this.legs.push(rightLeg);
+
+    const groundY = this.world ? this.world.heightAt(x, z) : 0;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
-    // Registra na Spatial Grid de NPCs para receber dano de armas
-    if (this.npcs?.spatialGrid) {
-      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
-      this._spatialCX = Math.floor(this.x * 0.0625);
-      this._spatialCZ = Math.floor(this.z * 0.0625);
-    }
+    this._inGrid = false;
   }
 
-  takeHit(amount, dirX, dirZ, force = 1.8) {
+  takeDamage(amount) {
+    return this.takeHit(amount, 0, 0, 1.5);
+  }
+
+  takeHit(amount, dirX = 0, dirZ = 0, force = 2.0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
 
     if (this.effects) {
       this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#ff2233", 1.4);
+      this.effects.play("slash", this.x, this.root.position.y + 1.2, this.z, "#cc1122", 1.2);
     }
 
-    this.x += dirX * 0.45;
-    this.z += dirZ * 0.45;
+    // Recuo de impacto
+    const mag = Math.hypot(dirX, dirZ);
+    if (mag > 0.01) {
+      this.x += (dirX / mag) * (0.45 * force);
+      this.z += (dirZ / mag) * (0.45 * force);
+    }
 
     if (this.health <= 0) {
       this.alive = false;
       this.state = "dead";
-      if (this.npcs?.spatialGrid) {
+      this.root.userData.isDead = true;
+
+      if (this.npcs?.spatialGrid && this._inGrid) {
         this.npcs.spatialGrid.remove(this);
+        this._inGrid = false;
       }
       if (this.effects) {
-        this.effects.play("dust", this.x, this.root.position.y + 0.6, this.z, "#2e2b26", 2.2);
+        this.effects.play("dust", this.x, this.root.position.y + 0.6, this.z, "#2e2b26", 2.4);
+        this.effects.play("star", this.x, this.root.position.y + 1.0, this.z, "#ff4444", 1.8);
       }
-      spawnLoot(this.root.position, 8);
+      spawnLoot(this.root.position, 14);
+      addGood(2, "Voraz Cego abatido");
       return true;
     }
     return false;
   }
 
-  update(dt) {
-    if (!this.alive) {
-      this.deadTime += dt;
-      if (this.deadTime < 0.6) {
-        this.model.rotation.x = THREE.MathUtils.lerp(this.model.rotation.x, -Math.PI / 2, dt * 6);
-        this.model.position.y = THREE.MathUtils.lerp(this.model.position.y, -0.4, dt * 6);
+  update(dt, isNight = false) {
+    // Só aparece e atua estritamente à noite
+    if (!isNight) {
+      if (this.root.visible) {
+        this.root.visible = false;
+        if (this.npcs?.spatialGrid && this._inGrid) {
+          this.npcs.spatialGrid.remove(this);
+          this._inGrid = false;
+        }
       }
       return;
     }
 
+    if (!this.alive) {
+      this.deadTime += dt;
+      if (this.deadTime < 0.8) {
+        this.model.rotation.x = THREE.MathUtils.lerp(this.model.rotation.x, -Math.PI / 2, dt * 6);
+        this.model.position.y = THREE.MathUtils.lerp(this.model.position.y, -0.4, dt * 6);
+      } else if (this.deadTime > 2.5) {
+        this.root.visible = false;
+      }
+      return;
+    }
+
+    if (!this.root.visible) this.root.visible = true;
+
+    // Garante presença na Spatial Grid de combate à noite
+    if (this.npcs?.spatialGrid && !this._inGrid) {
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+
+    if (this.attackCooldown > 0) this.attackCooldown -= dt;
+
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
+    const py = (this.player.root?.position?.y || 0);
     const dx = px - this.x;
     const dz = pz - this.z;
-    const distSq = dx * dx + dz * dz;
-    const dist = Math.sqrt(distSq);
+    const dist = Math.hypot(dx, dz);
 
-    // Comportamento:
-    // Cego: só ataca quando está perto (<= 9 metros)
-    if (dist <= 9.0) {
+    // Cego: só ataca quando detecta a presa por perto (<= 9.5 metros)
+    if (dist <= 9.5) {
       this.state = "charging";
-      // Encarar a presa
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 8.0);
       this.model.rotation.y = this.heading;
 
-      // "ele corre com os braços pra frente, muito rapido"
-      this.speed = THREE.MathUtils.lerp(this.speed, 12.0, dt * 6.0);
+      // Corre com os braços esticados para frente
+      this.speed = THREE.MathUtils.lerp(this.speed, 10.5, dt * 6.0);
 
-      // Postura aterrorizante: braços totalmente esticados para frente
       for (let i = 0; i < this.arms.length; i++) {
         this.arms[i].rotation.x = -1.45 + Math.sin(performance.now() * 0.02) * 0.15;
       }
-      this.model.rotation.x = 0.32; // Inclinado para frente na corrida veloz
+      this.model.rotation.x = 0.32;
 
-      // Ataque de mordida feroz quando bem perto (<= 1.8m)
-      if (dist <= 1.8) {
-        this.attackTimer += dt;
-        if (this.attackTimer > 0.65) {
-          this.attackTimer = 0;
+      // Ataque de mordida feroz corpo a corpo (<= 2.2m)
+      if (dist <= 2.2) {
+        this.speed = 2.0; // Freia o avanço para desferir a mordida sem atravessar o corpo
+        if (this.attackCooldown <= 0) {
+          this.attackCooldown = 0.85;
           if (this.combat?.hurtPlayer) {
-            this.combat.hurtPlayer(2.0, this.x, this.z, { weapon: "teeth_bite", knock: 2.8 });
+            this.combat.hurtPlayer(2.0, this.x, this.z, { weapon: "teeth_bite", knock: 3.2 });
           }
           if (this.effects) {
-            this.effects.play("slash", px, (this.player.root?.position?.y || 0) + 1.1, pz, "#cc1122", 1.5);
+            this.effects.play("slash", px, py + 1.1, pz, "#cc1122", 1.6);
+            this.effects.play("star", px, py + 1.0, pz, "#ff2222", 1.2);
           }
         }
       }
     } else {
-      // Quando longe: caminha errante e trêmulo sem olhos
+      // Quando longe: caminha errante e trêmulo tateando a névoa
       this.state = "wandering";
       this.speed = THREE.MathUtils.lerp(this.speed, 1.8, dt * 3.0);
       this.wanderTimer -= dt;
@@ -434,19 +454,17 @@ export class BlindBiter {
       this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, this.heading, dt * 3.0);
       this.model.rotation.x = 0.12;
 
-      // Braços balançando tateando o ar
       for (let i = 0; i < this.arms.length; i++) {
         this.arms[i].rotation.x = Math.sin(performance.now() * 0.003 + i) * 0.4 - 0.3;
       }
     }
 
-    // Deslocamento no mundo
+    // Deslocamento no terreno
     if (this.speed > 0.05) {
       const step = this.speed * dt;
       this.x += Math.sin(this.heading) * step;
       this.z += Math.cos(this.heading) * step;
 
-      // Animação das pernas correndo
       const legCycle = performance.now() * (this.state === "charging" ? 0.022 : 0.007);
       this.legs[0].rotation.x = Math.sin(legCycle) * 0.7;
       this.legs[1].rotation.x = -Math.sin(legCycle) * 0.7;
@@ -455,8 +473,8 @@ export class BlindBiter {
     const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
     this.root.position.set(this.x, groundY, this.z);
 
-    // Atualiza célula na Spatial Grid
-    if (this.npcs?.spatialGrid) {
+    // Atualização celular na Spatial Hash Grid
+    if (this.npcs?.spatialGrid && this._inGrid) {
       const curCX = Math.floor(this.x * 0.0625);
       const curCZ = Math.floor(this.z * 0.0625);
       if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
@@ -470,7 +488,7 @@ export class BlindBiter {
 }
 
 // ============================================================================
-// 3. BeastManager: Gerencia Spawns de Feras e Criaturas
+// 3. BeastManager: Gerencia Spawns de Feras e Criaturas Noturnas
 // ============================================================================
 export class BeastManager {
   constructor({ scene, world, effects, combat, player, npcs, audio }) {
@@ -483,30 +501,35 @@ export class BeastManager {
     this.audio = audio;
     this.walkers = [];
     this.biters = [];
+    this.respawnTimer = 0;
   }
 
   spawnInitialBeasts(cityCenter) {
     const cx = cityCenter.x ?? 0;
     const cz = cityCenter.z ?? 0;
 
-    // 1. Zancudos Sombrios: 2 gigantes colocados no horizonte visível
+    // 1. Zancudos Sombrios (Bichos Altões): 3 criaturas imponentes nos ermos com olhos amarelos
     const walkerSpots = [
-      { x: cx - 180, z: cz + 160 },
-      { x: cx + 190, z: cz - 150 },
+      { x: cx - 210, z: cz + 175 },
+      { x: cx + 220, z: cz - 165 },
+      { x: cx - 110, z: cz - 240 },
     ];
     for (const s of walkerSpots) {
       const w = new TallWalker(this.scene, this.world, this.effects, this.player, s.x, s.z);
       this.walkers.push(w);
     }
 
-    // 2. Vorazes Cegos: 4 criaturas espalhadas em matas e ruínas fora da vila
-    const biterSpots = [
-      { x: cx + 95, z: cz + 85 },
-      { x: cx - 110, z: cz - 90 },
-      { x: cx + 130, z: cz - 80 },
-      { x: cx - 85, z: cz + 135 },
-    ];
-    for (const b of biterSpots) {
+    // 2. Vorazes Cegos: Spawns completamente aleatórios nos ermos
+    this.spawnRandomBiters(cx, cz, 5);
+  }
+
+  spawnRandomBiters(cx, cz, count = 4) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 75 + Math.random() * 140;
+      const bx = cx + Math.cos(angle) * radius;
+      const bz = cz + Math.sin(angle) * radius;
+
       const biter = new BlindBiter(
         this.scene,
         this.world,
@@ -514,23 +537,39 @@ export class BeastManager {
         this.combat,
         this.player,
         this.npcs,
-        b.x,
-        b.z
+        bx,
+        bz
       );
       this.biters.push(biter);
-      // Adiciona também na lista de NPCs para permitir detecção com projéteis e mira
-      if (this.npcs?.npcs) {
+      if (this.npcs?.npcs && !this.npcs.npcs.includes(biter)) {
         this.npcs.npcs.push(biter);
       }
     }
   }
 
-  update(dt) {
+  update(dt, isNight = false) {
+    // Atualiza todos os Zancudos Sombrios
     for (let i = 0; i < this.walkers.length; i++) {
-      this.walkers[i].update(dt);
+      this.walkers[i].update(dt, isNight);
     }
+
+    // Atualiza todos os Vorazes Cegos
     for (let i = 0; i < this.biters.length; i++) {
-      this.biters[i].update(dt);
+      this.biters[i].update(dt, isNight);
+    }
+
+    // À noite, repõe criaturas mortas periodicamente de forma randômica
+    if (isNight) {
+      this.respawnTimer += dt;
+      if (this.respawnTimer > 25.0) {
+        this.respawnTimer = 0;
+        const activeCount = this.biters.filter((b) => b.alive && b.root.visible).length;
+        if (activeCount < 4) {
+          const px = this.player.x ?? 0;
+          const pz = this.player.z ?? 0;
+          this.spawnRandomBiters(px, pz, 2);
+        }
+      }
     }
   }
 }

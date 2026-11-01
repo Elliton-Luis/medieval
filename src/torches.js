@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CRYSTAL_PALETTE } from "./crystals.js";
 
 // Variáveis reutilizáveis no escopo do módulo para eliminar alocação no loop principal (Zero-GC)
 const _guardPos = new THREE.Vector3();
@@ -287,15 +288,25 @@ export class TorchSystem {
   }
 
   // Tocha presa à parede (nx, nz: direção para fora) ou no alto de um poste.
-  addTorch(x, y, z, nx = 0, nz = 0, post = false) {
+  addTorch(x, y, z, nx = 0, nz = 0, post = false, colorKey = "orange") {
+    const pal = CRYSTAL_PALETTE[colorKey] || CRYSTAL_PALETTE.orange || { flameHex: 0xffa040, coreHex: 0xffffff };
     const group = new THREE.Group();
     group.position.set(x + nx * 0.18, y, z + nz * 0.18);
     const stick = new THREE.Mesh(this.stickGeometry, this.stickMaterial);
     stick.rotation.set(nz * 0.3, 0, -nx * 0.3);
     group.add(stick);
-    const head = new THREE.Mesh(this.headGeometry, this.headMaterial);
+
+    const customHeadMaterial = new THREE.MeshStandardMaterial({
+      color: "#2c2218",
+      emissive: pal.flameHex,
+      emissiveIntensity: this.lit ? 1.8 : 0.05,
+      roughness: 1,
+      flatShading: true,
+    });
+    const head = new THREE.Mesh(this.headGeometry, customHeadMaterial);
     head.position.set(nx * 0.09, 0.34, nz * 0.09);
     group.add(head);
+
     if (!post) {
       const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.22), this.poleMaterial);
       bracket.position.set(-nx * 0.1, -0.15, -nz * 0.1);
@@ -308,12 +319,31 @@ export class TorchSystem {
       group.position.set(x, y, z);
     }
     this.group.add(group);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: "#ffc27a", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.glow,
+      color: pal.flameHex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
     sprite.scale.set(0.9, 1.1, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
     sprite.visible = false;
     this.scene.add(sprite);
-    const source = { x: x + nx * 0.27, y: y + 0.5, z: z + nz * 0.27, sprite, phase: Math.random() * 6.28, kind: "torch", alwaysOn: false, light: true, group };
+    const source = {
+      x: x + nx * 0.27,
+      y: y + 0.5,
+      z: z + nz * 0.27,
+      sprite,
+      phase: Math.random() * 6.28,
+      kind: "torch",
+      alwaysOn: false,
+      light: true,
+      group,
+      lightColor: pal.flameHex,
+      colorKey,
+      headMaterial: customHeadMaterial,
+    };
     this.sources.push(source);
     return source;
   }
@@ -354,6 +384,11 @@ export class TorchSystem {
     if (!this.lit && daylight < 0.42) this.lit = true;
     else if (this.lit && daylight > 0.55) this.lit = false;
     this.headMaterial.emissiveIntensity = this.lit ? 1.8 : 0.05;
+    for (let s = 0; s < this.sources.length; s++) {
+      if (this.sources[s].headMaterial) {
+        this.sources[s].headMaterial.emissiveIntensity = this.lit ? 1.8 : 0.05;
+      }
+    }
 
     const px = player.x;
     const pz = player.z;
@@ -417,7 +452,14 @@ export class TorchSystem {
       const flicker = source ? 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase) : 1;
       const target = source ? (source.kind === "hearth" ? 56 : 90) * flicker : 0;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
-      if (source) light.position.set(source.x, source.y + 0.2, source.z);
+      if (source) {
+        light.position.set(source.x, source.y + 0.2, source.z);
+        if (source.lightColor !== undefined) {
+          light.color.setHex(source.lightColor);
+        } else {
+          light.color.setHex(0xffb060);
+        }
+      }
     }
 
     // fagulhas subindo das fontes mais próximas

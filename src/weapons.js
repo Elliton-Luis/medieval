@@ -650,11 +650,12 @@ export class WeaponSystem {
         this.ui.showToast("Sem tochas no inventário! Crie no menu de artesanato (I).");
         return;
       }
+      const torchColor = PlayerInventory.torchColor || "orange";
       let placed;
       if (isNearWall) {
-        placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false);
+        placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false, torchColor);
       } else {
-        placed = torchSys?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true);
+        placed = torchSys?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true, torchColor);
       }
       this.effects.play("star", targetX, py, targetZ, "#ffa834", 1.2);
       this.audio.weaponSwing?.("chop", false);

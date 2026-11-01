@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
-import { igniteTarget, spawnLoot } from "./rpg.js";
+import { igniteTarget, spawnLoot, PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 
 // ============================================================================
 // 1. Materiais e Geometrias Otimizadas do Culto dos Cátaros (Zero-GC)
@@ -237,7 +237,20 @@ export function investigateCultCamp(altar, ui, audio, input) {
   if (audio?.bookPage) audio.bookPage();
 
   showCampInvestigationModal(altar, note);
-  ui?.showToast?.(`✦ Investigaste o ${altar.name || "Acampamento do Culto"}! (+1 Carisma)`);
+
+  // Chance de recuperar o Tractatus de Carcere ou páginas faltantes
+  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+  if (!PlayerInventory.hasDemiurgeDiary) {
+    PlayerInventory.hasDemiurgeDiary = true;
+    ui?.showToast?.("✦ Encontraste o Tractatus de Carcere esquecido junto às cinzas do acampamento! Pressione [L] para ler.");
+  } else if (missingPages.length > 0) {
+    const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
+    PlayerInventory.discoveredBookPages.push(gainedPage);
+    const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
+    ui?.showToast?.(`✦ Fragmento herético recuperado: ${pageTitle} foi anexada ao Tractatus de Carcere ([L])!`);
+  } else {
+    ui?.showToast?.(`✦ Investigaste o ${altar.name || "Acampamento do Culto"}! (+1 Carisma)`);
+  }
   return true;
 }
 

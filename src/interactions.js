@@ -32,6 +32,7 @@ import {
   isDemiurgeDiaryReaderOpen,
 } from "./demiurgeBook.js";
 import { checkCrystalNearby, collectCrystalNode, applyTorchColor, CRYSTAL_PALETTE } from "./crystals.js";
+import { checkGhostTownRubbleNearby, searchGhostTownRubble } from "./ghostTowns.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
@@ -119,7 +120,8 @@ export class InteractionSystem {
         !this._tryGatherHayBale() &&
         !this._tryCollectCrystal() &&
         !this._tryInteractDemiurgeDiary() &&
-        !this._tryInteractAltar()
+        !this._tryInteractAltar() &&
+        !this._trySearchGhostTown()
       ) {
         this._interactNearby();
       }
@@ -127,6 +129,7 @@ export class InteractionSystem {
     this._checkAltarNearby();
     this._checkDemiurgeDiaryNearby();
     this._checkCrystalNearby();
+    this._checkGhostTownNearby();
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
@@ -207,7 +210,7 @@ export class InteractionSystem {
       if (cInfo) {
         actions.push({
           id: `torch_color:${cKey}`,
-          label: `🔥 Infundir Tocha com Chama ${cInfo.label.toUpperCase()} (${cInfo.name})`,
+          label: `🔥 ${cInfo.label}`,
         });
       }
     }
@@ -308,6 +311,21 @@ export class InteractionSystem {
 
   _tryInteractDemiurgeDiary() {
     return interactWithDemiurgeDiary(this.player.root.position, this.ui, this.audio, this.input);
+  }
+
+  _checkGhostTownNearby() {
+    const town = checkGhostTownRubbleNearby(this.player.root.position);
+    if (town && !this.ui.dialoguePanel.hidden) {
+      this.ui.setPrompt?.(`✦ ${town.name.toUpperCase()} [E] Vasculhar Escombros & Códices`);
+    }
+  }
+
+  _trySearchGhostTown() {
+    const town = checkGhostTownRubbleNearby(this.player.root.position);
+    if (town) {
+      return searchGhostTownRubble(town, this.ui, this.audio);
+    }
+    return false;
   }
 
   _interactNearby() {

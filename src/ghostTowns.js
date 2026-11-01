@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
+import { PlayerInventory, PlayerStats } from "./rpg.js";
 
 // ============================================================================
 // Cidades Fantasma Procedurais: Ruínas de Guerra, Escombros e Sangue Seco
@@ -644,4 +645,52 @@ export function updateGhostTownAtmosphere(playerPos, ui, dt = 0.5) {
       }
     }
   }
+}
+
+/**
+ * Checa se o jogador está na praça central de uma cidade fantasma para vasculhar os escombros.
+ */
+export function checkGhostTownRubbleNearby(playerPos) {
+  if (!playerPos || ActiveGhostTowns.length === 0) return null;
+  const px = playerPos.x ?? 0;
+  const pz = playerPos.z ?? 0;
+  for (let i = 0; i < ActiveGhostTowns.length; i++) {
+    const town = ActiveGhostTowns[i];
+    const dx = px - town.center.x;
+    const dz = pz - town.center.z;
+    if (dx * dx + dz * dz < 12.0 * 12.0) {
+      return town;
+    }
+  }
+  return null;
+}
+
+/**
+ * Vasculha os escombros e lajes da praça da cidade fantasma em busca de códices e páginas perdidas.
+ */
+export function searchGhostTownRubble(town, ui, audio) {
+  if (!town) return false;
+  if (town.lastSearched && performance.now() - town.lastSearched < 25000) {
+    ui?.showToast?.(`✦ Os escombros de ${town.name} já foram revirados recentemente.`);
+    return true;
+  }
+  town.lastSearched = performance.now();
+  if (audio?.bookPage) audio.bookPage();
+
+  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+  if (!PlayerInventory.hasDemiurgeDiary) {
+    PlayerInventory.hasDemiurgeDiary = true;
+    ui?.showToast?.(`✦ Encontraste o códice Tractatus de Carcere soterrado sob os escombros de ${town.name}! [L] para ler.`);
+  } else if (missingPages.length > 0) {
+    const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
+    PlayerInventory.discoveredBookPages.push(gainedPage);
+    const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
+    ui?.showToast?.(`✦ Vasculhaste ${town.name}: Fragmento recuperado! Adicionada ${pageTitle} ao códice ([L]).`);
+  } else {
+    const goldFound = 8 + Math.floor(Math.random() * 14);
+    PlayerInventory.gold = (PlayerInventory.gold || 0) + goldFound;
+    PlayerStats.gold = PlayerInventory.gold;
+    ui?.showToast?.(`✦ Vasculhaste as ruínas de ${town.name} e recolheste ${goldFound} moedas antigas sob as pedras.`);
+  }
+  return true;
 }
