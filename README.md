@@ -77,6 +77,18 @@ Cada arma tem dano, alcance, velocidade, peso (afeta a velocidade de movimento),
 
 A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do primeiro clique: `town.mp3` nas vilas, `explore.mp3` no mundo aberto, `DST-GrassLands.mp3` nas planícies longe das vilas, `forest_2.ogg` dentro da floresta, `wanted.mp3` com procurado 1–3 e `chase.mp3` com procurado 4–5 (se esse arquivo não existir, toca `tense.mp3`). Dentro de casa o volume cai.
 
+## Compêndio de Armas e Arsenal
+
+- **Interface Simplificada**: Cada arma é exibida em um card limpo apenas com **Nome e Dano**.
+- **Ficha Técnica Individual**: Clicar em qualquer card abre a descrição detalhada com multiplicadores de força/forja, cadência, alcance, força de impacto, peso, munição, durabilidade e habilidades especiais.
+- **Equipamento Imediato**: Armas pegas do chão, drops ou criadas vão automaticamente para a mão (atribuídas aos slots vagos de 1 a 9). Se os 9 slots estiverem cheios, são guardadas no alforje.
+- **Tocha Compartilhada**: A tocha fica permanentemente compartilhada com a mão, sempre acessível independente da quantidade em estoque.
+
+## Otimização de Terreno e LOD Dianteiro
+
+- **LOD Dianteiro Direcional**: O limiar de alta qualidade geométrica é estendido dinamicamente à frente da câmera (até 130m na direção do movimento), evitando pop-ins bruscos durante cavalgadas em alta velocidade.
+- **Assentamento de Cidades Fantasma**: Coordenadas rigorosamente ancoradas no relevo analítico e fundações de pedra com 2.4m de profundidade subterrânea, impedindo que casas e muralhas flutuem ou fiquem soterradas em encostas acidentadas.
+
 ## Cidades Fantasma e Ruínas de Guerra
 
 - Cidades arruinadas geradas deterministicamente por seeds ao redor da capital (Norvânia, Cairn, Valdor, Oakhaven) e em regiões procedurais remotas.

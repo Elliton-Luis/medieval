@@ -50,6 +50,7 @@ export class World {
     this.loadRadiusSq = (this.radius + 0.35) * (this.radius + 0.35);
     this.unloadRadiusSq = CONFIG.chunkUnloadRadius * CONFIG.chunkUnloadRadius;
     this.viewDistanceSq = CONFIG.viewDistance * CONFIG.viewDistance;
+    this.lodDistance = CONFIG.lodDistance;
     this.lodDistanceSq = CONFIG.lodDistance * CONFIG.lodDistance;
     this._dummy = new THREE.Object3D();
     this._frustum = new THREE.Frustum();
@@ -858,8 +859,16 @@ export class World {
       const inShadowRange = distanceSq < shadowRadiusSq;
       const visible = distanceSq < this.viewDistanceSq && (inShadowRange || inFrustum);
       chunk.group.visible = visible;
-      chunk.near.visible = visible && distanceSq < this.lodDistanceSq;
-      chunk.far.visible = visible && distanceSq >= this.lodDistanceSq;
+
+      // LOD Dianteiro Direcional:
+      // Se o chunk estiver na frente da câmera (dotCam > 0), projeta o limiar do LOD em alta qualidade (near)
+      // muito mais à frente (até 130m), impedindo pop-in ou transição brusca na frente do cavalo.
+      const forwardFactor = Math.max(0, dotCam / Math.max(1, Math.sqrt(distToCamSq)));
+      const effectiveLodDist = this.lodDistance * (1.0 + forwardFactor * 0.95);
+      const effectiveLodSq = effectiveLodDist * effectiveLodDist;
+
+      chunk.near.visible = visible && distanceSq < effectiveLodSq;
+      chunk.far.visible = visible && distanceSq >= effectiveLodSq;
       for (let s = 0; s < chunk.shadowMeshes.length; s++) {
         chunk.shadowMeshes[s].castShadow = inShadowRange && (dotCam >= -10.0 || distToCamSq <= safeRadiusSq);
       }

@@ -4,9 +4,9 @@ export const CONFIG = Object.freeze({
   chunkSegments: 20,
   activeChunkRadius: 3,
   chunkUnloadRadius: 4.5,
-  viewDistance: 120,
-  lodDistance: 40,
-  fogDensity: 0.0165,
+  viewDistance: 150,
+  lodDistance: 65,
+  fogDensity: 0.0135,
   maxDelta: 0.05,
   player: {
     walkSpeed: 4.1,

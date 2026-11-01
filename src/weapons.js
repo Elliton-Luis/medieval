@@ -1122,10 +1122,43 @@ export class WeaponSystem {
 
   unlock(id, quiet = false) {
     const def = WEAPONS_BY_ID[id];
-    if (!def || this.owned.has(id)) return false;
+    if (!def) return false;
+    const wasOwned = this.owned.has(id);
     this.owned.add(id);
-    this._refreshWeaponHud();
-    if (!quiet) this.ui.showToast(`Nova arma: ${def.name} (slot ${def.slot})`);
+
+    // Regra: as armas pegas já devem ir para a mão, a menos que todos os 9 slots estejam cheios.
+    // A tocha é a única que fica compartilhada e fica com a mão, sempre, independente de quantas tochas.
+    let slotAssigned = -1;
+    const existingSlot = this.hotbarSlots.indexOf(id);
+
+    if (existingSlot >= 0) {
+      slotAssigned = existingSlot;
+    } else {
+      // Procura primeiro slot vago entre os 9
+      const freeIdx = this.hotbarSlots.indexOf(null);
+      if (freeIdx >= 0) {
+        this.hotbarSlots[freeIdx] = id;
+        slotAssigned = freeIdx;
+      } else if (id === "torch") {
+        // A tocha fica na mão sempre
+        if (!this.hotbarSlots.includes("torch")) {
+          this.hotbarSlots[0] = "torch";
+          slotAssigned = 0;
+        }
+      }
+    }
+
+    if (slotAssigned >= 0) {
+      this.equip(id, false);
+      this._refreshWeaponHud();
+      if (!quiet) this.ui.showToast(`Arma equipada na mão: ${def.name} (Slot ${slotAssigned + 1})`);
+    } else {
+      this._refreshWeaponHud();
+      if (!quiet && !wasOwned) {
+        this.ui.showToast(`Arma guardada no alforje: ${def.name} (9 slots cheios)`);
+      }
+    }
+
     return true;
   }
 

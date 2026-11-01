@@ -254,12 +254,19 @@ function buildRuinedHouseMesh(mats, random, isDestroyed = false) {
   const d = 4.4;
   const h = 3.2;
 
-  // 1. Fundação de pedra arruinada
-  const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.5, d + 0.3), mats.stoneDark);
-  found.position.y = 0.25;
+  // 1. Fundação de pedra arruinada profunda (desce 2.4m na terra para nunca flutuar em relevo inclinado)
+  const foundationDepth = 2.4;
+  const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.45, foundationDepth, d + 0.45), mats.stoneDark);
+  found.position.y = -foundationDepth * 0.5 + 0.35;
   found.castShadow = true;
   found.receiveShadow = true;
   group.add(found);
+
+  // Piso interno de madeira carcomida / fuligem
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.14, d - 0.1), mats.timberBurned);
+  floor.position.y = 0.38;
+  floor.receiveShadow = true;
+  group.add(floor);
 
   // 2. Paredes de enxaimel descascadas e enegrecidas
   // Parede Traseira (-Z)
@@ -399,7 +406,9 @@ export function generateGhostTown(townConfig, scene, world) {
   townRoot.name = `GhostTown_${name.replace(/\s+/g, "_")}`;
 
   const centerY = world ? world.heightAt(cx, cz) : 0;
-  townRoot.position.set(cx, 0, cz);
+  // townRoot fica em (0, 0, 0) para que todas as coordenadas (wx, groundY, wz) fiquem rigorosamente
+  // alinhadas com o relevo global onde heightAt foi avaliado, eliminando flutuações e objetos enterrados.
+  townRoot.position.set(0, 0, 0);
 
   const placedBounds = [];
 
@@ -422,13 +431,14 @@ export function generateGhostTown(townConfig, scene, world) {
 
     const wallH = isBreach ? 0.9 : isLowRuin ? 2.8 + random() * 1.2 : 5.8;
     const wallThick = 2.0;
+    const wallSubDepth = 2.4; // Afunda 2.4m na terra para nunca flutuar em encostas
 
     if (!isBreach) {
       const segMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(wallThick, wallH, segLen),
+        new THREE.BoxGeometry(wallThick, wallH + wallSubDepth, segLen),
         random() < 0.5 ? mats.stone : mats.stoneDark,
       );
-      segMesh.position.set(wx, groundY + wallH * 0.5, wz);
+      segMesh.position.set(wx, groundY + wallH * 0.5 - wallSubDepth * 0.5, wz);
       segMesh.rotation.y = -angle;
       segMesh.castShadow = true;
       segMesh.receiveShadow = true;

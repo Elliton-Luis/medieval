@@ -3,6 +3,7 @@ import { PlayerEquipment, PlayerStats } from "./rpg.js";
 
 let _codexModalEl = null;
 let _activeCategory = "all";
+let _inspectedWeaponId = null;
 
 const CODEX_CSS = `
 #weapons-codex-overlay {
@@ -31,39 +32,39 @@ const CODEX_CSS = `
   border: 2px solid #d4af37;
   border-radius: 8px;
   box-shadow: 0 0 45px rgba(212, 175, 55, 0.35), inset 0 0 30px rgba(0, 0, 0, 0.85);
-  max-width: 960px;
+  max-width: 920px;
   width: 96%;
-  max-height: 90vh;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  animation: codex-pop 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.2);
+  animation: codex-pop 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.2);
 }
 @keyframes codex-pop {
-  from { transform: scale(0.95); opacity: 0; }
+  from { transform: scale(0.96); opacity: 0; }
   to { transform: scale(1.0); opacity: 1; }
 }
 .codex-header {
-  padding: 18px 24px 14px;
+  padding: 16px 22px 12px;
   border-bottom: 1px solid rgba(212, 175, 55, 0.4);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
 }
 .codex-title-wrap h2 {
   margin: 0;
   font-family: "Cinzel Decorative", "Almendra", Georgia, serif;
-  font-size: clamp(18px, 2.5vw, 24px);
+  font-size: clamp(17px, 2.3vw, 22px);
   font-weight: 900;
   color: #ffd700;
   letter-spacing: 0.08em;
   text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
 }
 .codex-title-wrap p {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 3px 0 0;
+  font-size: 11.5px;
   color: #b5a489;
   letter-spacing: 0.04em;
 }
@@ -86,217 +87,20 @@ const CODEX_CSS = `
   color: #ffffff;
   border-color: #ff5555;
 }
-.codex-summary-bar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-  background: rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 24px;
-  font-size: 12px;
-}
-.codex-stat-chip {
-  display: flex;
-  flex-direction: column;
-}
-.codex-stat-chip span {
-  font-size: 11px;
-  color: #a49780;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.codex-stat-chip strong {
-  font-size: 14px;
-  color: #ffd700;
-  margin-top: 1px;
-}
-.codex-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 10px 24px;
-  background: rgba(10, 8, 14, 0.7);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  overflow-x: auto;
-}
-.codex-tab-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-  color: #d6ccb8;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-}
-.codex-tab-btn:hover {
-  background: rgba(212, 175, 55, 0.2);
-  border-color: #ffd700;
-  color: #ffffff;
-}
-.codex-tab-btn.active {
-  background: #d4af37;
-  border-color: #ffd700;
-  color: #0b0710;
-  font-weight: 700;
-}
-.codex-body {
-  padding: 16px 24px 24px;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-}
-.weapon-card {
-  background: rgba(22, 17, 30, 0.75);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  border-radius: 6px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: all 0.2s ease;
-}
-.weapon-card:hover {
-  border-color: #ffd700;
-  background: rgba(30, 24, 42, 0.9);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.5);
-}
-.weapon-card.equipped {
-  border: 1.5px solid #ffd700;
-  box-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
-  background: linear-gradient(180deg, rgba(38, 30, 52, 0.9) 0%, rgba(20, 15, 28, 0.9) 100%);
-}
-.weapon-card.owned:not(.equipped) {
-  border-color: rgba(90, 180, 110, 0.6);
-}
-.weapon-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
-.weapon-card-name {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.weapon-slot-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #d6ccb8;
-}
-.weapon-status-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.weapon-status-badge.eq {
-  background: #ffd700;
-  color: #0b0710;
-}
-.weapon-status-badge.inv {
-  background: rgba(90, 180, 110, 0.25);
-  border: 1px solid #5ab46e;
-  color: #88ffaa;
-}
-.weapon-status-badge.lock {
-  background: rgba(255, 255, 255, 0.06);
-  color: #887e6d;
-}
-.weapon-stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 12px;
-  font-size: 12.5px;
-}
-.weapon-stat-row {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
-  padding-bottom: 3px;
-}
-.weapon-stat-label {
-  color: #a49780;
-}
-.weapon-stat-val {
-  font-weight: 600;
-  color: #ffffff;
-}
-.weapon-stat-val.highlight {
-  color: #ffd700;
-  font-weight: 700;
-}
-.weapon-traits-tag {
-  font-size: 11px;
-  color: #c9a9ff;
-  background: rgba(142, 84, 233, 0.15);
-  border: 1px solid rgba(142, 84, 233, 0.3);
-  padding: 3px 6px;
-  border-radius: 3px;
-  margin-bottom: 12px;
-  line-height: 1.35;
-}
-.weapon-action-btn {
-  width: 100%;
-  padding: 7px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.18s;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.weapon-action-btn.btn-equip {
-  background: rgba(212, 175, 55, 0.25);
-  border: 1px solid #ffd700;
-  color: #ffe688;
-}
-.weapon-action-btn.btn-equip:hover {
-  background: #d4af37;
-  color: #0b0710;
-}
-.weapon-action-btn.btn-equipped {
-  background: rgba(255, 215, 0, 0.1);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  color: #ffd700;
-  cursor: default;
-}
-.weapon-action-btn.btn-locked {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #8c8270;
-  cursor: default;
-}
 .codex-hotbar-container {
   background: rgba(8, 6, 12, 0.75);
   border-bottom: 1px solid rgba(212, 175, 55, 0.25);
-  padding: 10px 24px;
+  padding: 9px 22px;
 }
 .codex-hotbar-title {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   color: #ffd700;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 .codex-hotbar-grid {
@@ -308,7 +112,7 @@ const CODEX_CSS = `
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
-  padding: 6px 4px;
+  padding: 5px 3px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -357,56 +161,279 @@ const CODEX_CSS = `
 .codex-hotbar-slot:hover .codex-hotbar-slot-clear {
   display: block;
 }
-.hotbar-assign-wrap {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.08);
-}
-.hotbar-assign-row {
+.codex-tabs {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 22px;
+  background: rgba(10, 8, 14, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
 }
-.hotbar-assign-label {
-  font-size: 10.5px;
-  color: #bfa888;
+.codex-tab-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #d6ccb8;
+  padding: 5px 11px;
+  font-size: 11.5px;
   font-weight: 600;
-}
-.hotbar-slot-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffe688;
-  border-radius: 3px;
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 2px 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  white-space: nowrap;
+  transition: all 0.18s ease;
 }
-.hotbar-slot-btn:hover {
-  background: #ffd700;
-  color: #110d18;
-  border-color: #ffffff;
-}
-.hotbar-slot-btn.active-slot {
-  background: #ffd700;
-  color: #110d18;
+.codex-tab-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
   border-color: #ffd700;
+  color: #ffffff;
 }
-.btn-unassign {
-  background: rgba(220, 50, 50, 0.2);
-  border: 1px solid rgba(220, 50, 50, 0.5);
-  color: #ff9999;
-  font-size: 10px;
+.codex-tab-btn.active {
+  background: #d4af37;
+  border-color: #ffd700;
+  color: #0b0710;
+  font-weight: 700;
+}
+.codex-body {
+  padding: 16px 22px 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+/* Card Simples e Organizado: Apenas Nome e Dano */
+.weapon-card-simple {
+  background: rgba(22, 17, 30, 0.75);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 6px;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.2);
+  user-select: none;
+}
+.weapon-card-simple:hover {
+  border-color: #ffd700;
+  background: rgba(35, 27, 48, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 10px rgba(212, 175, 55, 0.2);
+}
+.weapon-card-simple.equipped {
+  border: 1.5px solid #ffd700;
+  background: linear-gradient(180deg, rgba(38, 30, 52, 0.95) 0%, rgba(20, 15, 28, 0.95) 100%);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+}
+.weapon-card-simple.owned:not(.equipped) {
+  border-color: rgba(90, 180, 110, 0.55);
+}
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+.card-weapon-name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+}
+.card-status-badge {
+  font-size: 9.5px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
-  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
-.btn-unassign:hover {
-  background: #dc3232;
+.card-status-badge.eq {
+  background: #ffd700;
+  color: #0b0710;
+}
+.card-status-badge.hot {
+  background: rgba(255, 215, 0, 0.2);
+  border: 1px solid #ffd700;
+  color: #ffe888;
+}
+.card-status-badge.inv {
+  background: rgba(90, 180, 110, 0.2);
+  border: 1px solid #5ab46e;
+  color: #88ffaa;
+}
+.card-status-badge.lock {
+  background: rgba(255, 255, 255, 0.06);
+  color: #887e6d;
+}
+.card-damage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.card-damage-label {
+  font-size: 11.5px;
+  color: #a49780;
+}
+.card-damage-val {
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.card-click-hint {
+  font-size: 10px;
+  color: #b5a489;
+  text-align: right;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+.weapon-card-simple:hover .card-click-hint {
+  opacity: 1;
+  color: #ffd700;
+}
+
+/* Painel de Descrição Detalhada da Arma Inspecionada */
+.codex-detail-view {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  animation: codex-pop 0.18s ease;
+}
+.detail-back-btn {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffd700;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.detail-back-btn:hover {
+  background: #d4af37;
+  color: #0b0710;
+  border-color: #ffffff;
+}
+.detail-hero-card {
+  background: rgba(20, 15, 28, 0.85);
+  border: 1.5px solid #d4af37;
+  border-radius: 8px;
+  padding: 18px 22px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+.detail-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.35);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+.detail-hero-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 18px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.detail-stat-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+.detail-stat-label {
+  color: #a49780;
+}
+.detail-stat-val {
+  font-weight: 700;
+  color: #ffffff;
+}
+.detail-stat-val.gold {
+  color: #ffd700;
+}
+.detail-traits-box {
+  background: rgba(142, 84, 233, 0.12);
+  border: 1px solid rgba(142, 84, 233, 0.35);
+  border-radius: 5px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #dfceff;
+  margin-bottom: 18px;
+}
+.detail-actions-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.detail-equip-btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid #ffd700;
+  background: #d4af37;
+  color: #0b0710;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.18s;
+}
+.detail-equip-btn:hover {
+  background: #ffe366;
+  border-color: #ffffff;
+}
+.detail-slot-assign-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.detail-slot-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffe688;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.detail-slot-btn:hover {
+  background: #ffd700;
+  color: #110d18;
+}
+.detail-slot-btn.active-slot {
+  background: #ffd700;
+  color: #110d18;
+  border-color: #ffd700;
 }
 `;
 
@@ -419,7 +446,7 @@ function _injectCodexStyles() {
 }
 
 /**
- * Abre o compêndio completo de armas e estatísticas de dano.
+ * Abre o compêndio de armas com cards simples de Nome e Dano e visualizador individual.
  */
 export function openWeaponsScreen(env = window.__game || {}) {
   _injectCodexStyles();
@@ -437,34 +464,40 @@ export function openWeaponsScreen(env = window.__game || {}) {
     } catch {}
   }
 
+  _inspectedWeaponId = null;
   _renderCodex(env);
   _codexModalEl.classList.add("active");
 
   const close = () => {
     if (!_codexModalEl.classList.contains("active")) return;
     _codexModalEl.classList.remove("active");
+    _inspectedWeaponId = null;
     window.removeEventListener("keydown", onKeyDown);
   };
 
   const onKeyDown = (e) => {
     if (e.key === "Escape" || e.code === "Escape" || e.code === "KeyK") {
       e.preventDefault();
-      close();
+      if (_inspectedWeaponId) {
+        _inspectedWeaponId = null;
+        _renderCodex(env);
+      } else {
+        close();
+      }
     }
   };
 
   window.addEventListener("keydown", onKeyDown);
 
-  const btnClose = _codexModalEl.querySelector("#codex-btn-close");
-  btnClose?.addEventListener("click", () => close());
-  _codexModalEl.addEventListener("click", (e) => {
+  _codexModalEl.onclick = (e) => {
     if (e.target === _codexModalEl) close();
-  });
+  };
 }
 
 export function closeWeaponsScreen() {
   if (_codexModalEl) {
     _codexModalEl.classList.remove("active");
+    _inspectedWeaponId = null;
   }
 }
 
@@ -481,6 +514,149 @@ function _renderCodex(env) {
   const meleeMult = PlayerStats.getMeleeMult?.() ?? 1.0;
   const totalMeleeMult = Math.round(wepMult * meleeMult * 100) / 100;
 
+  // Se o jogador estiver inspecionando uma arma específica:
+  if (_inspectedWeaponId) {
+    const w = WEAPON_LIST.find((item) => item.id === _inspectedWeaponId) || WEAPON_LIST[0];
+    const isEquipped = currentWepId === w.id;
+    const isOwned = ownedSet.has(w.id);
+    const hotbarIdx = hotbar.indexOf(w.id);
+    const inHotbar = hotbarIdx >= 0;
+
+    let effectiveDmg = Math.round(w.damage * totalMeleeMult * 10) / 10;
+    if (w.type === "musket") effectiveDmg = Math.round(w.damage * wepMult * 10) / 10;
+    else if (w.type === "bow" || w.type === "crossbow") effectiveDmg = Math.round(w.damage * wepMult * 10) / 10;
+    else if (w.type === "throw") effectiveDmg = w.damage;
+
+    const attackSpeed = (1 / Math.max(0.1, w.cooldown)).toFixed(1);
+
+    let ammoDisplay = "Infinita (Corpo a Corpo)";
+    if (w.ammo) {
+      const count = ammoMap[w.ammo] ?? 0;
+      const label = AMMO_LABELS[w.ammo] || w.ammo.toUpperCase();
+      ammoDisplay = `${count} ${label}`;
+    }
+
+    let durDisplay = "Infinita (Aço Forjado)";
+    if (w.isImprovised) {
+      const cur = durMap[w.id] !== undefined ? durMap[w.id] : (w.durability || 10);
+      durDisplay = `${cur}/${w.maxDurability || 10} Usos (Rústica)`;
+    }
+
+    const traits = [];
+    if (w.id === "spear" || w.id === "makeshift_spear") traits.push("Investida com Lança: Dano aumenta com a velocidade (até 3.5x)");
+    if (w.combo) traits.push("Combo fluído de 3 golpes em sequência");
+    if (w.charge) traits.push("Ataque carregado pesado com alto recuo");
+    if (w.hands === 1) traits.push("1 Mão · Permite empunhar Escudo (segurar Q)");
+    else traits.push("2 Mãos · Golpe de arco amplo e devastador");
+    if (w.toolType === "AXE") traits.push("Corta árvores e colhe madeira");
+    if (w.toolType === "PICKAXE") traits.push("Minera rochas, pedregulhos e barro");
+    if (w.type === "musket") traits.push("Pólvora rápida (120 m/s) · Perfura armadura");
+    if (w.type === "bow" || w.type === "crossbow") traits.push("Disparo preciso de longa distância · Tiro na cabeça causa dano crítico");
+    if (w.radius) traits.push(`Explosão em raio (${w.radius}m)`);
+
+    _codexModalEl.innerHTML = `
+      <div class="codex-panel" role="dialog" aria-modal="true">
+        <div class="codex-header">
+          <div class="codex-title-wrap">
+            <h2>⚔️ DETALHES DA ARMA</h2>
+            <p>Estatísticas completas e atribuição aos slots em mãos</p>
+          </div>
+          <button class="codex-close-btn" id="codex-btn-close" aria-label="Fechar">✕</button>
+        </div>
+
+        <div class="codex-detail-view">
+          <button class="detail-back-btn" id="btn-back-codex">
+            ← Voltar ao Compêndio
+          </button>
+
+          <div class="detail-hero-card">
+            <div class="detail-hero-header">
+              <h3 class="detail-hero-title">
+                ${w.name}
+                <span class="card-status-badge ${isEquipped ? "eq" : inHotbar ? "hot" : isOwned ? "inv" : "lock"}">
+                  ${isEquipped ? "EM MÃOS" : inHotbar ? `SLOT ${hotbarIdx + 1}` : isOwned ? "NO ALFORJE" : "BLOQUEADA"}
+                </span>
+              </h3>
+              <span style="font-size: 12px; color: #ffd700; font-weight: 700;">
+                ${w.hands === 1 ? "1 Mão (Escudo)" : "2 Mãos"} · ${w.type.toUpperCase()}
+              </span>
+            </div>
+
+            <div class="detail-stats-grid">
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Dano Base da Arma:</span>
+                <span class="detail-stat-val gold">${w.damage} pts</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Dano Efetivo (Força + Forja):</span>
+                <span class="detail-stat-val gold">${effectiveDmg} pts</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Velocidade de Ataque:</span>
+                <span class="detail-stat-val">${attackSpeed} golpes/s (${w.cooldown}s)</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Alcance de Golpe:</span>
+                <span class="detail-stat-val">${w.reach ? `${w.reach}m` : "Projétil"}</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Força de Impacto:</span>
+                <span class="detail-stat-val">${w.knock} pts (Empurrão)</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Mobilidade (Peso):</span>
+                <span class="detail-stat-val">${Math.round(w.weight * 100)}% Velocidade</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Munição:</span>
+                <span class="detail-stat-val">${ammoDisplay}</span>
+              </div>
+              <div class="detail-stat-row">
+                <span class="detail-stat-label">Durabilidade:</span>
+                <span class="detail-stat-val">${durDisplay}</span>
+              </div>
+            </div>
+
+            <div class="detail-traits-box">
+              <strong>Propriedades:</strong> ${traits.join(" · ")}
+            </div>
+
+            <div class="detail-actions-box">
+              ${
+                isOwned
+                  ? `
+                  ${
+                    isEquipped
+                      ? `<button class="detail-equip-btn" style="background:#5ab46e;border-color:#5ab46e;color:#ffffff;" disabled>✓ Empunhada na Mão Agora</button>`
+                      : `<button class="detail-equip-btn" id="btn-detail-equip" data-equip-id="${w.id}">⚔️ Empunhar na Mão Agora</button>`
+                  }
+                  <div style="font-size: 11px; color: #b5a489; font-weight: 700; margin-top: 4px;">
+                    ATRIBUIR AOS SLOTS EM MÃOS (1 a 9):
+                  </div>
+                  <div class="detail-slot-assign-row">
+                    ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((sIdx) => {
+                      const isCurrent = hotbar[sIdx] === w.id;
+                      return `<button class="detail-slot-btn ${isCurrent ? "active-slot" : ""}" data-assign-slot="${sIdx}" data-assign-wep="${w.id}">Slot ${sIdx + 1}${isCurrent ? " (Atual)" : ""}</button>`;
+                    }).join("")}
+                    ${inHotbar && w.id !== "fists" ? `<button class="detail-slot-btn" style="color:#ff8888;" data-unassign-wep="${w.id}">✕ Remover da Mão</button>` : ""}
+                  </div>
+                `
+                  : `
+                  <div style="color: #ffaa77; font-size: 12.5px; font-weight: 600;">
+                    🔒 Arma bloqueada · ${w.price > 0 ? `Disponível com o Armeiro da capital por ${w.price} moedas.` : "Crie na bancada de artesanato ou encontre em missões."}
+                  </div>
+                `
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    _setupDetailListeners(env);
+    return;
+  }
+
   // Filtragem das armas
   const filtered = WEAPON_LIST.filter((w) => {
     if (_activeCategory === "all") return true;
@@ -495,35 +671,16 @@ function _renderCodex(env) {
     <div class="codex-panel" role="dialog" aria-modal="true">
       <div class="codex-header">
         <div class="codex-title-wrap">
-          <h2>⚔️ COMPÊNDIO DE ARMAS & ARSENAL</h2>
-          <p>Estatísticas completas de dano, velocidade, forja e balística do inventário</p>
+          <h2>⚔️ COMPÊNDIO DE ARMAS</h2>
+          <p>Selecione um card para ver a descrição detalhada e atribuir aos slots</p>
         </div>
         <button class="codex-close-btn" id="codex-btn-close" aria-label="Fechar">✕</button>
       </div>
 
-      <div class="codex-summary-bar">
-        <div class="codex-stat-chip">
-          <span>Afiação do Ferreiro</span>
-          <strong>Nível ${wepLevel} (+${Math.round((wepMult - 1) * 100)}% Dano)</strong>
-        </div>
-        <div class="codex-stat-chip">
-          <span>Força do Personagem (STR)</span>
-          <strong>${PlayerStats.str ?? 10} (+${Math.round((PlayerStats.str - 10) * 5)}% Físico)</strong>
-        </div>
-        <div class="codex-stat-chip">
-          <span>Multiplicador Total</span>
-          <strong>×${totalMeleeMult.toFixed(2)} Dano Final</strong>
-        </div>
-        <div class="codex-stat-chip">
-          <span>Arma em Mãos</span>
-          <strong>${weaponsSys?.currentWeapon?.name || "Mãos"}</strong>
-        </div>
-      </div>
-
       <div class="codex-hotbar-container">
         <div class="codex-hotbar-title">
-          <span>⚔️ ARSENAL EM MÃOS (HOTBAR 1-9 · MÁXIMO 9 ARMAS NO CICLO)</span>
-          <span style="color: #bfa888; font-size: 10px; font-weight: normal;">Clique no slot para empunhar ou escolha o slot abaixo de cada arma</span>
+          <span>⚔️ ARMAS EM MÃOS (HOTBAR 1-9 · CLIQUE NO SLOT PARA EMPUNHAR)</span>
+          <span style="color: #bfa888; font-size: 10px; font-weight: normal;">Tocha sempre compartilhada com a mão</span>
         </div>
         <div class="codex-hotbar-grid">
           ${hotbar.map((slotWepId, idx) => {
@@ -556,117 +713,20 @@ function _renderCodex(env) {
           const hotbarIdx = hotbar.indexOf(w.id);
           const inHotbar = hotbarIdx >= 0;
 
-          // Cálculo do dano efetivo
-          let effectiveDmg = Math.round(w.damage * totalMeleeMult * 10) / 10;
-          if (w.type === "musket") effectiveDmg = Math.round(w.damage * wepMult * 10) / 10;
-          else if (w.type === "bow" || w.type === "crossbow") effectiveDmg = Math.round(w.damage * wepMult * 10) / 10;
-          else if (w.type === "throw") effectiveDmg = w.damage;
-
-          // Cadência e velocidade
-          const attackSpeed = (1 / Math.max(0.1, w.cooldown)).toFixed(1);
-
-          // Munição
-          let ammoDisplay = "Infinita (Corpo a Corpo)";
-          if (w.ammo) {
-            const count = ammoMap[w.ammo] ?? 0;
-            const label = AMMO_LABELS[w.ammo] || w.ammo.toUpperCase();
-            ammoDisplay = `${count} ${label}`;
-          }
-
-          // Durabilidade
-          let durDisplay = "Infinita (Aço Forjado)";
-          if (w.isImprovised) {
-            const cur = durMap[w.id] !== undefined ? durMap[w.id] : (w.durability || 10);
-            durDisplay = `${cur}/${w.maxDurability || 10} Usos (Rústica)`;
-          }
-
-          // Propriedades especiais
-          const traits = [];
-          if (w.id === "spear" || w.id === "makeshift_spear") traits.push("Investida com Lança: Dano aumenta com a velocidade (até 3.5x)");
-          if (w.combo) traits.push("Combo de 3 Golpes");
-          if (w.charge) traits.push("Ataque Carregado Pesado");
-          if (w.hands === 1) traits.push("1 Mão · Permite Escudo (Q)");
-          else traits.push("2 Mãos · Golpe Largo e Lento");
-          if (w.toolType === "AXE") traits.push("Corta Árvores em Madeira");
-          if (w.toolType === "PICKAXE") traits.push("Minera Rochas e Barro");
-          if (w.type === "musket") traits.push("Pólvora Fulminante (120 m/s) · Perfura Armaduras");
-          if (w.type === "bow" || w.type === "crossbow") traits.push("Tiro de Longa Distância · Tiro na Cabeça Dobrado");
-          if (w.radius) traits.push(`Explosão em Raio (${w.radius}m)`);
-
           return `
-            <div class="weapon-card ${isEquipped ? "equipped" : isOwned ? "owned" : ""}">
-              <div>
-                <div class="weapon-card-header">
-                  <h3 class="weapon-card-name">
-                    ${w.name}
-                    ${inHotbar ? `<span class="weapon-slot-badge" style="background:#ffd700;color:#0b0710;">Slot ${hotbarIdx + 1} em Mãos</span>` : `<span class="weapon-slot-badge">Cat. ${w.slot}</span>`}
-                  </h3>
-                  <span class="weapon-status-badge ${isEquipped ? "eq" : isOwned ? "inv" : "lock"}">
-                    ${isEquipped ? "EM MÃOS" : inHotbar ? `HOTBAR (${hotbarIdx + 1})` : isOwned ? "NO ALFORJE" : "BLOQUEADA"}
-                  </span>
-                </div>
-
-                <div class="weapon-stats-list">
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Dano Base / Efetivo:</span>
-                    <span class="weapon-stat-val highlight">${w.damage} ➔ ${effectiveDmg} pts</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Velocidade de Ataque:</span>
-                    <span class="weapon-stat-val">${attackSpeed} golpes/s (${w.cooldown}s)</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Alcance da Arma:</span>
-                    <span class="weapon-stat-val">${w.reach ? `${w.reach}m` : "Disparo"}</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Força de Impacto:</span>
-                    <span class="weapon-stat-val">${w.knock} pts (Empurrão)</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Mobilidade (Peso):</span>
-                    <span class="weapon-stat-val">${Math.round(w.weight * 100)}% Velocidade</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Munição:</span>
-                    <span class="weapon-stat-val">${ammoDisplay}</span>
-                  </div>
-                  <div class="weapon-stat-row">
-                    <span class="weapon-stat-label">Durabilidade:</span>
-                    <span class="weapon-stat-val">${durDisplay}</span>
-                  </div>
-                </div>
-
-                <div class="weapon-traits-tag">
-                  ✦ ${traits.join(" · ")}
-                </div>
-
-                ${
-                  isOwned
-                    ? `
-                    <div class="hotbar-assign-wrap">
-                      <div class="hotbar-assign-row">
-                        <span class="hotbar-assign-label">Equipar no Slot:</span>
-                        ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((sIdx) => {
-                          const isCurrentSlot = hotbar[sIdx] === w.id;
-                          return `<button class="hotbar-slot-btn ${isCurrentSlot ? "active-slot" : ""}" data-assign-slot="${sIdx}" data-assign-wep="${w.id}" title="Equipar ${w.name} no Slot ${sIdx + 1}">${sIdx + 1}</button>`;
-                        }).join("")}
-                        ${inHotbar && w.id !== "fists" ? `<button class="btn-unassign" data-unassign-wep="${w.id}">Remover da Mão</button>` : ""}
-                      </div>
-                    </div>
-                  `
-                    : ""
-                }
+            <div class="weapon-card-simple ${isEquipped ? "equipped" : isOwned ? "owned" : ""}" data-inspect-wep="${w.id}">
+              <div class="card-header-row">
+                <h3 class="card-weapon-name">${w.name}</h3>
+                <span class="card-status-badge ${isEquipped ? "eq" : inHotbar ? "hot" : isOwned ? "inv" : "lock"}">
+                  ${isEquipped ? "EM MÃOS" : inHotbar ? `SLOT ${hotbarIdx + 1}` : isOwned ? "NO ALFORJE" : "BLOQUEADA"}
+                </span>
               </div>
-
-              <div style="margin-top: 8px;">
-                ${
-                  isEquipped
-                    ? `<button class="weapon-action-btn btn-equipped" disabled>✓ Empunhada Agora</button>`
-                    : isOwned
-                    ? `<button class="weapon-action-btn btn-equip" data-equip-id="${w.id}">Empunhar Agora</button>`
-                    : `<button class="weapon-action-btn btn-locked" disabled>Bloqueada · ${w.price > 0 ? `Compre no Armeiro por ${w.price} 🪙` : "Crie na Bancada"}</button>`
-                }
+              <div class="card-damage-row">
+                <span class="card-damage-label">Dano:</span>
+                <span class="card-damage-val">${w.damage} pts</span>
+              </div>
+              <div class="card-click-hint">
+                Ver Detalhes ➜
               </div>
             </div>
           `;
@@ -674,6 +734,16 @@ function _renderCodex(env) {
       </div>
     </div>
   `;
+
+  _setupGridListeners(env);
+}
+
+function _setupGridListeners(env) {
+  const weaponsSys = env.weapons || window.__game?.weapons;
+
+  // Botão fechar
+  const btnClose = _codexModalEl.querySelector("#codex-btn-close");
+  btnClose?.addEventListener("click", () => closeWeaponsScreen());
 
   // Listener para abas
   const tabBtns = _codexModalEl.querySelectorAll(".codex-tab-btn");
@@ -684,11 +754,22 @@ function _renderCodex(env) {
     });
   });
 
-  // Listener para seleção de slots rápidos na Hotbar superior
+  // Listener para clicar no card simples e abrir a descrição detalhada dessa arma
+  const cardEls = _codexModalEl.querySelectorAll("[data-inspect-wep]");
+  cardEls.forEach((card) => {
+    card.addEventListener("click", () => {
+      const wepId = card.getAttribute("data-inspect-wep");
+      if (wepId) {
+        _inspectedWeaponId = wepId;
+        _renderCodex(env);
+      }
+    });
+  });
+
+  // Hotbar rápida no topo
   const hotbarSlotEls = _codexModalEl.querySelectorAll("[data-hotbar-select]");
   hotbarSlotEls.forEach((el) => {
     el.addEventListener("click", (e) => {
-      // Ignora clique se for no botão de limpar slot
       if (e.target.closest(".codex-hotbar-slot-clear")) return;
       const num = Number(el.getAttribute("data-hotbar-select"));
       if (num && weaponsSys?.selectSlot) {
@@ -698,7 +779,7 @@ function _renderCodex(env) {
     });
   });
 
-  // Listener para desequipar slot específico da Hotbar
+  // Limpar slot da hotbar
   const clearSlotBtns = _codexModalEl.querySelectorAll("[data-unassign-slot]");
   clearSlotBtns.forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -710,10 +791,43 @@ function _renderCodex(env) {
       }
     });
   });
+}
 
-  // Listener para atribuir arma ao slot 1..9
-  const assignSlotBtns = _codexModalEl.querySelectorAll("[data-assign-slot]");
-  assignSlotBtns.forEach((btn) => {
+function _setupDetailListeners(env) {
+  const weaponsSys = env.weapons || window.__game?.weapons;
+
+  // Botão fechar
+  const btnClose = _codexModalEl.querySelector("#codex-btn-close");
+  btnClose?.addEventListener("click", () => closeWeaponsScreen());
+
+  // Botão voltar à lista
+  const btnBack = _codexModalEl.querySelector("#btn-back-codex");
+  btnBack?.addEventListener("click", () => {
+    _inspectedWeaponId = null;
+    _renderCodex(env);
+  });
+
+  // Botão equipar agora
+  const btnEquip = _codexModalEl.querySelector("#btn-detail-equip");
+  btnEquip?.addEventListener("click", (e) => {
+    const id = e.currentTarget.getAttribute("data-equip-id");
+    if (id && weaponsSys?.equip) {
+      if (weaponsSys.hotbarSlots && !weaponsSys.hotbarSlots.includes(id)) {
+        let freeIdx = weaponsSys.hotbarSlots.indexOf(null);
+        if (freeIdx === -1) freeIdx = 3;
+        weaponsSys.assignHotbarSlot(freeIdx, id);
+      }
+      weaponsSys.equip(id, false);
+      weaponsSys._refreshWeaponHud?.();
+      env.audio?.weaponSwing?.("slash", false);
+      env.ui?.showToast?.(`⚔️ Empunhaste: ${WEAPON_LIST.find((w) => w.id === id)?.name || id}`);
+      _renderCodex(env);
+    }
+  });
+
+  // Atribuir aos slots 1 a 9
+  const assignBtns = _codexModalEl.querySelectorAll("[data-assign-slot]");
+  assignBtns.forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const sIdx = Number(btn.getAttribute("data-assign-slot"));
       const wepId = btn.getAttribute("data-assign-wep");
@@ -726,41 +840,18 @@ function _renderCodex(env) {
     });
   });
 
-  // Listener para remover arma da hotbar
-  const unassignWepBtns = _codexModalEl.querySelectorAll("[data-unassign-wep]");
-  unassignWepBtns.forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const wepId = btn.getAttribute("data-unassign-wep");
-      if (weaponsSys?.hotbarSlots) {
-        const idx = weaponsSys.hotbarSlots.indexOf(wepId);
-        if (idx >= 0) {
-          weaponsSys.unassignHotbarSlot(idx);
-          env.ui?.showToast?.(`Arma recolhida para o alforje.`);
-          _renderCodex(env);
-        }
-      }
-    });
-  });
-
-  // Listener para botões de equipar diretamente
-  const equipBtns = _codexModalEl.querySelectorAll("[data-equip-id]");
-  equipBtns.forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const id = e.currentTarget.getAttribute("data-equip-id");
-      if (id && weaponsSys?.equip) {
-        // Se a arma não estiver em nenhum slot da hotbar, atribui a um slot livre ou ao primeiro que puder
-        if (weaponsSys.hotbarSlots && !weaponsSys.hotbarSlots.includes(id)) {
-          let freeIdx = weaponsSys.hotbarSlots.indexOf(null);
-          if (freeIdx === -1) freeIdx = 3; // Substitui o slot 4 se todos cheios
-          weaponsSys.assignHotbarSlot(freeIdx, id);
-        }
-        weaponsSys.equip(id, false);
-        weaponsSys._refreshWeaponHud?.();
-        env.audio?.weaponSwing?.("slash", false);
-        env.ui?.showToast?.(`⚔️ Empunhaste: ${WEAPON_LIST.find((w) => w.id === id)?.name || id}`);
+  // Remover da mão
+  const unassignBtn = _codexModalEl.querySelector("[data-unassign-wep]");
+  unassignBtn?.addEventListener("click", (e) => {
+    const wepId = e.currentTarget.getAttribute("data-unassign-wep");
+    if (weaponsSys?.hotbarSlots) {
+      const idx = weaponsSys.hotbarSlots.indexOf(wepId);
+      if (idx >= 0) {
+        weaponsSys.unassignHotbarSlot(idx);
+        env.ui?.showToast?.(`Arma recolhida para o alforje.`);
         _renderCodex(env);
       }
-    });
+    }
   });
 }
 
