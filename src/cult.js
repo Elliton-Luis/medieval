@@ -1572,7 +1572,7 @@ export class CultLeader {
     }
 
     const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
-    this.root.position.set(this.x, groundY, z);
+    this.root.position.set(this.x, groundY, this.z);
   }
 }
 
