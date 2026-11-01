@@ -712,20 +712,13 @@ export class World {
     return best;
   }
 
-  // Que tipo de obstáculo há em (x, z)? "tree", "rock", "solid" (paredes, construções) ou null.
-  // Serve ao cavalo: pedra se pisa por cima, árvore machuca, o resto só barra.
+  // Identifica obstáculos especificamente para o cavalo.
+  // Regra do jogo: o cavalo SEMPRE passa por cima de pedras, todas elas (rock, clay, stone).
+  // Ele SÓ deve bater em árvores ("tree") e casas/construções ("house"), apenas.
   obstacleAt(x, z, radius) {
-    for (let i = 0; i < this.staticColliders.length; i++) {
-      const o = this.staticColliders[i];
-      const dx = x - o.x;
-      const dz = z - o.z;
-      const min = radius + o.radius;
-      if (dx * dx + dz * dz < min * min) return "solid";
-    }
-    if (this._hitsBoxMove(x, z, radius)) return "solid";
+    // 1. Árvores próximas nos chunks carregados
     const cx = Math.floor(x / this.chunkSize);
     const cz = Math.floor(z / this.chunkSize);
-    let found = null;
     for (let c = 0; c < this.activeChunks.length; c++) {
       const chunk = this.activeChunks[c];
       if (Math.abs(chunk.x - cx) > 1 || Math.abs(chunk.z - cz) > 1) continue;
@@ -737,10 +730,58 @@ export class World {
         const min = radius + o.radius;
         if (dx * dx + dz * dz >= min * min) continue;
         if (o.kind === "tree") return "tree";
-        found = o.kind || "solid";
+        // Todas as pedras e barro/argila são ignorados pelo cavalo (passa por cima)
+        if (o.kind === "rock" || o.kind === "clay" || o.kind === "stone") continue;
       }
     }
-    return found;
+
+    // 2. Casas, muralhas e construções sólidas
+    if (this._hitsBoxMove(x, z, radius)) return "house";
+
+    // 3. Colisores estáticos de edifícios (torres, forjas, poços, paredes)
+    for (let i = 0; i < this.staticColliders.length; i++) {
+      const o = this.staticColliders[i];
+      if (o.disabled) continue;
+      if (o.kind === "rock" || o.kind === "clay" || o.kind === "stone") continue;
+      const dx = x - o.x;
+      const dz = z - o.z;
+      const min = radius + o.radius;
+      if (dx * dx + dz * dz < min * min) return "house";
+    }
+
+    return null;
+  }
+
+  isHorseBlocked(x, z, radius = 0.7) {
+    const obst = this.obstacleAt(x, z, radius);
+    return obst === "tree" || obst === "house";
+  }
+
+  // Altura do solo para cavalo: se estiver sobre pedras, eleva suavemente por cima delas
+  horseHeightAt(x, z) {
+    const baseH = this.heightAt(x, z);
+    const cx = Math.floor(x / this.chunkSize);
+    const cz = Math.floor(z / this.chunkSize);
+    for (let c = 0; c < this.activeChunks.length; c++) {
+      const chunk = this.activeChunks[c];
+      if (Math.abs(chunk.x - cx) > 1 || Math.abs(chunk.z - cz) > 1) continue;
+      for (let i = 0; i < chunk.colliders.length; i++) {
+        const o = chunk.colliders[i];
+        if (o.disabled || o.radius <= 0) continue;
+        if (o.kind !== "rock" && o.kind !== "clay" && o.kind !== "stone") continue;
+        const dx = x - o.x;
+        const dz = z - o.z;
+        const dSq = dx * dx + dz * dz;
+        const rad = o.radius * 1.15;
+        if (dSq < rad * rad) {
+          const dist = Math.sqrt(dSq);
+          const factor = Math.max(0, 1 - dist / rad);
+          const rockLift = Math.max(0, o.top - baseH) * factor * 0.75;
+          return baseH + rockLift;
+        }
+      }
+    }
+    return baseH;
   }
 
   addStaticCollider(x, z, radius, height = 8) {

@@ -271,21 +271,22 @@ export class RidingSystem {
       }
     }
 
-    // movimento em sub-passos (não atravessa paredes em alta velocidade).
-    // Pedra: o cavalo passa por cima. Árvore: bate e machuca. Paredes e afins: só barram.
+    // Movimento em sub-passos:
+    // Regra: o cavalo SEMPRE passa por cima de pedras, todas elas.
+    // Ele SÓ deve bater em árvores e casas, apenas.
     const total = horse.speed * dt;
     const steps = Math.max(1, Math.ceil(total / 0.35));
     const stepLength = total / steps;
-    let hitTree = false;
-    for (let i = 0; i < steps && !hitTree; i++) {
+    let hitObstacle = null;
+    for (let i = 0; i < steps && !hitObstacle; i++) {
       const nx = horse.x + Math.sin(horse.heading) * stepLength;
       const nz = horse.z + Math.cos(horse.heading) * stepLength;
       const front = this._probeObstacle(horse, nx, nz);
       if (!front) {
         horse.x = nx;
         horse.z = nz;
-      } else if (front === "tree" && horse.speed > 5) {
-        hitTree = true;
+      } else if ((front === "tree" || front === "house") && horse.speed > 5) {
+        hitObstacle = front;
       } else if (!this._probeObstacle(horse, nx, horse.z)) {
         horse.x = nx;
         horse.speed *= 0.9;
@@ -296,7 +297,7 @@ export class RidingSystem {
         horse.speed *= 0.5;
       }
     }
-    if (hitTree) {
+    if (hitObstacle) {
       const speed = horse.speed;
       horse.speed = 0;
       horse.buck();
@@ -304,7 +305,8 @@ export class RidingSystem {
       this.cameraRig.addShake(0.5);
       this.dismount(true);
       this.combat.hurtPlayer(speed > 16 ? 2 : 1, horse.x - Math.sin(horse.heading), horse.z - Math.cos(horse.heading), { knock: 6, weapon: "blunt" });
-      this.ui.showToast("Bateste numa árvore!");
+      const msg = hitObstacle === "tree" ? "Bateste numa árvore!" : "Bateste numa casa!";
+      this.ui.showToast(msg);
       return;
     }
 
@@ -354,8 +356,12 @@ export class RidingSystem {
     const world = this.world;
     const airborne = horse.height > 0.2;
     const found = world.obstacleAt(x, z, 0.7);
-    if (found === "rock") return null;
-    if (airborne && found !== "tree" && !world.isBlockedAtHeight(x, world.heightAt(horse.x, horse.z) + horse.height + 0.7, z, 0.7)) return null;
-    return found;
+    // Pedras: o cavalo SEMPRE passa por cima de todas elas
+    if (!found || found === "rock" || found === "clay" || found === "stone") return null;
+    // Se estiver no ar pulando, só barra se a altura física bloquear
+    if (airborne && !world.isBlockedAtHeight(x, (world.horseHeightAt ? world.horseHeightAt(horse.x, horse.z) : world.heightAt(horse.x, horse.z)) + horse.height + 0.7, z, 0.7)) return null;
+    // O cavalo só deve bater em árvores e casas, apenas
+    if (found === "tree" || found === "house") return found;
+    return null;
   }
 }

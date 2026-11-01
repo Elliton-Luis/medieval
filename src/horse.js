@@ -258,7 +258,11 @@ export class Horse {
   }
 
   _blocked(x, z) {
-    return this.world.isBlockedAt(x, z, 0.7);
+    if (this.world?.isHorseBlocked) {
+      return this.world.isHorseBlocked(x, z, 0.7);
+    }
+    const found = this.world?.obstacleAt ? this.world.obstacleAt(x, z, 0.7) : null;
+    return found === "tree" || found === "house";
   }
 
   update(dt, playerX, playerZ) {
@@ -537,7 +541,8 @@ export class Horse {
     this.model.rotation.y = this.heading;
     this.model.rotation.z = 0;
     this.model.position.y = this.bob;
-    this.root.position.set(this.x, this.world.heightAt(this.x, this.z) + this.height, this.z);
+    const groundY = this.world.horseHeightAt ? this.world.horseHeightAt(this.x, this.z) : this.world.heightAt(this.x, this.z);
+    this.root.position.set(this.x, groundY + this.height, this.z);
   }
 
   _updateDead(dt) {

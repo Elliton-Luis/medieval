@@ -41,7 +41,7 @@ Além da capital há seis vilas (Ferrovale, Pedraluz, Salgueiro, Cinzal, Brumas 
 
 - Manadas selvagens por chunk (limite total de 14) pastam, andam, trotam e fogem se atacadas ou assustadas (corrida do jogador por perto, tiros, explosões). Alguns cavalos ficam amarrados junto às casas, com um morador como dono.
 - `F` perto de um cavalo monta. Cavalos selvagens podem empinar e derrubar nas primeiras tentativas; roubar o de um NPC conta como crime.
-- Montado: galope com inércia e derrapagem, turbo com `Shift` (gasta o fôlego), salto com `Space`, atropelamento (derruba NPCs); bater numa árvore derruba o jogador e machuca (pedras o cavalo pisa por cima, paredes só o barram), combate montado (espada, arco, besta, mosquete). A câmera se afasta e o campo de visão abre com a velocidade.
+- Montado: galope com inércia e derrapagem, turbo com `Shift` (gasta o fôlego), salto com `Space`, atropelamento (derruba NPCs); bater numa árvore ou em uma casa em velocidade derruba o jogador e machuca (o cavalo passa por cima de todas as pedras, rochas e barro sem travar, colidindo e batendo apenas em árvores e casas), combate montado (espada, arco, besta, mosquete). A câmera se afasta e o campo de visão abre com a velocidade.
 - Ao desmontar o cavalo fica parado; `H` assobia para chamá-lo.
 
 ## Casas, interiores e dormir
