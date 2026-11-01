@@ -137,7 +137,45 @@ export class World {
     return this._proceduralHeightAt(x, z);
   }
 
-  // Raycast vertical descendente simples partindo do jogador para encaixar perfeitamente na malha do terreno
+  // Calcula a altura analítica exata da malha triangular do terreno em (x, z)
+  chunkGroundHeight(cx, cz, heights, x, z) {
+    for (let i = 0; i < this.floors.length; i++) {
+      const f = this.floors[i];
+      if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) return f.y;
+    }
+    const size = this.chunkSize;
+    const segments = CONFIG.chunkSegments;
+    const row = segments + 1;
+    const cellSize = size / segments;
+    const localX = (x - cx * size) / cellSize;
+    const localZ = (z - cz * size) / cellSize;
+    const gx = Math.max(0, Math.min(segments - 1, localX | 0));
+    const gz = Math.max(0, Math.min(segments - 1, localZ | 0));
+    const tx = localX - gx;
+    const tz = localZ - gz;
+
+    const ia = gz * row + gx;
+    const ya = heights[ia];
+    const yb = heights[ia + 1];
+    const yc = heights[ia + row];
+    const yd = heights[ia + row + 1];
+
+    if ((gx + gz) % 2 === 0) {
+      if (tx + tz <= 1) {
+        return ya + tx * (yb - ya) + tz * (yc - ya);
+      } else {
+        return yd + (1 - tx) * (yc - yd) + (1 - tz) * (yb - yd);
+      }
+    } else {
+      if (tz >= tx) {
+        return yc + tx * (yd - yc) + (1 - tz) * (ya - yc);
+      } else {
+        return yb + (1 - tx) * (ya - yb) + tz * (yd - yb);
+      }
+    }
+  }
+
+  // Raycast vertical descendente simples partindo do jogador para encaixar perfeitamente na malha do terreno (Zero-GC)
   raycastGround(x, y, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
@@ -156,55 +194,7 @@ export class World {
     }
     if (!chunk || !chunk.heights) return this._proceduralHeightAt(x, z);
 
-    const segments = CONFIG.chunkSegments;
-    const row = segments + 1;
-    const cellSize = size / segments;
-    const localX = (x - cx * size) / cellSize;
-    const localZ = (z - cz * size) / cellSize;
-    const gx = Math.max(0, Math.min(segments - 1, localX | 0));
-    const gz = Math.max(0, Math.min(segments - 1, localZ | 0));
-    const tx = localX - gx;
-    const tz = localZ - gz;
-    const x0 = cx * size + gx * cellSize;
-    const z0 = cz * size + gz * cellSize;
-    const x1 = x0 + cellSize;
-    const z1 = z0 + cellSize;
-
-    const h = chunk.heights;
-    const ia = gz * row + gx;
-    const ya = h[ia];
-    const yb = h[ia + 1];
-    const yc = h[ia + row];
-    const yd = h[ia + row + 1];
-
-    _rayOrigin.set(x, y + 25, z);
-    _raycaster.set(_rayOrigin, _rayDown);
-
-    if ((gx + gz) % 2 === 0) {
-      if (tx + tz <= 1) {
-        _v1.set(x0, ya, z0);
-        _v2.set(x0, yc, z1);
-        _v3.set(x1, yb, z0);
-      } else {
-        _v1.set(x1, yb, z0);
-        _v2.set(x0, yc, z1);
-        _v3.set(x1, yd, z1);
-      }
-    } else {
-      if (tz >= tx) {
-        _v1.set(x0, ya, z0);
-        _v2.set(x0, yc, z1);
-        _v3.set(x1, yd, z1);
-      } else {
-        _v1.set(x0, ya, z0);
-        _v2.set(x1, yd, z1);
-        _v3.set(x1, yb, z0);
-      }
-    }
-    if (_raycaster.ray.intersectTriangle(_v1, _v2, _v3, false, _hitPoint)) {
-      return _hitPoint.y;
-    }
-    return this._proceduralHeightAt(x, z);
+    return this.chunkGroundHeight(cx, cz, chunk.heights, x, z);
   }
 
   updateWind(dt) {
@@ -759,20 +749,9 @@ export class World {
     const centerX = (cx + 0.5) * this.chunkSize;
     const centerZ = (cz + 0.5) * this.chunkSize;
 
-    const isInitialSpawn = Math.abs(cx) <= 1 && Math.abs(cz) <= 1;
-    let initialGeometry;
-    let initialHeights = null;
-
-    if (isInitialSpawn || !this._worker) {
-      const result = this._createTerrainGeometry(cx, cz);
-      initialGeometry = result.geometry;
-      initialHeights = result.heights;
-    } else {
-      // Chunks dinâmicos: alocados via Web Worker nativo para Zero-Stutter
-      initialGeometry = new THREE.BufferGeometry();
-    }
-
-    const terrain = new THREE.Mesh(initialGeometry, this._terrainMaterial);
+    // Geração síncrona determinística da malha e das alturas do terreno (garante 100% de alinhamento com decorações)
+    const { geometry, heights } = this._createTerrainGeometry(cx, cz);
+    const terrain = new THREE.Mesh(geometry, this._terrainMaterial);
     terrain.receiveShadow = true;
     terrain.frustumCulled = true;
     terrain.matrixAutoUpdate = false;
@@ -782,7 +761,7 @@ export class World {
     near.matrixAutoUpdate = false;
     const far = new THREE.Group();
     far.matrixAutoUpdate = false;
-    const decor = this._createDecorations(cx, cz);
+    const decor = this._createDecorations(cx, cz, heights);
     for (let i = 0; i < decor.nearMeshes.length; i++) near.add(decor.nearMeshes[i]);
     for (let i = 0; i < decor.farMeshes.length; i++) far.add(decor.farMeshes[i]);
     for (let i = 0; i < decor.colliders.length; i++) {
@@ -799,24 +778,14 @@ export class World {
       centerZ,
       group,
       terrain,
-      heights: initialHeights,
+      heights,
       near,
       far,
-      bounds: initialGeometry.boundingSphere || null,
+      bounds: geometry.boundingSphere,
       colliders: decor.colliders,
       shadowMeshes: decor.shadowMeshes,
       instancedMeshes: decor.instancedMeshes,
     };
-
-    if (!isInitialSpawn && this._worker) {
-      this.requestTerrainChunk(cx, cz, ({ geometry, heights }) => {
-        if (!chunkData.terrain) return;
-        chunkData.terrain.geometry.dispose();
-        chunkData.terrain.geometry = geometry;
-        chunkData.heights = heights;
-        chunkData.bounds = geometry.boundingSphere;
-      });
-    }
 
     return chunkData;
   }
@@ -889,7 +858,7 @@ export class World {
     return { geometry, heights };
   }
 
-  _createDecorations(cx, cz) {
+  _createDecorations(cx, cz, heights) {
     const random = makeRandom(hash2(cx, cz, this.seed) * 4294967295);
     const colliders = [];
     const speciesData = { oak: [], pine: [], birch: [], bush: [] };
@@ -907,7 +876,7 @@ export class World {
       const dx = x - this._spawnX;
       const dz = z - this._spawnZ;
       if (dx * dx + dz * dz < 18 * 18 || this._isSettlementClear(x, z)) continue;
-      const y = this.heightAt(x, z);
+      const y = heights ? this.chunkGroundHeight(cx, cz, heights, x, z) : this.heightAt(x, z);
       const scale = 0.78 + random() * 0.62;
       const rotation = random() * Math.PI * 2;
       const kind = this.treeKit.pick(random());
@@ -930,7 +899,7 @@ export class World {
       const dx = x - this._spawnX;
       const dz = z - this._spawnZ;
       if (dx * dx + dz * dz < 18 * 18 || this._isSettlementClear(x, z)) continue;
-      const y = this.heightAt(x, z);
+      const y = heights ? this.chunkGroundHeight(cx, cz, heights, x, z) : this.heightAt(x, z);
       const scale = 0.42 + random() * 0.72;
       const rotation = random() * Math.PI * 2;
       const col = { x, z, radius: scale * 0.58, top: y + scale * 0.9, kind: "rock" };
@@ -942,7 +911,7 @@ export class World {
     for (let i = 0; i < grassCount; i++) {
       const x = baseX + 1.5 + random() * (size - 3);
       const z = baseZ + 1.5 + random() * (size - 3);
-      const y = this.heightAt(x, z);
+      const y = heights ? this.chunkGroundHeight(cx, cz, heights, x, z) : this.heightAt(x, z);
       if (y > 6.2 || this._isSettlementClear(x, z)) continue;
       const scale = 0.75 + random() * 0.65;
       const rotation = random() * Math.PI * 2;
@@ -991,7 +960,7 @@ export class World {
     }
 
     const rocks = this._makeInstances(this._rockGeometry, this._rockMaterial, rockData, (dummy, item) => {
-      dummy.position.set(item.x, item.y + item.scale * 0.32, item.z);
+      dummy.position.set(item.x, item.y + item.scale * 0.22, item.z);
       dummy.rotation.set(item.rotation * 0.4, item.rotation, item.rotation * 0.7);
       dummy.scale.set(item.scale, item.scale * (0.72 + item.scale * 0.12), item.scale * 0.86);
     }, false);

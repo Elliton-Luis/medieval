@@ -66,8 +66,8 @@ function terrainHeight(x, z, seed = 0) {
   return broad + valleys + detail + ridge;
 }
 
-const PLATEAU_INNER = 42;
-const PLATEAU_OUTER = 78;
+const PLATEAU_INNER = 24;
+const PLATEAU_OUTER = 40;
 
 function proceduralHeightAt(x, z, seed, villages, villageHeights, floors) {
   if (floors && floors.length > 0) {
