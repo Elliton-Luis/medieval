@@ -21,6 +21,7 @@ export class AimSystem {
     this.direction = new THREE.Vector3();
     this.target = null;
     this.assistTarget = null;
+    this.lockedTarget = null;
     this.assistPoint = new THREE.Vector3();
     this.assistLocked = false;
     this.assistEnabled = this._loadAssistPref();
@@ -146,14 +147,90 @@ export class AimSystem {
     return bestNpc;
   }
 
+  // Trava a mira definitivamente em um alvo que recebeu disparo ou golpe
+  lockOnTarget(target) {
+    if (!target || !target.alive || !target.root?.visible) return;
+    this.lockedTarget = target;
+    this.assistTarget = target;
+  }
+
+  // Permite ao jogador alternar o alvo com a tecla Y entre os alvos vivos disponíveis
+  cycleTarget(player, maxRange = ASSIST_MAX_RANGE) {
+    const npcs = this.npcs.npcs;
+    const px = player.x;
+    const py = player.root.position.y + 1.42;
+    const pz = player.z;
+    const maxDistSq = maxRange * maxRange;
+
+    const validTargets = [];
+    for (let i = 0; i < npcs.length; i++) {
+      const npc = npcs[i];
+      if (!npc.alive || !npc.root?.visible || (npc.controlled && player.mounted === npc)) continue;
+      const dx = npc.x - px;
+      const dz = npc.z - pz;
+      const dSq = dx * dx + dz * dz;
+      if (dSq > maxDistSq * 1.5 || dSq < 0.04) continue;
+      const targetY = npc.root.position.y + (npc.roleKey === "horse" ? 1.08 : 1.28);
+      if (!this._hasLineOfSight(px, py, pz, npc.x, targetY, npc.z)) continue;
+      validTargets.push(npc);
+    }
+
+    if (validTargets.length === 0) {
+      this.lockedTarget = null;
+      this.assistTarget = null;
+      return;
+    }
+
+    validTargets.sort((a, b) => {
+      const da = (a.x - px) ** 2 + (a.z - pz) ** 2;
+      const db = (b.x - px) ** 2 + (b.z - pz) ** 2;
+      return da - db;
+    });
+
+    let nextIdx = 0;
+    const curIdx = validTargets.indexOf(this.assistTarget || this.lockedTarget);
+    if (curIdx !== -1) {
+      nextIdx = (curIdx + 1) % validTargets.length;
+    }
+
+    const chosen = validTargets[nextIdx];
+    this.lockedTarget = chosen;
+    this.assistTarget = chosen;
+    this.ui.showToast?.(`🎯 Alvo selecionado: ${chosen.name || "Inimigo"} [Y para trocar]`);
+  }
+
   prepare(player, weapon, enabled) {
     this.ranged = Boolean(weapon && (weapon.ammo || weapon.type === "throw" || weapon.type === "bow" || weapon.type === "crossbow" || weapon.type === "musket"));
     this.wasActive = this.active;
     this.active = Boolean(enabled && this.input.aimHeld && !player.blocking);
 
+    const range = this.ranged ? ASSIST_MAX_RANGE : 16;
+
+    // Se o jogador pressionar Y para trocar de alvo
+    if (this.input.consumeCycleTargetPressed?.() && enabled && !player.knockedOut) {
+      this.cycleTarget(player, range);
+    }
+
     if (this.assistEnabled && enabled && !player.knockedOut) {
-      const range = this.ranged ? ASSIST_MAX_RANGE : 16;
-      this.assistTarget = this.findNearestBeing(player, range);
+      // Se tiver alvo travado (por golpe/disparo ou tecla Y), mantém nele enquanto for válido
+      if (this.lockedTarget) {
+        if (this.lockedTarget.alive && this.lockedTarget.root?.visible && !(this.lockedTarget.controlled && player.mounted === this.lockedTarget)) {
+          const ldx = this.lockedTarget.x - player.x;
+          const ldz = this.lockedTarget.z - player.z;
+          if (ldx * ldx + ldz * ldz < (range * 1.6) * (range * 1.6)) {
+            this.assistTarget = this.lockedTarget;
+          } else {
+            this.lockedTarget = null;
+            this.assistTarget = this.findNearestBeing(player, range);
+          }
+        } else {
+          this.lockedTarget = null;
+          this.assistTarget = this.findNearestBeing(player, range);
+        }
+      } else {
+        this.assistTarget = this.findNearestBeing(player, range);
+      }
+
       if (this.assistTarget) {
         const npc = this.assistTarget;
         const baseAimY = npc.root.position.y + (npc.roleKey === "horse" ? 1.08 : 1.3);

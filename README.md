@@ -16,7 +16,13 @@ Depois abra `http://localhost:4173`.
 
 - `W A S D` ou setas: mover · `Shift`: correr · `Space`: pular · `C`: rolar (esquiva com invulnerabilidade) · `U`: modo furtivo (agachado; os cavalos não fogem)
 - **Botão direito**: mirar (câmera sobre o ombro com retícula nítida de alta precisão) · **Clique esquerdo** (ou `J`): atacar/atirar mantendo a mira 100% fixa e estável no alvo, sem oscilar nem cair no chão
-- **Mira e Aim Assist (`T` para ligar/desligar)**: retícula sempre visível na tela com feedback tátil colorido (vermelho vivo sobre alvos e dourado radiante quando travada com colchetes de lock-on no inimigo). A mira permanece cravada no inimigo durante disparos consecutivos, transitando suavemente para o próximo alvo se o inimigo for derrotado.
+- **Mira, Aim Assist e Troca de Alvo (`T` ligar/desligar · `Y` ciclar alvos)**:
+  - Retícula sempre visível na tela com feedback tátil colorido (vermelho vivo sobre alvos e dourado radiante quando travada com colchetes de lock-on no inimigo).
+  - **Troca de Alvo com `Y`**: Ao mirar, pressionar a tecla `Y` cicla suavemente entre todos os alvos vivos disponíveis no campo de visão, permitindo escolher exatamente quem alvejar sem depender apenas da proximidade física.
+  - **Travamento Automático por Golpe/Tiro (Lock-on)**: Ao acertar qualquer disparo (flecha, virote, bala de mosquete, arremesso) ou golpe corpo a corpo em um inimigo, a mira trava (`locked`) automaticamente nele, acompanhando seus movimentos até sua derrota ou até o jogador alternar manualmente com `Y`.
+- **Física de Altura Real e Escalada em Muros e Pedras**:
+  - As hitboxes de pedras, rochas, muros e construções agora respeitam estritamente suas alturas reais (`top` e `bottom`), eliminando barreiras invisíveis infinitas no ar.
+  - O jogador pode pular e caminhar sobre o topo de pedras, muretas e muros com estabilidade física e subida suave de degraus (*step-climbing*), alcançando posições elevadas vantajosas.
 - **Armas `0`–`9` & Numpad**: `1`–`9` seleciona a categoria do slot correspondente; apertar o mesmo número de novo alterna ciclicamente entre as armas possuídas daquele slot. A tecla `0` (ou Numpad `0`) é o atalho instantâneo para equipar a **Tocha Mágica** (ou punhos se já equipada). A **roda do mouse** (scroll) troca sequencialmente de arma na ordem exata dos slots sem repetições nem saltos, e **Shift + roda** dá zoom na câmera
 - **Animação de Cooldown e Carga na Mira**: Uma barrinha animada posicionada logo abaixo da retícula central de mira (`#reticle`) indica a recarga e preparação das armas:
   - Enquanto segura o ataque para carregar golpes pesados (Montante e Martelo de Guerra), a barra preenche em azul ciano brilhante (`charging`).
@@ -171,9 +177,14 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
 
 ## Criaturas Noturnas dos Ermos
 
-- **Comportamento Estritamente Noturno**: Feras e horrores heréticos só surgem e agem durante a noite, sumindo ao alvorecer.
-- **Zancudo Sombrio (`TallWalker`)**: Quadrúpede esguio e gigantesco com pernas longas e finas que superam a copa das árvores. Possui **olhos amarelos luminescentes** (`0xffea00`) com brilho visível na escuridão. Existem de 2 a 3 deles simultaneamente rondando os ermos durante a noite; encaram o jogador fixamente à distância e fogem em passos largos e silenciosos se você tentar se aproximar.
-- **Voraz Cego (`BlindBiter`)**: Humanoide cego e grotesco sem a parte superior da cabeça, com mandíbula dilatada e dentes pontiagudos sempre à mostra. Spawna aleatoriamente pelos ermos à noite. Corre velozmente com os braços esticados para frente ao detectar a presença do jogador, causando mordidas com dano físico real (2.0 por ataque) e morrendo ao receber golpes corpo-a-corpo ou disparos, soltando moedas e sumindo com efeito de poeira e impacto.
+- **Comportamento Estritamente Noturno**: Feras e horrores heréticos só surgem e agem durante a noite, ficando completamente inativos e ocultos durante o dia.
+- **Gulur (O Colosso dos Ermos · Antigo Zancudo Sombrio)**:
+  - Quadrúpede esguio e gigantesco com pernas longas e finas que superam a copa das árvores e olhos amarelos luminescentes (`0xffea00`).
+  - **Mortal (35 HP)**: Pode ser alvejado e derrotado por armas brancas, flechas, virotes e tiros. Apresenta recuo, efeitos visuais de faíscas estelares e sangue negro.
+  - Ao morrer, sofre um colapso monumental: as pernas dobram e o corpo despenca de 16 metros estrondando o solo com nuvem de poeira e tremor, liberando 40 moedas de saque e bônus moral (`addGood(6)`).
+- **Necron (O Voraz Cego)**:
+  - Humanoide sem a parte superior da cabeça, com mandíbula dilatada e dentes pontiagudos sempre à mostra.
+  - **Comportamento de Emboscada Noturna**: Fica **esperando** imóvel no escuro, ouvindo a neblina. Só dispara em investida voraz quando o jogador se aproxima muito (`<= 7.5m`), desferindo mordidas com 2.0 de dano real. Pode ser abatido com armas e tiros (6 HP), dropando 14 moedas ao tombar.
 
 ## O Tomo do Demiurgo (*Tractatus de Carcere*) e Páginas Perdidas
 

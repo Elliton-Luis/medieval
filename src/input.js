@@ -18,6 +18,7 @@ export class InputManager {
     this.mountPressed = false;
     this.crouchPressed = false;
     this.aimAssistPressed = false;
+    this.cycleTargetPressed = false;
     this.hayBaitPressed = false;
     this.buildModePressed = false;
     this.craftMenuPressed = false;
@@ -46,6 +47,7 @@ export class InputManager {
       if (event.code === "KeyF" && !event.repeat) this.mountPressed = true;
       if (event.code === "KeyU" && !event.repeat) this.crouchPressed = true;
       if (event.code === "KeyT" && !event.repeat) this.aimAssistPressed = true;
+      if (event.code === "KeyY" && !event.repeat) this.cycleTargetPressed = true;
       if (event.code === "KeyG" && !event.repeat) this.hayBaitPressed = true;
       if (!event.repeat) {
         if (/^Digit[0-9]$/.test(event.code)) {
@@ -194,6 +196,12 @@ export class InputManager {
   consumeAimAssistPressed() {
     const pressed = this.aimAssistPressed && !this.modalOpen;
     this.aimAssistPressed = false;
+    return pressed;
+  }
+
+  consumeCycleTargetPressed() {
+    const pressed = this.cycleTargetPressed && !this.modalOpen;
+    this.cycleTargetPressed = false;
     return pressed;
   }
 

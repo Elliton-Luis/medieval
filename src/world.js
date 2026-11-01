@@ -195,8 +195,9 @@ export class World {
     }
   }
 
-  // Raycast vertical descendente simples partindo do jogador para encaixar perfeitamente na malha do terreno (Zero-GC)
-  raycastGround(x, y, z) {
+  // Raycast vertical descendente partindo do jogador para encaixar perfeitamente na malha do terreno, pisos, muros e rochas (Zero-GC)
+  raycastGround(x, y = 0, z = 0) {
+    let bestY = -Infinity;
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
       if (f.rot) {
@@ -204,14 +205,56 @@ export class World {
         const relZ = z - f.cz;
         const lx = relX * f.cos - relZ * f.sin;
         const lz = relX * f.sin + relZ * f.cos;
-        if (Math.abs(lx) <= f.hx && Math.abs(lz) <= f.hz) return f.y;
+        if (Math.abs(lx) <= f.hx && Math.abs(lz) <= f.hz) {
+          if (f.y <= y + 0.65 && f.y > bestY) bestY = f.y;
+        }
       } else if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) {
-        return f.y;
+        if (f.y <= y + 0.65 && f.y > bestY) bestY = f.y;
       }
     }
+
+    // Topo de caixas sólidas / muros / blocos (se o jogador estiver pulando ou caminhando sobre o topo)
+    const boxes = this._boxesAt(x, z, 0.42);
+    for (let i = 0; i < boxes.length; i++) {
+      const b = boxes[i];
+      if (!b.active || !b.move || b.top === undefined) continue;
+      let inside = false;
+      if (b.rot) {
+        const relX = x - b.cx;
+        const relZ = z - b.cz;
+        const lx = relX * b.cos - relZ * b.sin;
+        const lz = relX * b.sin + relZ * b.cos;
+        if (Math.abs(lx) <= b.hx + 0.05 && Math.abs(lz) <= b.hz + 0.05) inside = true;
+      } else {
+        if (x >= b.minX - 0.05 && x <= b.maxX + 0.05 && z >= b.minZ - 0.05 && z <= b.maxZ + 0.05) inside = true;
+      }
+      if (inside && b.top <= y + 0.65 && b.top > bestY) {
+        bestY = b.top;
+      }
+    }
+
+    // Topo de rochas e pedras naturais
     const size = this.chunkSize;
     const cx = Math.floor(x / size);
     const cz = Math.floor(z / size);
+    for (let c = 0; c < this.activeChunks.length; c++) {
+      const chunk = this.activeChunks[c];
+      if (Math.abs(chunk.x - cx) > 1 || Math.abs(chunk.z - cz) > 1) continue;
+      for (let i = 0; i < chunk.colliders.length; i++) {
+        const o = chunk.colliders[i];
+        if (o.disabled || o.radius <= 0 || o.top === undefined) continue;
+        if (o.kind !== "rock" && o.kind !== "clay" && o.kind !== "stone") continue;
+        const dx = x - o.x;
+        const dz = z - o.z;
+        const rad = o.radius * 1.15;
+        if (dx * dx + dz * dz <= rad * rad) {
+          if (o.top <= y + 0.75 && o.top > bestY) {
+            bestY = o.top;
+          }
+        }
+      }
+    }
+
     let chunk = null;
     for (let i = 0; i < this.activeChunks.length; i++) {
       const c = this.activeChunks[i];
@@ -220,9 +263,11 @@ export class World {
         break;
       }
     }
-    if (!chunk || !chunk.heights) return this._proceduralHeightAt(x, z);
+    const terrainH = (!chunk || !chunk.heights)
+      ? this._proceduralHeightAt(x, z)
+      : this.chunkGroundHeight(cx, cz, chunk.heights, x, z);
 
-    return this.chunkGroundHeight(cx, cz, chunk.heights, x, z);
+    return Math.max(terrainH, bestY);
   }
 
   updateWind(dt) {
@@ -315,23 +360,24 @@ export class World {
     }
   }
 
-  isBlockedAt(x, z, radius) {
+  isBlockedAt(x, z, radius, y = null) {
     // Spatial Hash Grid O(1): Testa apenas obstáculos locais na célula de 16m e vizinhas imediatas
     this.spatialGrid.queryRadius(x, z, radius + 2.5, this._nearbyColliders);
     for (let i = 0; i < this._nearbyColliders.length; i++) {
       const obstacle = this._nearbyColliders[i];
       if (obstacle.disabled || obstacle.radius <= 0) continue;
+      if (y !== null && obstacle.top !== undefined && y >= obstacle.top - 0.22) continue;
       const dx = x - obstacle.x;
       const dz = z - obstacle.z;
       const minDistance = radius + obstacle.radius;
       if (dx * dx + dz * dz < minDistance * minDistance) return true;
     }
-    if (this._hitsBoxMove(x, z, radius)) return true;
+    if (this._hitsBoxMove(x, z, radius, y)) return true;
     return false;
   }
 
-  // Resolução contínua de esfera/cápsula (deslizamento suave contra obstáculos circulares, AABBs e OBBs sem alocação GC).
-  resolveSphereMove(prevX, prevZ, nextX, nextZ, radius, out) {
+  // Resolução contínua de esfera/cápsula (deslizamento suave contra obstáculos circulares, AABBs e OBBs respeitando altura real Y).
+  resolveSphereMove(prevX, prevZ, nextX, nextZ, radius, out, playerY = null) {
     const totalDX = nextX - prevX;
     const totalDZ = nextZ - prevZ;
     const dist = Math.hypot(totalDX, totalDZ);
@@ -360,6 +406,7 @@ export class World {
         for (let i = 0; i < this._nearbyColliders.length; i++) {
           const o = this._nearbyColliders[i];
           if (o.disabled || o.radius <= 0) continue;
+          if (playerY !== null && o.top !== undefined && playerY >= o.top - 0.22) continue;
           const dx = x - o.x;
           const dz = z - o.z;
           const minD = radius + o.radius;
@@ -380,6 +427,10 @@ export class World {
         for (let i = 0; i < boxes.length; i++) {
           const b = boxes[i];
           if (!b.active || !b.move) continue;
+          if (playerY !== null && b.top !== undefined) {
+            if (playerY >= b.top - 0.22) continue;
+            if (b.bottom !== undefined && playerY + 1.8 <= b.bottom) continue;
+          }
           if (b.rot) {
             const relX = x - b.cx;
             const relZ = z - b.cz;
@@ -438,12 +489,12 @@ export class World {
         }
       }
 
-      if (this.isBlockedAt(x, z, radius)) {
-        if (!this.isBlockedAt(targetX, curZ, radius)) {
+      if (this.isBlockedAt(x, z, radius, playerY)) {
+        if (!this.isBlockedAt(targetX, curZ, radius, playerY)) {
           x = targetX;
           z = curZ;
           hitZ = true;
-        } else if (!this.isBlockedAt(curX, targetZ, radius)) {
+        } else if (!this.isBlockedAt(curX, targetZ, radius, playerY)) {
           x = curX;
           z = targetZ;
           hitX = true;
@@ -601,11 +652,15 @@ export class World {
     return out;
   }
 
-  _hitsBoxMove(x, z, radius) {
+  _hitsBoxMove(x, z, radius, y = null) {
     const boxes = this._boxesAt(x, z, radius);
     for (let i = 0; i < boxes.length; i++) {
       const b = boxes[i];
       if (!b.active || !b.move) continue;
+      if (y !== null && b.top !== undefined) {
+        if (y >= b.top - 0.22) continue;
+        if (b.bottom !== undefined && y + 1.8 <= b.bottom) continue;
+      }
       if (b.rot) {
         const relX = x - b.cx;
         const relZ = z - b.cz;

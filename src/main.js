@@ -440,6 +440,7 @@ function frame(now) {
   updateWaypointBillboard(player.root.position, now);
   updateFallingTrees(dt);
   ui.updateMissionHud(player.root.position);
+  const clock = dayNight.update(dt, player.x, player.z);
   const canAim = !input.modalOpen && !player.knockedOut && !player.blocking;
   aim.prepare(player, weapons.currentWeapon, canAim);
   cameraRig.update(dt, player, input, aim.active, aim);
@@ -451,7 +452,8 @@ function frame(now) {
   houses.update(dt, camera, isCutscene);
   fire.update(dt);
   horses.update(dt);
-  beasts.update(dt, dayNight.isNight);
+  const isNightStrict = Boolean(dayNight.isNight && dayNight.daylight < 0.45);
+  beasts.update(dt, isNightStrict);
   music.update(elapsed);
   damageFx.update(dt);
   world.updateWind(dt);
@@ -463,7 +465,6 @@ function frame(now) {
   explosions.update(dt);
   effects.update(dt);
   world.updateVisibility(camera, player.x, player.z, isCutscene);
-  const clock = dayNight.update(dt, player.x, player.z);
   renderer.render(scene, camera);
   ui.update(dt, clock, world.activeChunks.length, npcs.nearest, player.x, player.z);
 

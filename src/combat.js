@@ -178,6 +178,14 @@ export class CombatSystem {
 
   damageNPC(npc, amount, directionX, directionZ, color = "#f5d36e", size = 0.95, force = 1.8, launch = 0, headshot = false, silent = false) {
     if (!npc.alive) return false;
+
+    // Se o jogador atirar ou bater no alvo, a mira fica locked nele
+    if (this.aim?.lockOnTarget) {
+      this.aim.lockOnTarget(npc);
+    } else if (window.__game?.aim?.lockOnTarget) {
+      window.__game.aim.lockOnTarget(npc);
+    }
+
     const defeated = npc.takeHit(amount, directionX, directionZ, force, launch);
     if (npc.roleKey === "werewolf") {
       if (defeated) {

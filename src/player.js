@@ -521,21 +521,29 @@ export class Player {
 
     const nextX = this.x + this.vx * dt;
     const nextZ = this.z + this.vz * dt;
-    world.resolveSphereMove(this.x, this.z, nextX, nextZ, this.radius, _moveResult);
+    const currentY = this.root.position.y;
+    world.resolveSphereMove(this.x, this.z, nextX, nextZ, this.radius, _moveResult, currentY);
     this.x = _moveResult.x;
     this.z = _moveResult.z;
     if (_moveResult.hitX) this.vx = 0;
     if (_moveResult.hitZ) this.vz = 0;
 
-    // Raycast vertical descendente partindo do jogador para encaixar perfeitamente na malha do chão gerado
-    const ground = world.raycastGround(this.x, this.root.position.y, this.z);
+    // Raycast vertical descendente partindo do jogador para encaixar perfeitamente em terreno, pisos, muros e rochas
+    const targetGround = world.raycastGround(this.x, currentY + this.verticalOffset, this.z);
+
+    // Subida suave de degraus, muretas baixas e pedras ao caminhar
+    if (this.grounded && targetGround > currentY && targetGround - currentY <= 0.65) {
+      this.root.position.y = THREE.MathUtils.lerp(currentY, targetGround, 1 - Math.exp(-24 * dt));
+    }
+
     if (this.verticalOffset <= 0) {
       if (!this.grounded) landed = true;
       this.verticalOffset = 0;
       this.verticalSpeed = 0;
       this.grounded = true;
     }
-    this.root.position.set(this.x, ground + this.verticalOffset, this.z);
+    const finalGround = this.grounded ? targetGround : (targetGround + this.verticalOffset);
+    this.root.position.set(this.x, finalGround, this.z);
     if (landed) {
       this.audio?.land();
       this.landTimer = LAND_TIME;
@@ -939,7 +947,7 @@ export class Player {
     this.vz *= decay;
     const nextX = this.x + this.vx * dt;
     const nextZ = this.z + this.vz * dt;
-    world.resolveSphereMove(this.x, this.z, nextX, nextZ, this.radius, _moveResult);
+    world.resolveSphereMove(this.x, this.z, nextX, nextZ, this.radius, _moveResult, this.root.position.y);
     this.x = _moveResult.x;
     this.z = _moveResult.z;
     this.root.position.set(this.x, world.raycastGround(this.x, this.root.position.y, this.z), this.z);
