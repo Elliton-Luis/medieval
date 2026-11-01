@@ -17,21 +17,71 @@ canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(180deg, rgba(8, 13, 11, .48), transparent 24%, transparent 67%, rgba(8, 13, 11, .62));
 }
-.reticle { --gap: 10px; position: absolute; z-index: 2; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; transition: opacity .12s; }
+.reticle { --gap: 8px; position: absolute; z-index: 999; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; transition: opacity .15s ease-out; }
 .reticle[data-mode="off"] { opacity: 0; }
-.reticle .dot { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px #000a, 0 0 6px #000; }
-.reticle .tick { position: absolute; background: #fff; box-shadow: 0 0 0 1px #000a; transition: opacity .12s; }
-.reticle .tick.up, .reticle .tick.down { left: -1px; width: 2px; height: 9px; }
-.reticle .tick.left, .reticle .tick.right { top: -1px; height: 2px; width: 9px; }
+.reticle[data-mode="hip"] { opacity: 0.85; }
+.reticle[data-mode="aim"] { opacity: 1; }
+.reticle .dot {
+  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  background: #ffffff; border: 1px solid rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 0 3px #ffffff;
+  transition: transform .12s, background .15s;
+}
+.reticle .tick {
+  position: absolute; background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
+  border-radius: 1px; transition: all .12s ease-out;
+}
+.reticle .tick.up, .reticle .tick.down { left: -1px; width: 2.5px; height: 11px; }
+.reticle .tick.left, .reticle .tick.right { top: -1px; height: 2.5px; width: 11px; }
 .reticle .tick.up { bottom: var(--gap); }
 .reticle .tick.down { top: var(--gap); }
 .reticle .tick.left { right: var(--gap); }
 .reticle .tick.right { left: var(--gap); }
-.reticle[data-mode="hip"] .tick { opacity: .55; }
-.reticle[data-mode="aim"] .tick { opacity: 1; }
-.reticle.on-target .dot, .reticle.on-target .tick { background: #ff5a4a; }
-.reticle.assist-locked .dot { background: #ffd24a; transform: scale(1.3); }
-.reticle.assist-locked .tick { background: #ffd24a; }
+.reticle.on-target .dot { background: #ff2a2a; box-shadow: 0 0 8px #ff2a2a, 0 0 0 1px #000; transform: scale(1.4); }
+.reticle.on-target .tick { background: #ff3344; box-shadow: 0 0 6px #ff3344, 0 0 0 1px #000; }
+.reticle.assist-locked .dot { background: #ffd700; box-shadow: 0 0 10px #ffd700, 0 0 0 1px #000; transform: scale(1.45); }
+.reticle.assist-locked .tick { background: #ffd700; box-shadow: 0 0 8px rgba(255, 215, 0, 0.85), 0 0 0 1px #000; }
+
+/* Marcador de Alvo Lock-On sobre o Inimigo (3D Projetado) */
+#aim-lock-marker {
+  position: absolute;
+  z-index: 998;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
+  pointer-events: none;
+  display: none;
+  animation: lock-pulse 1.3s infinite alternate ease-in-out;
+}
+@keyframes lock-pulse {
+  from { transform: scale(0.95); opacity: 0.85; }
+  to { transform: scale(1.08); opacity: 1; }
+}
+.lock-bracket {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.75), inset 0 0 4px rgba(255, 215, 0, 0.4);
+}
+.lock-bracket.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+.lock-bracket.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+.lock-bracket.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+.lock-bracket.br { bottom: 0; right: 0; border-left: none; border-top: none; }
+.lock-diamond {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  margin-top: -3px;
+  background: #ffd700;
+  transform: rotate(45deg);
+  box-shadow: 0 0 6px #ffd700;
+}
 .hitmark { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; }
 .hitmark.show { opacity: 1; animation: hitpop .26s ease-out; }
 .hitmark i { position: absolute; left: -1px; top: -1px; width: 2px; height: 8px; background: #fff; transform-origin: 1px 1px; }

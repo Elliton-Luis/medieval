@@ -44,9 +44,10 @@ export class ThirdPersonCamera {
     this._assistSnapTimer = 0;
   }
 
-  // Coice vertical da arma: o cano sobe e a câmera volta sozinha.
+  // Coice da arma: adiciona impacto visual suave sem quebrar a inclinação da mira
   kick(amount) {
-    this.recoil = Math.min(0.18, this.recoil + amount * 0.75);
+    this.addShake(amount * 0.45);
+    this.recoil = Math.min(0.08, this.recoil + amount * 0.35);
   }
 
   // Encaixa e redefine imediatamente a câmera atrás do jogador (ex: ao terminar cutscene ou renascer)
@@ -165,7 +166,10 @@ export class ThirdPersonCamera {
 
     const aimPitch = this.pitch - 0.16 * blend;
     const base = aimPitch + (0.95 - aimPitch) * death;
-    const pitch = base - this.recoil;
+    // Durante mira ativa (aimActive), o recoil não desloca o pitch da câmera para baixo,
+    // evitando que a mira despalanque no chão ao atirar.
+    const recoilOffset = aimActive ? 0 : this.recoil;
+    const pitch = base - recoilOffset;
     const rightX = Math.cos(this.yaw);
     const rightZ = -Math.sin(this.yaw);
 

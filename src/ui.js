@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
 import { drawWeaponIcon } from "./weapondata.js";
 import { PlayerStats, getEvilPercent } from "./rpg.js";
@@ -213,6 +214,45 @@ export class GameUI {
       this._reticleGap = gap;
       this.reticle.style.setProperty("--gap", `${gap}px`);
     }
+  }
+
+  // Atualiza marcador visual de alvo sobre o ser mirado (HUD 3D Lock-On)
+  updateLockMarker(assistPos, visible, camera) {
+    if (!this.lockMarker) {
+      this.lockMarker = document.getElementById("aim-lock-marker");
+      if (!this.lockMarker) {
+        this.lockMarker = document.createElement("div");
+        this.lockMarker.id = "aim-lock-marker";
+        this.lockMarker.innerHTML = `
+          <div class="lock-bracket tl"></div>
+          <div class="lock-bracket tr"></div>
+          <div class="lock-bracket bl"></div>
+          <div class="lock-bracket br"></div>
+          <div class="lock-diamond"></div>
+        `;
+        document.body.appendChild(this.lockMarker);
+      }
+    }
+    if (!visible || !assistPos || !camera) {
+      this.lockMarker.style.display = "none";
+      return;
+    }
+
+    if (!this._projVec) this._projVec = new THREE.Vector3();
+    this._projVec.copy(assistPos).project(camera);
+    if (this._projVec.z > 1.0) {
+      this.lockMarker.style.display = "none";
+      return;
+    }
+
+    const halfW = window.innerWidth * 0.5;
+    const halfH = window.innerHeight * 0.5;
+    const screenX = Math.round(this._projVec.x * halfW + halfW);
+    const screenY = Math.round(-this._projVec.y * halfH + halfH);
+
+    this.lockMarker.style.display = "block";
+    this.lockMarker.style.left = `${screenX}px`;
+    this.lockMarker.style.top = `${screenY}px`;
   }
 
   setCandle(text, count, lit) {

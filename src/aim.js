@@ -86,7 +86,7 @@ export class AimSystem {
     return true;
   }
 
-  // Encontra o ser vivo mais próximo ao jogador (com verificação de linha de visão).
+  // Encontra o melhor alvo vivo na frente do jogador (com persistência de mira e verificação de linha de visão).
   findNearestBeing(player, maxRange = ASSIST_MAX_RANGE) {
     const npcs = this.npcs.npcs;
     const px = player.x;
@@ -94,10 +94,25 @@ export class AimSystem {
     const pz = player.z;
     const maxDistSq = maxRange * maxRange;
 
-    let bestVisible = null;
-    let bestVisibleDistSq = maxDistSq;
-    let bestFallback = null;
-    let bestFallbackDistSq = Math.min(maxDistSq, 18 * 18);
+    // 1. Target Stickiness: se já temos um alvo travado vivo no alcance e com visão, MANTÉM ELE!
+    if (this.assistTarget && this.assistTarget.alive && this.assistTarget.root?.visible && !this.assistTarget.controlled) {
+      const curDx = this.assistTarget.x - px;
+      const curDz = this.assistTarget.z - pz;
+      const curDistSq = curDx * curDx + curDz * curDz;
+      if (curDistSq < (maxRange * 1.25) * (maxRange * 1.25)) {
+        const curTargetY = this.assistTarget.root.position.y + (this.assistTarget.roleKey === "horse" ? 1.08 : 1.3);
+        if (this._hasLineOfSight(px, py, pz, this.assistTarget.x, curTargetY, this.assistTarget.z)) {
+          return this.assistTarget;
+        }
+      }
+    }
+
+    // 2. Se o alvo anterior morreu ou não é mais válido, busca o melhor alvo no cone frontal
+    const dxCam = this.direction.x || 0;
+    const dzCam = this.direction.z || 1;
+
+    let bestScore = -Infinity;
+    let bestNpc = null;
 
     for (let i = 0; i < npcs.length; i++) {
       const npc = npcs[i];
@@ -107,26 +122,37 @@ export class AimSystem {
       const dSq = dx * dx + dz * dz;
       if (dSq > maxDistSq || dSq < 0.04) continue;
 
+      const dist = Math.sqrt(dSq);
+      const toDirX = dx / dist;
+      const toDirZ = dz / dist;
+      const dot = toDirX * dxCam + toDirZ * dzCam;
+
+      // Prioriza alvos no campo de visão frontal
+      if (dot < -0.3 && dist > 10) continue;
+
       const targetY = npc.root.position.y + (npc.roleKey === "horse" ? 1.08 : 1.28);
-      if (dSq < bestVisibleDistSq && this._hasLineOfSight(px, py, pz, npc.x, targetY, npc.z)) {
-        bestVisibleDistSq = dSq;
-        bestVisible = npc;
-      } else if (dSq < bestFallbackDistSq) {
-        bestFallbackDistSq = dSq;
-        bestFallback = npc;
+      if (!this._hasLineOfSight(px, py, pz, npc.x, targetY, npc.z)) continue;
+
+      const isHostile = npc.hostile || npc.roleKey === "werewolf" || npc.roleKey === "cultist";
+      const hostileBonus = isHostile ? 50 : 0;
+      const score = (dot * 40) - dist + hostileBonus;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestNpc = npc;
       }
     }
 
-    return bestVisible || bestFallback;
+    return bestNpc;
   }
 
   prepare(player, weapon, enabled) {
-    this.ranged = Boolean(weapon && weapon.ammo);
+    this.ranged = Boolean(weapon && (weapon.ammo || weapon.type === "throw" || weapon.type === "bow" || weapon.type === "crossbow" || weapon.type === "musket"));
     this.wasActive = this.active;
     this.active = Boolean(enabled && this.input.aimHeld && !player.blocking);
 
     if (this.assistEnabled && enabled && !player.knockedOut) {
-      const range = this.ranged ? ASSIST_MAX_RANGE : 12;
+      const range = this.ranged ? ASSIST_MAX_RANGE : 16;
       this.assistTarget = this.findNearestBeing(player, range);
       if (this.assistTarget) {
         const npc = this.assistTarget;
@@ -150,10 +176,12 @@ export class AimSystem {
   update(dt, player, weapon, enabled) {
     this.bloom *= Math.exp(-6 * dt);
 
-    if (!this.ranged || !enabled) {
+    const shouldShow = enabled && (this.active || this.ranged || Boolean(weapon));
+    if (!shouldShow) {
       this.target = null;
       this.assistLocked = false;
       this.ui.setReticle(false, 0, false, false, false);
+      this.ui.updateLockMarker?.(null, false, this.camera);
       return;
     }
 
@@ -239,9 +267,10 @@ export class AimSystem {
     this.elevation = Math.max(-0.75, Math.min(0.9, Math.atan2(this.point.y - (player.root.position.y + 1.32), Math.max(flat, 1.5))));
 
     const speed = player.speedRatio;
-    const base = weapon.spread ?? 0.02;
+    const base = weapon?.spread ?? 0.02;
     const wanted = (this.active ? base * (this.assistLocked ? 0.35 : 0.75) : base * 2.2) + speed * (this.active ? 0.01 : 0.026) + this.bloom;
     this.spread += (wanted - this.spread) * (1 - Math.exp(-16 * dt));
     this.ui.setReticle(true, this.spread, target !== null, this.active, this.assistLocked);
+    this.ui.updateLockMarker?.(this.assistPoint, this.assistLocked && this.assistTarget !== null, this.camera);
   }
 }

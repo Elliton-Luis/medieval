@@ -15,7 +15,8 @@ Depois abra `http://localhost:4173`.
 ## Controles
 
 - `W A S D` ou setas: mover · `Shift`: correr · `Space`: pular · `C`: rolar (esquiva com invulnerabilidade) · `U`: modo furtivo (agachado; os cavalos não fogem)
-- **Botão direito**: mirar (câmera sobre o ombro, mira no centro da tela) · **Clique esquerdo** (ou `J`): atacar/atirar, mesmo com o botão direito pressionado
+- **Botão direito**: mirar (câmera sobre o ombro com retícula nítida de alta precisão) · **Clique esquerdo** (ou `J`): atacar/atirar mantendo a mira 100% fixa e estável no alvo, sem oscilar nem cair no chão
+- **Mira e Aim Assist (`T` para ligar/desligar)**: retícula sempre visível na tela com feedback tátil colorido (vermelho vivo sobre alvos e dourado radiante quando travada com colchetes de lock-on no inimigo). A mira permanece cravada no inimigo durante disparos consecutivos, transitando suavemente para o próximo alvo se o inimigo for derrotado.
 - **Armas `1`–`9`**: escolhe o slot; apertar o mesmo número de novo alterna entre as armas dele. A **roda do mouse** troca de arma e **Shift + roda** dá zoom na câmera
 - `Q` (segurar): escudo, só com armas de uma mão · `F`: monta/desmonta perto de um cavalo (também bloqueia, como antes) · `R`: poção · `E`: interagir/pegar · `H`: assobiar · `V`: vela
 - `M`: liga/desliga a música · `Esc`: pausa (volumes de música e de efeitos separados)
