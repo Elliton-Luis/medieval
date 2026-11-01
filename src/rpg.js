@@ -1592,8 +1592,9 @@ export const BUILD_COSTS = {
   TORCH_POST: {
     wood: 4,
     hay: 2,
+    torches: 1,
     label: "Poste de Iluminação",
-    desc: "Poste alto de madeira com suporte de ferro forjado e tocha permanente.",
+    desc: "Poste alto de madeira com suporte de ferro forjado e tocha permanente (exige 1 tocha no inventário).",
     category: "VILA",
     icon: "🏮",
   },
@@ -2632,9 +2633,87 @@ function _getBuildPreviewGroup(scene = _env.scene) {
 }
 
 /**
+ * Calcula a posição exata e orientação de construção considerando snapping de 15° para muralhas
+ * e inversão de 180° para que portas de casas/cabanas fiquem viradas de frente para o jogador.
+ */
+export function calculateBuildingTransform(playerPos, playerRot, type = "HOUSE", customAngle = null, pool = _playerBuildingsPool) {
+  const isWall = type.startsWith("STONE_WALL_") || type.startsWith("CLAY_WALL_") || type === "WALL_GATE";
+  const isHouseType = type === "HOUSE" || type === "CABIN" || type === "BARN";
+  const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
+    ? 2.6
+    : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
+      ? 3.8
+      : 5.0;
+
+  const baseRotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
+  _buildEuler.set(0, baseRotY, 0);
+  _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
+
+  let bx = (playerPos.x ?? 0) + _buildOffset.x;
+  let bz = (playerPos.z ?? 0) + _buildOffset.z;
+
+  const STEP_15 = Math.PI / 12; // 15 graus = 0.261799 rad
+  let rotY = customAngle !== null ? customAngle : baseRotY;
+
+  if (isWall) {
+    // Quantiza o ângulo da muralha em múltiplos de 15 graus
+    rotY = Math.round(rotY / STEP_15) * STEP_15;
+
+    const wallLen = (type.includes("LARGE") || type.includes("GATE")) ? 6.0 : 3.8;
+    let bestDistSq = 3.6 * 3.6;
+    let snapSocket = null;
+
+    const list = Array.isArray(pool) && pool.length > 0 ? pool : _playerBuildingsPool;
+    if (Array.isArray(list)) {
+      for (let i = 0; i < list.length; i++) {
+        const other = list[i];
+        if (!other || !other.visible) continue;
+        const oType = other.userData?.type || "";
+        if (!oType.startsWith("STONE_WALL_") && !oType.startsWith("CLAY_WALL_") && oType !== "WALL_GATE") continue;
+        const oLen = (oType.includes("LARGE") || oType.includes("GATE")) ? 6.0 : 3.8;
+        const oX = other.position.x;
+        const oZ = other.position.z;
+        const oY = other.rotation.y;
+
+        const hL = oLen * 0.5;
+        const cos = Math.cos(oY);
+        const sin = Math.sin(oY);
+        const s1X = oX + cos * hL;
+        const s1Z = oZ - sin * hL;
+        const s2X = oX - cos * hL;
+        const s2Z = oZ + sin * hL;
+
+        const d1Sq = (bx - s1X) ** 2 + (bz - s1Z) ** 2;
+        if (d1Sq < bestDistSq) {
+          bestDistSq = d1Sq;
+          snapSocket = { x: s1X, z: s1Z, refAngle: oY };
+        }
+        const d2Sq = (bx - s2X) ** 2 + (bz - s2Z) ** 2;
+        if (d2Sq < bestDistSq) {
+          bestDistSq = d2Sq;
+          snapSocket = { x: s2X, z: s2Z, refAngle: oY };
+        }
+      }
+    }
+
+    if (snapSocket) {
+      // Cola na extremidade da outra muralha e projeta a nova no ângulo selecionado de 15° em 15°
+      bx = snapSocket.x + Math.cos(rotY) * (wallLen * 0.5);
+      bz = snapSocket.z - Math.sin(rotY) * (wallLen * 0.5);
+    }
+  } else if (isHouseType) {
+    // A fachada com porta está em +Z local. Giramos 180° para a porta ficar virada de frente para o jogador.
+    rotY = rotY + Math.PI;
+  }
+
+  const by = _env.world ? _env.world.heightAt(bx, bz) : playerPos.y ?? 0;
+  return { bx, by, bz, rotY };
+}
+
+/**
  * Atualiza posição, rotação e visual translúcido do holograma 3D de construção.
  */
-export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE") {
+export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE", customAngle = null) {
   const preview = _getBuildPreviewGroup(_env.scene);
   if (!preview) return;
 
@@ -2651,24 +2730,12 @@ export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE")
     PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
     (cost.hay ? PlayerInventory.hay >= cost.hay : true) &&
-    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true);
+    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true) &&
+    (cost.torches ? (PlayerInventory.torches || 0) >= cost.torches : true);
 
   const activeMat = canAfford ? _previewGreenMat : _previewRedMat;
 
-  // Ajusta a distância frontal conforme a escala do edifício
-  const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
-    ? 2.6
-    : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
-      ? 3.8
-      : 5.0;
-
-  const rotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
-  _buildEuler.set(0, rotY, 0);
-  _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
-
-  const bx = (playerPos.x ?? 0) + _buildOffset.x;
-  const bz = (playerPos.z ?? 0) + _buildOffset.z;
-  const by = _env.world ? _env.world.heightAt(bx, bz) : playerPos.y ?? 0;
+  const { bx, by, bz, rotY } = calculateBuildingTransform(playerPos, playerRot, type, customAngle, _playerBuildingsPool);
 
   preview.position.set(bx, by, bz);
   preview.rotation.y = rotY;
@@ -2915,7 +2982,7 @@ function _registerBuildingColliders(building, world = _env.world) {
  * @param {string} type
  * @param {Array<THREE.Object3D>} [playerBuildingsPool]
  */
-export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuildingsPool = _playerBuildingsPool) {
+export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuildingsPool = _playerBuildingsPool, customAngle = null) {
   const cost = BUILD_COSTS[type];
   if (!cost) return false;
 
@@ -2923,7 +2990,8 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
     PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
     (cost.hay ? PlayerInventory.hay >= cost.hay : true) &&
-    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true)
+    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true) &&
+    (cost.torches ? (PlayerInventory.torches || 0) >= cost.torches : true)
   ) {
     const pool =
       playerBuildingsPool && playerBuildingsPool.length > 0
@@ -2941,35 +3009,20 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
     if (cost.wood) PlayerInventory.wood -= cost.wood;
     if (cost.stone) PlayerInventory.stone -= cost.stone;
     if (cost.clay) PlayerInventory.clay = Math.max(0, (PlayerInventory.clay || 0) - cost.clay);
+    if (cost.torches) PlayerInventory.torches = Math.max(0, (PlayerInventory.torches || 0) - cost.torches);
     if (cost.hay) {
       PlayerInventory.hay -= cost.hay;
       PlayerStats.hay = PlayerInventory.hay;
     }
 
-    const rotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
-    if (playerRot && playerRot.isEuler) {
-      _buildEuler.copy(playerRot);
-    } else {
-      _buildEuler.set(0, rotY, 0);
-    }
-
-    const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
-      ? 2.6
-      : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
-        ? 3.8
-        : 5.0;
-
-    _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
-    const bx = (playerPos.x ?? 0) + _buildOffset.x;
-    const bz = (playerPos.z ?? 0) + _buildOffset.z;
-    const by = _env.world ? _env.world.heightAt(bx, bz) : playerPos.y ?? 0;
+    const { bx, by, bz, rotY } = calculateBuildingTransform(playerPos, playerRot, type, customAngle, pool);
 
     building.position.set(bx, by, bz);
     building.rotation.y = rotY;
     building.visible = true;
 
     // Limpa árvores e pedras do terreno dentro da área da construção
-    _env.world?.clearObstaclesInRadius?.(bx, bz, fwdDist + 1.2);
+    _env.world?.clearObstaclesInRadius?.(bx, bz, 4.8);
 
     // Registra colisões e pisos no mundo físico
     _registerBuildingColliders(building, _env.world);

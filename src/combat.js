@@ -111,15 +111,30 @@ export class CombatSystem {
     const forwardX = -Math.sin(cameraYaw);
     const forwardZ = -Math.cos(cameraYaw);
     const player = this.player;
-    // lança e alabarda a cavalo: mais alcance e dano com o galope
-    const charging = player.mounted && def.pole && player.mounted.speed > 7;
-    const reach = def.reach + (charging ? 1.1 : 0);
+    // Velocidade de deslocamento do atacante (montado a cavalo ou correndo a pé)
+    const mountedSpeed = player.mounted ? (player.mounted.speed || 0) : 0;
+    const footSpeed = Math.hypot(player.vx || 0, player.vz || 0);
+    const moveSpeed = Math.max(mountedSpeed, footSpeed);
+
+    // Efeito de Investida da Lança: quanto maior a velocidade, maior o dano
+    const isSpear = def.id === "spear" || def.id === "makeshift_spear" || Boolean(def.pole);
+    let speedMult = 1.0;
+    let speedBonusDmg = 0;
+
+    if (isSpear && moveSpeed > 1.2) {
+      // Bônus cinético proporcional à velocidade (a pé até ~2.0x, a cavalo a galope até 3.5x de dano!)
+      speedMult = Math.min(3.5, 1.0 + (moveSpeed - 1.2) * 0.18);
+      speedBonusDmg = Math.round((moveSpeed - 1.2) * 0.5);
+    }
+
+    const charging = isSpear && moveSpeed > 5.5;
+    const reach = def.reach + (charging ? 1.25 : 0);
     const minFacing = def.arc;
-    const baseDamage = def.damage + (finisher ? 1 : 0) + (charge > 0.6 ? 1 : 0) + (charging ? 1 : 0);
-    const damage = Math.max(1, Math.round(baseDamage * PlayerStats.getMeleeMult() * PlayerEquipment.getWeaponMult() * 10) / 10);
-    const knock = def.knock * (finisher ? 1.35 : 1) * (1 + charge * 0.8) * PlayerStats.getMeleeMult();
-    const launch = def.launch ? def.launch * (0.5 + charge) : finisher ? 0.8 : 0;
-    const big = def.hands === 2 || finisher;
+    const baseDamage = def.damage + (finisher ? 1 : 0) + (charge > 0.6 ? 1 : 0) + speedBonusDmg;
+    const damage = Math.max(1, Math.round(baseDamage * speedMult * PlayerStats.getMeleeMult() * PlayerEquipment.getWeaponMult() * 10) / 10);
+    const knock = def.knock * (finisher ? 1.35 : 1) * (1 + charge * 0.8) * (isSpear ? speedMult : 1) * PlayerStats.getMeleeMult();
+    const launch = def.launch ? def.launch * (0.5 + charge) : finisher || (isSpear && moveSpeed > 8) ? 0.95 : 0;
+    const big = def.hands === 2 || finisher || charging;
     const color = def.type === "fists" ? "#f3dfaa" : big ? "#ffd89a" : "#f3dfaa";
     if (def.type !== "fists") this.effects.play("slash", player.x + forwardX * 1.3, player.root.position.y + 1.2, player.z + forwardZ * 1.3, color, big ? 2.3 : 1.7);
 
@@ -148,8 +163,17 @@ export class CombatSystem {
       hitCount++;
     }
     if (this.houses?.hitAt(player.x + forwardX * 1.5, player.root.position.y + 1.0, player.z + forwardZ * 1.5, 1.0, def.damage)) hitCount++;
-    if (hitCount > 0) this.cameraRig.addShake(big ? 0.22 + charge * 0.12 : 0.1);
-    else if (big) this.effects.play("smoke", player.x + forwardX * 1.9, player.root.position.y + 0.35, player.z + forwardZ * 1.9, "#cdbb97", 0.9);
+    if (hitCount > 0) {
+      this.cameraRig.addShake(big ? 0.22 + charge * 0.12 : 0.1);
+      if (isSpear && moveSpeed > 4.5) {
+        this.cameraRig?.addShake?.(0.24 + Math.min(0.25, moveSpeed * 0.02));
+        this.effects.play("star", player.x + forwardX * reach, player.root.position.y + 1.2, player.z + forwardZ * reach, "#ffffff", 1.8);
+        this.audio?.weaponSwing?.("bash", true);
+        this.ui?.showToast?.(`✦ Investida com Lança! [${damage} de dano · ${(speedMult).toFixed(1)}x velocidade]`);
+      }
+    } else if (big) {
+      this.effects.play("smoke", player.x + forwardX * 1.9, player.root.position.y + 0.35, player.z + forwardZ * 1.9, "#cdbb97", 0.9);
+    }
   }
 
   damageNPC(npc, amount, directionX, directionZ, color = "#f5d36e", size = 0.95, force = 1.8, launch = 0, headshot = false, silent = false) {

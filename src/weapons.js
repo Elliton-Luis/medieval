@@ -52,11 +52,16 @@ export class WeaponSystem {
     this.currentId = "fists";
     this.slot = 0;
     this.lastInSlot = {};
+    // Hotbar de 9 slots em mãos (escolhidos pelo jogador através do Compêndio/Inventário)
+    this.hotbarSlots = ["fists", "axe", "pickaxe", null, null, null, null, null, null];
     this.cooldown = 0;
     this.buffered = 0;
     this.charging = false;
     this.chargeTime = 0;
     this.buildMode = false;
+    this.buildAngle = 0;
+    this._buildTurnAccum = 0;
+    this._keyRotCooldown = 0;
     this.selectedBuildType = "HOUSE";
     this.ammo = { bolts: 8, arrows: 12, bombs: 3, knives: 0, oil: 0 };
     this.projectiles = [];
@@ -70,6 +75,21 @@ export class WeaponSystem {
     this._createMusketTracer(scene);
     this._nearbyNPCs = [];
     this.equip("fists", false);
+  }
+
+  assignHotbarSlot(slotIndex, weaponId) {
+    if (slotIndex < 0 || slotIndex >= 9) return;
+    for (let i = 0; i < 9; i++) {
+      if (this.hotbarSlots[i] === weaponId) this.hotbarSlots[i] = null;
+    }
+    this.hotbarSlots[slotIndex] = weaponId;
+    this._refreshWeaponHud();
+  }
+
+  unassignHotbarSlot(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= 9) return;
+    this.hotbarSlots[slotIndex] = null;
+    this._refreshWeaponHud();
   }
 
   get currentWeapon() {
@@ -284,17 +304,45 @@ export class WeaponSystem {
         this.selectSlot(selection);
       }
     }
+
     const wheel = this.input.consumeWheelStep();
-    if (wheel !== 0) {
-      if (this.buildMode) {
-        const types = [...Object.keys(BUILD_COSTS), "PLACE_ITEM"];
-        const curIdx = types.indexOf(this.selectedBuildType || "HOUSE");
-        this.selectedBuildType = types[(curIdx + (wheel > 0 ? 1 : types.length - 1)) % types.length];
-        this._announceBuildMode();
-      } else {
+    if (this.buildMode) {
+      // No modo de construção, a câmera permanece travada e o jogador gira a construção em passos de 15°
+      if (this.cameraRig) this.cameraRig.frozen = true;
+      const STEP_15 = Math.PI / 12;
+
+      // Scroll da roda do mouse roda a construção em 15°
+      if (wheel !== 0) {
+        this.buildAngle += (wheel > 0 ? 1 : -1) * STEP_15;
+      }
+
+      // Teclas Q e E (ou setas Esquerda/Direita) giram a construção em 15°
+      if (this._keyRotCooldown > 0) this._keyRotCooldown -= dt;
+      if (this._keyRotCooldown <= 0) {
+        if (this.input.isKeyPressed?.("KeyQ") || this.input.isKeyPressed?.("ArrowLeft")) {
+          this.buildAngle -= STEP_15;
+          this._keyRotCooldown = 0.16;
+        } else if (this.input.isKeyPressed?.("KeyE") || this.input.isKeyPressed?.("ArrowRight")) {
+          this.buildAngle += STEP_15;
+          this._keyRotCooldown = 0.16;
+        }
+      }
+
+      // Movimento do mouse enquanto a câmera está travada
+      const lookX = this.cameraRig?._smoothLookX || 0;
+      if (Math.abs(lookX) > 0.12) {
+        this._buildTurnAccum += lookX;
+        if (Math.abs(this._buildTurnAccum) > 0.75) {
+          this.buildAngle -= Math.sign(this._buildTurnAccum) * STEP_15;
+          this._buildTurnAccum = 0;
+        }
+      }
+    } else {
+      if (wheel !== 0) {
         this.cycle(wheel);
       }
     }
+
     this.cooldown = Math.max(0, this.cooldown - dt);
     const def = this.currentWeapon;
     const dead = this.player.knockedOut || this.player.dead;
@@ -325,8 +373,9 @@ export class WeaponSystem {
         this.player.model?.rotation?.y ?? 0,
         true,
         this.selectedBuildType || "HOUSE",
+        this.buildAngle,
       );
-      if ((this.input.consumeAttackPressed() || this.input.consumeInteractPressed?.()) && !dead) {
+      if ((this.input.consumeAttackPressed() || this.input.consumeInteractPressed?.() || this.input.isKeyPressed?.("Space")) && !dead) {
         if (this.selectedBuildType === "PLACE_ITEM") {
           this._tryPlaceHeldItem();
         } else {
@@ -431,6 +480,7 @@ export class WeaponSystem {
   closeBuildHub() {
     this.buildHubOpen = false;
     this.buildMode = false;
+    if (this.cameraRig) this.cameraRig.frozen = false;
     this.ui.closeBuildHub();
     this.input.setModalOpen(false);
     updateBuildPreview(this.player.root.position, 0, false);
@@ -443,9 +493,10 @@ export class WeaponSystem {
   exitBuildMode() {
     this.buildMode = false;
     this.buildHubOpen = false;
+    if (this.cameraRig) this.cameraRig.frozen = false;
     this.input.setModalOpen(false);
     updateBuildPreview(this.player.root.position, 0, false);
-    this.ui.showToast("Modo Construção encerrado.");
+    this.ui.showToast("Modo Construção encerrado. Câmera liberada.");
     this._refreshWeaponHud();
   }
 
@@ -453,6 +504,8 @@ export class WeaponSystem {
     this.buildHubOpen = false;
     this.buildMode = true;
     this.selectedBuildType = type;
+    this.buildAngle = Math.round((this.player.model?.rotation?.y ?? 0) / (Math.PI / 12)) * (Math.PI / 12);
+    if (this.cameraRig) this.cameraRig.frozen = true;
     this.input.setModalOpen(false);
     this._announceBuildMode();
     try {
@@ -474,12 +527,13 @@ export class WeaponSystem {
     if (cost.wood) parts.push(`${cost.wood} Mad`);
     if (cost.stone) parts.push(`${cost.stone} Ped`);
     if (cost.clay) parts.push(`${cost.clay} Barro`);
+    if (cost.torches) parts.push(`${cost.torches} Tocha (Tens ${PlayerInventory.torches || 0})`);
     if (cost.hay) parts.push(`${cost.hay} Feno`);
     const costStr = parts.join(", ");
 
     const label = `${(cost.label || type).toLocaleUpperCase("pt-BR")} (${costStr})`;
     this.ui.setWeapon("MODO CONSTRUÇÃO (C)", label);
-    this.ui.showToast(`Construir: ${cost.label || type} · [Clique/E] Erguer · [C] Abrir Catálogo · [Roda] Trocar`);
+    this.ui.showToast(`Construir: ${cost.label || type} · [Mouse/Wheel/Q/E] Rodar 15° · [Clique/E] Erguer · [C] Catálogo`);
   }
 
   _tryPlaceHeldItem() {
@@ -573,6 +627,10 @@ export class WeaponSystem {
 
     // 2. Fixar Tocha
     if (def.id === "torch" || (def.id === "fists" && hasTorchInInv)) {
+      if (def.id !== "torch" && (PlayerInventory.torches || 0) <= 0) {
+        this.ui.showToast("Sem tochas no inventário! Crie no menu de artesanato (I).");
+        return;
+      }
       let placed;
       if (isNearWall) {
         placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false);
@@ -581,14 +639,16 @@ export class WeaponSystem {
       }
       this.effects.play("star", targetX, py, targetZ, "#ffa834", 1.2);
       this.audio.weaponSwing?.("chop", false);
-      this.ui.showToast("Tocha fixada! Pressione E para recolher.");
 
       if (def.id === "torch") {
         this.unlock("torch", false);
+        PlayerInventory.torches = Math.max(0, (PlayerInventory.torches || 1) - 1);
         this.selectSlot(1);
-      } else if (PlayerInventory.torches > 0) {
-        PlayerInventory.torches--;
+      } else {
+        PlayerInventory.torches = Math.max(0, (PlayerInventory.torches || 0) - 1);
       }
+
+      this.ui.showToast(`Tocha fixada! Restam ${PlayerInventory.torches} no alforje. [E] Recolher.`);
 
       this.placedItems.push({
         id: "torch",
@@ -648,8 +708,9 @@ export class WeaponSystem {
           if (item.torchSource?.group) item.torchSource.group.parent?.remove(item.torchSource.group);
           if (item.torchSource?.sprite) item.torchSource.sprite.parent?.remove(item.torchSource.sprite);
           this.unlock("torch", false);
+          PlayerInventory.torches = (PlayerInventory.torches || 0) + 1;
           this.equip("torch", false);
-          this.ui.showToast("Tocha recolhida de volta ao inventário!");
+          this.ui.showToast(`Tocha recolhida de volta ao inventário! (Total: ${PlayerInventory.torches})`);
         } else if (item.id === "candle") {
           if (item.model) item.model.parent?.remove(item.model);
           if (this.candle) {
@@ -675,11 +736,18 @@ export class WeaponSystem {
   _tryBuildInMode() {
     const type = this.selectedBuildType || "HOUSE";
     const cost = BUILD_COSTS[type] || BUILD_COSTS.HOUSE;
+
+    if (cost.torches && (PlayerInventory.torches || 0) < cost.torches) {
+      this.ui.showToast(`Faltam tochas no inventário! (Tens ${PlayerInventory.torches || 0}, precisas de ${cost.torches}). Crie no menu de artesanato (I).`);
+      return;
+    }
+
     const built = buildStructure(
       this.player.root.position,
       this.player.model.rotation,
       type,
       this.playerBuildingsPool,
+      this.buildAngle,
     );
     if (built) {
       this.ui.showToast(`✦ ${cost.label || type} erguido com sucesso no reino!`);
@@ -689,6 +757,7 @@ export class WeaponSystem {
       if (cost.wood) parts.push(`${cost.wood} Madeira (tens ${PlayerInventory.wood})`);
       if (cost.stone) parts.push(`${cost.stone} Pedra (tens ${PlayerInventory.stone})`);
       if (cost.clay) parts.push(`${cost.clay} Barro (tens ${PlayerInventory.clay || 0})`);
+      if (cost.torches) parts.push(`${cost.torches} Tocha (tens ${PlayerInventory.torches || 0})`);
       if (cost.hay) parts.push(`${cost.hay} Feno (tens ${PlayerInventory.hay})`);
       this.ui.showToast(`Recursos insuficientes! Precisas de: ${parts.join(" · ")}`);
     }
@@ -1017,26 +1086,38 @@ export class WeaponSystem {
     return true;
   }
 
-  // Teclas 1-9: escolhe o slot; apertar de novo alterna entre as armas dele (estilo GTA).
+  // Teclas 1-9: escolhe a arma atribuída a esse slot da hotbar (máximo 9 armas em mãos)
   selectSlot(number) {
     const index = number - 1;
-    const owned = SLOTS[index].filter((id) => this.owned.has(id));
-    if (owned.length === 0) {
-      this.ui.showToast(`Nenhuma arma no slot ${number}`);
+    if (index < 0 || index >= 9) return;
+    const id = this.hotbarSlots[index];
+    if (!id) {
+      this.ui.showToast(`Slot [${number}] vazio. Abra o Arsenal (B ou I) para equipar uma arma.`);
       return;
     }
-    let id;
-    if (this.slot === index && owned.length > 1) id = owned[(owned.indexOf(this.currentId) + 1) % owned.length];
-    else id = owned.includes(this.lastInSlot[index]) ? this.lastInSlot[index] : owned[0];
+    if (!this.owned.has(id)) {
+      this.ui.showToast(`A arma do slot [${number}] não está mais no seu inventário.`);
+      this.hotbarSlots[index] = null;
+      return;
+    }
+    this.slot = index;
     this.equip(id);
   }
 
-  // Roda do mouse: percorre todas as armas que você tem.
+  // Roda do mouse: percorre estritamente as armas atribuídas à Hotbar (máximo 9 armas em mãos)
   cycle(step) {
-    const order = WEAPON_LIST.filter((w) => this.owned.has(w.id)).map((w) => w.id);
-    if (order.length < 2) return;
-    const next = (order.indexOf(this.currentId) + step + order.length) % order.length;
-    this.equip(order[next]);
+    const active = this.hotbarSlots.filter((id) => id && this.owned.has(id));
+    if (active.length === 0) {
+      if (this.owned.has("fists")) this.equip("fists");
+      return;
+    }
+    if (active.length === 1) {
+      this.equip(active[0]);
+      return;
+    }
+    const curIdx = active.indexOf(this.currentId);
+    const nextIdx = (curIdx + (step > 0 ? 1 : active.length - 1)) % active.length;
+    this.equip(active[nextIdx]);
   }
 
   unlock(id, quiet = false) {

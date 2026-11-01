@@ -238,6 +238,17 @@ export function initCheatMenu(env = {}) {
         env.weapons.bombs = 99;
         env.weapons.knives = 99;
         env.weapons.oil = 99;
+        env.weapons.hotbarSlots = [
+          "fists",
+          "longsword",
+          "spear",
+          "flanged_mace",
+          "warhammer",
+          "greatsword",
+          "heavycrossbow",
+          "musket",
+          "bomb"
+        ];
         env.weapons.equip?.("greatsword", false);
         env.weapons._refreshWeaponHud?.();
       }

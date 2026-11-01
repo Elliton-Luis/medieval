@@ -133,6 +133,21 @@ export class HouseSystem {
     const activeCam = this.camera;
     const player = this.player;
 
+    // Regeneração de vitalidade do jogador sentado no pé da fogueira
+    if (player.sitting && player.sittingAtCampfire) {
+      this._cfHealTimer = (this._cfHealTimer || 0) + dt;
+      if (this._cfHealTimer >= 2.0) {
+        this._cfHealTimer = 0;
+        if (player.health < player.maxHealth) {
+          player.health = Math.min(player.maxHealth, player.health + 1);
+          this.ui?.setVitals?.(player.health, player.maxHealth, player.coins, player.potions);
+          this.effects?.play?.("star", player.x, player.root.position.y + 1.2, player.z, "#ff9933", 0.9);
+        }
+      }
+    } else {
+      this._cfHealTimer = 0;
+    }
+
     let camX = 0, camY = 0, camZ = 0;
     let cdx = 0, cdz = 1;
     let hasCam = false;
@@ -199,6 +214,9 @@ export class HouseSystem {
       } else if (player.praying) {
         _targetScratch.type = "stand_up";
         _targetScratch.label = "E / WASD / Espaço · levantar da oração";
+      } else if (player.sittingAtCampfire) {
+        _targetScratch.type = "stand_up";
+        _targetScratch.label = "E / WASD · levantar-se da fogueira";
       } else {
         _targetScratch.type = "stand_up";
         _targetScratch.label = "E / WASD / Espaço · levantar do banco";
@@ -457,8 +475,41 @@ export class HouseSystem {
       }
     }
 
-    // Interagíveis externos (Bancos da Praça e Poços de Água) quando em pé e fora de montaria
+    // Interagíveis externos (Fogueiras, Bancos da Praça e Poços de Água) quando em pé e fora de montaria
     if (!player.sitting && !player.praying && !player.mounted) {
+      // 1. Fogueiras erguidas pelo jogador
+      const campfires = (window.__game?.weapons?.playerBuildingsPool || []).filter(
+        (b) => b && b.visible && b.userData?.type === "CAMPFIRE"
+      );
+      for (let i = 0; i < campfires.length; i++) {
+        const cf = campfires[i];
+        const cfDistSq = (player.x - cf.position.x) ** 2 + (player.z - cf.position.z) ** 2;
+        if (cfDistSq < 2.85 * 2.85 && cfDistSq < nearestDistance) {
+          nearestDistance = cfDistSq;
+          _targetScratch.type = "campfire";
+          _targetScratch.house = null;
+          _targetScratch.data = { x: cf.position.x, z: cf.position.z };
+          _targetScratch.label = "E · sentar no pé da fogueira (descansar e regenerar)";
+          hasTarget = true;
+        }
+      }
+
+      // 2. Fogueiras rituais dos postos cultistas
+      const outposts = window.__game?.CultState?.outposts || [];
+      for (let i = 0; i < outposts.length; i++) {
+        const out = outposts[i];
+        if (!out) continue;
+        const oDistSq = (player.x - out.x) ** 2 + (player.z - out.z) ** 2;
+        if (oDistSq < 3.2 * 3.2 && oDistSq < nearestDistance) {
+          nearestDistance = oDistSq;
+          _targetScratch.type = "campfire";
+          _targetScratch.house = null;
+          _targetScratch.data = { x: out.x, z: out.z };
+          _targetScratch.label = "E · sentar no pé da fogueira do acampamento";
+          hasTarget = true;
+        }
+      }
+
       if (this.townBenches) {
         for (let i = 0; i < this.townBenches.length; i++) {
           const bench = this.townBenches[i];
@@ -536,6 +587,19 @@ export class HouseSystem {
 
     if (t.type === "stand_up") {
       this.player.standUp();
+      return true;
+    }
+    if (t.type === "campfire" && t.data) {
+      const fx = t.data.x;
+      const fz = t.data.z;
+      const angle = Math.atan2(this.player.z - fz, this.player.x - fx);
+      const seatX = fx + Math.cos(angle) * 1.25;
+      const seatZ = fz + Math.sin(angle) * 1.25;
+      const faceYaw = angle + Math.PI;
+      this.player.sitAt(seatX, seatZ, faceYaw, false);
+      this.player.sittingAtCampfire = true;
+      this.audio.step(false, 0.8);
+      this.ui.showToast("Sentado junto ao calor da fogueira · Vitalidade e vigor recuperando · Pressione E ou WASD para levantar");
       return true;
     }
     if (t.type === "church_pew_active") {

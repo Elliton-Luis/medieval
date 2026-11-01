@@ -254,6 +254,11 @@ export class InputManager {
     return selection;
   }
 
+  isKeyPressed(code) {
+    if (this.modalOpen) return false;
+    return this.keys.has(code);
+  }
+
   setModalOpen(open) {
     this.modalOpen = open;
     this.lookX = 0;

@@ -588,6 +588,28 @@ export class Werewolf extends NPC {
     this.userData.speedMult = 1.35;
     this.root.visible = false;
     this.model.scale.set(-1.26, 1.32, 1.26);
+    this.resetPose();
+  }
+
+  resetPose() {
+    this.root.rotation.set(0, 0, 0);
+    this.model.position.set(0, 0, 0);
+    this.model.rotation.set(0, 0, 0);
+    this._ragdollTime = 0;
+    this._launch = 0;
+    this.deadTime = 0;
+    this._fallSide = 1;
+    if (this.leftArm) this.leftArm.rotation.set(0, 0, 0);
+    if (this.rightArm) this.rightArm.rotation.set(0, 0, 0);
+    if (this.leftLeg) this.leftLeg.rotation.set(0, 0, 0);
+    if (this.rightLeg) this.rightLeg.rotation.set(0, 0, 0);
+    if (this.head) this.head.rotation.set(0, 0, 0);
+    if (this.torso) this.torso.rotation.set(0, 0, 0);
+    if (this.flashMaterials) {
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        this.flashMaterials[i].emissive?.set?.("#000000");
+      }
+    }
   }
 
   get visible() {
@@ -597,6 +619,7 @@ export class Werewolf extends NPC {
   set visible(val) {
     this.root.visible = Boolean(val);
     if (val) {
+      this.resetPose();
       this.removed = false;
       this.alive = true;
       this.health = this.maxHealth;
@@ -621,6 +644,7 @@ export class Werewolf extends NPC {
       this.alive = false;
       this.removed = true;
       this.userData.state = "IDLE";
+      this.resetPose();
       if (this.npcSystem?.spatialGrid) {
         this.npcSystem.spatialGrid.remove(this);
       }
@@ -1002,6 +1026,7 @@ export function updateWildernessSpawns(playerPos, cityData, isNight, monstersPoo
 
       _spawnPos.set(sx, sy, sz);
       werewolf.position.copy(_spawnPos);
+      werewolf.resetPose?.();
       werewolf.visible = true;
       werewolf.userData.state = "HUNTING_PLAYER";
       werewolf.userData.speedMult = 1.35; // Mais rápido que lobos/guardas

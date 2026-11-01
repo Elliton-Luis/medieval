@@ -1084,6 +1084,7 @@ export class Player {
     this.sitting = false;
     this.praying = false;
     this.sittingInChurch = false;
+    this.sittingAtCampfire = false;
     this.userData.state = "IDLE";
     if (this.handSocket) this.handSocket.visible = true;
   }
