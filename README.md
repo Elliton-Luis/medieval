@@ -199,8 +199,13 @@ Acesso total e irrestrito a todos os recursos, itens, munições, poderes e even
   - Digite a sequência `POTATO` ou `CHIEFS` no teclado a qualquer momento durante a gameplay.
   - Pressione `Esc` para pausar e clique no botão **🥔 CHEAT MENU (RECURSOS & ITENS)**.
   - Execute no console do navegador: `window.CheatMenu.open()`.
-- **Exibição em Tempo Real**: O topo do menu mostra os totais em estoque do jogador (Madeira, Pedra, Barro, Feno, Ouro, Tochas, Poções, Velas, Cor da Tocha e Cristais), atualizando instantaneamente a cada clique.
+- **Exibição em Tempo Real**: O topo do menu mostra os totais em estoque do jogador (Madeira, Pedra, Barro, Feno, Ouro, Tochas, Poções, Velas, Cor da Tocha, Cristais e Horário com estado Dia/Noite), atualizando instantaneamente a cada clique.
 - **Categorias e Recursos Disponíveis**:
+  - **Horário & Ciclo Dia/Noite (`tab-time`)**:
+    - **Seletor de Hora Precisa**: Slider contínuo de 0h a 23h com pré-visualização e aplicação imediata.
+    - **Presets Instantâneos**: Amanhecer (06:00), Manhã (09:00), Meio-Dia (12:00), Tarde (15:00), Pôr do Sol (18:00), Crepúsculo (19:30), Noite Profunda (21:30), Meia-Noite dos Rituais (00:00) e Madrugada dos Ermos (03:00).
+    - **Alternadores & Saltos de Tempo**: Botões para alternar instantaneamente para Dia ou Noite, e avançar ou retroceder horas (+1h, -1h, +3h, +6h, +12h).
+    - Comandos via console: `window.CheatMenu.setTime(horas, minutos)`, `window.CheatMenu.setDay()`, `window.CheatMenu.setNight()`, `window.CheatMenu.addHours(delta)` e `window.CheatMenu.getTime()`.
   - **Recursos de Construção & Matérias-Primas**:
     - Madeira (`wood`): +100 ou Max 999
     - Pedra (`stone`): +100 ou Max 999

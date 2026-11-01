@@ -264,6 +264,16 @@ function _updateStatusDisplays() {
 
   const curColor = CRYSTAL_PALETTE[PlayerInventory.torchColor]?.name || PlayerInventory.torchColor || "Fogo Comum";
   if (torchColorEl) torchColorEl.textContent = curColor;
+
+  const clockEl = _cheatModalEl.querySelector("#cs-clock");
+  const dn = _activeEnv?.dayNight || window.__game?.dayNight;
+  if (clockEl && dn) {
+    const totalMinutes = Math.floor((dn.progress ?? 0.36) * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60).toString().padStart(2, "0");
+    const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+    const isNight = dn.isNight ? "🌙 Noite" : "☀️ Dia";
+    clockEl.textContent = `${hours}:${minutes} (${isNight})`;
+  }
 }
 
 export function openCheatModal(env) {
@@ -286,6 +296,7 @@ export function openCheatModal(env) {
       <!-- Barra de Abas -->
       <div class="cheat-tabs">
         <button class="cheat-tab-btn active" data-tab="quick">🌟 Ações Rápidas</button>
+        <button class="cheat-tab-btn" data-tab="time">⏰ Horário & Tempo</button>
         <button class="cheat-tab-btn" data-tab="resources">🪵 Recursos & Matérias</button>
         <button class="cheat-tab-btn" data-tab="crystals">💎 Cristais & Tochas</button>
         <button class="cheat-tab-btn" data-tab="ammo">🏹 Consumíveis & Munição</button>
@@ -295,6 +306,7 @@ export function openCheatModal(env) {
 
       <!-- Status em Tempo Real -->
       <div class="cheat-status-box">
+        <div class="cheat-status-item">⏰ Horário: <span class="cheat-status-val" id="cs-clock">--:--</span></div>
         <div class="cheat-status-item">🪵 Mad: <span class="cheat-status-val" id="cs-wood">0</span></div>
         <div class="cheat-status-item">🪨 Ped: <span class="cheat-status-val" id="cs-stone">0</span></div>
         <div class="cheat-status-item">🏺 Barro: <span class="cheat-status-val" id="cs-clay">0</span></div>
@@ -316,6 +328,8 @@ export function openCheatModal(env) {
             <button class="cheat-btn highlight full-width" data-cheat="maxAllItems">🎒 Encher Todos os Itens, Recursos, Arsenal & Atributos (Max)</button>
             <button class="cheat-btn highlight full-width" data-cheat="giveAllResources">📦 Dar +500 de Todos os Recursos de Construção & Forja</button>
             <button class="cheat-btn highlight full-width" data-cheat="giveAllCrystals">💎 Dar +20 de Todos os Cristais Místicos para Tochas</button>
+            <button class="cheat-btn" data-cheat="time_set_day">☀️ Mudar para Dia (10:00)</button>
+            <button class="cheat-btn" data-cheat="time_set_night">🌙 Mudar para Noite (22:00)</button>
             <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
             <button class="cheat-btn" data-cheat="makeMeRich">💰 +10.000 Ouro</button>
             <button class="cheat-btn" data-cheat="giveAllWeapons">⚔️ Liberar Todo o Arsenal</button>
@@ -324,6 +338,42 @@ export function openCheatModal(env) {
             <button class="cheat-btn" data-cheat="killAllEnemies">💀 Exterminar Inimigos Próximos</button>
             <button class="cheat-btn" data-cheat="giveDemiurgeDiary">📖 Obter Livro do Demiurgo (L)</button>
             <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Traje do Culto</button>
+          </div>
+        </div>
+
+        <!-- ABA DE HORÁRIO & TEMPO -->
+        <div class="cheat-tab-content" id="tab-time">
+          <div class="cheat-time-slider-box" style="background: rgba(142, 84, 233, 0.12); border: 1px solid rgba(142, 84, 233, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 700; color: #ffd700; font-size: 13.5px;">⏰ Seletor de Hora Precisa (0h a 23h):</span>
+              <span id="cheat-slider-label" style="font-size: 15px; font-weight: 800; color: #ffffff; background: #8e54e9; padding: 3px 12px; border-radius: 12px;">12:00</span>
+            </div>
+            <input type="range" id="cheat-time-slider" min="0" max="23" step="1" value="12" style="width: 100%; cursor: pointer; accent-color: #8e54e9; margin-bottom: 12px;">
+            <button class="cheat-btn highlight full-width" id="cheat-apply-slider-time">🎯 Aplicar Horário Selecionado no Slider</button>
+          </div>
+
+          <div style="font-size: 12px; color: #bba8d8; font-weight: 700; margin: 10px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">Presets de Horário Imediatos</div>
+          <div class="cheat-grid">
+            <button class="cheat-btn" data-cheat="time_dawn">🌅 Amanhecer (06:00)</button>
+            <button class="cheat-btn" data-cheat="time_morning">☀️ Manhã Ensolarada (09:00)</button>
+            <button class="cheat-btn" data-cheat="time_noon">☀️ Meio-Dia Pleno (12:00)</button>
+            <button class="cheat-btn" data-cheat="time_afternoon">🌤️ Meio da Tarde (15:00)</button>
+            <button class="cheat-btn" data-cheat="time_sunset">🌇 Pôr do Sol / Crepúsculo (18:00)</button>
+            <button class="cheat-btn" data-cheat="time_dusk">🌆 Anoitecer (19:30)</button>
+            <button class="cheat-btn" data-cheat="time_night">🌙 Noite Profunda (21:30)</button>
+            <button class="cheat-btn" data-cheat="time_midnight">🌌 Meia-Noite dos Rituais (00:00)</button>
+            <button class="cheat-btn" data-cheat="time_witching">🌑 Madrugada dos Ermos (03:00)</button>
+            <button class="cheat-btn" data-cheat="time_set_day">☀️ Fazer Dia Imediato (10:00)</button>
+            <button class="cheat-btn" data-cheat="time_set_night">🌙 Fazer Noite Imediata (22:00)</button>
+          </div>
+
+          <div style="font-size: 12px; color: #bba8d8; font-weight: 700; margin: 14px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">Avançar & Retroceder o Relógio</div>
+          <div class="cheat-grid">
+            <button class="cheat-btn" data-cheat="time_add_1h">⏩ Avançar +1 Hora</button>
+            <button class="cheat-btn" data-cheat="time_sub_1h">⏪ Voltar -1 Hora</button>
+            <button class="cheat-btn" data-cheat="time_add_3h">⏩ Avançar +3 Horas</button>
+            <button class="cheat-btn" data-cheat="time_add_6h">⏩ Avançar +6 Horas</button>
+            <button class="cheat-btn" data-cheat="time_add_12h">⏩ Avançar +12 Horas (Meio Ciclo)</button>
           </div>
         </div>
 
@@ -460,15 +510,86 @@ export function openCheatModal(env) {
   buttons.forEach((b) => {
     b.addEventListener("click", (e) => {
       const type = e.currentTarget.getAttribute("data-cheat");
-      _handleCheatAction(type);
-      _updateStatusDisplays();
+      if (type) {
+        _handleCheatAction(type);
+        _updateStatusDisplays();
+      }
     });
   });
+
+  // Configuração do Slider de Horário
+  const slider = _cheatModalEl.querySelector("#cheat-time-slider");
+  const sliderLabel = _cheatModalEl.querySelector("#cheat-slider-label");
+  const btnApplySlider = _cheatModalEl.querySelector("#cheat-apply-slider-time");
+  if (slider && sliderLabel) {
+    const dn = _activeEnv?.dayNight || window.__game?.dayNight;
+    if (dn) {
+      const curHour = Math.floor((dn.progress ?? 0.36) * 24);
+      slider.value = curHour;
+      sliderLabel.textContent = `${curHour.toString().padStart(2, "0")}:00`;
+    }
+    slider.addEventListener("input", () => {
+      sliderLabel.textContent = `${slider.value.padStart(2, "0")}:00`;
+    });
+    btnApplySlider?.addEventListener("click", () => {
+      window.CheatMenu?.setTime(Number(slider.value), 0);
+      _updateStatusDisplays();
+    });
+  }
 }
 
 function _handleCheatAction(type) {
   if (!window.CheatMenu) return;
   switch (type) {
+    // Horário & Ciclo Dia/Noite
+    case "time_dawn":
+      window.CheatMenu.setTime(6, 0);
+      break;
+    case "time_morning":
+      window.CheatMenu.setTime(9, 0);
+      break;
+    case "time_noon":
+      window.CheatMenu.setTime(12, 0);
+      break;
+    case "time_afternoon":
+      window.CheatMenu.setTime(15, 0);
+      break;
+    case "time_sunset":
+      window.CheatMenu.setTime(18, 0);
+      break;
+    case "time_dusk":
+      window.CheatMenu.setTime(19, 30);
+      break;
+    case "time_night":
+      window.CheatMenu.setTime(21, 30);
+      break;
+    case "time_midnight":
+      window.CheatMenu.setTime(0, 0);
+      break;
+    case "time_witching":
+      window.CheatMenu.setTime(3, 0);
+      break;
+    case "time_set_day":
+      window.CheatMenu.setDay();
+      break;
+    case "time_set_night":
+      window.CheatMenu.setNight();
+      break;
+    case "time_add_1h":
+      window.CheatMenu.addHours(1);
+      break;
+    case "time_sub_1h":
+      window.CheatMenu.addHours(-1);
+      break;
+    case "time_add_3h":
+      window.CheatMenu.addHours(3);
+      break;
+    case "time_add_6h":
+      window.CheatMenu.addHours(6);
+      break;
+    case "time_add_12h":
+      window.CheatMenu.addHours(12);
+      break;
     case "maxAllItems":
       window.CheatMenu.maxAllItems();
       break;
@@ -663,6 +784,78 @@ export function initCheatMenu(env = {}) {
 
     close() {
       if (_cheatModalEl) _cheatModalEl.classList.remove("active");
+    },
+
+    setTime(hours = 12, minutes = 0) {
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (!dn) {
+        env.ui?.showToast?.("⚠️ Sistema de tempo (DayNight) não inicializado.");
+        return "Erro";
+      }
+      const h = ((Number(hours) % 24) + 24) % 24;
+      const m = Math.max(0, Math.min(59, Number(minutes) || 0));
+      const totalMinutes = h * 60 + m;
+      dn.progress = totalMinutes / (24 * 60);
+      const px = env.player?.x ?? window.__game?.player?.x ?? 0;
+      const pz = env.player?.z ?? window.__game?.player?.z ?? 0;
+      const clock = dn.update(0, px, pz, env.renderer || window.__game?.renderer);
+      const isNight = dn.isNight ? "🌙 Noite" : "☀️ Dia";
+
+      // Atualiza feras e tochas instantaneamente
+      if (window.__game?.beasts) {
+        window.__game.beasts.update(0, Boolean(dn.isNight && dn.daylight < 0.45));
+      }
+      if (window.__game?.torches && window.__game?.player) {
+        window.__game.torches.update(0, window.__game.player);
+      }
+
+      env.audio?.bell?.();
+      env.ui?.showToast?.(`⏰ CHEAT: Horário alterado para ${clock} (${isNight})!`);
+      console.log(`⏰ CHEAT: Horário alterado para ${clock} (${isNight})`);
+      return `Horário: ${clock}`;
+    },
+
+    setDay() {
+      return this.setTime(10, 0);
+    },
+
+    setNight() {
+      return this.setTime(22, 0);
+    },
+
+    addHours(delta = 1) {
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (!dn) return "DayNight não disponível";
+      const curProg = dn.progress ?? 0;
+      const deltaProg = Number(delta) / 24;
+      let newProg = (curProg + deltaProg) % 1;
+      if (newProg < 0) newProg += 1;
+      dn.progress = newProg;
+      const px = env.player?.x ?? window.__game?.player?.x ?? 0;
+      const pz = env.player?.z ?? window.__game?.player?.z ?? 0;
+      const clock = dn.update(0, px, pz, env.renderer || window.__game?.renderer);
+      const isNight = dn.isNight ? "🌙 Noite" : "☀️ Dia";
+
+      if (window.__game?.beasts) {
+        window.__game.beasts.update(0, Boolean(dn.isNight && dn.daylight < 0.45));
+      }
+      if (window.__game?.torches && window.__game?.player) {
+        window.__game.torches.update(0, window.__game.player);
+      }
+
+      env.audio?.bell?.();
+      env.ui?.showToast?.(`⏰ CHEAT: Horário ajustado para ${clock} (${isNight})!`);
+      console.log(`⏰ CHEAT: Horário ajustado para ${clock} (${isNight})`);
+      return `Horário: ${clock}`;
+    },
+
+    getTime() {
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (!dn) return "00:00";
+      const totalMinutes = Math.floor((dn.progress ?? 0) * 24 * 60);
+      const hours = Math.floor(totalMinutes / 60).toString().padStart(2, "0");
+      const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+      return `${hours}:${minutes} (${dn.isNight ? "Noite" : "Dia"})`;
     },
 
     giveWood(amount = 100) {
