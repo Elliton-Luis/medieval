@@ -75,33 +75,42 @@ export function spawnCrystalNodes({ scene, world, cityCenter }) {
   const cx = cityCenter?.x ?? 0;
   const cz = cityCenter?.z ?? 0;
 
-  // 18 Nós de Cristais em posições espalhadas pelo reino
-  const nodeDefinitions = [
-    // Verde (Esmeralda)
-    { color: "green", x: cx - 45, z: cz - 75 },
-    { color: "green", x: cx + 115, z: cz + 65 },
-    { color: "green", x: cx - 140, z: cz + 130 },
-    // Azul (Safira)
-    { color: "blue", x: cx + 60, z: cz - 110 },
-    { color: "blue", x: cx - 90, z: cz + 80 },
-    { color: "blue", x: cx + 160, z: cz - 40 },
-    // Rosa (Quartzo Rosa)
-    { color: "pink", x: cx - 120, z: cz - 60 },
-    { color: "pink", x: cx + 80, z: cz + 120 },
-    { color: "pink", x: cx - 50, z: cz + 160 },
-    // Vermelho (Rubi)
-    { color: "red", x: cx + 140, z: cz + 40 },
-    { color: "red", x: cx - 70, z: cz - 130 },
-    { color: "red", x: cx + 30, z: cz + 175 },
-    // Branco (Diamante)
-    { color: "white", x: cx - 150, z: cz - 110 },
-    { color: "white", x: cx + 175, z: cz + 110 },
-    { color: "white", x: cx + 5, z: cz - 165 },
-    // Roxo (Ametista)
-    { color: "purple", x: cx + 105, z: cz - 145 },
-    { color: "purple", x: cx - 165, z: cz + 50 },
-    { color: "purple", x: cx - 30, z: cz - 185 },
-  ];
+  // 48 Nós de Cristais com alta frequência e distribuição equilibrada
+  const colors = ["green", "blue", "pink", "red", "white", "purple"];
+  const nodeDefinitions = [];
+  
+  // Anel próximo (35m a 85m) - 12 nós
+  const nearR = [38, 55, 70, 82, 45, 62, 75, 50, 68, 85, 42, 60];
+  for (let i = 0; i < nearR.length; i++) {
+    const ang = (i / nearR.length) * Math.PI * 2 + 0.2;
+    nodeDefinitions.push({
+      color: colors[i % colors.length],
+      x: cx + Math.cos(ang) * nearR[i],
+      z: cz + Math.sin(ang) * nearR[i],
+    });
+  }
+
+  // Anel intermediário (90m a 160m) - 18 nós
+  const midR = [95, 110, 125, 140, 155, 105, 120, 135, 150, 115, 130, 145, 160, 100, 128, 142, 118, 152];
+  for (let i = 0; i < midR.length; i++) {
+    const ang = (i / midR.length) * Math.PI * 2 + 0.5;
+    nodeDefinitions.push({
+      color: colors[(i + 1) % colors.length],
+      x: cx + Math.cos(ang) * midR[i],
+      z: cz + Math.sin(ang) * midR[i],
+    });
+  }
+
+  // Anel distante e ermos (170m a 270m) - 18 nós
+  const farR = [175, 195, 215, 235, 255, 185, 205, 225, 245, 265, 180, 200, 220, 240, 260, 190, 210, 250];
+  for (let i = 0; i < farR.length; i++) {
+    const ang = (i / farR.length) * Math.PI * 2 + 0.9;
+    nodeDefinitions.push({
+      color: colors[(i + 2) % colors.length],
+      x: cx + Math.cos(ang) * farR[i],
+      z: cz + Math.sin(ang) * farR[i],
+    });
+  }
 
   for (let i = 0; i < nodeDefinitions.length; i++) {
     const def = nodeDefinitions[i];

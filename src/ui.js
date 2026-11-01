@@ -580,8 +580,20 @@ export class GameUI {
     if (this.dialogueEyebrow) this.dialogueEyebrow.textContent = meta.eyebrow || "CALDERA · CONVERSA";
 
     if (this.dialoguePortrait) {
-      const frame = PORTRAIT_FRAMES[meta.roleKey] || PORTRAIT_FRAMES.villager;
-      this.dialoguePortrait.style.backgroundPosition = `${-frame.x * 34}px ${-frame.y * 34}px`;
+      if (meta.customPortrait) {
+        this.dialoguePortrait.style.backgroundImage = `url("${meta.customPortrait}")`;
+        this.dialoguePortrait.style.backgroundPosition = "center";
+        this.dialoguePortrait.style.backgroundSize = "contain";
+        this.dialoguePortrait.style.backgroundColor = "#0a0610";
+        this.dialoguePortrait.style.borderColor = "#aa33ff";
+      } else {
+        this.dialoguePortrait.style.backgroundImage = 'url("./assets/sprites/kenney-roguelike/roguelikeChar_transparent.png")';
+        this.dialoguePortrait.style.backgroundSize = "1836px 406px";
+        this.dialoguePortrait.style.backgroundColor = "#17211b";
+        this.dialoguePortrait.style.borderColor = "#d2a96988";
+        const frame = PORTRAIT_FRAMES[meta.roleKey] || PORTRAIT_FRAMES.villager;
+        this.dialoguePortrait.style.backgroundPosition = `${-frame.x * 34}px ${-frame.y * 34}px`;
+      }
     }
 
     if (meta.funds) {

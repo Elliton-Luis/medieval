@@ -235,8 +235,36 @@ Acesso total e irrestrito a todos os recursos, itens, munições, poderes e even
     - Exterminar inimigos e feras próximos.
     - Invocar Lobisomem nos ermos.
     - Invocar o Mensageiro do Demiurgo.
+    - Invocar o Líder da Seita Cátara (Morvath, o Perfeito).
     - Disparar o Final Bom (*Ira Dei* / Triunfo Sagrado).
     - Disparar o Mal Final (*Apocalipse* / Descida do Demiurgo).
+
+## Seita Cátara, Acampamentos & Grão-Mestre Morvath
+
+- **Distribuição e Tiers de Acampamentos**:
+  - **Pequeno (4 acampamentos nos arredores)**: Fogueira roxa, 2 tochas rubras, 2 servos sentados. Saque: 15–25 moedas, notas e chance de fragmentos.
+  - **Médio (3 acampamentos fortificados)**: Paliçadas de troncos queimados, 4 tochas cerimoniais, fogueira roxa viva e altar ritual de pedras com 4 sentinelas. Saque: 50–80 moedas, 2 cristais raros e página garantida.
+  - **Enorme (Grande Bastião Cátaro de Rex Mundi)**: Fortaleza imponente cercada por paliçadas com estacas e crânios, 2 braseiros monumentais de chama roxa, fogueira cerimonial, altar monumental com efígie esculpida do Demiurgo, 6 cultistas guardiões e a morada de **Morvath, o Perfeito**. Saque: 190–250 moedas, 4 cristais raros, túnica cerimonial e recuperação de todas as páginas faltantes do *Tractatus de Carcere*.
+- **Morvath, o Grão-Mestre Cátaro**:
+  - **Entidade Física e Persistente**: Não desvanece na aproximação, permanecendo de pé perante o grande altar no Bastião.
+  - **Modelo 3D Imponente**: Manto sacerdotal preto com bordados em ouro puro, estola carmesim, capuz com chifres retorcidos de ébano e máscara de porcelana com órbitas ardentes. Empunha o Cajado do Demiurgo com serpente dourada e gema de ametista pulsante.
+  - **Sprite / Retrato Sombrio de HUD**: Retrato vetorial SVG detalhado com iluminação dramática, estola, chifres e órbitas flamejantes do Pleroma.
+  - **Diálogo Filosófico e Interativo**: Dialoga sobre a criação material de Rex Mundi, a Endura (recusa da carne), o Sacramento da Madeira Órfã e concede a Bênção do Vazio com fragmentos do códice, ou aceita ser desafiado em batalha mística.
+  - **Invocação por Cheat**: Disponível no Cheat Menu (`tab-events`) e via console: `window.CheatMenu.summonCultLeader()`.
+
+## Criaturas e Feras Noturnas dos Ermos
+
+Todas as feras e abominações sobrenaturais só aparecem e atuam estritamente durante a noite (das 19:30 às 05:30), desvanecendo ou colapsando ao amanhecer:
+- **Gulur (O Colosso dos Ermos)**: Quadrúpede colossal de 16 metros de altura com pernas finíssimas e olhos amarelos incandescentes no alto. Fica estático ou caminha vagarosamente encarando o jogador à distância; se o jogador se aproximar demais, foge em passadas monumentais. É mortal (35 HP) e pode ser abatido com armas de longo alcance ou ataques coordenados.
+- **Necron (O Devorador Cego)**: Humanoide emaciado de pele pálida, sem o topo da cabeça e sem olhos, com mandíbula escancarada repleta de dentes pontiagudos expostos. Fica estático no escuro ouvindo a noite; só ataca em investida violenta quando o jogador se aproxima a menos de 7.5m.
+- **Hexoculus (O Observador dos Seis Olhos)**: Bípede magro e esquelético de 3.4 metros de altura, com costelas e espinhos ósseos salientes na coluna, cabeça angular sem boca e **seis olhos amarelos incandescentes** piscando em colunas verticais. Emerge da névoa noturna em passadas rápidas, emite uma aura cósmica violeta e desfere cortes de garras afiadas.
+- **Polyphonia (A Fauce Múltipla / Anomalia de Yaldabaoth)**: Criatura serpentiforme magra e segmentada, sem olhos, de cujo tronco superior brotam **três mandíbulas dentadas canibais** articuladas que mastigam a escuridão. Rasteja com ondulações sinuosas no terreno e desfere botes rápidos e ferozes.
+- **Mira Assistida e Lock-On Total**: Todas as criaturas integram-se à Spatial Grid e à mira assistida, podendo ser alternadas com a tecla `Y` e travadas automaticamente após o primeiro impacto.
+
+## Exploração Expandida: Cristais e Cidades Fantasmas
+
+- **48 Nós de Cristais Místicos**: Espalhados em anéis concêntricos (próximos a 35m–85m, intermediários a 90m–160m e distantes a 170m–270m) em todas as 6 cores (Esmeralda, Safira, Quartzo Rosa, Rubi, Diamante e Ametista), permitindo infundir a tocha com chamas coloridas dinâmicas.
+- **7 Cidades Fantasmas Devastadas**: Ruínas procedurais de guerra (Norvânia, Cairn, Valdor, Oakhaven, Kren, Corvos e Morvath) com muros caídos, sangue seco, flechas e ossadas, onde é possível vasculhar a praça central para resgatar o *Tractatus de Carcere* e suas páginas faltantes.
 
 ## Fase 1
 

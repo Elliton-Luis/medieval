@@ -22,7 +22,7 @@ import {
   payDebtorMission,
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
-import { checkAltarInteraction, investigateCultCamp } from "./cult.js";
+import { checkAltarInteraction, investigateCultCamp, CULT_LEADER_PORTRAIT } from "./cult.js";
 import {
   checkDemiurgeDiaryNearby,
   interactWithDemiurgeDiary,
@@ -563,6 +563,34 @@ export class InteractionSystem {
           : []),
         { id: "close", label: "Encerrar conversa" },
       ];
+    } else if (npc.roleKey === "cult_leader") {
+      const hasBook = Boolean(PlayerInventory.hasDemiurgeDiary);
+      body = message || (hasBook
+        ? "«Morvath curva a cabeça com reverência sombria, sua máscara de porcelana e chifres de ébano reluzindo à luz púrpura: 'Vejo que carregas o Tractatus de Carcere... Sentes a podridão da matéria pulsando em tuas veias, caminhante? O Arquiteto Cego tece o barro para nos escravizar. Mas tua centelha ainda pode retornar ao Pleroma.'»"
+        : "«Morvath ergue o cajado de ametista e fala com voz grave e hipnótica: 'Caminhante cego... a igreja te ensina a amar tua masmorra. A matéria é um tumor cósmico forjado por Rex Mundi. Vem, escuta as escrituras da Endura antes que o véu rasgue.'»");
+      actions = [
+        {
+          id: "cult_leader:about_book",
+          label: hasBook ? "✦ Indagar sobre a Criação no Tractatus de Carcere" : "✦ Receber o Tractatus de Carcere (O Livro do Barro)",
+        },
+        {
+          id: "cult_leader:endura",
+          label: "✦ Compreender a Endura: A recusa do barro e o jejum",
+        },
+        {
+          id: "cult_leader:sacraments",
+          label: "✦ Os Sacramentos da Ruína: O fogo e o Observador dos Seis Olhos",
+        },
+        {
+          id: "cult_leader:blessing",
+          label: "✦ Aceitar a Bênção de Morvath (Manto Cerimonial, Fragmento & +2 CAR)",
+        },
+        {
+          id: "cult_leader:challenge",
+          label: "⚔️ Desafiar o Grão-Mestre: 'Tua seita é uma abominação herética!'",
+        },
+        { id: "close", label: "Retirar-se em silêncio nas sombras" },
+      ];
     } else {
       body = message || "Psst... Um comprador discreto paga 60 moedas por um Cavalo Puro-Sangue furtado da muralha leste.";
       actions = [
@@ -587,7 +615,8 @@ export class InteractionSystem {
     this.ui.showDialogue(npc.name, body, actions, {
       role: npc.title || "Habitante de Caldera",
       roleKey: npc.roleKey,
-      eyebrow: "CALDERA · CONVERSA & COMÉRCIO",
+      customPortrait: npc.portrait || (npc.roleKey === "cult_leader" ? CULT_LEADER_PORTRAIT : null),
+      eyebrow: npc.roleKey === "cult_leader" ? "GRANDE BASTIÃO DE REX MUNDI · DIÁLOGO HERÉTICO" : "CALDERA · CONVERSA & COMÉRCIO",
       funds: {
         coins: this.player.coins,
         wood: PlayerInventory.wood,
@@ -646,6 +675,65 @@ export class InteractionSystem {
       this._showNPCDialogue(rumor);
       return;
     }
+    if (action.startsWith("cult_leader:")) {
+      const sub = action.split(":")[1];
+      if (sub === "about_book") {
+        if (!PlayerInventory.hasDemiurgeDiary) {
+          PlayerInventory.hasDemiurgeDiary = true;
+          this.ui.showToast("✦ Recebeste o Tractatus de Carcere das mãos de Morvath! Pressione [L] para ler.");
+          if (this.audio?.bookPage) this.audio.bookPage();
+        }
+        this._showNPCDialogue(
+          "«Morvath declama em tom litúrgico e hipnótico: 'No princípio, não havia a Terra, mas o Pleroma — o abismo de pura luz silenciosa e imóvel. O desastre começou quando Rex Mundi, o Arquiteto Cego, tentou espelhar a glória do Todo e pariu a matéria como um tumor no vazio perfeito. O Éden não foi paraíso, mas matadouro; a serpente sussurrou a verdade. Comer, respirar e procriar são as engrenagens da máquina de moer almas do Demiurgo. Nascer é o verdadeiro pecado original.'»"
+        );
+        return;
+      }
+      if (sub === "endura") {
+        this._showNPCDialogue(
+          "«Morvath aponta para sua máscara de porcelana e diz: 'A Endura é a recusa solene da carne. Jejuamos doze dias ingerindo cinzas e água pura para que o estômago lembre que a terra é estéril. A máscara com filtro de carvão não serve para pestes comuns, mas para barrar o fedor da criação. Olhamos através do vidro fumê para não sermos seduzidos pelo falso sol e pela beleza mundana. O fiel deve ver apenas a decadência para alcançar a libertação.'»"
+        );
+        return;
+      }
+      if (sub === "sacraments") {
+        this._showNPCDialogue(
+          "«Morvath reluz os olhos avermelhados na névoa: 'Nossos sacramentos buscam agredir o Arquiteto Cego. No Rito da Madeira Órfã, incendiamos árvores vivas com enxofre para devolver ao Pleroma a centelha aprisionada na celulose. Na Liturgia dos Seis Olhos, invocamos o Observador que enlouqueceu ao ver a farsa cósmica — quem acolhe o abismo ganha a força das tempestades. E com lâminas quebradas e enferrujadas, espalhamos a desintegração do mundo material.'»"
+        );
+        return;
+      }
+      if (sub === "blessing") {
+        PlayerStats.cha = Math.min(20, (PlayerStats.cha || 10) + 2);
+        this.player.health = this.player.maxHealth;
+        syncPlayerStatsToPlayer(this.player, this.ui);
+
+        import("./rpg.js").then(({ unlockDemiurgeAttire }) => {
+          unlockDemiurgeAttire(this.player, this.ui, this.audio);
+        }).catch(() => {});
+
+        const missing = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+        if (missing.length > 0) {
+          const gained = missing[0];
+          PlayerInventory.discoveredBookPages.push(gained);
+          const pageTitle = gained === 21 ? "O Sacrifício Final" : `Página ${gained}`;
+          this.ui.showToast(`✦ Bênção acolhida! +2 CAR, vida restaurada e ${pageTitle} anexada ao Tractatus!`);
+        } else {
+          this.ui.showToast("✦ Bênção acolhida! Vida restaurada, Túnica Cerimonial consagrada e +2 Carisma!");
+        }
+
+        this._showNPCDialogue(
+          "«Morvath toca tua fronte com a ametista do cajado: 'Que a cinza proteja tua centelha. Recebe o Manto Cerimonial do Demiurgo e a comunhão do Vazio primordial. Tua alma começa a se descolar da casca mortal de Rex Mundi.'»"
+        );
+        return;
+      }
+      if (sub === "challenge") {
+        if (this.activeNPC) {
+          this.activeNPC.hostile = true;
+        }
+        this.ui.closeDialogue();
+        this.ui.showToast("⚔️ Desafiaste o Grão-Mestre Morvath! Defende-te da cólera do Vazio!");
+        return;
+      }
+    }
+
     if (action === "rumor:demiurge_book") {
       const hint = getDemiurgeDiaryHint();
       let speech = `«O aldeão olha ao redor temeroso e sussurra: "${hint}"»`;

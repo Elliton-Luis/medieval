@@ -13,10 +13,16 @@ const GHOST_TOWN_NAMES = [
   "Povoado Silencioso de Oakhaven",
   "Bastião Sangrento de Kren",
   "Vila Arruinada de Corvos",
+  "Necrópole Deserta de Morvath",
 ];
 
-// 4 Cidades Fantasma principais ao redor da vila central (faixa 320m a 480m)
+// Cidades Fantasma distribuídas em anéis intermediários e distantes (150m a 350m)
 export const FIXED_GHOST_TOWNS = [
+  // Cidades intermediárias (mais fáceis de achar durante exploração dos ermos)
+  { name: GHOST_TOWN_NAMES[4], x: -165, z: 125, seed: 55102, radius: 46 },
+  { name: GHOST_TOWN_NAMES[5], x: 175, z: -140, seed: 44208, radius: 48 },
+  { name: GHOST_TOWN_NAMES[6], x: -120, z: -180, seed: 33405, radius: 45 },
+  // Cidades distantes nos confins do mapa
   { name: GHOST_TOWN_NAMES[0], x: -280, z: -310, seed: 77101, radius: 52 },
   { name: GHOST_TOWN_NAMES[1], x: 320, z: -270, seed: 88203, radius: 50 },
   { name: GHOST_TOWN_NAMES[2], x: -330, z: 290, seed: 99307, radius: 55 },
@@ -658,7 +664,7 @@ export function checkGhostTownRubbleNearby(playerPos) {
     const town = ActiveGhostTowns[i];
     const dx = px - town.center.x;
     const dz = pz - town.center.z;
-    if (dx * dx + dz * dz < 12.0 * 12.0) {
+    if (dx * dx + dz * dz < 16.0 * 16.0) {
       return town;
     }
   }

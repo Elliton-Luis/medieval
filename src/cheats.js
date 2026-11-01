@@ -455,6 +455,7 @@ export function openCheatModal(env) {
             <button class="cheat-btn" data-cheat="killAllEnemies">💀 Exterminar Inimigos Próximos</button>
             <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem nos Ermos</button>
             <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
+            <button class="cheat-btn" data-cheat="summonCultLeader">👁️ Invocar Líder da Seita Cátara</button>
             <button class="cheat-btn full-width" data-cheat="holyEnding">✝️ O Final Bom: A Trombeta e Assunção Sagrada</button>
             <button class="cheat-btn full-width" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
           </div>
@@ -652,6 +653,9 @@ function _handleCheatAction(type) {
       break;
     case "summonMessenger":
       window.CheatMenu.summonMessenger();
+      break;
+    case "summonCultLeader":
+      window.CheatMenu.summonCultLeader();
       break;
 
     // Recursos específicos
@@ -1379,6 +1383,15 @@ export function initCheatMenu(env = {}) {
         console.log("👁️ CHEAT: Mensageiro do Demiurgo invocado!");
       });
       return "Mensageiro invocado";
+    },
+
+    summonCultLeader() {
+      import("./cult.js").then(({ summonCultLeader }) => {
+        const leader = summonCultLeader(env.player, env.scene, env.world, env.effects, env.combat);
+        env.ui?.showToast?.("👁️ CHEAT: Morvath, o Líder da Seita Cátara, foi invocado!");
+        console.log("👁️ CHEAT: Líder da Seita Cátara invocado:", leader);
+      });
+      return "Líder da Seita Cátara invocado";
     },
   };
 
