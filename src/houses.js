@@ -1,5 +1,6 @@
 // Sistema das casas: portas com animação, interiores (telhado e paredes somem ao entrar),
 // mobília interativa e destrutível, baús, camas e reação dos donos.
+import * as THREE from "three";
 import {
   PlayerStats,
   PlayerEquipment,
@@ -7,6 +8,24 @@ import {
   checkWitnesses,
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
+
+export const _activeOccluders = [];
+let _activeCameraPos = null;
+
+export function isOccludedByHouses(x, z) {
+  if (_activeOccluders.length === 0 || !_activeCameraPos) return false;
+  const cx = x - _activeCameraPos.x;
+  const cz = z - _activeCameraPos.z;
+  const dist = Math.hypot(cx, cz);
+  const angle = Math.atan2(cx, cz);
+  for (let i = 0; i < _activeOccluders.length; i++) {
+    const occ = _activeOccluders[i];
+    if (dist > occ.dist + 3.5 && angle >= occ.minAngle && angle <= occ.maxAngle) {
+      return true;
+    }
+  }
+  return false;
+}
 
 const LOOT_CHEST = { coins: [8, 20], items: [["potion", 0.3], ["gem", 0.2], ["bread", 0.4], ["bolts", 0.3], ["arrows", 0.3]] };
 const _targetScratch = { type: null, house: null, data: null, label: null };
@@ -50,6 +69,8 @@ export class HouseSystem {
     this._wellCooldown = 0;
     this._altarBlessCooldown = 0;
     this._scriptureIndex = 0;
+    this.camera = null;
+    this._camDir = new THREE.Vector3();
 
     // Estado do evento da celebração da Santa Missa (Random Church Mass Event)
     this.mass = {
@@ -106,8 +127,54 @@ export class HouseSystem {
     this.npcs.notifyCrime(owner.x, owner.z, 18, null, severity);
   }
 
-  update(dt) {
+  update(dt, camera = null) {
+    if (camera) this.camera = camera;
+    const activeCam = this.camera;
     const player = this.player;
+
+    let camX = 0, camY = 0, camZ = 0;
+    let cdx = 0, cdz = 1;
+    let hasCam = false;
+    if (activeCam) {
+      hasCam = true;
+      camX = activeCam.position.x;
+      camY = activeCam.position.y;
+      camZ = activeCam.position.z;
+      if (!this._camDir) this._camDir = new THREE.Vector3();
+      activeCam.getWorldDirection(this._camDir);
+      cdx = this._camDir.x;
+      cdz = this._camDir.z;
+      if (!_activeCameraPos) _activeCameraPos = new THREE.Vector3();
+      _activeCameraPos.copy(activeCam.position);
+    }
+
+    // 1. Constrói a lista de oclusores rápidos (as maiores casas próximas diretamente à frente da câmera)
+    _activeOccluders.length = 0;
+    if (hasCam) {
+      for (let i = 0; i < this.houses.length; i++) {
+        const h = this.houses[i];
+        if (h === this.current) continue;
+        const cx = h.x - camX;
+        const cz = h.z - camZ;
+        const cDistSq = cx * cx + cz * cz;
+        const cdot = cx * cdx + cz * cdz;
+        if (cdot > 3.0 && cDistSq > 5 * 5 && cDistSq < 38 * 38) {
+          const dist = Math.sqrt(cDistSq);
+          const centerAngle = Math.atan2(cx, cz);
+          const radius = Math.max(h.W, h.D) * 0.44;
+          const halfAngle = Math.atan2(radius, dist);
+          _activeOccluders.push({
+            x: h.x,
+            z: h.z,
+            dist,
+            minAngle: centerAngle - halfAngle,
+            maxAngle: centerAngle + halfAngle,
+          });
+          if (_activeOccluders.length >= 6) break;
+        }
+      }
+    }
+
     if (this._wellCooldown > 0) this._wellCooldown = Math.max(0, this._wellCooldown - dt);
     if (this._altarBlessCooldown > 0) this._altarBlessCooldown = Math.max(0, this._altarBlessCooldown - dt);
 
@@ -154,8 +221,67 @@ export class HouseSystem {
       const dz = player.z - house.z;
       const distanceSq = dx * dx + dz * dz;
 
-      // porta: abre e fecha suavemente
+      // 1. Culling ATRÁS DO PLAYER:
+      // O usuário: "renderize só imediatamente atrás do player, o longe não"
+      const toHouseX = house.x - player.x;
+      const toHouseZ = house.z - player.z;
+      const dot = toHouseX * cdx + toHouseZ * cdz;
+      if (hasCam && dot < -3.0 && distanceSq > 14 * 14) {
+        if (house.group.visible) house.group.visible = false;
+        if (house.interior && house.interior.visible) house.interior.visible = false;
+        continue;
+      }
+
+      // 2. Culling de DISTÂNCIA MÁXIMA (neblina):
+      if (distanceSq > 115 * 115) {
+        if (house.group.visible) house.group.visible = false;
+        if (house.interior && house.interior.visible) house.interior.visible = false;
+        continue;
+      }
+
+      // 3. Culling de OCLUSÃO ATRÁS DE OUTRAS CASAS:
+      // O usuário: "não renderize o que está atrás das casas"
+      if (hasCam && _activeOccluders.length > 0 && distanceSq > 18 * 18) {
+        const cx = house.x - camX;
+        const cz = house.z - camZ;
+        const hDist = Math.hypot(cx, cz);
+        const hAngle = Math.atan2(cx, cz);
+        let occluded = false;
+        for (let o = 0; o < _activeOccluders.length; o++) {
+          const occ = _activeOccluders[o];
+          if (hDist > occ.dist + 5.0 && hAngle >= occ.minAngle && hAngle <= occ.maxAngle) {
+            occluded = true;
+            break;
+          }
+        }
+        if (occluded) {
+          if (house.group.visible) house.group.visible = false;
+          if (house.interior && house.interior.visible) house.interior.visible = false;
+          continue;
+        }
+      }
+
+      // Casa visível!
+      if (!house.group.visible) house.group.visible = true;
+
+      // 4. LOD de Fachada das Casas:
+      // A mais de 38m, esconde vidraças/janelas finas para economia de polígonos
+      if (house.meshes.glass) {
+        const showGlass = distanceSq < 38 * 38;
+        if (house.meshes.glass.visible !== showGlass) house.meshes.glass.visible = showGlass;
+      }
+
+      // 5. Culling do INTERIOR das Casas:
+      // O usuário: "não renderize o interior das casas"
+      // Só renderiza o interior se o jogador estiver dentro ou rente à porta aberta (< 5m)
       const door = house.door;
+      const doorDistSq = (player.x - door.x) ** 2 + (player.z - door.z) ** 2;
+      const showInterior = house.inside || (doorDistSq < 5.0 * 5.0 && door.open);
+      if (house.interior && house.interior.visible !== showInterior) {
+        house.interior.visible = showInterior;
+      }
+
+      // porta: abre e fecha suavemente
       door.angle += (door.target - door.angle) * (1 - Math.exp(-9 * dt));
       door.pivot.rotation.y = door.angle;
       if (house.chest.opened && house.chest.openAmount < 1 && house.chest.lid) {
@@ -169,7 +295,6 @@ export class HouseSystem {
       if (player.sitting || player.praying) continue;
 
       // interagíveis perto (Zero-GC)
-      const doorDistSq = (player.x - door.x) ** 2 + (player.z - door.z) ** 2;
       if (doorDistSq < 2.0 * 2.0 && doorDistSq < nearestDistance) {
         nearestDistance = doorDistSq;
         _targetScratch.type = "door";
@@ -357,6 +482,7 @@ export class HouseSystem {
     if (house.meshes.roof) house.meshes.roof.visible = !on;
     if (house.meshes.ceiling) house.meshes.ceiling.visible = !on;
     if (house.meshes.towerTop) house.meshes.towerTop.visible = !on;
+    if (house.interior) house.interior.visible = on;
   }
 
   // Tecla E. Retorna true se alguma interação aconteceu.

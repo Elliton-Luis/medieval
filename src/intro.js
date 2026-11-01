@@ -594,7 +594,7 @@ export function endIntroSequence() {
       dayNight.progress = 0.25; // 6:00 AM (Amanhecer claro)
     }
     if (scene && scene.fog) {
-      scene.fog.density = CONFIG.fogDensity || 0.009;
+      scene.fog.density = CONFIG.fogDensity || 0.0165;
       scene.fog.color.set("#aebfae");
       scene.background.set("#aebfae");
     }

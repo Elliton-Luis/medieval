@@ -6,6 +6,7 @@ import { meleeThink, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js";
 import { NPC_TYPES, NPC_STATES, updateNPCRoutine } from "./rpg.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
+import { isOccludedByHouses } from "./houses.js";
 
 function getDeterministicFleeTarget(npc) {
   const anchors = npc.root?.userData?.anchors;
@@ -1055,6 +1056,8 @@ export class NPCSystem {
     this.torches = null;
     this.isNight = false;
     this.isPlayerLit = true;
+    this.camera = null;
+    this._camDir = new THREE.Vector3();
     this._wasNight = null;
     this.spatialGrid = new SpatialHashGrid(16.0);
     this._candidateNearby = [];
@@ -1345,6 +1348,17 @@ export class NPCSystem {
         this.onAlert?.("A guarda perdeu o seu rastro e desistiu da perseguição.");
       }
     }
+    let camX = 0, camZ = 0, cdx = 0, cdz = 1, hasCam = false;
+    if (this.camera) {
+      hasCam = true;
+      camX = this.camera.position.x;
+      camZ = this.camera.position.z;
+      if (!this._camDir) this._camDir = new THREE.Vector3();
+      this.camera.getWorldDirection(this._camDir);
+      cdx = this._camDir.x;
+      cdz = this._camDir.z;
+    }
+
     let nearest = null;
     let nearestDistanceSq = 16 * 16;
     for (let i = 0; i < this.npcs.length; i++) {
@@ -1353,6 +1367,26 @@ export class NPCSystem {
       const dz = playerZ - npc.z;
       const distanceSq = dx * dx + dz * dz;
       npc.distanceSq = distanceSq;
+
+      // 1. Culling ATRÁS DO PLAYER:
+      // O usuário: "renderize só imediatamente atrás do player, o longe não"
+      const toNpcX = npc.x - playerX;
+      const toNpcZ = npc.z - playerZ;
+      const dot = toNpcX * cdx + toNpcZ * cdz;
+      if (hasCam && dot < -2.2 && distanceSq > 14 * 14) {
+        if (npc.root.visible) npc.root.visible = false;
+        if (npc.alive && !npc.temporary) npc.update(clampedDt, playerX, playerZ);
+        continue;
+      }
+
+      // 2. Culling de OCLUSÃO ATRÁS DAS CASAS:
+      // O usuário: "não renderize o que está atrás das casas"
+      if (hasCam && distanceSq > 16 * 16 && isOccludedByHouses(npc.x, npc.z)) {
+        if (npc.root.visible) npc.root.visible = false;
+        if (npc.alive && !npc.temporary) npc.update(clampedDt, playerX, playerZ);
+        continue;
+      }
+
       if (npc.alive && npc.mode === "report" && (npc.targetCheck -= clampedDt) <= 0) {
         npc.targetCheck = 1;
         if (!npc.reportTarget || !npc.reportTarget.alive) npc.reportTarget = this._nearestGuard(npc);
@@ -1381,7 +1415,7 @@ export class NPCSystem {
           }
         }
       }
-      if (distanceSq > ACTIVE_DISTANCE_SQ && npc.mode === "work") {
+      if (distanceSq > 55 * 55 && npc.mode === "work") {
         // Longe do jogador: não anima nem desenha, mas o respawn continua contando.
         if (npc.alive) {
           npc.root.visible = false;

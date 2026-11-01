@@ -54,6 +54,7 @@ export class World {
     this._dummy = new THREE.Object3D();
     this._frustum = new THREE.Frustum();
     this._projectionView = new THREE.Matrix4();
+    this._camDir = new THREE.Vector3();
     this._terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true });
     this.treeKit = new TreeKit();
     this._farTreeGeometry = new THREE.ConeGeometry(1.7, 6.8, 5, 1);
@@ -706,19 +707,39 @@ export class World {
     camera.updateMatrixWorld();
     this._projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._projectionView);
+    camera.getWorldDirection(this._camDir);
+    const cdx = this._camDir.x;
+    const cdz = this._camDir.z;
+
     const shadowRadiusSq = (SHADOW_RADIUS + this.chunkSize * 0.5) * (SHADOW_RADIUS + this.chunkSize * 0.5);
     for (let i = 0; i < this.activeChunks.length; i++) {
       const chunk = this.activeChunks[i];
-      const dx = x - chunk.centerX;
-      const dz = z - chunk.centerZ;
-      const distanceSq = dx * dx + dz * dz;
+      const toChunkX = chunk.centerX - x;
+      const toChunkZ = chunk.centerZ - z;
+      const distanceSq = toChunkX * toChunkX + toChunkZ * toChunkZ;
+
+      // Culling ATRÁS DO PLAYER:
+      // O usuário: "renderize só imediatamente atrás do player, o longe não"
+      // Se o chunk estiver atrás do jogador (dot < -12.0) e além do raio imediato de 16m: CORTA!
+      const dot = toChunkX * cdx + toChunkZ * cdz;
+      if (dot < -12.0 && distanceSq > 16 * 16) {
+        chunk.group.visible = false;
+        chunk.near.visible = false;
+        chunk.far.visible = false;
+        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
+          chunk.shadowMeshes[s].castShadow = false;
+        }
+        continue;
+      }
+
       const inShadowRange = distanceSq < shadowRadiusSq;
-      const visible = distanceSq < this.viewDistanceSq && (inShadowRange || this._frustum.intersectsSphere(chunk.bounds));
+      const inFrustum = this._frustum.intersectsSphere(chunk.bounds);
+      const visible = distanceSq < this.viewDistanceSq && (inShadowRange || inFrustum);
       chunk.group.visible = visible;
       chunk.near.visible = visible && distanceSq < this.lodDistanceSq;
       chunk.far.visible = visible && distanceSq >= this.lodDistanceSq;
       for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-        chunk.shadowMeshes[s].castShadow = inShadowRange;
+        chunk.shadowMeshes[s].castShadow = inShadowRange && (dot >= -4.0 || distanceSq <= 16 * 16);
       }
     }
   }

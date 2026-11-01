@@ -52,8 +52,8 @@ export class DayNightCycle {
     this.scene.background.copy(this.currentColor);
     if (this.scene.fog) {
       this.scene.fog.color.copy(this.currentColor);
-      // Neblina mais densa à noite (até 0.025) para atmosfera noturna e corte de geometria distante
-      this.scene.fog.density = CONFIG.fogDensity + (0.025 - CONFIG.fogDensity) * (night * night);
+      // Neblina mais densa ao fundo para parecer longe e cortar geometria distante sem pop-in
+      this.scene.fog.density = CONFIG.fogDensity + (0.028 - CONFIG.fogDensity) * (night * night);
     }
 
     // Luz ambiente e sol/lua única com transição suave sem alocação GC

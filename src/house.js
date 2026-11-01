@@ -383,7 +383,12 @@ export function createHouse(scene, world, opts) {
   const doorBox = addCollider(doorX - door.w / 2 - 0.06, doorX + door.w / 2 + 0.06, D / 2 - wallThick, D / 2 + 0.08, -0.2, door.top, { move: true, shot: true, cam: true });
   const doorState = { pivot, box: doorBox, open: false, angle: 0, target: 0, x: doorWorld.x, z: doorWorld.z };
 
-  // --- mobília ---
+  // --- mobília e interior ---
+  const interior = new THREE.Group();
+  interior.name = "house_interior";
+  interior.visible = false;
+  group.add(interior);
+
   const props = [];
   const px = (lx, lz) => toWorld(lx, lz);
   const innerX = W / 2 - t;
@@ -404,7 +409,7 @@ export function createHouse(scene, world, opts) {
   furnMesh(blanket, 0.95, 0.12, 1.1, 0, 0.6, 0.4, bed);
   furnMesh(M.cloth, 0.6, 0.12, 0.35, 0, 0.62, -0.78, bed);
   furnMesh(M.furnDark, 1.0, 0.7, 0.1, 0, 0.5, -1.08, bed);
-  group.add(bed);
+  interior.add(bed);
   const bedBox = addCollider(bedX - 0.5, bedX + 0.5, bedZ - 1.05, bedZ + 1.05, 0, 0.7, { move: true, shot: true, cam: false });
   const bedWorld = px(bedX, bedZ);
 
@@ -420,7 +425,7 @@ export function createHouse(scene, world, opts) {
   chest.add(lid);
   furnMesh(M.furnWood, 0.9, 0.14, 0.55, 0, 0.07, 0.27, lid);
   furnMesh(M.dark, 0.1, 0.1, 0.06, 0, 0.0, 0.56, lid);
-  group.add(chest);
+  interior.add(chest);
   const chestBox = addCollider(chestX - 0.45, chestX + 0.45, chestZ - 0.28, chestZ + 0.28, 0, 0.6, { move: true, shot: true, cam: false });
   const chestWorld = px(chestX, chestZ);
   const chestState = { lid, opened: false, x: chestWorld.x, z: chestWorld.z, box: chestBox, openAmount: 0 };
@@ -432,7 +437,7 @@ export function createHouse(scene, world, opts) {
   table.position.set(tableX, 0, tableZ);
   furnMesh(M.furnWood, 1.3, 0.08, 0.8, 0, 0.84, 0, table);
   for (const [lx, lz] of [[-0.55, -0.32], [0.55, -0.32], [-0.55, 0.32], [0.55, 0.32]]) furnMesh(M.furnDark, 0.09, 0.8, 0.09, lx, 0.4, lz, table);
-  group.add(table);
+  interior.add(table);
   const tableBox = addCollider(tableX - 0.65, tableX + 0.65, tableZ - 0.4, tableZ + 0.4, 0, 0.9, { move: true, shot: true, cam: false });
   registerProp(table, tableBox, "mesa", 3, tableX, tableZ, 0.9);
   const seats = [];
@@ -442,7 +447,7 @@ export function createHouse(scene, world, opts) {
     bench.position.set(tableX, 0, bz);
     furnMesh(M.furnWood, 1.15, 0.07, 0.3, 0, 0.45, 0, bench);
     for (const lx of [-0.45, 0.45]) furnMesh(M.furnDark, 0.08, 0.43, 0.26, lx, 0.22, 0, bench);
-    group.add(bench);
+    interior.add(bench);
     const benchBox = addCollider(tableX - 0.58, tableX + 0.58, bz - 0.16, bz + 0.16, 0, 0.5, { move: false, shot: true, cam: false });
     registerProp(bench, benchBox, "banco", 2, tableX, bz, 0.5);
     const seatW = px(tableX, bz);
@@ -462,7 +467,7 @@ export function createHouse(scene, world, opts) {
   shelf.position.set(shelfX, 0, shelfZ);
   furnMesh(M.furnDark, 0.36, 1.9, 1.3, 0, 0.95, 0, shelf);
   for (const y of [0.5, 1.0, 1.5]) furnMesh(M.furnWood, 0.42, 0.05, 1.34, -side * 0.04, y, 0, shelf);
-  group.add(shelf);
+  interior.add(shelf);
   addCollider(shelfX - 0.2, shelfX + 0.2, shelfZ - 0.66, shelfZ + 0.66, 0, 1.9, { move: true, shot: true, cam: false });
   for (const y of [0.5, 1.0, 1.5]) {
     for (const lz of [-0.4, 0, 0.4]) {
@@ -475,16 +480,16 @@ export function createHouse(scene, world, opts) {
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.08, 6), M.clay);
       neck.position.y = 0.24;
       pot.add(body, neck);
-      group.add(pot);
+      interior.add(pot);
       const p = px(shelfX - side * 0.1, shelfZ + lz);
       props.push({ mesh: pot, box: null, kind: "pote", hp: 1, x: p.x, z: p.z, y: floorY + y + 0.15, h: 0.3, radius: 0.22, loot: random() < 0.35 ? { coins: [1, 3] } : null, broken: false });
     }
   }
   // tapete
-  const rug = furnMesh(new THREE.MeshStandardMaterial({ color: SHUTTER[Math.floor(random() * SHUTTER.length)], roughness: 1 }), 1.7, 0.02, 1.2, tableX, 0.08, tableZ, group);
+  const rug = furnMesh(new THREE.MeshStandardMaterial({ color: SHUTTER[Math.floor(random() * SHUTTER.length)], roughness: 1 }), 1.7, 0.02, 1.2, tableX, 0.08, tableZ, interior);
   rug.receiveShadow = true;
   // lenha na lareira
-  const logs = furnMesh(M.fire, 0.5, 0.18, 0.18, hx, 0.3, -D / 2 + t + 0.55, group);
+  const logs = furnMesh(M.fire, 0.5, 0.18, 0.18, hx, 0.3, -D / 2 + t + 0.55, interior);
 
   const hw = px(hx, -D / 2 + t + 0.6);
   const torchSpots = [];
@@ -496,7 +501,7 @@ export function createHouse(scene, world, opts) {
     x: opts.x, z: opts.z, ry, floorY, W, D, thatch,
     rect: worldRect(-innerX, innerX, -innerZ, innerZ),
     outer: footprint,
-    group, meshes, M,
+    group, meshes, M, interior,
     door: doorState,
     chest: chestState,
     bed: { x: bedWorld.x, z: bedWorld.z, box: bedBox },
@@ -740,8 +745,14 @@ export function createChurchBuilding(scene, world, opts) {
   const whiteClothMat = new THREE.MeshStandardMaterial({ color: "#f2ead7", roughness: 0.9, flatShading: true });
   const holyWaterMat = new THREE.MeshStandardMaterial({ color: "#6ec5e9", emissive: "#246a8a", emissiveIntensity: 0.45, roughness: 0.25, flatShading: true });
 
+  // --- Mobília e Interior Sagrado ---
+  const interior = new THREE.Group();
+  interior.name = "church_interior";
+  interior.visible = false;
+  group.add(interior);
+
   // Tapete vermelho central até o altar
-  furnMesh(redCarpetMat, 1.35, 0.03, D - 2.6, 0, 0.07, 0.35, group);
+  furnMesh(redCarpetMat, 1.35, 0.03, D - 2.6, 0, 0.07, 0.35, interior);
 
   // 4 Bancos compridos de igreja (Pews) com encosto — 8 assentos voltados para o altar
   const seats = [];
@@ -756,7 +767,7 @@ export function createChurchBuilding(scene, world, opts) {
       for (const lx of [-0.82, 0.82]) {
         furnMesh(M.furnDark, 0.1, 0.88, 0.48, lx, 0.44, 0, pew);
       }
-      group.add(pew);
+      interior.add(pew);
       addCollider(sideX - 0.92, sideX + 0.92, rowZ - 0.22, rowZ + 0.22, 0, 0.85, { move: false, shot: true, cam: false });
 
       for (const offsetSeatX of [-0.45, 0.45]) {
@@ -791,7 +802,7 @@ export function createChurchBuilding(scene, world, opts) {
     furnMesh(whiteClothMat, 0.06, 0.2, 0.06, cx, 1.5, 0, altarGroup);
     furnMesh(M.fire, 0.05, 0.09, 0.05, cx, 1.64, 0, altarGroup);
   }
-  group.add(altarGroup);
+  interior.add(altarGroup);
   addCollider(-1.12, 1.12, altarZ - 0.48, altarZ + 0.48, 0, 1.15, { move: true, shot: true, cam: false });
   const altarPraySpot = toWorld(0, altarZ + 1.05);
 
@@ -803,7 +814,7 @@ export function createChurchBuilding(scene, world, opts) {
   furnMesh(M.stone, 0.42, 0.82, 0.42, 0, 0.41, 0, fontGroup);
   furnMesh(M.stone, 0.72, 0.22, 0.72, 0, 0.9, 0, fontGroup);
   furnMesh(holyWaterMat, 0.54, 0.06, 0.54, 0, 1.02, 0, fontGroup);
-  group.add(fontGroup);
+  interior.add(fontGroup);
   addCollider(fontX - 0.36, fontX + 0.36, fontZ - 0.36, fontZ + 0.36, 0, 1.05, { move: true, shot: true, cam: false });
   const holyFontWorld = toWorld(fontX, fontZ);
 
@@ -814,7 +825,7 @@ export function createChurchBuilding(scene, world, opts) {
   ropeGroup.position.set(ropeX, 0, ropeZ);
   furnMesh(M.furnWood, 0.05, H - 0.5, 0.05, 0, (H - 0.5) / 2 + 0.45, 0, ropeGroup);
   furnMesh(goldMat, 0.14, 0.24, 0.14, 0, 0.52, 0, ropeGroup);
-  group.add(ropeGroup);
+  interior.add(ropeGroup);
   const bellRopeWorld = toWorld(ropeX, ropeZ);
 
   // Caixa de Ofertas / Dízimo (próxima ao altar à esquerda)
@@ -824,7 +835,7 @@ export function createChurchBuilding(scene, world, opts) {
   offGroup.position.set(boxX, 0, boxZ);
   furnMesh(M.furnDark, 0.55, 0.85, 0.48, 0, 0.425, 0, offGroup);
   furnMesh(goldMat, 0.58, 0.08, 0.5, 0, 0.72, 0, offGroup);
-  group.add(offGroup);
+  interior.add(offGroup);
   addCollider(boxX - 0.28, boxX + 0.28, boxZ - 0.25, boxZ + 0.25, 0, 0.9, { move: true, shot: true, cam: false });
   const offeringBoxWorld = toWorld(boxX, boxZ);
 
@@ -838,7 +849,7 @@ export function createChurchBuilding(scene, world, opts) {
   desk.rotation.x = 0.35;
   const book = furnMesh(whiteClothMat, 0.44, 0.05, 0.32, 0, 1.14, 0.02, lecGroup);
   book.rotation.x = 0.35;
-  group.add(lecGroup);
+  interior.add(lecGroup);
   addCollider(lecX - 0.28, lecX + 0.28, lecZ - 0.25, lecZ + 0.25, 0, 1.2, { move: true, shot: true, cam: false });
   const lecternWorld = toWorld(lecX, lecZ);
 
@@ -880,6 +891,7 @@ export function createChurchBuilding(scene, world, opts) {
     group,
     meshes,
     M,
+    interior,
     door: doorState,
     chest: { lid: null, opened: true, x: 0, z: 0, box: null, openAmount: 1 },
     bed: { x: 99999, z: 99999, box: null },

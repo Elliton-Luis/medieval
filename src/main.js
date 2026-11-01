@@ -156,6 +156,7 @@ const player = new Player(scene, world);
 const audio = new GameAudio();
 const effects = new SpriteEffects(scene);
 const npcs = new NPCSystem(scene, world, settlement, effects);
+npcs.camera = camera;
 const input = new InputManager(renderer.domElement);
 const cameraRig = new ThirdPersonCamera(camera, world);
 const dayNight = new DayNightCycle(scene, sun, hemisphere);
@@ -377,7 +378,7 @@ function frame(now) {
   director.update(dt, player);
   torches.update(dt, player);
   candle.update(dt, player.mounted ? player.mounted.speed : 0);
-  houses.update(dt);
+  houses.update(dt, camera);
   fire.update(dt);
   horses.update(dt);
   music.update(elapsed);
