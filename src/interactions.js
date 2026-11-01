@@ -22,8 +22,15 @@ import {
   payDebtorMission,
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
-import { checkAltarInteraction } from "./cult.js";
-import { checkDemiurgeDiaryNearby, interactWithDemiurgeDiary, getDemiurgeDiaryHint } from "./demiurgeBook.js";
+import { checkAltarInteraction, investigateCultCamp } from "./cult.js";
+import {
+  checkDemiurgeDiaryNearby,
+  interactWithDemiurgeDiary,
+  getDemiurgeDiaryHint,
+  openDemiurgeDiaryReader,
+  closeDemiurgeDiaryReader,
+  isDemiurgeDiaryReaderOpen,
+} from "./demiurgeBook.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
@@ -84,6 +91,18 @@ export class InteractionSystem {
       return;
     }
 
+    if (this.input.consumeDiaryPressed?.()) {
+      if (isDemiurgeDiaryReaderOpen()) {
+        closeDemiurgeDiaryReader();
+      } else if (PlayerInventory.hasDemiurgeDiary) {
+        if (document.pointerLockElement) document.exitPointerLock();
+        openDemiurgeDiaryReader(0, this.audio);
+      } else {
+        this.ui.showToast(`✦ Não possuis o Diário dos Demiurgos... Dica: ${getDemiurgeDiaryHint()}`);
+      }
+      return;
+    }
+
     if (this.input.consumeHayBaitPressed()) {
       this._tryDropHayBait();
     }
@@ -123,7 +142,16 @@ export class InteractionSystem {
     const canHouse = inv.wood >= BUILD_COSTS.HOUSE.wood && inv.stone >= BUILD_COSTS.HOUSE.stone;
     const canCorral = inv.wood >= BUILD_COSTS.CORRAL.wood && inv.hay >= BUILD_COSTS.CORRAL.hay;
 
-    const actions = [
+    const actions = [];
+
+    if (inv.hasDemiurgeDiary) {
+      actions.push({
+        id: "read:demiurge_diary",
+        label: "📖 Ler Diário dos Demiurgos (Códice Proibido · Tecla L)",
+      });
+    }
+
+    actions.push(
       {
         id: "view:weapons_codex",
         label: "⚔️ Compêndio de Armas (Dano, Velocidade, Melhorias & Status)",
@@ -216,27 +244,25 @@ export class InteractionSystem {
   }
 
   _checkAltarNearby() {
-    const altar = checkAltarInteraction(this.player.root.position);
-    if (altar && !altar.inspected && !this.ui.dialoguePanel.hidden) {
-      this.ui.setPrompt("✦ ALTAR DOS CÁTAROS [E] Inspecionar Pistas");
+    const isNight = this.dayNight ? this.dayNight.isNight : true;
+    const altar = checkAltarInteraction(this.player.root.position, isNight);
+    if (altar && !this.ui.dialoguePanel.hidden) {
+      this.ui.setPrompt(`✦ ${altar.name ? altar.name.toUpperCase() : "ACAMPAMENTO DO DEMIURGO"} [E] Investigar Pistas & Notas`);
     }
   }
 
   _tryInteractAltar() {
-    const altar = checkAltarInteraction(this.player.root.position);
+    const isNight = this.dayNight ? this.dayNight.isNight : true;
+    const altar = checkAltarInteraction(this.player.root.position, isNight);
     if (altar) {
-      altar.inspected = true;
-      PlayerStats.cha += 1;
-      this.ui.showToast(`✦ Pistas dos Cátaros: ${altar.lorePrompt} (+1 Carisma)`);
-      syncPlayerStatsToPlayer(this.player, this.ui);
-      return true;
+      return investigateCultCamp(altar, this.ui, this.audio, this.input);
     }
     return false;
   }
 
   _checkDemiurgeDiaryNearby() {
     if (checkDemiurgeDiaryNearby(this.player.root.position)) {
-      this.ui.setPrompt?.("✦ DIÁRIO DOS DEMIURGOS [E] Ler Códice Proibido");
+      this.ui.setPrompt?.("✦ DIÁRIO DOS DEMIURGOS [E] Recolher Diário Proibido");
     }
   }
 
@@ -573,6 +599,13 @@ export class InteractionSystem {
         speech = `«O bandido sorri de soslaio: 'Procuras o livro proibido? Boas moedas pagam essa informação: "${hint}"'»`;
       }
       this._showNPCDialogue(speech);
+      return;
+    }
+
+    if (action === "read:demiurge_diary") {
+      this.ui.closeDialogue();
+      if (document.pointerLockElement) document.exitPointerLock();
+      openDemiurgeDiaryReader(0, this.audio);
       return;
     }
 

@@ -103,6 +103,27 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
 - **Firmamento de Olhos Reptilianos**: 42 olhos esféricos 3D cobrem os céus (esclera branca com veias ramificadas, nervo óptico e músculos retro-oculares). Cada olho acompanha ativamente o jogador com `lookAt` em tempo real durante 10 segundos antes do impacto.
 - **O Demiurgo como Sol Negro**: Ser cósmico amorfo de matéria escura pulsante, anéis de acreção concêntricos, corona de espículas carmesins e a Tríade Maldita (três olhos demoníacos de esclera ensanguentada e pupilas verticais fenda de crocodilo) que descem dos céus causando tremores catastróficos e destruição total da terra.
 
+## Acampamentos do Demiurgo e Pistas Noturnas
+
+- **Aparição Estritamente Noturna**: Os acampamentos e altares dos servos do Demiurgo surgem nos ermos exclusivamente à noite (`isNight`). Durante o dia, os acampamentos, fogueiras roxas e tochas permanecem invisíveis e desativados, e os servos do Demiurgo desvanecem imediatamente sob a luz solar.
+- **Investigação Interativa de Pistas (`E`)**: Ao aproximar-se de qualquer acampamento ou altar ritual à noite, o jogador pode investigar vestígios deixados pelos hereges. Revela documentos divididos em três naturezas:
+  - **Planos de Ataque e Cerco**: Ordens seladas como *"Em 10 dias, ataque na Igreja..."*, envenenamento de poços da vila, emboscadas ao ferreiro e sabotagens com fogo.
+  - **Ensinamentos e Doutrinas**: Tratados do Demiurgo sobre a matéria como cárcere do espírito e a purificação pelas cinzas.
+  - **Garranchos e Delírios Crípticos**: Bilhetes sem nexo escritos em estados de febre ou transe herético (ex: *"Maçã sapato olho, 3 dias..."*).
+- Concede +1 de Carisma por investigação e registra a pista no histórico lore.
+
+## Diário dos Demiurgos (Coletável & Leitor de Códice)
+
+- **Item Coletável no Mundo (`E`)**: O códice profano spawna em local secreto aleatório na vila de Caldera. Ao se aproximar, o jogador pode recolhê-lo para o inventário, sumindo com o modelo do chão.
+- **Leitura a Qualquer Momento (`L` ou Inventário)**: Uma vez recolhido, o diário pode ser aberto a qualquer momento teclando `L` ou selecionando a opção no inventário de recursos.
+- **Interface Modular de Tomo Antigo**: Leitor estilizado em tela cheia com textura de pergaminho envelhecido, encadernação de couro escuro, sons de folhear páginas (`audio.bookPage`) e navegação por setas (`◄`/`►`, `A`/`D`, `ESC`/`L`):
+  - **Códice I**: Ritual do Círculo dos Nove Olhos e conjuração da centelha.
+  - **Códice II**: Esboço e mapa ilustrado do cerco a Caldera e alvos prioritários.
+  - **Códice III (Página Rasgada)**: Folha com bordas violentamente arrancadas e queimadas, restando apenas o título solene: *"O SACRIFÍCIO FINAL"*.
+  - **Códice IV (Página Manchada de Tinta/Sangue)**: Pergaminho coberto por poças e respingos escorrendo de tinta vermelha violenta (como uma caneta estourada), cobrindo relatos aterrorizantes.
+  - **Códice V**: Revelação e doutrina do Sol Negro de 3 Olhos.
+  - **Códice VI**: Folhas pautadas preservadas para anotações modulares futuras.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

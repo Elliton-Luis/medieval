@@ -22,6 +22,7 @@ export class InputManager {
     this.buildModePressed = false;
     this.craftMenuPressed = false;
     this.weaponsCodexPressed = false;
+    this.diaryPressed = false;
     this.weaponSelection = 0;
     this.modalOpen = false;
     this.locked = false;
@@ -38,6 +39,7 @@ export class InputManager {
       if (event.code === "KeyC" && !event.repeat) this.buildModePressed = true;
       if (event.code === "KeyI" && !event.repeat) this.craftMenuPressed = true;
       if (event.code === "KeyB" && !event.repeat) this.weaponsCodexPressed = true;
+      if (event.code === "KeyL" && !event.repeat) this.diaryPressed = true;
       if (event.code === "KeyV" && !event.repeat) this.candlePressed = true;
       if (event.code === "KeyH" && !event.repeat) this.whistlePressed = true;
       if (event.code === "KeyF" && !event.repeat) this.mountPressed = true;
@@ -209,6 +211,12 @@ export class InputManager {
   consumeWeaponsCodexPressed() {
     const pressed = this.weaponsCodexPressed;
     this.weaponsCodexPressed = false;
+    return pressed;
+  }
+
+  consumeDiaryPressed() {
+    const pressed = this.diaryPressed;
+    this.diaryPressed = false;
     return pressed;
   }
 

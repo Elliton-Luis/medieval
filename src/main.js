@@ -238,6 +238,7 @@ weapons.horses = horses;
 houses.riding = riding;
 interactions.horses = horses;
 interactions.hayBales = settlement.hay;
+interactions.dayNight = dayNight;
 initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs, dayNight, houses });
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
@@ -319,6 +320,7 @@ if (saved) {
     PlayerInventory.clay = saved.stats.clay ?? PlayerInventory.clay;
     PlayerInventory.torches = saved.stats.torches ?? PlayerInventory.torches;
     PlayerInventory.hasSword = saved.stats.hasSword ?? PlayerInventory.hasSword;
+    PlayerInventory.hasDemiurgeDiary = Boolean(saved.stats.hasDemiurgeDiary || saved.hasDemiurgeDiary);
   }
   player.coins = saved.coins ?? player.coins;
   PlayerStats.gold = player.coins;
@@ -339,7 +341,12 @@ if (saved) {
 }
 
 // Inicializa o Diário dos Demiurgos em posição aleatória persistida no save
-initDemiurgeDiary({ scene, world, savedSpotIndex: saved?.demiurgeBookSpotIndex });
+initDemiurgeDiary({
+  scene,
+  world,
+  savedSpotIndex: saved?.demiurgeBookSpotIndex,
+  isCollected: PlayerInventory.hasDemiurgeDiary,
+});
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {

@@ -98,6 +98,7 @@ export class SleepSystem {
           clay: PlayerInventory.clay || 0,
           torches: PlayerInventory.torches,
           hasSword: PlayerInventory.hasSword,
+          hasDemiurgeDiary: Boolean(PlayerInventory.hasDemiurgeDiary),
         },
       });
       this.state = "hold";

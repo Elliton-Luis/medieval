@@ -493,6 +493,13 @@ export class GameAudio {
     }
   }
 
+  // Som de folhear página e farfalhar pergaminho antigo
+  bookPage() {
+    if (!this.context) return;
+    this._burst(0.24, 0.42, "bandpass", 950, 420);
+    this._burst(0.12, 0.28, "highpass", 1600, 1100);
+  }
+
   // Som contínuo de rugido e vento abissal da descida do Olho do Demiurgo
   demiurgeDescent() {
     if (!this.context) return;

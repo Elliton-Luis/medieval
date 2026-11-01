@@ -72,6 +72,174 @@ const _rotEuler = new THREE.Euler();
 
 // Lista global de altares para pistas e inspeção
 export const CULT_ALTARS = [];
+export const CULT_CAMP_GROUPS = [];
+
+// ============================================================================
+// Acervo de Notas e Pistas Investigativas dos Acampamentos do Demiurgo
+// ============================================================================
+export const CULT_INVESTIGATION_NOTES = [
+  // 1. Planos de Ataque e Sabotagem
+  {
+    type: "Plano de Cerco",
+    icon: "⚔️",
+    title: "Ordem Cátara Selada",
+    text: "«Em 10 dias, ataque na Igreja. Trancai as portas de carvalho por fora com correntes de ferro, apagai as lamparinas sagradas e tomai os cálices de prata para consagração da cinza.»",
+  },
+  {
+    type: "Ordem de Sabotagem",
+    icon: "🔥",
+    title: "Plano do Piche & Fogo",
+    text: "«Na quarta noite após a lua minguante, espalhai óleo no celeiro sul e quebrai as trancas do curral. Quando o gado fugir em disparada, a sentinela do portão abandonará seu posto.»",
+  },
+  {
+    type: "Plano de Envenenamento",
+    icon: "☠️",
+    title: "Instrução de Beladona",
+    text: "«O poço central de Caldera deve receber o extrato de cicuta e cinzas antes da missa dominical. Ninguém deve beber da água sem provar o sabor do Vazio primordial.»",
+  },
+  {
+    type: "Ordem de Execução",
+    icon: "🗡️",
+    title: "Aviso ao Ferreiro",
+    text: "«O ferreiro da praça forja pontas de flecha de prata para os guardas reais. Calai o som de sua bigorna antes do próximo alvorecer; queimai seus foles enquanto ele dorme.»",
+  },
+  // 2. Ensinamentos e Doutrinas do Demiurgo
+  {
+    type: "Doutrina do Demiurgo",
+    icon: "📜",
+    title: "Escritura da Cinza Purificadora",
+    text: "«A matéria que vos cerca não é milagre, mas a masmorra imperfeita criada pelo Deus Cego. Cada gota de suor e cada febre que consome o corpo é a prova de que a carne pertence à podridão.»",
+  },
+  {
+    type: "Ensinamento aos Perfeitos",
+    icon: "👁️",
+    title: "Cânone dos Cátaros Ocultos",
+    text: "«Não choreis por aqueles que perecem sob a lâmina: a morte não é perda, mas a quebra do vaso de barro. Somente pela destruição das formas terrenas a centelha do fogo eterno retorna ao Nada absoluto.»",
+  },
+  {
+    type: "Doutrina da Luz Enganosa",
+    icon: "🌑",
+    title: "Tratado do Sol Falso",
+    text: "«O sol dourado é a tocha que cega os homens no vale da ilusão. Adorai as sombras do Demiurgo, pois na escuridão mais densa não há mentiras nem falsos pastores.»",
+  },
+  // 3. Frases Incoerentes / Nada com Nada
+  {
+    type: "Garrancho Delirante",
+    icon: "🌀",
+    title: "Rabisco Febril",
+    text: "«Maçã sapato olho, 3 dias... as pedras mastigam o silêncio quando a lua tropeça nos arbustos.»",
+  },
+  {
+    type: "Frase Sem Sentido",
+    icon: "🌀",
+    title: "Delírio Noturno",
+    text: "«Galinha relógio espelho... quando o céu girar ao contrário, as pernas do tempo quebram na curva do moinho.»",
+  },
+  {
+    type: "Rabisco Incompreensível",
+    icon: "🌀",
+    title: "Palavras na Cinza",
+    text: "«Sete colheres na lama fria, peixe sem osso riu do sino... não olhe para o teto da torre quando o vento assoviar.»",
+  },
+  {
+    type: "Garrancho Febril",
+    icon: "🌀",
+    title: "Rascunho Queimado",
+    text: "«Corda vermelha, besouro no bolso, chuva de pregos... quem não tem orelha ouve a parede de pedra rir baixinho.»",
+  },
+];
+
+let _campModalEl = null;
+
+function _ensureCampModal() {
+  if (_campModalEl) return _campModalEl;
+  const overlay = document.createElement("div");
+  overlay.id = "cult-camp-modal-overlay";
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(5, 2, 8, 0.88); backdrop-filter: blur(6px);
+    z-index: 10002; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    font-family: 'Cinzel', 'Cinzel Decorative', Georgia, serif;
+  `;
+  overlay.innerHTML = `
+    <div style="
+      position: relative; width: 90%; max-width: 580px; background: #160d0f;
+      border: 3px solid #6b1b24; border-radius: 8px; padding: 24px 28px;
+      box-shadow: 0 0 35px rgba(0,0,0,0.9), 0 0 20px rgba(180,30,40,0.5);
+      color: #ebd7c1;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #7d202b; padding-bottom:10px; margin-bottom:16px;">
+        <div style="font-size:13px; letter-spacing:2px; color:#ff4433; font-weight:700;" id="camp-modal-header">
+          👁️ VESTÍGIOS DO CULTO DO DEMIURGO
+        </div>
+        <button id="camp-modal-close" style="
+          background:#330a10; border:1px solid #8e202c; color:#f0dcc5;
+          font-family:inherit; font-size:12px; padding:5px 12px; border-radius:4px; cursor:pointer;
+        ">✕ Fechar (ESC/E)</button>
+      </div>
+      <div style="font-size:11px; letter-spacing:2px; color:#a37553; text-transform:uppercase; margin-bottom:4px;" id="camp-modal-category">
+        Plano de Cerco
+      </div>
+      <h3 style="margin:0 0 14px 0; font-size:20px; color:#f05544; border-bottom:1px dashed #591b22; padding-bottom:6px;" id="camp-modal-title">
+        Ordem Cátara Selada
+      </h3>
+      <div style="background:#cfbc94; color:#231411; border-radius:4px; padding:18px 22px; font-size:15px; line-height:1.7; font-style:italic; box-shadow:inset 0 0 20px rgba(50,20,10,0.4); margin-bottom:16px;" id="camp-modal-text">
+        <!-- Texto da nota -->
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#8e7762;">
+        <span id="camp-modal-site">Acampamento dos Ermos</span>
+        <span style="color:#e68a38;">✦ Pista registrada · +1 Carisma</span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  _campModalEl = overlay;
+
+  const closeBtn = overlay.querySelector("#camp-modal-close");
+  closeBtn.addEventListener("click", () => {
+    overlay.style.opacity = "0";
+    overlay.style.pointerEvents = "none";
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (overlay.style.pointerEvents === "auto" && (e.key === "Escape" || e.code === "KeyE")) {
+      e.preventDefault();
+      overlay.style.opacity = "0";
+      overlay.style.pointerEvents = "none";
+    }
+  });
+
+  return overlay;
+}
+
+export function showCampInvestigationModal(altar, note) {
+  const overlay = _ensureCampModal();
+  overlay.querySelector("#camp-modal-header").textContent = `👁️ ${altar.name?.toUpperCase() || "ACAMPAMENTO DO DEMIURGO"}`;
+  overlay.querySelector("#camp-modal-category").textContent = `${note.icon || "📜"} ${note.type || "Anotação Oculta"}`;
+  overlay.querySelector("#camp-modal-title").textContent = note.title || "Vestígio Herético";
+  overlay.querySelector("#camp-modal-text").textContent = note.text || "";
+  overlay.querySelector("#camp-modal-site").textContent = altar.name || "Ermos Noturnos";
+
+  overlay.style.opacity = "1";
+  overlay.style.pointerEvents = "auto";
+}
+
+export function investigateCultCamp(altar, ui, audio, input) {
+  if (!altar) return false;
+  altar.investigationIndex = (altar.investigationIndex ?? Math.floor(Math.random() * CULT_INVESTIGATION_NOTES.length));
+  const note = CULT_INVESTIGATION_NOTES[altar.investigationIndex % CULT_INVESTIGATION_NOTES.length];
+  altar.investigationIndex++;
+  altar.inspected = true;
+
+  PlayerStats.cha = Math.min(20, (PlayerStats.cha || 10) + 1);
+  syncPlayerStatsToPlayer();
+
+  if (audio?.bookPage) audio.bookPage();
+
+  showCampInvestigationModal(altar, note);
+  ui?.showToast?.(`✦ Investigaste o ${altar.name || "Acampamento do Culto"}! (+1 Carisma)`);
+  return true;
+}
 
 // ============================================================================
 // Estado de Poder e Sacrifícios da Seita Cátara (A Ordem do Demiurgo)
@@ -179,6 +347,9 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
   if (!skullsMesh || !weaponsMesh || !cityCenter) return;
   const random = createSeededRandom(regionSeed || 12345);
 
+  CULT_ALTARS.length = 0;
+  CULT_CAMP_GROUPS.length = 0;
+
   const cx = cityCenter.x ?? 0;
   const cz = cityCenter.z ?? 0;
 
@@ -257,6 +428,10 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       skullDeco.position.set(0.7, 0.14, 0.7);
       campGroup.add(skullDeco);
 
+      // Os acampamentos só aparecem à noite
+      campGroup.visible = false;
+      CULT_CAMP_GROUPS.push(campGroup);
+
       scene.add(campGroup);
     }
   }
@@ -320,6 +495,10 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       const skullDeco = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 1), _boneMat);
       skullDeco.position.set(0.65, 0.12, 0.65);
       altarGroup.add(skullDeco);
+
+      // Altares e acampamentos só aparecem à noite
+      altarGroup.visible = false;
+      CULT_CAMP_GROUPS.push(altarGroup);
 
       scene.add(altarGroup);
     }
@@ -870,9 +1049,31 @@ let _cultistCheckTimer = 0;
 
 /**
  * Atualiza o ciclo de vida dos Cultistas do Demiurgo fora dos muros.
+ * Os acampamentos e cultistas SÓ aparecem à noite, nunca de dia.
  */
 export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt, isNight, cityData) {
   if (!Array.isArray(cultistsPool) || !player) return;
+
+  const isNightBool = Boolean(isNight);
+
+  // 1. Visibilidade dos Acampamentos dos Servos dos Demiurgos: SÓ APARECEM À NOITE, NUNCA DE DIA!
+  for (let c = 0; c < CULT_CAMP_GROUPS.length; c++) {
+    const camp = CULT_CAMP_GROUPS[c];
+    if (camp && camp.visible !== isNightBool) {
+      camp.visible = isNightBool;
+    }
+  }
+
+  // 2. Se for de dia, nenhum servo do demiurgo atua e os que estiverem ativos desvanecem imediatamente
+  if (!isNightBool) {
+    for (let i = 0; i < cultistsPool.length; i++) {
+      const c = cultistsPool[i];
+      if (c.root.visible) {
+        c.vanish(false);
+      }
+    }
+    return;
+  }
 
   const time = performance.now();
 
@@ -915,10 +1116,11 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 }
 
 /**
- * Checa se o jogador está perto de um Altar Ritual para inspecionar pistas com E.
+ * Checa se o jogador está perto de um Acampamento do Culto para investigar pistas com E.
+ * SÓ PODE INVESTIGAR À NOITE QUANDO O ACAMPAMENTO ESTIVER PRESENTE.
  */
-export function checkAltarInteraction(playerPos, onInspect) {
-  if (!playerPos) return null;
+export function checkAltarInteraction(playerPos, isNight = true) {
+  if (!playerPos || !isNight) return null;
   const px = playerPos.x ?? playerPos.position?.x ?? 0;
   const pz = playerPos.z ?? playerPos.position?.z ?? 0;
 
@@ -926,7 +1128,8 @@ export function checkAltarInteraction(playerPos, onInspect) {
     const altar = CULT_ALTARS[i];
     const dx = altar.x - px;
     const dz = altar.z - pz;
-    if (dx * dx + dz * dz < 10) {
+    const radius = altar.radius || 6.5;
+    if (dx * dx + dz * dz < radius * radius) {
       return altar;
     }
   }

@@ -343,6 +343,7 @@ export const PlayerInventory = {
   hasSword: false,
   hasQuestItem: false,
   hasDemiurgeRobe: false,
+  hasDemiurgeDiary: false,
 
   craftTorch: () => {
     if (PlayerInventory.wood >= 1 && PlayerInventory.hay >= 1) {
