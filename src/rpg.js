@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { triggerCultistMessenger } from "./decay.js?v=19";
-import { CultState } from "./cult.js?v=20";
+import { triggerCultistMessenger } from "./decay.js";
+import { CultState } from "./cult.js";
 
 // ============================================================================
 // 1. Parâmetros e Cache de Vetores (Zero-GC)

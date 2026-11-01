@@ -1,5 +1,5 @@
 import { ROADS, VILLAGES } from "./kingdom.js";
-import { MissionState } from "./rpg.js?v=19";
+import { MissionState } from "./rpg.js";
 
 const SIZE = 224;
 const RADIUS = SIZE / 2 - 5;

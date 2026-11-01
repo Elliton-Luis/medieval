@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { createSeededRandom } from "./procedural.js?v=19";
-import { igniteTarget, spawnLoot } from "./rpg.js?v=19";
+import { createSeededRandom } from "./procedural.js";
+import { igniteTarget, spawnLoot } from "./rpg.js";
 
 // ============================================================================
 // 1. Materiais e Geometrias Otimizadas do Culto dos Cátaros (Zero-GC)

@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js?v=20";
-import { spawnWaypointMarker } from "./rpg.js?v=20";
+import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js";
+import { spawnWaypointMarker } from "./rpg.js";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
@@ -394,15 +394,256 @@ export function showDemiurgeModal(message, level = 1, onDismiss) {
   });
 }
 
+// ============================================================================
+// Modelo Anatômico Exclusivo do Mensageiro do Demiurgo
+// Capa roxa com preto e vermelho, partículas de brasas e olhos brancos ameaçadores
+// ============================================================================
+export function buildDemiurgeMessengerMesh() {
+  const root = new THREE.Group();
+  root.name = "DemiurgeMessengerRoot";
+
+  const model = new THREE.Group();
+  model.name = "DemiurgeMessengerModel";
+  root.add(model);
+
+  // Materiais Sombrios Exclusivos
+  const robeBlack = new THREE.MeshStandardMaterial({
+    color: 0x09070f,
+    roughness: 0.85,
+    metalness: 0.15,
+    flatShading: true,
+  });
+  const cloakPurple = new THREE.MeshStandardMaterial({
+    color: 0x2e0d47,
+    roughness: 0.65,
+    metalness: 0.25,
+    flatShading: true,
+  });
+  const liningCrimson = new THREE.MeshStandardMaterial({
+    color: 0x820f1e,
+    roughness: 0.6,
+    metalness: 0.25,
+    flatShading: true,
+  });
+  const voidFace = new THREE.MeshBasicMaterial({
+    color: 0x010103,
+  });
+  const whiteEyes = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+  });
+  const darkSpikes = new THREE.MeshStandardMaterial({
+    color: 0x140d1c,
+    roughness: 0.4,
+    metalness: 0.6,
+  });
+  const orbCoreMat = new THREE.MeshBasicMaterial({
+    color: 0xcc22ff,
+  });
+
+  // 1. Manto preto longo até o chão (esguio e ameaçador, 2.2m de altura)
+  const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.48, 1.7, 10), robeBlack);
+  robe.position.set(0, 0.88, 0);
+  robe.castShadow = true;
+  model.add(robe);
+
+  // Faixas carmesins rasgadas na frente do manto
+  const frontSash = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.45, 0.04), liningCrimson);
+  frontSash.position.set(0, 0.78, 0.23);
+  frontSash.rotation.x = -0.06;
+  model.add(frontSash);
+
+  // Tiras esfarrapadas inferiores
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const tatter = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.35, 0.02), i % 2 === 0 ? cloakPurple : liningCrimson);
+    tatter.position.set(Math.cos(angle) * 0.44, 0.16, Math.sin(angle) * 0.44);
+    tatter.rotation.y = angle;
+    tatter.rotation.z = Math.sin(i * 1.5) * 0.2;
+    model.add(tatter);
+  }
+
+  // 2. Sobrecapa real roxa (violeta profundo) com ombreiras e gola alta
+  const cape = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.38, 0.62, 1.35, 9, 1, true, -Math.PI * 0.78, Math.PI * 1.56),
+    cloakPurple
+  );
+  cape.position.set(0, 1.15, -0.02);
+  cape.castShadow = true;
+  model.add(cape);
+
+  // Forro interno da capa em vermelho sangue
+  const capeLining = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.365, 0.605, 1.34, 9, 1, true, -Math.PI * 0.76, Math.PI * 1.52),
+    liningCrimson
+  );
+  capeLining.position.set(0, 1.15, -0.015);
+  model.add(capeLining);
+
+  // Gola pontiaguda e ombreiras sombrias
+  const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.62, 7), cloakPurple);
+  mantle.position.set(0, 1.55, -0.03);
+  mantle.rotation.y = Math.PI;
+  model.add(mantle);
+
+  const collarTrim = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.58, 7), liningCrimson);
+  collarTrim.position.set(0, 1.53, -0.03);
+  collarTrim.rotation.y = Math.PI;
+  collarTrim.scale.set(0.98, 0.98, 0.98);
+  model.add(collarTrim);
+
+  // 3. Capuz profundo inclinado para a frente
+  const hood = new THREE.Mesh(
+    new THREE.SphereGeometry(0.25, 9, 7, 0, Math.PI * 2, 0, Math.PI * 0.75),
+    cloakPurple
+  );
+  hood.position.set(0, 1.82, 0.02);
+  hood.rotation.x = 0.28;
+  model.add(hood);
+
+  // Borda carmesim do capuz
+  const hoodRim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.24, 0.028, 6, 12, Math.PI * 1.2),
+    liningCrimson
+  );
+  hoodRim.position.set(0, 1.82, 0.14);
+  hoodRim.rotation.x = Math.PI * 0.42;
+  hoodRim.rotation.z = Math.PI * 0.9;
+  model.add(hoodRim);
+
+  // Chifres/espinhos curvados de obsidiana
+  for (const side of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.36, 5), darkSpikes);
+    horn.position.set(side * 0.18, 1.95, -0.08);
+    horn.rotation.x = -0.45;
+    horn.rotation.z = side * 0.42;
+    model.add(horn);
+  }
+
+  // 4. Rosto abissal (Vazio de escuridão pura)
+  const faceVoid = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), voidFace);
+  faceVoid.position.set(0, 1.78, 0.08);
+  model.add(faceVoid);
+
+  // 5. Olhos Brancos Incandescentes e Ameaçadores
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), whiteEyes);
+  eyeL.scale.set(1.4, 0.7, 0.8);
+  eyeL.position.set(-0.068, 1.81, 0.19);
+  eyeL.rotation.z = 0.15;
+  model.add(eyeL);
+
+  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), whiteEyes);
+  eyeR.scale.set(1.4, 0.7, 0.8);
+  eyeR.position.set(0.068, 1.81, 0.19);
+  eyeR.rotation.z = -0.15;
+  model.add(eyeR);
+
+  // Pequena luz branca espectral nos olhos
+  const eyeGlow = new THREE.PointLight(0xffffff, 0.8, 3.2, 2.0);
+  eyeGlow.position.set(0, 1.82, 0.28);
+  model.add(eyeGlow);
+
+  // 6. Braços longos com mangas esvoaçantes
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 0.82, 6), robeBlack);
+  armL.position.set(-0.35, 1.34, 0.1);
+  armL.rotation.x = 0.35;
+  armL.rotation.z = 0.28;
+  model.add(armL);
+
+  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 0.82, 6), robeBlack);
+  armR.position.set(0.35, 1.34, 0.15);
+  armR.rotation.x = 0.65; // Braço direito estendido chamando o jogador
+  armR.rotation.z = -0.22;
+  model.add(armR);
+
+  // Mão direita em garra escura estendida
+  const clawHand = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 4), darkSpikes);
+  clawHand.position.set(0.38, 1.05, 0.45);
+  clawHand.rotation.x = Math.PI * 0.45;
+  model.add(clawHand);
+
+  // Mão esquerda segurando o Selo do Demiurgo (Orbe violeta pulsante)
+  const sealGroup = new THREE.Group();
+  sealGroup.position.set(-0.38, 1.05, 0.32);
+
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), orbCoreMat);
+  sealGroup.add(orb);
+
+  const sealLight = new THREE.PointLight(0xaa22ff, 1.8, 6.0, 2.0);
+  sealGroup.add(sealLight);
+  model.add(sealGroup);
+
+  // 7. Enxame de Partículas Espirituais (Brasas e cinzas roxas e vermelhas)
+  const pCount = 32;
+  const pPositions = new Float32Array(pCount * 3);
+  const pColors = new Float32Array(pCount * 3);
+  const pSpeeds = new Float32Array(pCount);
+  const pAngles = new Float32Array(pCount);
+  const pRadii = new Float32Array(pCount);
+
+  const colPurple = new THREE.Color(0xa822ee);
+  const colCrimson = new THREE.Color(0xff2244);
+  const colDark = new THREE.Color(0x220533);
+
+  for (let i = 0; i < pCount; i++) {
+    pAngles[i] = Math.random() * Math.PI * 2;
+    pRadii[i] = 0.35 + Math.random() * 0.55;
+    pSpeeds[i] = 1.2 + Math.random() * 1.6;
+    const y = 0.1 + Math.random() * 1.9;
+    pPositions[i * 3] = Math.cos(pAngles[i]) * pRadii[i];
+    pPositions[i * 3 + 1] = y;
+    pPositions[i * 3 + 2] = Math.sin(pAngles[i]) * pRadii[i];
+
+    const pick = Math.random();
+    const c = pick < 0.45 ? colPurple : pick < 0.8 ? colCrimson : colDark;
+    pColors[i * 3] = c.r;
+    pColors[i * 3 + 1] = c.g;
+    pColors[i * 3 + 2] = c.b;
+  }
+
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute("position", new THREE.BufferAttribute(pPositions, 3));
+  pGeo.setAttribute("color", new THREE.BufferAttribute(pColors, 3));
+  const pMat = new THREE.PointsMaterial({
+    size: 0.09,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.88,
+  });
+  const particles = new THREE.Points(pGeo, pMat);
+  particles.name = "DemiurgeParticles";
+  model.add(particles);
+
+  root.visible = false;
+  return {
+    root,
+    model,
+    robe,
+    cape,
+    armL,
+    armR,
+    orb,
+    sealLight,
+    eyeGlow,
+    particles,
+    pPositions,
+    pAngles,
+    pRadii,
+    pSpeeds,
+    pCount,
+  };
+}
+
 function _ensureMessenger(scene) {
   if (_messengerNPC || !scene) return _messengerNPC;
 
-  const { root, model } = buildCultistMesh();
+  const meshData = buildDemiurgeMessengerMesh();
+  const { root, model } = meshData;
   root.name = "CultistMessenger";
   root.visible = false;
   scene.add(root);
 
   _messengerNPC = {
+    ...meshData,
     root,
     model,
     x: 0,
@@ -412,6 +653,7 @@ function _ensureMessenger(scene) {
     isEvilMessage: false,
     timer: 0,
     floatPhase: 0,
+    lastDustTime: 0,
   };
   return _messengerNPC;
 }
@@ -429,20 +671,22 @@ export function triggerCultistMessenger(player, scene, world, isEvilAction = tru
   const pz = player.z ?? player.position?.z ?? 0;
   const rotY = player.model?.rotation?.y ?? 0;
 
-  // Spawna exatamente às costas da visão do jogador a 10 metros
-  _spawnVec.set(0, 0, -10).applyEuler(new THREE.Euler(0, rotY, 0));
+  // Spawna a ~11 metros com leve desvio para surgir no campo visual do jogador
+  const spawnAngle = rotY + (Math.random() < 0.5 ? 0.35 : -0.35);
+  _spawnVec.set(Math.sin(spawnAngle) * 11, 0, Math.cos(spawnAngle) * 11);
   const mx = px + _spawnVec.x;
   const mz = pz + _spawnVec.z;
   const my = world ? world.heightAt(mx, mz) : py;
 
   messenger.x = mx;
   messenger.z = mz;
-  messenger.root.position.set(mx, my, mz);
+  messenger.root.position.set(mx, my + 0.22, mz);
   messenger.root.visible = true;
   messenger.visible = true;
   messenger.state = "APPROACH_PLAYER";
   messenger.isEvilMessage = isEvilAction;
-  messenger.timer = performance.now() + 18000; // 18 segundos de timeout
+  messenger.timer = performance.now() + 25000; // 25 segundos de timeout
+  messenger.lastDustTime = 0;
 }
 
 export const CULT_MESSAGES = {
@@ -473,29 +717,74 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
 
   const m = _messengerNPC;
   const now = performance.now();
-  m.floatPhase += dt * 3.5;
+  m.floatPhase += dt * 3.8;
+
+  // Atualiza as partículas de brasas orbitais ao redor do mensageiro
+  if (m.pPositions && m.particles) {
+    const pos = m.pPositions;
+    for (let i = 0; i < m.pCount; i++) {
+      m.pAngles[i] += dt * m.pSpeeds[i];
+      pos[i * 3] = Math.cos(m.pAngles[i]) * m.pRadii[i];
+      pos[i * 3 + 1] += dt * 0.45;
+      if (pos[i * 3 + 1] > 2.25) {
+        pos[i * 3 + 1] = 0.15 + Math.random() * 0.25;
+        m.pRadii[i] = 0.3 + Math.random() * 0.55;
+      }
+      pos[i * 3 + 2] = Math.sin(m.pAngles[i]) * m.pRadii[i];
+    }
+    m.particles.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // Pulso do orbe violeta e brilho nos olhos
+  if (m.sealLight) {
+    m.sealLight.intensity = 1.4 + Math.sin(m.floatPhase * 2.0) * 0.6;
+  }
+  if (m.eyeGlow) {
+    m.eyeGlow.intensity = 0.7 + Math.sin(m.floatPhase * 1.5) * 0.3;
+  }
 
   const px = player.x ?? player.position?.x ?? 0;
   const pz = player.z ?? player.position?.z ?? 0;
   const dx = px - m.x;
   const dz = pz - m.z;
-  const distSq = dx * dx + dz * dz;
+  const dist = Math.hypot(dx, dz) || 0.001;
 
   if (m.state === "APPROACH_PLAYER") {
-    // Caminha silenciosamente até o jogador deslizando a 2.4 m/s
-    const len = Math.hypot(dx, dz) || 1;
-    m.x += (dx / len) * (2.4 * dt);
-    m.z += (dz / len) * (2.4 * dt);
+    // Velocidade adaptativa: persegue ativamente o jogador sem ficar para trás
+    const playerSpeed = Math.hypot(player.vx ?? 0, player.vz ?? 0);
+    const speed = Math.max(5.6, playerSpeed + 2.4);
 
+    // Desliza velozmente e suavemente em direção ao jogador
+    m.x += (dx / dist) * (speed * dt);
+    m.z += (dz / dist) * (speed * dt);
+
+    // Encarar fixamente o jogador
     const targetYaw = Math.atan2(dx, dz);
-    m.model.rotation.y = THREE.MathUtils.lerp(m.model.rotation.y, targetYaw, 0.08);
+    m.model.rotation.y = THREE.MathUtils.lerp(m.model.rotation.y, targetYaw, 0.15);
 
-    const gy = world ? world.heightAt(m.x, m.z) : 0;
-    m.root.position.set(m.x, gy + 0.05 + Math.sin(m.floatPhase) * 0.04, m.z);
+    // Inclinação sutil para a frente ao deslizar e balanço lateral suave
+    m.model.rotation.x = THREE.MathUtils.lerp(m.model.rotation.x, 0.12, 0.1);
+    m.model.rotation.z = Math.sin(m.floatPhase * 1.6) * 0.07;
 
-    // Chegou a 3.2 metros: entrega a profecia cerimonial evolutiva
-    if (distSq < 10.24) {
-      m.state = "DELIVERED";
+    // Levitação espectral acima do solo (0.22m + flutuação senoidal)
+    const gy = world ? world.heightAt(m.x, m.z) : (player.root?.position?.y ?? 0);
+    const hoverY = gy + 0.22 + Math.sin(m.floatPhase) * 0.12;
+    m.root.position.set(m.x, hoverY, m.z);
+
+    // Emite rastro de cinzas negras e partículas roxas no chão enquanto voa
+    if (now - (m.lastDustTime || 0) > 140 && effects) {
+      m.lastDustTime = now;
+      effects.play("dust", m.x + (Math.random() - 0.5) * 0.3, gy + 0.15, m.z + (Math.random() - 0.5) * 0.3, "#1a0824", 1.2);
+      if (Math.random() < 0.4) {
+        effects.play("star", m.x, gy + 0.35, m.z, "#7711bb", 1.1);
+      }
+    }
+
+    // Chegou a ~3.2 metros: entrega a profecia cerimonial evolutiva
+    if (dist < 3.4) {
+      m.state = "DELIVERING";
+      m.model.rotation.x = 0;
+
       let pool = CULT_MESSAGES.GOOD;
       const level = CultState?.level || 1;
       if (m.isEvilMessage) {
@@ -507,6 +796,11 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
 
       const message = pool[Math.floor(Math.random() * pool.length)];
       if (audio?.hit) audio.hit(false);
+
+      if (effects) {
+        effects.play("dust", m.x, gy + 1.2, m.z, "#220533", 2.4);
+        effects.play("star", m.x, gy + 1.8, m.z, "#ffffff", 1.8);
+      }
 
       // Exibe a Profecia em Modal Gótico escuro que só fecha no ESC ou botão [X]
       showDemiurgeModal(message, level, () => {
@@ -520,20 +814,27 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
             );
           }
         }
-      });
 
-      // Desfaz-se em cinzas e névoa negra após entregar a profecia
-      if (effects) {
-        effects.play("dust", m.x, gy + 0.9, m.z, "#16151c", 2.6);
-        effects.play("star", m.x, gy + 1.2, m.z, "#7722bb", 1.8);
-      }
-      m.visible = false;
-      m.root.visible = false;
+        // Dissipação espetacular ao fechar o modal
+        if (effects) {
+          effects.play("dust", m.x, gy + 1.0, m.z, "#0c0814", 3.4);
+          effects.play("star", m.x, gy + 1.4, m.z, "#a822ee", 2.6);
+          effects.play("star", m.x, gy + 1.8, m.z, "#ff2244", 2.2);
+        }
+        m.visible = false;
+        m.root.visible = false;
+      });
     }
+  } else if (m.state === "DELIVERING") {
+    // Enquanto o modal estiver aberto, ele fica flutuando suavemente encarando o jogador
+    const targetYaw = Math.atan2(dx, dz);
+    m.model.rotation.y = THREE.MathUtils.lerp(m.model.rotation.y, targetYaw, 0.1);
+    const gy = world ? world.heightAt(m.x, m.z) : 0;
+    m.root.position.set(m.x, gy + 0.22 + Math.sin(m.floatPhase) * 0.08, m.z);
   }
 
   // Timeout de segurança se travar no relevo
-  if (now > m.timer && m.visible) {
+  if (now > m.timer && m.visible && m.state !== "DELIVERING") {
     m.visible = false;
     m.root.visible = false;
     if (effects) {

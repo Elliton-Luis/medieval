@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { distanceToRoad, VILLAGES } from "./kingdom.js";
-import { NPC } from "./npc.js?v=19";
+import { NPC } from "./npc.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
-import { WorldDecay } from "./decay.js?v=19";
+import { WorldDecay } from "./decay.js";
 import { mergeBufferGeometries } from "./mergeUtils.js";
 
 // ============================================================================

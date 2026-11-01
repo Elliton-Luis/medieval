@@ -4,7 +4,7 @@ import {
   PlayerEquipment,
   equipArmor,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=20";
+} from "./rpg.js";
 
 let _cheatModalEl = null;
 
@@ -152,6 +152,7 @@ export function openCheatModal(env) {
         <button class="cheat-btn" data-cheat="armor1">🛡️ Armadura 1 (Couro)</button>
         <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
         <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas / Templário)</button>
+        <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
       </div>
       <p class="cheat-tip">Você também pode executar <code>window.CheatMenu.godMode()</code> diretamente no console.</p>
     </div>
@@ -194,6 +195,7 @@ export function openCheatModal(env) {
       else if (type === "armor1") window.CheatMenu.equipArmor(1);
       else if (type === "armor2") window.CheatMenu.equipArmor(2);
       else if (type === "armor3") window.CheatMenu.equipArmor(3);
+      else if (type === "summonMessenger") window.CheatMenu.summonMessenger();
     });
   });
 }
@@ -316,6 +318,15 @@ export function initCheatMenu(env = {}) {
       env.ui?.showToast?.(`🛡️ CHEAT: Armadura Nível ${lv} (${names[lv]}) equipada!`);
       console.log(`🛡️ CHEAT: Armadura Nível ${lv} equipada`);
       return `Armadura nível ${lv}`;
+    },
+
+    summonMessenger() {
+      import("./decay.js").then(({ triggerCultistMessenger }) => {
+        triggerCultistMessenger(env.player, env.scene, env.world, true);
+        env.ui?.showToast?.("👁️ CHEAT: Mensageiro do Demiurgo invocado!");
+        console.log("👁️ CHEAT: Mensageiro do Demiurgo invocado!");
+      });
+      return "Mensageiro invocado";
     },
   };
 

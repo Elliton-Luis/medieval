@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { clamp } from "./utils.js";
-import { updateAtmosphereDecay } from "./decay.js?v=19";
+import { updateAtmosphereDecay } from "./decay.js";
 
 const _hemiSkyDay = new THREE.Color("#eaf0dd");
 const _hemiSkyNight = new THREE.Color("#141e30");

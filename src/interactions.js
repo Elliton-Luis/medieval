@@ -21,8 +21,8 @@ import {
   failActiveMission,
   payDebtorMission,
   syncPlayerStatsToPlayer,
-} from "./rpg.js?v=20";
-import { checkAltarInteraction } from "./cult.js?v=19";
+} from "./rpg.js";
+import { checkAltarInteraction } from "./cult.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
