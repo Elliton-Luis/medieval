@@ -354,8 +354,6 @@ export function generateCity(
       unifiedHousesMesh.name = "UnifiedCityHouses";
       scene.add(unifiedHousesMesh);
     }
-    scene.add(bMesh);
-    scene.add(roofMesh);
   }
 
   // Integra também as construções interativas de Caldera nas listas de âncoras
