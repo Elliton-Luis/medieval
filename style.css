@@ -43,6 +43,40 @@ canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%
 .reticle.assist-locked .dot { background: #ffd700; box-shadow: 0 0 10px #ffd700, 0 0 0 1px #000; transform: scale(1.45); }
 .reticle.assist-locked .tick { background: #ffd700; box-shadow: 0 0 8px rgba(255, 215, 0, 0.85), 0 0 0 1px #000; }
 
+/* Barra animada de Cooldown e Carregamento sob a mira */
+.reticle-cooldown-wrap {
+  position: absolute;
+  top: 22px;
+  left: -22px;
+  width: 44px;
+  height: 4.5px;
+  background: rgba(8, 12, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.95);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+}
+.reticle-cooldown-wrap.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reticle-cooldown-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ffd700 0%, #ff8800 100%);
+  box-shadow: 0 0 6px #ffd700;
+  transform-origin: left center;
+  transition: width 0.04s linear;
+}
+.reticle-cooldown-fill.charging {
+  background: linear-gradient(90deg, #00f0ff 0%, #0077ff 100%);
+  box-shadow: 0 0 7px #00e5ff;
+}
+
 /* Marcador de Alvo Lock-On sobre o Inimigo (3D Projetado) */
 #aim-lock-marker {
   position: absolute;

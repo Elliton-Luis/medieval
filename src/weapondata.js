@@ -88,12 +88,22 @@ function pommel(g, M, y) {
 
 const builders = {
   torch(g, M) {
-    handle(g, M, -0.18, 0.58, 0.032);
-    mesh(g, new THREE.CylinderGeometry(0.055, 0.04, 0.14, 7), M.iron, 0, 0.62, 0);
-    const flameMat = new THREE.MeshBasicMaterial({ color: "#ff9933" });
-    const coreMat = new THREE.MeshBasicMaterial({ color: "#fff1aa" });
-    mesh(g, new THREE.ConeGeometry(0.08, 0.26, 6), flameMat, 0, 0.78, 0);
-    mesh(g, new THREE.ConeGeometry(0.045, 0.16, 5), coreMat, 0, 0.75, 0);
+    // Cabo de madeira roliça reforçada
+    handle(g, M, -0.22, 0.54, 0.034);
+    // Anéis de reforço de ferro no cabo
+    mesh(g, new THREE.CylinderGeometry(0.038, 0.038, 0.04, 7), M.iron, 0, 0.12, 0);
+    mesh(g, new THREE.CylinderGeometry(0.04, 0.04, 0.04, 7), M.iron, 0, 0.38, 0);
+    // Cesto superior de ferro forjado
+    mesh(g, new THREE.CylinderGeometry(0.065, 0.045, 0.16, 8), M.iron, 0, 0.60, 0);
+    mesh(g, new THREE.CylinderGeometry(0.07, 0.065, 0.04, 8), M.brass, 0, 0.68, 0);
+    // Miolo de brasas ardentes
+    const emberMat = new THREE.MeshBasicMaterial({ color: "#ff5500", toneMapped: false });
+    mesh(g, new THREE.SphereGeometry(0.05, 6, 5), emberMat, 0, 0.68, 0);
+    // Chamas vibrantes em camadas cônicas
+    const flameMat = new THREE.MeshBasicMaterial({ color: "#ff9933", toneMapped: false });
+    const coreMat = new THREE.MeshBasicMaterial({ color: "#fff3bb", toneMapped: false });
+    mesh(g, new THREE.ConeGeometry(0.09, 0.28, 7), flameMat, 0, 0.81, 0);
+    mesh(g, new THREE.ConeGeometry(0.05, 0.18, 6), coreMat, 0, 0.77, 0);
   },
   musket(g, M) {
     mesh(g, new THREE.BoxGeometry(0.11, 0.48, 0.14), M.darkWood, 0, -0.12, 0.02);

@@ -49,12 +49,16 @@ export class WeaponSystem {
     this.npcs = npcs;
     this.fire = null;
     this.owned = new Set(STARTER_WEAPONS);
+    // A tocha é compartilhada e fica na mão sempre
+    this.owned.add("torch");
+    PlayerInventory.torches = Math.max(1, PlayerInventory.torches || 1);
     this.currentId = "fists";
     this.slot = 0;
-    this.lastInSlot = {};
-    // Hotbar de 9 slots em mãos (escolhidos pelo jogador através do Compêndio/Inventário)
+    this.lastInSlot = { 0: "fists", 1: "axe", 2: "pickaxe" };
+    // Hotbar de 9 slots em mãos
     this.hotbarSlots = ["fists", "axe", "pickaxe", null, null, null, null, null, null];
     this.cooldown = 0;
+    this._maxCooldown = 0;
     this.buffered = 0;
     this.charging = false;
     this.chargeTime = 0;
@@ -293,7 +297,7 @@ export class WeaponSystem {
     }
 
     const selection = this.input.consumeWeaponSelection();
-    if (selection > 0) {
+    if (selection >= 0) {
       if (this.buildMode) {
         const types = Object.keys(BUILD_COSTS);
         if (selection >= 1 && selection <= types.length) {
@@ -344,6 +348,21 @@ export class WeaponSystem {
     }
 
     this.cooldown = Math.max(0, this.cooldown - dt);
+
+    // Animação da barra de cooldown / carregamento na mira
+    let cdVisible = false;
+    let cdPercent = 0;
+    let isCharging = false;
+    if (this.charging && this.chargeTime > 0) {
+      cdVisible = true;
+      isCharging = true;
+      cdPercent = Math.min(1.0, this.chargeTime / 0.85);
+    } else if (this.cooldown > 0 && this._maxCooldown > 0.04) {
+      cdVisible = true;
+      isCharging = false;
+      cdPercent = Math.max(0, Math.min(1.0, this.cooldown / this._maxCooldown));
+    }
+    this.ui?.setCooldownBar?.(cdVisible, cdPercent, isCharging);
     const def = this.currentWeapon;
     const dead = this.player.knockedOut || this.player.dead;
     this.player.isHoldingSecondary = Boolean(this.aim && this.aim.active);
@@ -793,6 +812,7 @@ export class WeaponSystem {
     this.player._lastGatherYaw = cameraYaw;
     if (this.combat.attackMelee(cameraYaw, def, charge)) {
       this.cooldown = this.combat.attackCooldown;
+      this._maxCooldown = Math.max(this.cooldown, def.cooldown || 0.35);
       this._consumeDurability(def);
       if (def.id === "torch") {
         this._igniteWithTorch(cameraYaw);
@@ -1034,6 +1054,7 @@ export class WeaponSystem {
       musketModel.userData.nextShot = now + 3500;
     }
     this.cooldown = 3.5;
+    this._maxCooldown = 3.5;
   }
 
   _updateMusketTracer(dt) {
@@ -1055,21 +1076,55 @@ export class WeaponSystem {
     this.ui.setCharge(null);
   }
 
+  // Retorna todas as armas possuídas em ordem canônica estrita (slots 1 a 9)
+  getOwnedWeaponsList() {
+    if ((PlayerInventory.torches || 0) > 0 || !this.owned.has("torch")) {
+      this.owned.add("torch");
+    }
+    const list = [];
+    for (const def of WEAPON_LIST) {
+      if (this.owned.has(def.id) && !list.includes(def.id)) {
+        list.push(def.id);
+      }
+    }
+    if (!list.includes("fists")) list.unshift("fists");
+    if (!list.includes("torch")) list.splice(1, 0, "torch");
+    return list;
+  }
+
   // Equipa uma arma pelo id.
   equip(id, announce = true) {
+    if (id === "torch") {
+      this.owned.add("torch");
+      PlayerInventory.torches = Math.max(1, PlayerInventory.torches || 1);
+    }
     const def = WEAPONS_BY_ID[id];
-    if (!def || !this.owned.has(id)) return false;
+    if (!def) return false;
+    if (!this.owned.has(id)) {
+      if (id === "fists" || id === "torch") this.owned.add(id);
+      else return false;
+    }
     this._cancelCharge();
     this.currentId = id;
     this.slot = def.slot - 1;
     this.lastInSlot[this.slot] = id;
+
+    // Atualiza visibilidade dos modelos 3D na mão do personagem
     for (const [key, model] of Object.entries(this.models)) {
       if (key === "spear" && model.userData?.isThrown) {
         model.visible = false;
       } else {
-        model.visible = key === id;
+        model.visible = (key === id);
       }
     }
+
+    if (id === "torch" && this.models.torch) {
+      this.models.torch.visible = true;
+      if (this.torchLight) this.torchLight.intensity = 15.0;
+    } else if (this.torchLight) {
+      this.torchLight.intensity = 0;
+    }
+
     const player = this.player;
     player.weaponId = id;
     player.weaponGrip = def.grip;
@@ -1080,44 +1135,78 @@ export class WeaponSystem {
     if (!player.canBlock) player.cancelBlock();
     player.faceYaw = this._yaw + Math.PI;
     player.faceTimer = 0.25;
-    this.cooldown = Math.max(this.cooldown, 0.18);
+    this.cooldown = Math.max(this.cooldown, 0.15);
     this._refreshWeaponHud();
     if (announce) this.ui.showToast(`${def.name}${def.hands === 2 ? " · duas mãos" : ""}`);
     return true;
   }
 
-  // Teclas 1-9: escolhe a arma atribuída a esse slot da hotbar (máximo 9 armas em mãos)
+  // Teclas 0-9: escolhe o slot ou alterna armas do mesmo slot
   selectSlot(number) {
-    const index = number - 1;
-    if (index < 0 || index >= 9) return;
-    const id = this.hotbarSlots[index];
-    if (!id) {
-      this.ui.showToast(`Slot [${number}] vazio. Abra o Arsenal (B ou I) para equipar uma arma.`);
+    // Tecla 0: Atalho direto para a Tocha mágica (ou Punhos se já estiver com ela)
+    if (number === 0) {
+      if (this.currentId === "torch") {
+        this.equip("fists");
+      } else {
+        this.equip("torch");
+      }
       return;
     }
-    if (!this.owned.has(id)) {
-      this.ui.showToast(`A arma do slot [${number}] não está mais no seu inventário.`);
-      this.hotbarSlots[index] = null;
+
+    const slotIndex = number - 1;
+    if (slotIndex < 0 || slotIndex >= 9) return;
+
+    // Obtém todas as armas canônicas deste slot
+    const slotWeapons = SLOTS[slotIndex] || [];
+    // Armas possuídas pelo jogador neste slot
+    const ownedInSlot = slotWeapons.filter((id) => this.owned.has(id));
+
+    // No slot 1, garante tocha se houver tochas no inventário
+    if (number === 1 && !ownedInSlot.includes("torch")) {
+      ownedInSlot.push("torch");
+      this.owned.add("torch");
+    }
+
+    if (ownedInSlot.length === 0) {
+      const slotLabels = [
+        "Punhos / Tocha",
+        "Machados / Lâminas",
+        "Picareta",
+        "Espadas / Maças",
+        "Armas de Duas Mãos",
+        "Lanças / Alabardas",
+        "Arcos",
+        "Bestas / Mosquete",
+        "Arremesso / Bombas",
+      ];
+      this.ui.showToast(`Slot [${number}] vazio · Sem ${slotLabels[slotIndex] || "armas"} no inventário`);
       return;
     }
-    this.slot = index;
-    this.equip(id);
+
+    // Se já estiver empunhando uma arma deste mesmo slot, alterna para a próxima arma possuída
+    if (ownedInSlot.includes(this.currentId) && ownedInSlot.length > 1) {
+      const curIdx = ownedInSlot.indexOf(this.currentId);
+      const nextId = ownedInSlot[(curIdx + 1) % ownedInSlot.length];
+      this.lastInSlot[slotIndex] = nextId;
+      this.equip(nextId);
+      return;
+    }
+
+    // Caso contrário, equipa a arma favorita ou a primeira disponível do slot
+    const prefId = this.lastInSlot[slotIndex];
+    const targetId = (prefId && ownedInSlot.includes(prefId)) ? prefId : ownedInSlot[0];
+    this.lastInSlot[slotIndex] = targetId;
+    this.equip(targetId);
   }
 
-  // Roda do mouse: percorre estritamente as armas atribuídas à Hotbar (máximo 9 armas em mãos)
+  // Roda do mouse: percorre estritamente em ordem todas as armas possuídas
   cycle(step) {
-    const active = this.hotbarSlots.filter((id) => id && this.owned.has(id));
-    if (active.length === 0) {
-      if (this.owned.has("fists")) this.equip("fists");
-      return;
-    }
-    if (active.length === 1) {
-      this.equip(active[0]);
-      return;
-    }
-    const curIdx = active.indexOf(this.currentId);
-    const nextIdx = (curIdx + (step > 0 ? 1 : active.length - 1)) % active.length;
-    this.equip(active[nextIdx]);
+    const list = this.getOwnedWeaponsList();
+    if (list.length <= 1) return;
+    let curIdx = list.indexOf(this.currentId);
+    if (curIdx < 0) curIdx = 0;
+    const nextIdx = (curIdx + (step > 0 ? 1 : list.length - 1)) % list.length;
+    this.equip(list[nextIdx]);
   }
 
   unlock(id, quiet = false) {
@@ -1350,6 +1439,7 @@ export class WeaponSystem {
       return;
     }
     this.cooldown = weapon.cooldown;
+    this._maxCooldown = weapon.cooldown;
     this.ammo[weapon.ammo]--;
     this.player.faceYaw = cameraYaw + Math.PI;
     this.player.faceTimer = 0.6;

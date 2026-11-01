@@ -17,7 +17,10 @@ Depois abra `http://localhost:4173`.
 - `W A S D` ou setas: mover · `Shift`: correr · `Space`: pular · `C`: rolar (esquiva com invulnerabilidade) · `U`: modo furtivo (agachado; os cavalos não fogem)
 - **Botão direito**: mirar (câmera sobre o ombro com retícula nítida de alta precisão) · **Clique esquerdo** (ou `J`): atacar/atirar mantendo a mira 100% fixa e estável no alvo, sem oscilar nem cair no chão
 - **Mira e Aim Assist (`T` para ligar/desligar)**: retícula sempre visível na tela com feedback tátil colorido (vermelho vivo sobre alvos e dourado radiante quando travada com colchetes de lock-on no inimigo). A mira permanece cravada no inimigo durante disparos consecutivos, transitando suavemente para o próximo alvo se o inimigo for derrotado.
-- **Armas `1`–`9`**: escolhe o slot; apertar o mesmo número de novo alterna entre as armas dele. A **roda do mouse** troca de arma e **Shift + roda** dá zoom na câmera
+- **Armas `0`–`9` & Numpad**: `1`–`9` seleciona a categoria do slot correspondente; apertar o mesmo número de novo alterna ciclicamente entre as armas possuídas daquele slot. A tecla `0` (ou Numpad `0`) é o atalho instantâneo para equipar a **Tocha Mágica** (ou punhos se já equipada). A **roda do mouse** (scroll) troca sequencialmente de arma na ordem exata dos slots sem repetições nem saltos, e **Shift + roda** dá zoom na câmera
+- **Animação de Cooldown e Carga na Mira**: Uma barrinha animada posicionada logo abaixo da retícula central de mira (`#reticle`) indica a recarga e preparação das armas:
+  - Enquanto segura o ataque para carregar golpes pesados (Montante e Martelo de Guerra), a barra preenche em azul ciano brilhante (`charging`).
+  - Durante o cooldown e recarga pós-disparo (Mosquete com recarga de 3.5s, Balestras, Arcos, arremessos e ataques corporais), a barra inicia cheia em degradê dourado/laranja e **vai reduzindo suavemente até zero**, ocultando-se assim que a arma estiver pronta para disparar ou golpear novamente.
 - `Q` (segurar): escudo, só com armas de uma mão · `F`: monta/desmonta perto de um cavalo (também bloqueia, como antes) · `R`: poção · `E`: interagir/pegar · `H`: assobiar · `V`: vela
 - `M`: liga/desliga a música · `Esc`: pausa (volumes de música e de efeitos separados + botão do Cheat Menu)
 - **Menu de Cheats**: Digite `POTATO` ou `CHIEFS` a qualquer momento durante o jogo, clique no botão **Cheat Menu** dentro da tela de pausa (`Esc`), ou execute comandos pelo console via `window.CheatMenu`
@@ -59,19 +62,19 @@ Além da capital há seis vilas (Ferrovale, Pedraluz, Salgueiro, Cinzal, Brumas 
 - O jogador começa com uma vela apagada. `V` equipa; `E` perto de tocha ou lareira acende. A vela acesa é a luz que segue o jogador, dura 4 minutos e apaga se você correr muito, galopar ou rolar. Velas se compram com o mercador e no estande das igrejas.
 - Chegar com a vela acesa perto de feno ateia fogo; o fogo se espalha pelos fardos e pode queimar telhados de palha vizinhos (e machuca quem ficar perto).
 
-## Armas (slots 1–9)
+## Armas (slots 1–9 e tecla 0)
 
 | Slot | Armas |
 | --- | --- |
-| 1 | Punhos |
-| 2 | Adaga, faca |
-| 3 | Espada curta, espada longa |
-| 4 | Machado, maça, mangual |
-| 5 | Martelo de guerra, montante (duas mãos, lentos; atacar segurando carrega o golpe e arremessa inimigos) |
-| 6 | Lança, alabarda (alcance longo; a cavalo e em movimento ganham alcance e dano) |
-| 7 | Arco curto, arco longo |
-| 8 | Balestra leve, balestra pesada |
-| 9 | Facas de arremesso, bomba incendiária, pote de óleo (cria uma poça em chamas) |
+| 1 (ou `0`) | Punhos, Tocha mágica (sempre compartilhada com a mão) |
+| 2 | Machado de lenhador, Adaga, Faca |
+| 3 | Picareta (minerar pedra e ferro) |
+| 4 | Espada curta, Espada longa, Maça, Mangual, Porrete rústico |
+| 5 | Martelo de guerra, Montante (duas mãos; segurar carrega golpe destruidor) |
+| 6 | Lança, Lança improvisada, Alabarda (alcance longo; bônus montado) |
+| 7 | Arco curto, Arco longo |
+| 8 | Balestra leve, Balestra pesada, Mosquete (tiro devastador com 3.5s de recarga) |
+| 9 | Facas de arremesso, Bomba incendiária, Pote de óleo |
 
 Cada arma tem dano, alcance, velocidade, peso (afeta a velocidade de movimento), som e animação próprios (`src/weapondata.js`). As armas leves fazem combo de 3 golpes (o último é mais forte). Você começa com punhos, espada curta, arco curto, balestra leve e bomba incendiária. Novas armas se compram no ferreiro (armeiro) ou saem dos drops de guardas, soldados e cavaleiros.
 

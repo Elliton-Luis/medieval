@@ -23,7 +23,8 @@ export class InputManager {
     this.craftMenuPressed = false;
     this.weaponsCodexPressed = false;
     this.diaryPressed = false;
-    this.weaponSelection = 0;
+    this.weaponSelection = -1;
+    this._lastWheelTime = 0;
     this.modalOpen = false;
     this.locked = false;
     this._onKeyDown = (event) => {
@@ -46,7 +47,13 @@ export class InputManager {
       if (event.code === "KeyU" && !event.repeat) this.crouchPressed = true;
       if (event.code === "KeyT" && !event.repeat) this.aimAssistPressed = true;
       if (event.code === "KeyG" && !event.repeat) this.hayBaitPressed = true;
-      if (/^Digit[1-9]$/.test(event.code) && !event.repeat) this.weaponSelection = Number(event.code.slice(5));
+      if (!event.repeat) {
+        if (/^Digit[0-9]$/.test(event.code)) {
+          this.weaponSelection = Number(event.code.slice(5));
+        } else if (/^Numpad[0-9]$/.test(event.code)) {
+          this.weaponSelection = Number(event.code.slice(6));
+        }
+      }
       this.keys.add(event.code);
     };
     this._onKeyUp = (event) => {
@@ -226,9 +233,15 @@ export class InputManager {
       this.wheelAccum = 0;
       return 0;
     }
-    if (Math.abs(this.wheelAccum) < 40) return 0;
+    if (Math.abs(this.wheelAccum) < 30) return 0;
+    const now = performance.now();
+    if (now - this._lastWheelTime < 75) {
+      this.wheelAccum = 0;
+      return 0;
+    }
     const step = this.wheelAccum > 0 ? 1 : -1;
     this.wheelAccum = 0;
+    this._lastWheelTime = now;
     return step;
   }
 
@@ -257,8 +270,8 @@ export class InputManager {
   }
 
   consumeWeaponSelection() {
-    const selection = this.modalOpen ? 0 : this.weaponSelection;
-    this.weaponSelection = 0;
+    const selection = this.modalOpen ? -1 : this.weaponSelection;
+    this.weaponSelection = -1;
     return selection;
   }
 

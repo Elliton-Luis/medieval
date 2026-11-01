@@ -216,6 +216,24 @@ export class GameUI {
     }
   }
 
+  // Atualiza a barrinha animada de cooldown / recarga / carregamento na mira
+  setCooldownBar(visible, percent, isCharging = false) {
+    if (!this.reticleCooldownWrap) {
+      this.reticleCooldownWrap = document.getElementById("reticle-cooldown");
+      this.reticleCooldownFill = document.getElementById("reticle-cooldown-fill");
+    }
+    if (!this.reticleCooldownWrap || !this.reticleCooldownFill) return;
+
+    if (!visible || percent <= 0.005) {
+      this.reticleCooldownWrap.classList.remove("active");
+    } else {
+      this.reticleCooldownWrap.classList.add("active");
+      const pct = Math.max(0, Math.min(100, percent * 100));
+      this.reticleCooldownFill.style.width = `${pct}%`;
+      this.reticleCooldownFill.classList.toggle("charging", Boolean(isCharging));
+    }
+  }
+
   // Atualiza marcador visual de alvo sobre o ser mirado (HUD 3D Lock-On)
   updateLockMarker(assistPos, visible, camera) {
     if (!this.lockMarker) {
