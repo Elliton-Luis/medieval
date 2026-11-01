@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { PlayerStats, PlayerInventory, syncPlayerStatsToPlayer } from "./rpg.js";
 
 // ============================================================================
-// Diário dos Demiurgos (Livro Oculto em Posição Aleatória por Save)
+// Tractatus de Carcere · O Livro do Barro
+// (Livro da Seita do Demiurgo oculto em posição aleatória persistida por save)
 // ============================================================================
 
 export const DEMIURGE_BOOK_SPOTS = [
@@ -11,42 +12,42 @@ export const DEMIURGE_BOOK_SPOTS = [
     name: "Cemitério da Igreja",
     x: -16.8,
     z: -12.5,
-    hint: "Vi sombras encapuzadas sussurrando entre as lápides frias do cemitério atrás da igreja de Caldera.",
+    hint: "Vi vultos de bico de pássaro sussurrando entre as lápides frias do cemitério atrás da igreja de Caldera.",
   },
   {
     id: 1,
     name: "Beco da Taverna",
     x: 10.5,
     z: -17.5,
-    hint: "Dizem que algo herético foi jogado atrás dos barris de vinho no beco da taverna da praça.",
+    hint: "Dizem que o Livro do Barro foi jogado atrás dos barris de vinho no beco escuro da taverna da praça.",
   },
   {
     id: 2,
     name: "Alcova do Velho Poço",
     x: 2.2,
     z: -8.8,
-    hint: "Na calada da noite vi um brilho carmesim pulsando na base de pedra do poço central da vila.",
+    hint: "Na calada da noite vi um brilho carmesim e cheiro de terra velha pulsando na base do poço central da vila.",
   },
   {
     id: 3,
     name: "Entulho do Ferreiro",
     x: -21.0,
     z: 14.5,
-    hint: "O ferreiro jurou que deixaram um livro negro sob os restos de escória atrás de sua forja.",
+    hint: "O ferreiro jurou que deixaram um códice encadernado em couro áspero sob a escória atrás de sua forja.",
   },
   {
     id: 4,
     name: "Bancas do Mercado Antigo",
     x: -8.0,
     z: -23.5,
-    hint: "Um viajante de capa escura esqueceu um tomo oculto sob os caixotes de especiarias do mercado velho.",
+    hint: "Um viajante de capa escura esqueceu um tomo que cheira a cobre sob os caixotes do mercado velho.",
   },
   {
     id: 5,
     name: "Portão da Muralha Sul",
     x: 5.5,
     z: -38.0,
-    hint: "Guardas encontraram marcas de cinzas e um códice sinistro nos esteios de madeira perto do grande portão da muralha.",
+    hint: "Guardas encontraram marcas de sangue oxidado e um tomo com páginas de pergaminho irregular perto do grande portão.",
   },
 ];
 
@@ -57,210 +58,487 @@ let _cachedScene = null;
 let _cachedWorld = null;
 let _isCollected = false;
 
+// Flags de efeitos desencadeados pela leitura de páginas específicas
+let _hasReadPage2 = false;
+let _hasReadPage19 = false;
+
 // ============================================================================
-// Estrutura Modular das Páginas do Diário dos Demiurgos
-// O usuário pode expandir ou alterar o conteúdo de cada página futuramente.
+// As 20 Páginas do Tractatus de Carcere
 // ============================================================================
 export const DEMIURGE_DIARY_PAGES = [
+  // --- PÁGINAS 1 A 4: A GÊNESE DO ABORTO CÓSMICO ---
   {
     id: 1,
-    chapter: "CÓDICE I",
-    title: "O Círculo dos Nove Olhos",
-    type: "ritual",
-    svg: `
-      <svg viewBox="0 0 280 200" class="diary-svg" style="width:100%;max-height:160px;">
-        <defs>
-          <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#ff3322" stop-opacity="0.9"/>
-            <stop offset="65%" stop-color="#880011" stop-opacity="0.4"/>
-            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <!-- Círculos concêntricos e runas -->
-        <circle cx="140" cy="100" r="82" fill="none" stroke="#682218" stroke-width="1.8" stroke-dasharray="4 3"/>
-        <circle cx="140" cy="100" r="70" fill="none" stroke="#8a2b22" stroke-width="1.2"/>
-        <circle cx="140" cy="100" r="50" fill="none" stroke="#521b18" stroke-width="1"/>
-        <!-- Heptagrama ritual -->
-        <polygon points="140,32 178,148 78,74 202,74 102,148" fill="none" stroke="#992620" stroke-width="1.4"/>
-        <!-- Olho Central Reptiliano -->
-        <circle cx="140" cy="100" r="32" fill="url(#eyeGlow)"/>
-        <path d="M 104 100 Q 140 70 176 100 Q 140 130 104 100 Z" fill="#180e0c" stroke="#aa2218" stroke-width="2"/>
-        <ellipse cx="140" cy="100" rx="4" ry="17" fill="#ff2211"/>
-        <circle cx="140" cy="100" r="2.2" fill="#fff"/>
-        <!-- Runas nos eixos -->
-        <text x="135" y="24" fill="#a8352b" font-size="11" font-family="serif">𐡀</text>
-        <text x="228" y="104" fill="#a8352b" font-size="11" font-family="serif">𐡁</text>
-        <text x="135" y="192" fill="#a8352b" font-size="11" font-family="serif">𐡂</text>
-        <text x="44" y="104" fill="#a8352b" font-size="11" font-family="serif">𐡃</text>
-      </svg>
-    `,
+    chapter: "GÊNESE DO ABORTO CÓSMICO · I",
+    title: "O Pleroma e a Centelha",
+    stateLabel: "Estado: Folha rasgada e puída nas bordas",
+    isTorn: true,
+    svg: ``,
     html: `
-      <p class="diary-lead">«A matéria que tocais não é a obra do Pai Celestial, mas o cárcere forjado pelo Demiurgo cego. Cada rocha talhada, cada carne que sangra e adoece foi moldada para aprisionar a centelha do fogo eterno em barro perecível.»</p>
-      <p class="diary-text">«Às doze badaladas da meia-noite, sobre o heptagrama de cinzas de carvalho, misturai três gotas de sangue de inocente com pó de ossos secos. Os olhos do firmamento não piscam; eles aguardam o romper do primeiro selo.»</p>
+      <div class="diary-torn-fragment">
+        <p class="diary-lead">«No princípio, não havia a Terra, mas o Pleroma, o abismo de pura luz silenciosa e imóvel...»</p>
+        <p class="diary-text">«O desastre começou com um pensamento errante. Uma centelha rebelde tentou espelhar a glória do Todo e, nesse delírio de vaidade, pariu a anomalia...»</p>
+        <div class="diary-torn-tear-line">[O restante da página foi violentamente arrancado]</div>
+      </div>
     `,
   },
   {
     id: 2,
-    chapter: "CÓDICE II",
-    title: "Esboço do Cerco à Caldera",
-    type: "plans",
+    chapter: "GÊNESE DO ABORTO CÓSMICO · II",
+    title: "O Arquiteto Cego",
+    origin: "Encontrada em uma capela saqueada",
+    stateLabel: "Estado: Bordas queimadas, cheiro forte de enxofre",
+    isLegible: true,
+    pageType: "page2_blind_architect",
     svg: `
-      <svg viewBox="0 0 280 180" class="diary-svg" style="width:100%;max-height:150px;">
-        <!-- Mapa rústico de Caldera -->
-        <rect x="25" y="20" width="230" height="140" rx="8" fill="none" stroke="#5d3b28" stroke-width="1.5" stroke-dasharray="6 3"/>
-        <!-- Muralhas e torres -->
-        <circle cx="45" cy="40" r="12" fill="none" stroke="#7a4228" stroke-width="2"/>
-        <circle cx="235" cy="40" r="12" fill="none" stroke="#7a4228" stroke-width="2"/>
-        <circle cx="45" cy="140" r="12" fill="none" stroke="#7a4228" stroke-width="2"/>
-        <circle cx="235" cy="140" r="12" fill="none" stroke="#7a4228" stroke-width="2"/>
-        <!-- Igreja e Altar com cruz invertida e fogo -->
-        <rect x="110" y="55" width="45" height="35" fill="none" stroke="#882211" stroke-width="1.8"/>
-        <path d="M 132 45 L 132 60 M 126 52 L 138 52" stroke="#cc2211" stroke-width="1.8"/>
-        <!-- Setas de Ataque marcadas em carmesim -->
-        <path d="M 15 90 L 95 90 M 80 82 L 95 90 L 80 98" stroke="#ff2211" stroke-width="2.2" fill="none"/>
-        <path d="M 265 110 L 175 110 M 190 102 L 175 110 L 190 118" stroke="#ff2211" stroke-width="2.2" fill="none"/>
-        <!-- Marcador de Fogo no Poço -->
-        <circle cx="140" cy="120" r="6" fill="#ff4411"/>
-        <text x="152" y="124" fill="#ff5522" font-size="9" font-family="monospace">POÇO (VENENO)</text>
-        <text x="60" y="32" fill="#996644" font-size="9" font-family="serif">MURALHA NORTE</text>
-        <text x="96" y="103" fill="#cc2211" font-size="9" font-family="serif">IGREJA (ALVO)</text>
+      <svg viewBox="0 0 320 210" class="diary-illustration-svg" style="width:100%;max-height:170px;">
+        <defs>
+          <radialGradient id="mudSpill" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#3d2112"/>
+            <stop offset="60%" stop-color="#1f1109"/>
+            <stop offset="100%" stop-color="#000"/>
+          </radialGradient>
+        </defs>
+        <!-- Serpente enroscada sobre si mesma com escamas de rostos humanos gritando -->
+        <path d="M 60 160 Q 40 100 90 70 Q 150 40 210 75 Q 260 110 230 160 Q 180 200 120 175 Q 80 150 110 115 Q 160 85 200 120 Q 210 150 170 165 Z" fill="none" stroke="#2b231d" stroke-width="18" stroke-linecap="round"/>
+        <!-- Rostos agonizantes nas escamas -->
+        <g fill="#a3927d" font-size="8" font-family="sans-serif">
+          <circle cx="70" cy="130" r="3"/>
+          <circle cx="76" cy="130" r="3"/>
+          <ellipse cx="73" cy="137" rx="3.5" ry="5" fill="#1c1612"/>
+          <circle cx="120" cy="65" r="3"/>
+          <circle cx="126" cy="65" r="3"/>
+          <ellipse cx="123" cy="72" rx="3.5" ry="5" fill="#1c1612"/>
+          <circle cx="230" cy="120" r="3"/>
+          <circle cx="236" cy="120" r="3"/>
+          <ellipse cx="233" cy="127" rx="3.5" ry="5" fill="#1c1612"/>
+          <circle cx="150" cy="170" r="3"/>
+          <circle cx="156" cy="170" r="3"/>
+          <ellipse cx="153" cy="177" rx="3.5" ry="5" fill="#1c1612"/>
+        </g>
+        <!-- Cabeça de Leão Cego sem olhos de boca aberta -->
+        <ellipse cx="160" cy="60" rx="26" ry="24" fill="#36291f" stroke="#1c1510" stroke-width="2"/>
+        <!-- Juba de leão espinhosa -->
+        <path d="M 130 50 L 120 35 L 138 42 L 140 25 L 152 38 L 160 20 L 168 38 L 180 25 L 182 42 L 200 35 L 190 50 L 205 60 L 190 70 L 202 85 L 185 85" fill="none" stroke="#241b14" stroke-width="2.5"/>
+        <!-- Órbitas cegas seladas sem pupilas -->
+        <line x1="148" y1="52" x2="156" y2="52" stroke="#000" stroke-width="3"/>
+        <line x1="164" y1="52" x2="172" y2="52" stroke="#000" stroke-width="3"/>
+        <!-- Boca escancarada vomitando lama sobre a esfera perfeita -->
+        <path d="M 148 68 Q 160 92 172 68 Z" fill="#120505"/>
+        <!-- Lama negra/terra escorrendo -->
+        <path d="M 152 75 Q 160 115 158 140 Q 160 150 162 140 Q 168 115 168 75 Z" fill="url(#mudSpill)"/>
+        <!-- A Esfera Perfeita sendo maculada -->
+        <circle cx="160" cy="145" r="22" fill="#d9cbb2" stroke="#544332" stroke-width="1.8"/>
+        <!-- Mancha de lama sobre a esfera -->
+        <path d="M 148 135 Q 160 148 172 135 Q 168 158 152 155 Z" fill="#2b1a11"/>
       </svg>
     `,
     html: `
-      <p class="diary-lead">«Na décima noite após a lua de cinzas, queimai a torre de madeira a oeste para desviar as sentinelas reais.»</p>
-      <p class="diary-text">«Enquanto os guardas correrem para o fogo, duas almas mascaradas devem despejar o frasco de seiva negra na fonte central da praça. Ninguém beberá sem vomitar o próprio sangue. As portas do templo serão trancadas por fora com arames recozidos.»</p>
+      <div class="diary-legible-box">
+        <p class="diary-lead">«[...] no delírio de vaidade, pariu a anomalia: Rex Mundi, o Arquiteto Cego. A matéria não é criação, é um tumor. O Demiurgo roubou a luz e a trancou em gaiolas de osso. Comer, beber e copular são engrenagens da máquina. Nascer é o verdadeiro pecado original. Olhe para as suas mãos: elas apodrecem enquanto você [...]»</p>
+      </div>
+      <div class="diary-effect-badge">✦ Efeito: Revelação do Arquiteto Cego · Visão dessaturada por 3 segundos após a leitura.</div>
     `,
   },
   {
     id: 3,
-    chapter: "CÓDICE III",
-    title: "[Fragmento Arrancado]",
-    type: "torn",
+    chapter: "GÊNESE DO ABORTO CÓSMICO · III",
+    title: "O Primeiro Matadouro",
+    stateLabel: "Estado: Manchada por cinzas e sangue oxidado",
+    isTorn: true,
     svg: ``,
     html: `
-      <div class="diary-torn-container">
-        <div class="diary-torn-jagged-top"></div>
-        <div class="diary-torn-page-content">
-          <div class="diary-torn-charred-burn"></div>
-          <div class="diary-torn-title">O SACRIFÍCIO FINAL</div>
-          <p class="diary-torn-sub">...não sobrará um só sopro de vida sobre a carne corrompida...</p>
-          <div class="diary-torn-scratch-line"></div>
-        </div>
-        <div class="diary-torn-jagged-bottom"></div>
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«A matéria não é uma criação, é um erro, um tumor no vazio perfeito. O Demiurgo, invejoso da luz que não podia compreender, roubou fragmentos do Pleroma e os aprisionou em gaiolas de carne e osso. O Éden não foi um paraíso, mas o primeiro matadouro...»</p>
+        <p class="diary-text">«...A serpente da árvore não era o mal, era o mensageiro da verdadeira divindade sussurrando: "A casca é uma mentira"...»</p>
       </div>
     `,
   },
   {
     id: 4,
-    chapter: "CÓDICE IV",
-    title: "[Ilegível · Tinta & Sangue]",
-    type: "bloody_splatter",
-    svg: `
-      <svg viewBox="0 0 320 220" class="diary-bloody-svg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;">
-        <!-- Manchas densas de tinta vermelha e sangue espirrado cobrindo o texto como caneta explodida -->
-        <path d="M 40 40 Q 90 20 120 50 Q 170 30 210 65 Q 260 40 280 85 Q 295 140 250 170 Q 200 200 140 185 Q 80 205 45 160 Q 15 110 40 40 Z" fill="#7a0a0a" opacity="0.92"/>
-        <path d="M 60 60 Q 110 45 140 70 Q 190 55 230 85 Q 270 125 240 155 Q 180 185 130 165 Q 70 175 55 130 Z" fill="#990f14" opacity="0.88"/>
-        <!-- Gotas escorrendo para baixo -->
-        <path d="M 85 160 Q 88 195 90 215 Q 85 220 82 215 Q 80 195 85 160 Z" fill="#880c10"/>
-        <path d="M 160 175 Q 163 205 165 218 Q 160 222 157 217 Q 155 200 160 175 Z" fill="#990f14"/>
-        <path d="M 230 155 Q 235 185 238 205 Q 233 210 230 205 Q 227 185 230 155 Z" fill="#77080a"/>
-        <!-- Respingos e salpicos finos -->
-        <circle cx="28" cy="85" r="4.5" fill="#8e0d10"/>
-        <circle cx="18" cy="115" r="2.8" fill="#a01215"/>
-        <circle cx="35" cy="145" r="3.2" fill="#7a0a0a"/>
-        <circle cx="265" cy="35" r="5" fill="#8e0d10"/>
-        <circle cx="295" cy="65" r="3.5" fill="#a01215"/>
-        <circle cx="285" cy="120" r="4" fill="#77080a"/>
-        <circle cx="145" cy="15" r="3" fill="#8e0d10"/>
-        <circle cx="185" cy="22" r="2.5" fill="#a01215"/>
-        <!-- Rabisco de caneta arrebentada -->
-        <path d="M 30 180 L 110 70 L 150 140 L 220 80 L 290 150" stroke="#4a0404" stroke-width="4.5" fill="none" opacity="0.6"/>
-      </svg>
-    `,
+    chapter: "GÊNESE DO ABORTO CÓSMICO · IV",
+    title: "A Escravidão do Solo",
+    stateLabel: "Estado: Tinta borrada por umidade antiga",
+    isTorn: true,
+    svg: ``,
     html: `
-      <div class="diary-bloody-container">
-        <div class="diary-bloody-ghost-text">
-          <p>«...eles romperam o manto das nuvens... as sete cabeças...»</p>
-          <p>«...não adianta rezar... a luz sagrada apagou... ELE ESTÁ VINDO...»</p>
-          <p>«...socorro... a carne derrete... o abismo...»</p>
-        </div>
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...Comer, beber, respirar, copular — cada ato biológico é uma engrenagem na máquina de moer almas de Rex Mundi. A fome foi inventada para que fôssemos escravos do solo. O amor carnal foi forjado para gerar novos prisioneiros...»</p>
+      </div>
+    `,
+  },
+
+  // --- PÁGINAS 5 A 8: A ENDURA E A NEGAÇÃO DA FORMA ---
+  {
+    id: 5,
+    chapter: "A ENDURA E A NEGAÇÃO DA FORMA · I",
+    title: "O Ódio ao Reflexo",
+    stateLabel: "Estado: Bordas queimadas e desfiadas",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-lead">«Para enxergar além do barro, o devoto deve primeiro odiar o próprio reflexo. A dor não purifica, mas anestesia os instintos colocados em nós pelo Criador Menor...»</p>
       </div>
     `,
   },
   {
-    id: 5,
-    chapter: "CÓDICE V",
-    title: "A Revelação do Sol Negro",
-    type: "doctrine",
-    svg: `
-      <svg viewBox="0 0 280 180" class="diary-svg" style="width:100%;max-height:150px;">
-        <defs>
-          <radialGradient id="blackSunGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#0a0508"/>
-            <stop offset="60%" stop-color="#2a0f18"/>
-            <stop offset="85%" stop-color="#6e101b"/>
-            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <!-- Raios retorcidos do Sol Negro -->
-        <g stroke="#801822" stroke-width="1.8" fill="none">
-          <path d="M 140 20 Q 155 50 140 70"/>
-          <path d="M 140 160 Q 125 130 140 110"/>
-          <path d="M 70 90 Q 95 105 115 90"/>
-          <path d="M 210 90 Q 185 75 165 90"/>
-          <path d="M 85 45 Q 110 70 120 75"/>
-          <path d="M 195 135 Q 170 110 160 105"/>
-          <path d="M 195 45 Q 170 70 160 75"/>
-          <path d="M 85 135 Q 110 110 120 105"/>
-        </g>
-        <!-- Disco Central Escuro com 3 Olhos de Crocodilo -->
-        <circle cx="140" cy="90" r="42" fill="url(#blackSunGlow)" stroke="#ff2233" stroke-width="1.5"/>
-        <!-- Olho Superior -->
-        <ellipse cx="140" cy="74" rx="12" ry="6" fill="#110508" stroke="#ff2211" stroke-width="1.2"/>
-        <line x1="140" y1="69" x2="140" y2="79" stroke="#ffaa22" stroke-width="1.8"/>
-        <!-- Olho Inferior Esquerdo -->
-        <ellipse cx="126" cy="98" rx="11" ry="5.5" fill="#110508" stroke="#ff2211" stroke-width="1.2"/>
-        <line x1="126" y1="93" x2="126" y2="103" stroke="#ffaa22" stroke-width="1.8"/>
-        <!-- Olho Inferior Direito -->
-        <ellipse cx="154" cy="98" rx="11" ry="5.5" fill="#110508" stroke="#ff2211" stroke-width="1.2"/>
-        <line x1="154" y1="93" x2="154" y2="103" stroke="#ffaa22" stroke-width="1.8"/>
-      </svg>
-    `,
+    id: 6,
+    chapter: "A ENDURA E A NEGAÇÃO DA FORMA · II",
+    title: "O Jejum das Sombras",
+    stateLabel: "Estado: Pergaminho puído e cinzento",
+    isTorn: true,
+    svg: ``,
     html: `
-      <p class="diary-lead">«O Demiurgo não possui compaixão; sua forja é a vaidade e a escuridão primordial. Três olhos vigiam a alma humana para pesar cada pecado como chumbo.»</p>
-      <p class="diary-text">«Aquele que aceita a cinza transcende o cárcere dos elementos. Quando as trombetas calarem, o Sol Negro consumirá até a última memória deste reino.»</p>
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...O iniciado começa com o Jejum das Sombras. Durante doze dias, ele deve ingerir apenas água misturada com cinzas de madeira queimada, para lembrar ao estômago que a terra é estéril...»</p>
+      </div>
     `,
   },
   {
-    id: 6,
-    chapter: "CÓDICE VI",
-    title: "Anotações do Viajante",
-    type: "modular_blank",
+    id: 7,
+    chapter: "A ENDURA E A NEGAÇÃO DA FORMA · III",
+    title: "A Máscara e o Jejum",
+    origin: "Encontrada no cadáver de um mercador na estrada",
+    stateLabel: "Estado: Rasgada ao meio, com manchas de sangue seco",
+    isLegible: true,
+    pageType: "page7_mask_and_fasting",
+    svg: `
+      <svg viewBox="0 0 320 210" class="diary-illustration-svg" style="width:100%;max-height:170px;">
+        <!-- Sol Negro no Céu -->
+        <circle cx="230" cy="45" r="24" fill="#0d080a" stroke="#8c1c1c" stroke-width="2"/>
+        <g stroke="#6e1515" stroke-width="1.4" fill="none">
+          <line x1="230" y1="15" x2="230" y2="5"/>
+          <line x1="230" y1="75" x2="230" y2="85"/>
+          <line x1="200" y1="45" x2="190" y2="45"/>
+          <line x1="260" y1="45" x2="270" y2="45"/>
+          <line x1="208" y1="23" x2="201" y2="16"/>
+          <line x1="252" y1="67" x2="259" y2="74"/>
+        </g>
+        <!-- Homem ajoelhado serrando os dedos da mão esquerda com faca cega -->
+        <path d="M 85 180 L 105 145 L 125 155 L 140 180" stroke="#4a3b30" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <!-- Torso curvado em penitência -->
+        <path d="M 115 145 L 128 105 L 142 110 L 132 150 Z" fill="#382d25"/>
+        <!-- Braço esquerdo estendido apoiado na pedra -->
+        <path d="M 125 110 L 150 125 L 175 125" stroke="#4a3b30" stroke-width="5" fill="none"/>
+        <circle cx="180" cy="125" r="5" fill="#691212"/> <!-- Sangue na mão -->
+        <!-- Braço direito serrando com lâmina -->
+        <path d="M 132 110 L 155 105 L 178 122" stroke="#4a3b30" stroke-width="4.5" fill="none"/>
+        <line x1="172" y1="116" x2="184" y2="128" stroke="#8a837a" stroke-width="3"/>
+        <!-- Cabeça: Corvo usando máscara pontiaguda de couro observando o sol negro -->
+        <ellipse cx="120" cy="90" rx="14" ry="12" fill="#141113"/>
+        <!-- Bico longo cônico da máscara pontiaguda -->
+        <polygon points="122,86 172,96 122,98" fill="#241b18" stroke="#120d0b" stroke-width="1.2"/>
+        <!-- Lente escura fumê da máscara -->
+        <circle cx="124" cy="91" r="3.5" fill="#080709" stroke="#997a4d" stroke-width="1"/>
+      </svg>
+    `,
+    html: `
+      <div class="diary-legible-box">
+        <p class="diary-lead">«A veste não é adorno, é escudo. A máscara pontiaguda filtra o fedor da criação. Os olhos de vidro fumê nos impedem de ser seduzidos pela beleza do mundo inferior. [...] o Jejum das Sombras. Água e cinzas, para lembrar ao estômago que a terra é estéril. Aquele que ainda chora por um camponês morto ainda está acorrentado ao barro.»</p>
+      </div>
+      <div class="diary-effect-badge">✦ Conhecimento: O escudo dos Cátaros e sua frieza absoluta revelados.</div>
+    `,
+  },
+  {
+    id: 8,
+    chapter: "A ENDURA E A NEGAÇÃO DA FORMA · IV",
+    title: "O Vidro Fumê",
+    stateLabel: "Estado: Manchada de seiva e carvão",
+    isTorn: true,
     svg: ``,
     html: `
-      <div class="diary-blank-notes">
-        <p class="diary-notes-lead">✦ Páginas de pergaminho preservadas para novos decretos, rituais e planos sombrios...</p>
-        <div class="diary-ruled-lines">
-          <div class="diary-line"></div>
-          <div class="diary-line"></div>
-          <div class="diary-line"></div>
-          <div class="diary-line"></div>
-          <div class="diary-line"></div>
-        </div>
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...O ar das cidades é denso de pecado e suor; o Cátaro Verdadeiro respira apenas a morte. Os olhos da máscara são de vidro fumê, pois olhar diretamente para a beleza do mundo — uma árvore frondosa, um cavalo galopando, o sorriso de uma criança — é ser seduzido pelas ilusões do Demiurgo. O fiel deve ver apenas a decadência...»</p>
+      </div>
+    `,
+  },
+
+  // --- PÁGINAS 9 A 14: OS SACRAMENTOS DA RUÍNA ---
+  {
+    id: 9,
+    chapter: "OS SACRAMENTOS DA RUÍNA · I",
+    title: "A Salvação pela Entropia",
+    stateLabel: "Estado: Folha rasgada diagonalmente",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-lead">«A salvação só vem através da entropia. Os rituais não buscam agradar a Deus, mas agredir o Demiurgo...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 10,
+    chapter: "OS SACRAMENTOS DA RUÍNA · II",
+    title: "O Rito da Madeira Órfã",
+    stateLabel: "Estado: Papel chamuscado e carcomido",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...A madeira é o pilar da falsa criação, enraizada no abismo. O sacerdote aponta árvores específicas fora das muralhas. Durante a lua nova, o tronco é ferido, e seiva fervente misturada com enxofre é derramada nas raízes...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 11,
+    chapter: "OS SACRAMENTOS DA RUÍNA · III",
+    title: "A Madeira Órfã",
+    origin: "Encontrada cravada em uma árvore morta na floresta",
+    stateLabel: "Estado: Papel úmido e manchado de seiva escura",
+    isLegible: true,
+    pageType: "page11_orphan_wood",
+    svg: `
+      <svg viewBox="0 0 320 210" class="diary-illustration-svg" style="width:100%;max-height:170px;">
+        <!-- Troncos de árvores contorcidos em figuras humanas agonizantes com braços em forma de galhos -->
+        <g stroke="#261b14" stroke-width="4.5" fill="none" stroke-linecap="round">
+          <!-- Árvore Esquerda -->
+          <path d="M 40 190 Q 55 130 50 100 Q 30 70 20 40 M 50 100 Q 70 70 80 45"/>
+          <circle cx="50" cy="95" r="8" fill="#1f1510"/>
+          <!-- Árvore Direita -->
+          <path d="M 280 190 Q 265 130 270 100 Q 250 70 240 40 M 270 100 Q 290 70 300 45"/>
+          <circle cx="270" cy="95" r="8" fill="#1f1510"/>
+        </g>
+        <!-- Pilha de cavalos mortos no centro -->
+        <path d="M 110 180 Q 160 145 210 180 Z" fill="#38251b" stroke="#1f130c" stroke-width="2"/>
+        <circle cx="125" cy="165" r="9" fill="#291a13"/> <!-- Cabeça de cavalo -->
+        <path d="M 135 150 L 142 165 L 148 152" stroke="#24160f" stroke-width="2.5" fill="none"/>
+        <!-- Três figuras encapuzadas atirando tochas -->
+        <!-- Figura 1 (Esquerda) -->
+        <path d="M 85 185 L 95 135 L 105 185 Z" fill="#120f14"/>
+        <line x1="95" y1="145" x2="115" y2="135" stroke="#d68a29" stroke-width="2"/>
+        <circle cx="118" cy="133" r="4.5" fill="#ff4411"/>
+        <!-- Figura 2 (Centro-Fundo) -->
+        <path d="M 155 165 L 160 120 L 168 165 Z" fill="#17131a"/>
+        <circle cx="162" cy="116" r="3.5" fill="#ff6611"/>
+        <!-- Figura 3 (Direita) -->
+        <path d="M 215 185 L 225 135 L 235 185 Z" fill="#120f14"/>
+        <line x1="225" y1="145" x2="205" y2="135" stroke="#d68a29" stroke-width="2"/>
+        <circle cx="202" cy="133" r="4.5" fill="#ff4411"/>
+        <!-- Fogueira e fumaça subindo -->
+        <path d="M 140 160 Q 160 120 160 90 Q 180 130 180 160 Z" fill="#ff4411" opacity="0.85"/>
+      </svg>
+    `,
+    html: `
+      <div class="diary-legible-box">
+        <p class="diary-lead">«[...] a madeira é o pilar da falsa criação. Derramar fogo nas raízes não é destruição, é libertar a luz. Três figuras atiraram tochas na pilha de [...] O sangue de um puro no fardo de feno virgem na encruzilhada leste. Os seis olhos amarelos brilharão na névoa. Se tremer diante do terror, sua carne será reclamada.»</p>
+      </div>
+      <div class="diary-effect-badge">✦ Ritual Revelado: Feno virgem e sangue inocente na encruzilhada leste atraem o Observador.</div>
+    `,
+  },
+  {
+    id: 12,
+    chapter: "OS SACRAMENTOS DA RUÍNA · IV",
+    title: "A Liturgia dos Seis Olhos",
+    stateLabel: "Estado: Manchada de seiva avermelhada",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...O Observador não é nosso líder, mas o carcereiro do Demiurgo que enlouqueceu ao ver a verdade. Ele vaga pela neblina. Para invocá-lo e aprender seus segredos, o fiel deve permanecer imóvel. Se aceitar o abismo, ganhará a força do vento e a invisibilidade noturna...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 13,
+    chapter: "OS SACRAMENTOS DA RUÍNA · V",
+    title: "A Arma Quebrada",
+    stateLabel: "Estado: Marcada por ferrugem e pontas cortadas",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-text">«O terceiro é a Consagração da Arma Quebrada. Uma lâmina perfeita serve aos reis da terra. O Cátaro quebra a ponta de sua adaga e a enterra no peito de um cão ou lobo...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 14,
+    chapter: "OS SACRAMENTOS DA RUÍNA · VI",
+    title: "A Ferrugem da Desintegração",
+    stateLabel: "Estado: Pergaminho corroído por óxido marrom",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...A arma é deixada para enferrujar ao relento. Depois de sete luas, ela é recolhida. Seu corte causará febre, e a ferida nunca fechará, pois a ferrugem carrega o toque da desintegração...»</p>
+      </div>
+    `,
+  },
+
+  // --- PÁGINAS 15 A 17: A URGÊNCIA DA QUEDA ---
+  {
+    id: 15,
+    chapter: "A URGÊNCIA DA QUEDA · I",
+    title: "As Âncoras da Corrupção",
+    stateLabel: "Estado: Comido por traças e poeira",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-lead">«O caos não pode ser aleatório; deve ser cirúrgico. As cidades, com suas muralhas, feiras e igrejas, são altares dedicados a Rex Mundi...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 16,
+    chapter: "A URGÊNCIA DA QUEDA · II",
+    title: "O Cerco do Silêncio",
+    origin: "Encontrada enterrada perto das muralhas",
+    stateLabel: "Estado: Suja de terra e parcialmente ilegível",
+    isLegible: true,
+    pageType: "page16_siege_of_silence",
+    svg: `
+      <svg viewBox="0 0 320 210" class="diary-illustration-svg" style="width:100%;max-height:170px;">
+        <!-- Contorno do mapa da vila como a anatomia de um estômago humano -->
+        <path d="M 80 50 Q 140 25 210 40 Q 260 70 250 130 Q 230 180 150 185 Q 70 175 60 115 Q 55 75 80 50 Z" fill="#2b1a1c" stroke="#872935" stroke-width="2.5" stroke-dasharray="4 3"/>
+        <!-- Portas da cidade como dentes podres e pontiagudos -->
+        <g fill="#d1be9b" stroke="#3d2719" stroke-width="1">
+          <!-- Portão Norte -->
+          <polygon points="135,32 140,46 145,32"/>
+          <polygon points="146,32 151,46 156,32"/>
+          <polygon points="157,32 162,46 167,32"/>
+          <!-- Portão Sul -->
+          <polygon points="140,185 145,172 150,185"/>
+          <polygon points="152,185 157,172 162,185"/>
+        </g>
+        <!-- Casas da vila como dobras e vilosidades gástricas -->
+        <g fill="#453133">
+          <rect x="95" y="80" width="16" height="14" rx="2"/>
+          <rect x="120" y="70" width="18" height="15" rx="2"/>
+          <rect x="180" y="75" width="18" height="15" rx="2"/>
+          <rect x="205" y="95" width="16" height="14" rx="2"/>
+          <rect x="195" y="130" width="18" height="16" rx="2"/>
+          <rect x="105" y="130" width="16" height="15" rx="2"/>
+        </g>
+        <!-- Igreja central desenhada como um coração anatômico -->
+        <path d="M 160 95 C 160 85, 145 75, 135 88 C 120 105, 145 130, 160 145 C 175 130, 200 105, 185 88 C 175 75, 160 85, 160 95 Z" fill="#6e101b" stroke="#aa1c29" stroke-width="1.8"/>
+        <!-- Três pregos de ferro perfurando o coração -->
+        <g stroke="#1a181c" stroke-width="3" stroke-linecap="round">
+          <line x1="120" y1="85" x2="155" y2="108"/>
+          <line x1="160" y1="65" x2="160" y2="115"/>
+          <line x1="200" y1="85" x2="165" y2="108"/>
+        </g>
+      </svg>
+    `,
+    html: `
+      <div class="diary-legible-box">
+        <p class="diary-lead">«As âncoras da corrupção são os sinos das igrejas [...] Para sufocar a cidade, crânios abençoados pelo Consolamentum Negro devem ser enterrados em um anel ao redor das muralhas. Cada morte injusta perto deles enfraquece o mundo material. Não atacaremos os portões; faremos os aldeões desconfiarem da própria sombra. A engrenagem quebrará de dentro para fora.»</p>
+      </div>
+      <div class="diary-effect-badge">✦ Conspiração: Assassinatos aceleram a ruína e os crânios são elos de desestabilização.</div>
+    `,
+  },
+  {
+    id: 17,
+    chapter: "A URGÊNCIA DA QUEDA · III",
+    title: "O Tumor da Paranoia",
+    stateLabel: "Estado: Tinta escorrida e manchas de terra podre",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-stained-fragment">
+        <p class="diary-text">«...Nós provocamos os guardas, sussurramos mentiras aos nobres, fazemos mercadores assassinarem camponeses por ouro. Quanto mais ódio, mais a densidade do mundo material enfraquece. O mundo não será conquistado por exércitos, mas por um tumor de paranoia...»</p>
+      </div>
+    `,
+  },
+
+  // --- PÁGINAS 18 A 20: O APOCALIPSE DO OLHO CEGO ---
+  {
+    id: 18,
+    chapter: "O APOCALIPSE DO OLHO CEGO · I",
+    title: "O Rompimento do Véu",
+    stateLabel: "Estado: Pergaminho estaladiço e fissurado pelo calor",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-lead">«Quando o último sino for silenciado e o sangue empapar o perímetro dos crânios, o véu da mentira rasgará. O sol não se porá, mas apodrecerá no céu...»</p>
+      </div>
+    `,
+  },
+  {
+    id: 19,
+    chapter: "O APOCALIPSE DO OLHO CEGO · II",
+    title: "O Eclipse",
+    origin: "Entregue pelo Mensageiro de Cinzas",
+    stateLabel: "Estado: Imaculada, escrita com tinta que parece brilhar na luz",
+    isLegible: true,
+    pageType: "page19_eclipse",
+    svg: `
+      <svg viewBox="0 0 320 210" class="diary-illustration-svg" style="width:100%;max-height:170px;">
+        <defs>
+          <linearGradient id="paleFire" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fff8db"/>
+            <stop offset="60%" stop-color="#f5e18c"/>
+            <stop offset="100%" stop-color="#998038"/>
+          </linearGradient>
+        </defs>
+        <!-- Céu rachando como vidro -->
+        <g stroke="#ffffff" stroke-width="1.8" opacity="0.85">
+          <line x1="40" y1="10" x2="90" y2="45"/>
+          <line x1="90" y1="45" x2="160" y2="25"/>
+          <line x1="160" y1="25" x2="230" y2="55"/>
+          <line x1="230" y1="55" x2="290" y2="15"/>
+          <line x1="90" y1="45" x2="110" y2="90"/>
+          <line x1="230" y1="55" x2="215" y2="95"/>
+        </g>
+        <!-- Braços esqueléticos gigantescos de anjos descendo do céu -->
+        <g stroke="url(#paleFire)" stroke-width="5" fill="none" stroke-linecap="round">
+          <!-- Braço 1 esmagando catedral esquerda -->
+          <path d="M 80 20 L 75 70 L 60 120 L 50 155"/>
+          <!-- Braço 2 esmagando catedral central -->
+          <path d="M 160 15 L 165 75 L 155 125 L 160 160"/>
+          <!-- Braço 3 esmagando torre direita -->
+          <path d="M 240 20 L 245 70 L 260 120 L 270 155"/>
+        </g>
+        <!-- Catedrais sendo esmagadas -->
+        <path d="M 35 185 L 50 150 L 65 185 Z" fill="#291a1f" stroke="#000"/>
+        <path d="M 140 185 L 160 145 L 180 185 Z" fill="#291a1f" stroke="#000"/>
+        <path d="M 255 185 L 270 150 L 285 185 Z" fill="#291a1f" stroke="#000"/>
+        <!-- Pessoas derretendo em lodo negro no chão -->
+        <path d="M 20 195 Q 80 180 160 190 Q 240 180 300 195 Z" fill="#140b0f"/>
+        <!-- Almas subindo como esferas brilhantes -->
+        <g fill="#ffe688">
+          <circle cx="85" cy="155" r="5"/>
+          <circle cx="115" cy="130" r="4"/>
+          <circle cx="195" cy="140" r="5.5"/>
+          <circle cx="225" cy="120" r="4"/>
+          <circle cx="160" cy="95" r="6"/>
+        </g>
+      </svg>
+    `,
+    html: `
+      <div class="diary-legible-box diary-illuminated">
+        <p class="diary-lead">«Quando o último sino silenciar, o sol apodrecerá no céu. O Eclipse é a pupila do Demiurgo dilatando em puro terror. Braços de fogo pálido descerão para esmagar as catedrais. A carne derreterá. Nós não morreremos; retornaremos ao Todo, puros e informes. O mundo precisa morrer para que possamos viver.»</p>
+      </div>
+      <div class="diary-effect-badge" style="border-color:#ff4433; color:#ff7766;">✦ Prenúncio do Fim dos Tempos: A trilha sonora mudará ao fechar o tomo.</div>
+    `,
+  },
+  {
+    id: 20,
+    chapter: "O APOCALIPSE DO OLHO CEGO · III",
+    title: "O Abraço Final do Pleroma",
+    stateLabel: "Estado: Última folha selada a chumbo",
+    isTorn: true,
+    svg: ``,
+    html: `
+      <div class="diary-torn-fragment">
+        <p class="diary-text">«A aniquilação é o abraço final. Os bestiais gritarão enquanto a própria gravidade deixar de existir e suas casas virarem pó esmagador. Mas nós, os portadores do silêncio, os corvos da praga cósmica, abriremos os braços. Não sentiremos dor, pois a dor pertence à carne, e nós já nos despedimos dela há muito tempo. A fumaça subirá, e o Pleroma nos absorverá. A falha será corrigida. O universo voltará ao Nada perfeito.»</p>
       </div>
     `,
   },
 ];
 
 // ============================================================================
-// CSS da Interface do Leitor do Diário dos Demiurgos
+// CSS Estilizado do Tractatus de Carcere (O Livro do Barro)
 // ============================================================================
-const DIARY_READER_CSS = `
+const TRACTATUS_CSS = `
 #demiurge-diary-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 2, 6, 0.92);
-  backdrop-filter: blur(8px);
+  background: rgba(3, 1, 4, 0.94);
+  backdrop-filter: blur(10px);
   z-index: 10001;
   display: flex;
   align-items: center;
@@ -277,12 +555,12 @@ const DIARY_READER_CSS = `
 .diary-book-wrapper {
   position: relative;
   width: 92%;
-  max-width: 820px;
-  min-height: 540px;
-  background: #140d0c;
-  border: 4px solid #4a1818;
-  border-radius: 12px;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.95), 0 0 25px rgba(180, 25, 25, 0.45);
+  max-width: 840px;
+  min-height: 570px;
+  background: #140b09; /* Couro que cheira a terra velha e cobre */
+  border: 4px solid #4a1912;
+  border-radius: 10px;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.98), 0 0 30px rgba(160, 20, 20, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -292,23 +570,23 @@ const DIARY_READER_CSS = `
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  background: linear-gradient(90deg, #1f0b0d 0%, #300c11 50%, #1f0b0d 100%);
-  border-bottom: 2px solid #6b1b22;
-  color: #eed6b0;
+  background: linear-gradient(90deg, #1f0a0c 0%, #3b1115 50%, #1f0a0c 100%);
+  border-bottom: 2px solid #6b171c;
+  color: #ebd3ba;
 }
 .diary-book-title-badge {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 15px;
+  font-size: 14.5px;
   letter-spacing: 2px;
-  color: #ff5544;
-  text-shadow: 0 0 8px rgba(255, 50, 50, 0.6);
+  color: #ff4d3b;
+  text-shadow: 0 0 8px rgba(255, 60, 60, 0.6);
 }
 .diary-close-btn {
-  background: #360a0f;
-  border: 1px solid #7d1c24;
-  color: #e8d0b5;
+  background: #2b080c;
+  border: 1px solid #7a181e;
+  color: #e6ceb8;
   font-family: inherit;
   font-size: 12px;
   padding: 6px 14px;
@@ -317,153 +595,131 @@ const DIARY_READER_CSS = `
   transition: all 0.2s;
 }
 .diary-close-btn:hover {
-  background: #7a151f;
+  background: #73131a;
   color: #fff;
   box-shadow: 0 0 10px rgba(255, 40, 50, 0.8);
 }
 .diary-page-viewport {
   flex: 1;
   display: flex;
-  background: radial-gradient(circle at center, #231614 0%, #130b0a 100%);
-  padding: 22px;
+  background: radial-gradient(circle at center, #1f120f 0%, #0d0605 100%);
+  padding: 20px;
   position: relative;
   overflow-y: auto;
-  max-height: 440px;
+  max-height: 470px;
 }
 .diary-parchment-sheet {
   flex: 1;
-  background: #cfbe95;
-  color: #241411;
+  background: #cfbc94; /* Pergaminho irregular que arranha os dedos */
+  color: #211310;
   border-radius: 4px;
-  padding: 26px 32px;
-  box-shadow: inset 0 0 40px rgba(70, 35, 20, 0.4), 0 4px 16px rgba(0, 0, 0, 0.6);
+  padding: 24px 30px;
+  box-shadow: inset 0 0 45px rgba(60, 25, 15, 0.45), 0 4px 16px rgba(0, 0, 0, 0.7);
   position: relative;
-  min-height: 380px;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
 }
 .diary-chapter-label {
-  font-size: 12px;
-  letter-spacing: 3px;
-  color: #882218;
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  color: #781c15;
   font-weight: 700;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 .diary-page-heading {
-  font-size: 20px;
-  margin: 0 0 14px 0;
-  color: #3b110e;
-  border-bottom: 2px solid #8e3228;
-  padding-bottom: 6px;
+  font-size: 21px;
+  margin: 0 0 4px 0;
+  color: #380f0b;
   letter-spacing: 1px;
+}
+.diary-state-badge {
+  font-size: 11px;
+  color: #634032;
+  font-style: italic;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed rgba(110, 40, 25, 0.4);
+  padding-bottom: 5px;
+}
+.diary-origin-tag {
+  color: #8c261e;
+  font-weight: 600;
 }
 .diary-lead {
   font-size: 15px;
   font-style: italic;
-  line-height: 1.6;
-  color: #381a16;
+  line-height: 1.65;
+  color: #301410;
   margin-bottom: 12px;
 }
 .diary-text {
   font-size: 14px;
   line-height: 1.65;
-  color: #2b1714;
+  color: #26120e;
+  margin-bottom: 10px;
+}
+.diary-illustration-svg {
+  background: rgba(40, 25, 20, 0.12);
+  border-radius: 4px;
+  border: 1px solid rgba(120, 40, 30, 0.3);
+  margin-bottom: 14px;
 }
 
-/* Página Rasgada: O Sacrifício Final */
-.diary-torn-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+/* Caixa legível com destaque */
+.diary-legible-box {
+  background: rgba(255, 248, 235, 0.4);
+  border-left: 3px solid #7d1c16;
+  padding: 12px 16px;
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 10px;
+}
+.diary-illuminated {
+  background: rgba(255, 250, 220, 0.65);
+  border-left-color: #bd3124;
+  box-shadow: 0 0 15px rgba(255, 220, 120, 0.25);
+}
+.diary-effect-badge {
+  font-size: 12px;
+  color: #a8421e;
+  background: rgba(30, 10, 8, 0.1);
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px dashed #9e361b;
+  margin-top: auto;
+}
+
+/* Efeito de páginas rasgadas */
+.diary-torn-fragment {
   position: relative;
-  background: repeating-linear-gradient(45deg, #bfa87a, #bfa87a 10px, #b8a072 10px, #b8a072 20px);
-  border: 3px dashed #6b1f18;
-  padding: 30px;
-  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.5);
+  background: repeating-linear-gradient(45deg, #c4b087, #c4b087 10px, #bfa97e 10px, #bfa97e 20px);
+  padding: 24px;
+  border: 2px dashed #6b241c;
+  border-radius: 4px;
   clip-path: polygon(
-    0% 5%, 8% 2%, 16% 7%, 25% 1%, 35% 6%, 45% 0%, 55% 5%, 65% 2%, 75% 7%, 85% 1%, 95% 6%, 100% 2%,
-    98% 30%, 100% 50%, 97% 70%, 100% 90%, 95% 98%, 85% 94%, 75% 99%, 65% 95%, 55% 100%, 45% 94%, 35% 98%, 25% 93%, 15% 99%, 5% 95%, 0% 100%,
-    3% 75%, 0% 55%, 4% 35%, 1% 15%
+    0% 4%, 12% 1%, 25% 5%, 38% 0%, 50% 4%, 62% 1%, 75% 5%, 88% 0%, 100% 4%,
+    98% 35%, 100% 65%, 97% 95%, 85% 98%, 70% 95%, 55% 100%, 40% 96%, 25% 100%, 10% 95%, 0% 100%,
+    3% 65%, 0% 35%
   );
 }
-.diary-torn-title {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 4px;
-  color: #1a0808;
-  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.3);
-  text-align: center;
-  margin-bottom: 12px;
-  border-top: 2px solid #5a1515;
-  border-bottom: 2px solid #5a1515;
-  padding: 10px 0;
-}
-.diary-torn-sub {
-  font-size: 13px;
+.diary-torn-tear-line {
+  font-size: 12px;
   font-style: italic;
-  color: #551915;
+  color: #70261e;
   text-align: center;
-}
-.diary-torn-charred-burn {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  width: 45px;
-  height: 45px;
-  background: radial-gradient(circle, #050202 0%, #290d0b 60%, transparent 100%);
-  border-radius: 50%;
-  opacity: 0.85;
+  margin-top: 16px;
+  border-top: 1px dashed #70261e;
+  padding-top: 8px;
 }
 
-/* Página Manchada de Sangue/Tinta */
-.diary-bloody-container {
+/* Efeito de páginas manchadas de cinzas/sangue/terra */
+.diary-stained-fragment {
   position: relative;
-  flex: 1;
-  min-height: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #992222;
+  background: #bfa97d;
+  padding: 22px;
   border-radius: 4px;
-  overflow: hidden;
-  box-shadow: inset 0 0 50px #3a0505;
-}
-.diary-bloody-ghost-text {
-  position: relative;
-  z-index: 1;
-  color: rgba(240, 180, 180, 0.45);
-  font-size: 14px;
-  line-height: 2.2;
-  font-style: italic;
-  padding: 24px;
-  text-align: center;
-  filter: blur(0.6px);
-}
-
-/* Linhas em branco modulares */
-.diary-blank-notes {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.diary-notes-lead {
-  font-size: 13px;
-  color: #6a2a22;
-  font-style: italic;
-  margin-bottom: 16px;
-}
-.diary-ruled-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.diary-line {
-  height: 1px;
-  background: rgba(100, 40, 30, 0.35);
-  width: 100%;
+  box-shadow: inset 0 0 30px rgba(50, 20, 10, 0.6);
+  opacity: 0.85;
 }
 
 /* Rodapé de navegação */
@@ -472,16 +728,16 @@ const DIARY_READER_CSS = `
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: #190c0d;
-  border-top: 2px solid #5a151b;
+  background: #170a0b;
+  border-top: 2px solid #541318;
 }
 .diary-nav-btn {
-  background: #2b0c10;
-  border: 1px solid #751a23;
-  color: #f0dac2;
+  background: #24090c;
+  border: 1px solid #6e161c;
+  color: #eed6bd;
   font-family: inherit;
   font-size: 13px;
-  padding: 8px 18px;
+  padding: 7px 16px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
@@ -490,25 +746,57 @@ const DIARY_READER_CSS = `
   gap: 8px;
 }
 .diary-nav-btn:hover:not(:disabled) {
-  background: #6a141c;
+  background: #611219;
   color: #fff;
-  box-shadow: 0 0 10px rgba(255, 50, 70, 0.5);
+  box-shadow: 0 0 10px rgba(255, 50, 60, 0.5);
 }
 .diary-nav-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
-  border-color: #3b181a;
+  border-color: #361416;
 }
 .diary-page-indicator {
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 2px;
-  color: #d1b590;
+  color: #cfb38c;
+}
+
+/* Filtro Cinza na Tela (Efeito Página 2) */
+#grey-vision-overlay {
+  position: fixed;
+  inset: 0;
+  backdrop-filter: grayscale(0.88) contrast(1.15) brightness(0.9);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#grey-vision-overlay.active {
+  opacity: 1;
 }
 `;
 
 let _diaryReaderModalEl = null;
 let _currentReadingPage = 0;
 let _cachedAudio = null;
+let _greyVisionOverlayEl = null;
+
+function _ensureGreyVisionOverlay() {
+  if (_greyVisionOverlayEl) return _greyVisionOverlayEl;
+  const el = document.createElement("div");
+  el.id = "grey-vision-overlay";
+  document.body.appendChild(el);
+  _greyVisionOverlayEl = el;
+  return el;
+}
+
+function _triggerGreyFilterEffect(durationSeconds = 3) {
+  const overlay = _ensureGreyVisionOverlay();
+  overlay.classList.add("active");
+  setTimeout(() => {
+    overlay.classList.remove("active");
+  }, durationSeconds * 1000);
+}
 
 function _ensureDiaryModal(audio) {
   _cachedAudio = audio || _cachedAudio;
@@ -516,7 +804,7 @@ function _ensureDiaryModal(audio) {
 
   const style = document.createElement("style");
   style.id = "demiurge-diary-css";
-  style.textContent = DIARY_READER_CSS;
+  style.textContent = TRACTATUS_CSS;
   document.head.appendChild(style);
 
   const overlay = document.createElement("div");
@@ -526,12 +814,12 @@ function _ensureDiaryModal(audio) {
       <div class="diary-book-header">
         <div class="diary-book-title-badge">
           <span>👁️</span>
-          <span>DIÁRIO DOS DEMIURGOS · CÓDICE PROIBIDO</span>
+          <span>TRACTATUS DE CARCERE · O LIVRO DO BARRO</span>
         </div>
-        <button class="diary-close-btn" id="diary-close-btn">✕ Fechar (ESC / L)</button>
+        <button class="diary-close-btn" id="diary-close-btn">✕ Fechar Tomo (ESC / L)</button>
       </div>
       <div class="diary-page-viewport" id="diary-viewport">
-        <!-- Inserido dinamicamente -->
+        <!-- Renderizado dinamicamente -->
       </div>
       <div class="diary-book-footer">
         <button class="diary-nav-btn" id="diary-prev-btn">◄ Anterior (A)</button>
@@ -583,10 +871,17 @@ function _renderCurrentPage() {
   prevBtn.disabled = _currentReadingPage === 0;
   nextBtn.disabled = _currentReadingPage === DEMIURGE_DIARY_PAGES.length - 1;
 
+  if (page.id === 2) _hasReadPage2 = true;
+  if (page.id === 19) _hasReadPage19 = true;
+
   viewport.innerHTML = `
     <div class="diary-parchment-sheet">
       <div class="diary-chapter-label">${page.chapter}</div>
       <h2 class="diary-page-heading">${page.title}</h2>
+      <div class="diary-state-badge">
+        ${page.origin ? `<span class="diary-origin-tag">[${page.origin}]</span> · ` : ""}
+        ${page.stateLabel || ""}
+      </div>
       ${page.svg || ""}
       ${page.html || ""}
     </div>
@@ -606,6 +901,20 @@ export function openDemiurgeDiaryReader(pageIndex = 0, audio = null) {
 export function closeDemiurgeDiaryReader() {
   if (_diaryReaderModalEl) {
     _diaryReaderModalEl.classList.remove("active");
+  }
+
+  // Efeito da Página 2: visão ganha filtro cinza por 3 segundos
+  if (_hasReadPage2) {
+    _hasReadPage2 = false;
+    _triggerGreyFilterEffect(3);
+    window.__game?.ui?.showToast?.("✦ A revelação do tumor cósmico turva tua visão em cinzas...");
+  }
+
+  // Efeito da Página 19: prenúncio do fim, a trilha sonora muda imediatamente
+  if (_hasReadPage19) {
+    _hasReadPage19 = false;
+    window.__game?.music?.playTrack?.("tense");
+    window.__game?.ui?.showToast?.("🌑 O Apocalipse do Olho Cego foi revelado... A música do mundo silencia em pavor.");
   }
 }
 
@@ -670,51 +979,51 @@ export function initDemiurgeDiary({ scene, world, savedSpotIndex = null, isColle
   }
 
   _demiurgeBookGroup = new THREE.Group();
-  _demiurgeBookGroup.name = "DiarioDosDemiurgos";
+  _demiurgeBookGroup.name = "TractatusDeCarcere";
 
-  // Materiais do tomo profano
-  const leatherMat = new THREE.MeshStandardMaterial({ color: 0x140e0c, roughness: 0.88, flatShading: true });
-  const goldTrimMat = new THREE.MeshStandardMaterial({ color: 0xb58b38, metalness: 0.75, roughness: 0.35, flatShading: true });
-  const paperMat = new THREE.MeshStandardMaterial({ color: 0xd6c498, roughness: 0.95, flatShading: true });
+  // Materiais do tomo: couro áspero que cheira a terra velha e cobre
+  const leatherMat = new THREE.MeshStandardMaterial({ color: 0x180f0c, roughness: 0.95, flatShading: true });
+  const copperTrimMat = new THREE.MeshStandardMaterial({ color: 0x9c4e2b, metalness: 0.8, roughness: 0.4, flatShading: true });
+  const paperMat = new THREE.MeshStandardMaterial({ color: 0xc8b58a, roughness: 0.98, flatShading: true });
   const eyeSealMat = new THREE.MeshBasicMaterial({ color: 0xff1500 });
 
   // Capa inferior e capa superior
-  const coverBottom = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.025, 0.48), leatherMat);
+  const coverBottom = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.025, 0.50), leatherMat);
   coverBottom.position.set(0, 0.015, 0);
   coverBottom.castShadow = true;
   _demiurgeBookGroup.add(coverBottom);
 
-  const pages = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.07, 0.45), paperMat);
-  pages.position.set(0.01, 0.06, 0);
+  const pages = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 0.47), paperMat);
+  pages.position.set(0.01, 0.065, 0);
   _demiurgeBookGroup.add(pages);
 
-  const coverTop = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.025, 0.48), leatherMat);
-  coverTop.position.set(0, 0.105, 0);
+  const coverTop = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.025, 0.50), leatherMat);
+  coverTop.position.set(0, 0.115, 0);
   coverTop.castShadow = true;
   _demiurgeBookGroup.add(coverTop);
 
-  // Lombada reforçada de couro trabalhado
-  const spine = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.115, 0.48), leatherMat);
-  spine.position.set(-0.175, 0.06, 0);
+  // Lombada reforçada de couro envelhecido
+  const spine = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.125, 0.50), leatherMat);
+  spine.position.set(-0.185, 0.065, 0);
   _demiurgeBookGroup.add(spine);
 
-  // Cantoneiras de bronze entalhado
-  for (const cx of [-0.155, 0.155]) {
-    for (const cz of [-0.215, 0.215]) {
-      const corner = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.028, 0.05), goldTrimMat);
-      corner.position.set(cx, 0.106, cz);
+  // Cantoneiras de cobre oxidado
+  for (const cx of [-0.165, 0.165]) {
+    for (const cz of [-0.225, 0.225]) {
+      const corner = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.030, 0.055), copperTrimMat);
+      corner.position.set(cx, 0.116, cz);
       _demiurgeBookGroup.add(corner);
     }
   }
 
   // Olho Oculto do Demiurgo na capa frontal
-  const eyeGlow = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), eyeSealMat);
-  eyeGlow.position.set(0.02, 0.122, 0);
+  const eyeGlow = new THREE.Mesh(new THREE.SphereGeometry(0.048, 6, 6), eyeSealMat);
+  eyeGlow.position.set(0.02, 0.132, 0);
   eyeGlow.scale.set(1.2, 0.35, 0.85);
   _demiurgeBookGroup.add(eyeGlow);
 
-  const eyePupil = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.028, 0.055), goldTrimMat);
-  eyePupil.position.set(0.02, 0.126, 0);
+  const eyePupil = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.028, 0.055), copperTrimMat);
+  eyePupil.position.set(0.02, 0.136, 0);
   _demiurgeBookGroup.add(eyePupil);
 
   // Luz carmesim oculta que pulsa sobre o livro
@@ -748,7 +1057,7 @@ export function checkDemiurgeDiaryNearby(playerPos) {
 export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
   if (!checkDemiurgeDiaryNearby(playerPos)) return false;
 
-  // Coleta o Diário para o Inventário do Jogador
+  // Coleta o Tomo para o Inventário do Jogador
   _isCollected = true;
   PlayerInventory.hasDemiurgeDiary = true;
 
@@ -759,15 +1068,14 @@ export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
     }
   }
 
-  // Notificação e concessão de atributos ocultos
   PlayerStats.cha += 1;
   syncPlayerStatsToPlayer();
 
   import("./decay.js").then(({ addEvil }) => {
-    addEvil(2, "Recolheu o Diário dos Demiurgos das sombras da vila");
+    addEvil(2, "Recolheu o Tractatus de Carcere (O Livro do Barro)");
   });
 
-  ui?.showToast?.("✦ Diário dos Demiurgos coletado! Pressione [L] para lê-lo a qualquer momento. (+1 Carisma)");
+  ui?.showToast?.("✦ Tractatus de Carcere recolhido! Pressione [L] para ler o Tomo do Barro a qualquer momento. (+1 Carisma)");
   audio?.bookPage?.();
 
   // Abre imediatamente o leitor na página 1

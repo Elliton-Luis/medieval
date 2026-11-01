@@ -112,17 +112,24 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
   - **Garranchos e Delírios Crípticos**: Bilhetes sem nexo escritos em estados de febre ou transe herético (ex: *"Maçã sapato olho, 3 dias..."*).
 - Concede +1 de Carisma por investigação e registra a pista no histórico lore.
 
-## Diário dos Demiurgos (Coletável & Leitor de Códice)
+## O Tractatus de Carcere (O Livro do Barro)
 
-- **Item Coletável no Mundo (`E`)**: O códice profano spawna em local secreto aleatório na vila de Caldera. Ao se aproximar, o jogador pode recolhê-lo para o inventário, sumindo com o modelo do chão.
-- **Leitura a Qualquer Momento (`L` ou Inventário)**: Uma vez recolhido, o diário pode ser aberto a qualquer momento teclando `L` ou selecionando a opção no inventário de recursos.
-- **Interface Modular de Tomo Antigo**: Leitor estilizado em tela cheia com textura de pergaminho envelhecido, encadernação de couro escuro, sons de folhear páginas (`audio.bookPage`) e navegação por setas (`◄`/`►`, `A`/`D`, `ESC`/`L`):
-  - **Códice I**: Ritual do Círculo dos Nove Olhos e conjuração da centelha.
-  - **Códice II**: Esboço e mapa ilustrado do cerco a Caldera e alvos prioritários.
-  - **Códice III (Página Rasgada)**: Folha com bordas violentamente arrancadas e queimadas, restando apenas o título solene: *"O SACRIFÍCIO FINAL"*.
-  - **Códice IV (Página Manchada de Tinta/Sangue)**: Pergaminho coberto por poças e respingos escorrendo de tinta vermelha violenta (como uma caneta estourada), cobrindo relatos aterrorizantes.
-  - **Códice V**: Revelação e doutrina do Sol Negro de 3 Olhos.
-  - **Códice VI**: Folhas pautadas preservadas para anotações modulares futuras.
+- **Códice Canônico da Seita do Demiurgo**: Encadernado em couro áspero que cheira a cobre e terra velha, com páginas de pergaminho irregular que arranham os dedos.
+- **Estrutura Completa de 20 Páginas (`TRACTATUS_DE_CARCERE.md` e in-game via `L`)**:
+  - **Páginas 1 a 4**: *A Gênese do Aborto Cósmico*.
+    - **Página 2 (Legível)**: Ilustração a carvão do Arquiteto Cego (Rex Mundi) — serpente com escamas de rostos humanos gritando e cabeça de leão cega vomitando lama sobre uma esfera perfeita.
+    - *Efeito In-Game*: A tela ganha um filtro cinza dessaturado por 3 segundos após a leitura ao fechar o tomo.
+  - **Páginas 5 a 8**: *A Endura e a Negação da Forma*.
+    - **Página 7 (Legível)**: Gravura rústica em sangue oxidado de um homem ajoelhado serrando os próprios dedos da mão esquerda, observado por um homem com máscara de corvo e bico pontiagudo perante um sol negro. Explica o jejum das sombras e a veste de bico de pássaro.
+  - **Páginas 9 a 14**: *Os Sacramentos da Ruína*.
+    - **Página 11 (Legível)**: Ilustração do bosque agonizante com troncos que se torcem em figuras humanas em agonia e cultistas ateando tochas em pilha de cavalos mortos. Detalha a invocação do Observador dos Seis Olhos com feno e sangue, o corte com lâminas enferrujadas e a queima de árvores com enxofre.
+  - **Páginas 15 a 17**: *A Urgência da Queda*.
+    - **Página 16 (Legível)**: Diagrama anatômico onde a cidade de Caldera é mapeada como o estômago de um gigante e a igreja é o coração a ser perfurado. Revela que cada assassinato degrada a ilusão da matéria e ensina a semear crânios humanos nos portões.
+  - **Páginas 18 a 20**: *O Apocalipse do Olho Cego*.
+    - **Página 19 (Legível)**: Gravura apocalíptica do céu rachando como vidro trincado, o Sol Negro devorando a luz e braços de fogo pálido puxando as almas das montanhas. Prenúncio do fim dos tempos.
+    - *Efeito In-Game*: Ao fechar o tomo após a leitura, a trilha sonora transita imediatamente para a melodia tensa/sombria (`tense.mp3`), com tremor suave de atmosfera.
+  - **Páginas 1, 3-6, 8-10, 12-15, 17-18 e 20**: Folhas rasgadas, ensanguentadas, queimadas por enxofre ou borradas por graxa escura, com fragmentos textuais profanos e misteriosos.
+- **Documentação de Referência**: O compêndio canônico integral de todas as 20 páginas, transcrições e descrições visuais está registrado em [`TRACTATUS_DE_CARCERE.md`](./TRACTATUS_DE_CARCERE.md).
 
 ## Mortalidade e Dano aos Cavalos
 
