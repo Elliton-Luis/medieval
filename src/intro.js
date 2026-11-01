@@ -21,55 +21,52 @@ let _tallFigure = null;
 let _entitySpawnedZ = 0;
 
 // ============================================================================
-// 2. A Entidade de 5 Olhos: O Corpo Seco (Figura Alta, Magra e Esquelética)
+// 2. A Entidade do Vazio Abissal: VULGUS (Silhueta Toda Preta, Olhos e Dentes-Zíper)
 // ============================================================================
 export function createTallFigure() {
   const group = new THREE.Group();
-  group.name = "CorpoSeco_6Eyes";
+  group.name = "Vulgus";
 
-  // Texturas e materiais cadavéricos: ossos ressequidos, carne mumificada e olhos hipnóticos
-  const dryFleshMat = new THREE.MeshBasicMaterial({ color: 0x0a080c });
-  const boneAccentMat = new THREE.MeshBasicMaterial({ color: 0x221c1a });
-  const skullBoneMat = new THREE.MeshBasicMaterial({ color: 0x362d2a });
-  const teethMat = new THREE.MeshBasicMaterial({ color: 0xefe5d6 });
-  const mawVoidMat = new THREE.MeshBasicMaterial({ color: 0x020004 });
-  const eyeBaseMat = new THREE.MeshBasicMaterial({ color: 0x440812 });
-  const eyeIrisMat = new THREE.MeshBasicMaterial({ color: 0xee2200 });
-  const eyeWhiteDotMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Ponto branco penetrante no centro
+  // O corpo do Vulgus é feito de escuridão pura e impenetrável (preto absoluto 0x000000).
+  // Na escuridão, apenas seus olhos e os píxeis brancos da boca vertical em zíper são visíveis.
+  const pitchBlackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff1800 });
+  const eyeWhitePixelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const zipperTeethMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
   // --------------------------------------------------------------------------
-  // 1. Pernas Longas, Emaciadas e Articuladas (Extremamente Magras / Esqueléticas)
+  // 1. Pernas Longas, Esqueléticas e Finas (Totalmente Pretas)
   // --------------------------------------------------------------------------
   for (const side of [-1, 1]) {
-    // Coxa fina e ressequida
+    // Coxa fina de sombra
     const thighGeo = new THREE.CylinderGeometry(0.045, 0.035, 1.45, 5);
-    const thigh = new THREE.Mesh(thighGeo, dryFleshMat);
+    const thigh = new THREE.Mesh(thighGeo, pitchBlackMat);
     thigh.position.set(side * 0.16, 1.95, -0.05);
     thigh.rotation.x = -0.18;
     group.add(thigh);
 
-    // Joelho nodoso saliente de osso exposto
+    // Joelho nodoso
     const kneeGeo = new THREE.DodecahedronGeometry(0.065, 0);
-    const knee = new THREE.Mesh(kneeGeo, boneAccentMat);
+    const knee = new THREE.Mesh(kneeGeo, pitchBlackMat);
     knee.position.set(side * 0.16, 1.32, 0.08);
     group.add(knee);
 
-    // Canela longa, arqueada para trás
+    // Canela longa inclinada
     const shinGeo = new THREE.CylinderGeometry(0.035, 0.026, 1.55, 5);
-    const shin = new THREE.Mesh(shinGeo, dryFleshMat);
+    const shin = new THREE.Mesh(shinGeo, pitchBlackMat);
     shin.position.set(side * 0.16, 0.65, -0.02);
     shin.rotation.x = 0.16;
     group.add(shin);
 
-    // Pé esquelético comprido com garras cravadas no solo
+    // Pé comprido
     const footGeo = new THREE.BoxGeometry(0.08, 0.035, 0.42);
-    const foot = new THREE.Mesh(footGeo, dryFleshMat);
+    const foot = new THREE.Mesh(footGeo, pitchBlackMat);
     foot.position.set(side * 0.16, 0.025, 0.14);
     group.add(foot);
 
     // Garras finas dos pés
     for (const fx of [-0.028, 0, 0.028]) {
-      const toeClaw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.14, 4), boneAccentMat);
+      const toeClaw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.14, 4), pitchBlackMat);
       toeClaw.position.set(side * 0.16 + fx, 0.025, 0.35);
       toeClaw.rotation.x = Math.PI * 0.5;
       group.add(toeClaw);
@@ -77,75 +74,44 @@ export function createTallFigure() {
   }
 
   // --------------------------------------------------------------------------
-  // 2. Pelve Estreita e Coluna Vertebral Ressequida com Vértebras Salientes
+  // 2. Pelve Estreita e Coluna Vertebral Curva (Totalmente Pretas)
   // --------------------------------------------------------------------------
   const pelvisGeo = new THREE.BoxGeometry(0.28, 0.16, 0.18);
-  const pelvis = new THREE.Mesh(pelvisGeo, dryFleshMat);
+  const pelvis = new THREE.Mesh(pelvisGeo, pitchBlackMat);
   pelvis.position.set(0, 2.58, 0);
   group.add(pelvis);
 
-  // Coluna lombar e dorsal curva e fina
+  // Coluna vertebral inclinada para frente
   const spineGeo = new THREE.CylinderGeometry(0.045, 0.055, 1.35, 6);
-  const spine = new THREE.Mesh(spineGeo, dryFleshMat);
+  const spine = new THREE.Mesh(spineGeo, pitchBlackMat);
   spine.position.set(0, 3.25, -0.04);
-  spine.rotation.x = 0.15; // Curvado para a frente em postura predatória
+  spine.rotation.x = 0.15;
   group.add(spine);
 
-  // Vértebras pontiagudas salientes nas costas (corcunda esquelética)
+  // Vértebras pontiagudas dorsais
   for (let v = 0; v < 6; v++) {
     const vertGeo = new THREE.ConeGeometry(0.03, 0.2, 4);
-    const vert = new THREE.Mesh(vertGeo, boneAccentMat);
+    const vert = new THREE.Mesh(vertGeo, pitchBlackMat);
     vert.position.set(0, 2.75 + v * 0.22, -0.12 - (v * 0.02));
     vert.rotation.x = -Math.PI * 0.42;
     group.add(vert);
   }
 
   // --------------------------------------------------------------------------
-  // 3. Tórax Magro com BOCA ABERTA NO MEIO DO PEITO (Bocarra Torácica)
+  // 3. Tórax Magro e Emaciado (Totalmente Preto - Sem boca no peito)
   // --------------------------------------------------------------------------
-  // Estrutura do esterno dividida ao redor da bocarra
-  const sternumUpper = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.32, 0.16), dryFleshMat);
-  sternumUpper.position.set(0, 3.82, 0.05);
-  sternumUpper.rotation.x = 0.15;
-  group.add(sternumUpper);
+  const sternum = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.18), pitchBlackMat);
+  sternum.position.set(0, 3.48, 0.03);
+  sternum.rotation.x = 0.15;
+  group.add(sternum);
 
-  const sternumLower = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.14), dryFleshMat);
-  sternumLower.position.set(0, 2.95, -0.01);
-  sternumLower.rotation.x = 0.15;
-  group.add(sternumLower);
-
-  // Cavidade profunda da Boca no Peito (Void Maw)
-  const chestMouthCavity = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.52, 0.26), mawVoidMat);
-  chestMouthCavity.position.set(0, 3.42, 0.05);
-  chestMouthCavity.rotation.x = 0.15;
-  group.add(chestMouthCavity);
-
-  // Lábios e mandíbulas ósseas externas da boca torácica
-  for (const side of [-1, 1]) {
-    const lipGeo = new THREE.BoxGeometry(0.05, 0.54, 0.12);
-    const lip = new THREE.Mesh(lipGeo, boneAccentMat);
-    lip.position.set(side * 0.12, 3.42, 0.14);
-    lip.rotation.y = side * 0.25;
-    group.add(lip);
-
-    // Dentes pontiagudos de agulha saindo das bordas da boca do peito
-    for (let t = 0; t < 4; t++) {
-      const toothGeo = new THREE.ConeGeometry(0.018, 0.09, 4);
-      const tooth = new THREE.Mesh(toothGeo, teethMat);
-      tooth.position.set(side * 0.09, 3.22 + t * 0.12, 0.16);
-      tooth.rotation.z = side * -Math.PI * 0.45;
-      tooth.rotation.x = 0.15;
-      group.add(tooth);
-    }
-  }
-
-  // Costelas finas e pontiagudas abraçando a boca do peito
+  // Costelas finas emaciadas
   for (let r = 0; r < 5; r++) {
     const ry = 3.05 + r * 0.19;
     const rScale = 0.85 + (r === 2 ? 0.25 : r * 0.08);
     for (const side of [-1, 1]) {
       const ribGeo = new THREE.BoxGeometry(0.13 * rScale, 0.028, 0.22 * rScale);
-      const rib = new THREE.Mesh(ribGeo, boneAccentMat);
+      const rib = new THREE.Mesh(ribGeo, pitchBlackMat);
       rib.position.set(side * (0.13 * rScale), ry, 0.02);
       rib.rotation.z = side * -0.25;
       rib.rotation.y = side * 0.18;
@@ -154,43 +120,43 @@ export function createTallFigure() {
   }
 
   // --------------------------------------------------------------------------
-  // 4. Clavículas, Escápulas e Braços Desproporcionais que vão até o chão
+  // 4. Clavículas e Braços Desproporcionais (Totalmente Pretos)
   // --------------------------------------------------------------------------
   const clavicleGeo = new THREE.BoxGeometry(0.64, 0.05, 0.08);
-  const clavicle = new THREE.Mesh(clavicleGeo, boneAccentMat);
+  const clavicle = new THREE.Mesh(clavicleGeo, pitchBlackMat);
   clavicle.position.set(0, 4.02, 0.06);
   group.add(clavicle);
 
   for (const side of [-1, 1]) {
     const scapulaGeo = new THREE.ConeGeometry(0.08, 0.38, 4);
-    const scapula = new THREE.Mesh(scapulaGeo, dryFleshMat);
+    const scapula = new THREE.Mesh(scapulaGeo, pitchBlackMat);
     scapula.position.set(side * 0.32, 4.16, -0.06);
     scapula.rotation.z = side * -0.45;
     scapula.rotation.x = -0.25;
     group.add(scapula);
 
     const upperArmGeo = new THREE.CylinderGeometry(0.038, 0.03, 1.5, 5);
-    const upperArm = new THREE.Mesh(upperArmGeo, dryFleshMat);
+    const upperArm = new THREE.Mesh(upperArmGeo, pitchBlackMat);
     upperArm.position.set(side * 0.4, 3.28, 0.02);
     upperArm.rotation.z = side * -0.12;
     upperArm.rotation.x = 0.12;
     group.add(upperArm);
 
     const elbowGeo = new THREE.DodecahedronGeometry(0.048, 0);
-    const elbow = new THREE.Mesh(elbowGeo, boneAccentMat);
+    const elbow = new THREE.Mesh(elbowGeo, pitchBlackMat);
     elbow.position.set(side * 0.46, 2.52, 0.12);
     group.add(elbow);
 
     const forearmGeo = new THREE.CylinderGeometry(0.032, 0.024, 1.6, 5);
-    const forearm = new THREE.Mesh(forearmGeo, dryFleshMat);
+    const forearm = new THREE.Mesh(forearmGeo, pitchBlackMat);
     forearm.position.set(side * 0.5, 1.72, 0.08);
     forearm.rotation.z = side * -0.06;
     group.add(forearm);
 
-    // Garras longas de espinho nas mãos
+    // Garras longas pontiagudas
     for (let c = -1; c <= 2; c++) {
       const clawGeo = new THREE.ConeGeometry(0.016, 0.45, 4);
-      const claw = new THREE.Mesh(clawGeo, boneAccentMat);
+      const claw = new THREE.Mesh(clawGeo, pitchBlackMat);
       claw.position.set(side * 0.5 + c * 0.032, 0.78, 0.06 + Math.abs(c) * 0.02);
       claw.rotation.x = 0.28 + c * 0.05;
       claw.rotation.z = side * (0.08 + c * 0.06);
@@ -199,93 +165,90 @@ export function createTallFigure() {
   }
 
   // --------------------------------------------------------------------------
-  // 5. Pescoço Esguio e Cabeça Parecida com CAVEIRA
+  // 5. Pescoço e Cabeça do Vulgus (Totalmente Pretos)
   // --------------------------------------------------------------------------
   const neckGeo = new THREE.CylinderGeometry(0.075, 0.095, 0.88, 6);
-  const neck = new THREE.Mesh(neckGeo, dryFleshMat);
+  const neck = new THREE.Mesh(neckGeo, pitchBlackMat);
   neck.position.set(0, 4.42, 0.14);
   neck.rotation.x = 0.24;
   group.add(neck);
 
-  // Caixa craniana da caveira
-  const skullCraniumGeo = new THREE.BoxGeometry(0.28, 0.38, 0.36);
-  const skullCranium = new THREE.Mesh(skullCraniumGeo, skullBoneMat);
+  // Caixa craniana escura
+  const skullCraniumGeo = new THREE.BoxGeometry(0.28, 0.42, 0.36);
+  const skullCranium = new THREE.Mesh(skullCraniumGeo, pitchBlackMat);
   skullCranium.position.set(0, 5.25, 0.26);
   skullCranium.rotation.x = 0.12;
   group.add(skullCranium);
 
-  // Topo do crânio arredondado
+  // Topo do crânio
   const skullDomeGeo = new THREE.SphereGeometry(0.19, 8, 8);
-  const skullDome = new THREE.Mesh(skullDomeGeo, skullBoneMat);
-  skullDome.position.set(0, 5.42, 0.22);
+  const skullDome = new THREE.Mesh(skullDomeGeo, pitchBlackMat);
+  skullDome.position.set(0, 5.44, 0.22);
   skullDome.scale.set(1.0, 0.7, 1.1);
   group.add(skullDome);
 
-  // Maçãs do rosto (zigomáticos) salientes da caveira
-  for (const side of [-1, 1]) {
-    const cheekGeo = new THREE.BoxGeometry(0.06, 0.08, 0.14);
-    const cheek = new THREE.Mesh(cheekGeo, skullBoneMat);
-    cheek.position.set(side * 0.14, 5.08, 0.34);
-    cheek.rotation.y = side * 0.22;
-    group.add(cheek);
-  }
+  // Mandíbula alongada e afunilada
+  const jawGeo = new THREE.BoxGeometry(0.22, 0.28, 0.26);
+  const jaw = new THREE.Mesh(jawGeo, pitchBlackMat);
+  jaw.position.set(0, 4.75, 0.32);
+  group.add(jaw);
 
-  // Cavidade nasal afundada da caveira
-  const nasalVoid = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.1, 3), mawVoidMat);
-  nasalVoid.position.set(0, 4.95, 0.43);
-  nasalVoid.rotation.x = -Math.PI * 0.5;
-  group.add(nasalVoid);
-
-  // Mandíbula e arcada dentária da caveira humana exposta
-  const maxilla = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.22), skullBoneMat);
-  maxilla.position.set(0, 4.78, 0.34);
-  group.add(maxilla);
-
-  const mandible = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.2), skullBoneMat);
-  mandible.position.set(0, 4.58, 0.32);
-  group.add(mandible);
-
-  // Dentes expostos da caveira
-  for (let t = -3; t <= 3; t++) {
-    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.045, 0.02), teethMat);
-    tooth.position.set(t * 0.026, 4.71, 0.44);
-    group.add(tooth);
-  }
+  // Fenda profunda no meio da face para abrigar a boca vertical
+  const verticalSlitGeo = new THREE.BoxGeometry(0.035, 0.84, 0.12);
+  const verticalSlit = new THREE.Mesh(verticalSlitGeo, pitchBlackMat);
+  verticalSlit.position.set(0, 5.08, 0.43);
+  group.add(verticalSlit);
 
   // --------------------------------------------------------------------------
-  // 6. OS 6 OLHOS SEPARADOS COM PONTO BRANCO NO CENTRO ("MONSTRO DE 6 OLHOS")
+  // 6. OLHOS DO VULGUS (Únicos elementos visíveis além dos dentes!)
   // --------------------------------------------------------------------------
-  // Disposição dos 6 olhos bem separados e espaçados pela caveira:
-  // - 2 Olhos Superiores na Testa (afastados lateralmente)
-  // - 2 Olhos Intermediários nas Têmporas/Órbitas externas (bem espaçados)
-  // - 2 Olhos Inferiores nas Bochechas/Mandíbula
-  const sixEyeConfigs = [
-    // 1 & 2: Testa Superior (Separados)
-    { x: -0.11, y: 5.38, z: 0.43, radius: 0.042 },
-    { x: 0.11, y: 5.38, z: 0.43, radius: 0.042 },
-    // 3 & 4: Têmporas / Órbitas Externas (Bem Separados para os lados)
-    { x: -0.155, y: 5.12, z: 0.38, radius: 0.045 },
-    { x: 0.155, y: 5.12, z: 0.38, radius: 0.045 },
-    // 5 & 6: Bochechas / Mandíbula Inferior (Separados)
-    { x: -0.085, y: 4.82, z: 0.42, radius: 0.038 },
-    { x: 0.085, y: 4.82, z: 0.42, radius: 0.038 },
+  // Olhos penetrantes situados nas laterais da cabeça, à esquerda e à direita
+  const eyesConfig = [
+    { x: -0.125, y: 5.16, z: 0.42, radius: 0.040 },
+    { x:  0.125, y: 5.16, z: 0.42, radius: 0.040 },
+    // Par secundário ligeiramente mais alto nas têmporas
+    { x: -0.155, y: 5.34, z: 0.36, radius: 0.030 },
+    { x:  0.155, y: 5.34, z: 0.36, radius: 0.030 },
   ];
 
-  sixEyeConfigs.forEach((eyeCfg) => {
-    // Órbita / Esclerótica escura
-    const orbit = new THREE.Mesh(new THREE.SphereGeometry(eyeCfg.radius * 1.15, 6, 6), eyeBaseMat);
-    orbit.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z);
-    group.add(orbit);
-
-    // Íris vermelha/carmesim pulsante
-    const iris = new THREE.Mesh(new THREE.SphereGeometry(eyeCfg.radius * 0.85, 6, 6), eyeIrisMat);
-    iris.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z + 0.015);
+  eyesConfig.forEach((eyeCfg) => {
+    // Esfera luminosa carmesim/vermelha
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(eyeCfg.radius, 6, 6), eyeGlowMat);
+    iris.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z);
     group.add(iris);
 
-    // Ponto BRANCO puro no CENTRO exato de cada olho ("ponto branco no centro")
-    const whiteDot = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.024, 0.028), eyeWhiteDotMat);
-    whiteDot.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z + 0.035);
-    group.add(whiteDot);
+    // Píxel branco puro no centro do olho
+    const pupilPixel = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.024), eyeWhitePixelMat);
+    pupilPixel.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z + eyeCfg.radius * 0.72);
+    group.add(pupilPixel);
+  });
+
+  // --------------------------------------------------------------------------
+  // 7. BOCA VERTICAL ENTRE OS OLHOS COM PÍXEIS BRANCOS DE DENTES (ESTILO ZÍPER IRREGULAR)
+  // --------------------------------------------------------------------------
+  // Dentes finos, quadrados, separados e irregulares dispostos na vertical entre os olhos
+  const zipperTeethData = [
+    { side: -1, y: 4.70, xOffset: 0.018, z: 0.435, rotZ:  0.08, w: 0.016, h: 0.014, d: 0.022 },
+    { side:  1, y: 4.76, xOffset: 0.016, z: 0.442, rotZ: -0.14, w: 0.015, h: 0.016, d: 0.024 },
+    { side: -1, y: 4.83, xOffset: 0.020, z: 0.447, rotZ: -0.06, w: 0.017, h: 0.014, d: 0.021 },
+    { side:  1, y: 4.90, xOffset: 0.017, z: 0.450, rotZ:  0.12, w: 0.016, h: 0.017, d: 0.025 },
+    { side: -1, y: 4.97, xOffset: 0.019, z: 0.453, rotZ: -0.11, w: 0.015, h: 0.015, d: 0.023 },
+    { side:  1, y: 5.04, xOffset: 0.022, z: 0.452, rotZ:  0.07, w: 0.018, h: 0.016, d: 0.026 },
+    // Altura central (exatamente no eixo dos olhos principais y ~ 5.14)
+    { side: -1, y: 5.12, xOffset: 0.020, z: 0.449, rotZ:  0.16, w: 0.017, h: 0.017, d: 0.026 },
+    { side:  1, y: 5.19, xOffset: 0.018, z: 0.445, rotZ: -0.13, w: 0.016, h: 0.015, d: 0.024 },
+    { side: -1, y: 5.26, xOffset: 0.021, z: 0.439, rotZ:  0.09, w: 0.017, h: 0.016, d: 0.023 },
+    { side:  1, y: 5.33, xOffset: 0.017, z: 0.431, rotZ: -0.08, w: 0.015, h: 0.014, d: 0.021 },
+    { side: -1, y: 5.40, xOffset: 0.020, z: 0.420, rotZ:  0.14, w: 0.016, h: 0.015, d: 0.020 },
+    { side:  1, y: 5.46, xOffset: 0.022, z: 0.408, rotZ: -0.10, w: 0.014, h: 0.013, d: 0.018 },
+  ];
+
+  zipperTeethData.forEach((t) => {
+    const toothGeo = new THREE.BoxGeometry(t.w, t.h, t.d);
+    const toothMesh = new THREE.Mesh(toothGeo, zipperTeethMat);
+    toothMesh.position.set(t.side * t.xOffset, t.y, t.z);
+    toothMesh.rotation.z = t.rotZ;
+    group.add(toothMesh);
   });
 
   group.visible = false;

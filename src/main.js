@@ -30,6 +30,7 @@ import { MusicDirector, TRACK_CATALOG, getMusicCredits } from "./music.js";
 import { PauseMenu } from "./pause.js";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
+import { initDemiurgeDiary, updateDemiurgeDiary } from "./demiurgeBook.js";
 import {
   PlayerStats,
   PlayerEquipment,
@@ -306,6 +307,7 @@ if (saved) {
     PlayerInventory.hay = PlayerStats.hay;
     PlayerInventory.wood = saved.stats.wood ?? PlayerInventory.wood;
     PlayerInventory.stone = saved.stats.stone ?? PlayerInventory.stone;
+    PlayerInventory.clay = saved.stats.clay ?? PlayerInventory.clay;
     PlayerInventory.torches = saved.stats.torches ?? PlayerInventory.torches;
     PlayerInventory.hasSword = saved.stats.hasSword ?? PlayerInventory.hasSword;
   }
@@ -326,6 +328,9 @@ if (saved) {
   candle._sync();
   weapons._refreshWeaponHud();
 }
+
+// Inicializa o Diário dos Demiurgos em posição aleatória persistida no save
+initDemiurgeDiary({ scene, world, savedSpotIndex: saved?.demiurgeBookSpotIndex });
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {
@@ -418,6 +423,7 @@ function frame(now) {
   world.updateWind(dt);
   sleep.update(elapsed);
   drops.update(dt);
+  updateDemiurgeDiary(dt, now);
   minimap.churches = settlement.churches;
   minimap.update(dt, player, cameraRig.yaw, npcs, npcs.wanted);
   explosions.update(dt);

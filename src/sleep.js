@@ -1,6 +1,7 @@
 import { saveGame } from "./save.js";
 import { PlayerStats, PlayerInventory } from "./rpg.js";
 import { CultState } from "./cult.js";
+import { getDemiurgeDiarySpotIndex } from "./demiurgeBook.js";
 
 const CSS = `
 .sleep-layer { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; display: grid; place-content: center; text-align: center; transition: opacity 1.2s ease; }
@@ -82,6 +83,7 @@ export class SleepSystem {
         x: this.player.x,
         z: this.player.z,
         candles: this.candle?.count ?? 0,
+        demiurgeBookSpotIndex: getDemiurgeDiarySpotIndex(),
         stats: {
           str: PlayerStats.str,
           con: PlayerStats.con,
@@ -92,6 +94,7 @@ export class SleepSystem {
           hay: PlayerInventory.hay,
           wood: PlayerInventory.wood,
           stone: PlayerInventory.stone,
+          clay: PlayerInventory.clay || 0,
           torches: PlayerInventory.torches,
           hasSword: PlayerInventory.hasSword,
         },

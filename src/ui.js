@@ -37,6 +37,7 @@ export class GameUI {
     this.dialogueCoins = document.getElementById("dialogue-coins");
     this.dialogueWood = document.getElementById("dialogue-wood");
     this.dialogueStone = document.getElementById("dialogue-stone");
+    this.dialogueClay = document.getElementById("dialogue-clay");
     this.dialogueHay = document.getElementById("dialogue-hay");
     this.dialogueEyebrow = document.getElementById("dialogue-eyebrow");
     this._dialogueActiveTab = "all";
@@ -69,6 +70,7 @@ export class GameUI {
     this.buildGrid = document.getElementById("build-grid");
     this.buildWood = document.getElementById("build-wood");
     this.buildStone = document.getElementById("build-stone");
+    this.buildClay = document.getElementById("build-clay");
     this.buildHay = document.getElementById("build-hay");
     this.buildClose = document.getElementById("build-close");
     this.buildTabs = document.getElementById("build-tabs");
@@ -82,6 +84,7 @@ export class GameUI {
     this.hayCount = document.getElementById("hay-count");
     this.woodCount = document.getElementById("wood-count");
     this.stoneCount = document.getElementById("stone-count");
+    this.clayCount = document.getElementById("clay-count");
     this.rpgStats = document.getElementById("rpg-stats");
     this.staminaFill = document.getElementById("stamina-fill");
     this.staminaBar = document.getElementById("stamina-bar");
@@ -288,6 +291,7 @@ export class GameUI {
     this._buildActiveTab = "all";
     if (this.buildWood) this.buildWood.textContent = String(playerInventory?.wood ?? 0);
     if (this.buildStone) this.buildStone.textContent = String(playerInventory?.stone ?? 0);
+    if (this.buildClay) this.buildClay.textContent = String(playerInventory?.clay ?? 0);
     if (this.buildHay) this.buildHay.textContent = String(playerInventory?.hay ?? 0);
 
     if (this.buildTabs) {
@@ -341,8 +345,9 @@ export class GameUI {
 
       const hasWood = (inv.wood || 0) >= (item.wood || 0);
       const hasStone = (inv.stone || 0) >= (item.stone || 0);
+      const hasClay = (inv.clay || 0) >= (item.clay || 0);
       const hasHay = (inv.hay || 0) >= (item.hay || 0);
-      const canAfford = hasWood && hasStone && hasHay;
+      const canAfford = hasWood && hasStone && hasClay && hasHay;
 
       if (!canAfford) card.classList.add("unaffordable");
 
@@ -380,6 +385,12 @@ export class GameUI {
         const tag = document.createElement("span");
         tag.className = `cost-tag ${hasStone ? "ok" : "missing"}`;
         tag.textContent = `◆ ${item.stone} Ped (${inv.stone || 0})`;
+        costsRow.append(tag);
+      }
+      if (item.clay) {
+        const tag = document.createElement("span");
+        tag.className = `cost-tag ${hasClay ? "ok" : "missing"}`;
+        tag.textContent = `☲ ${item.clay} Barro (${inv.clay || 0})`;
         costsRow.append(tag);
       }
       if (item.hay) {
@@ -444,6 +455,7 @@ export class GameUI {
     if (inv) {
       if (this.woodCount) this.woodCount.textContent = String(inv.wood ?? 0);
       if (this.stoneCount) this.stoneCount.textContent = String(inv.stone ?? 0);
+      if (this.clayCount) this.clayCount.textContent = String(inv.clay ?? 0);
     }
     if (this.rpgStats) {
       const armPct = equip ? Math.round((equip.armorNegationChance || 0) * 100) : 0;
@@ -495,10 +507,11 @@ export class GameUI {
     this.weaponAmmo.textContent = ammoText;
   }
 
-  setPlayerInventoryDisplay(coins, wood, stone, hay) {
+  setPlayerInventoryDisplay(coins, wood, stone, hay, clay) {
     if (this.dialogueCoins) this.dialogueCoins.textContent = String(coins ?? 0);
     if (this.dialogueWood) this.dialogueWood.textContent = String(wood ?? 0);
     if (this.dialogueStone) this.dialogueStone.textContent = String(stone ?? 0);
+    if (this.dialogueClay) this.dialogueClay.textContent = String(clay ?? 0);
     if (this.dialogueHay) this.dialogueHay.textContent = String(hay ?? 0);
   }
 
@@ -514,7 +527,7 @@ export class GameUI {
     }
 
     if (meta.funds) {
-      this.setPlayerInventoryDisplay(meta.funds.coins, meta.funds.wood, meta.funds.stone, meta.funds.hay);
+      this.setPlayerInventoryDisplay(meta.funds.coins, meta.funds.wood, meta.funds.stone, meta.funds.hay, meta.funds.clay);
     }
 
     // Categorização inteligente em abas

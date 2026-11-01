@@ -260,6 +260,7 @@ export function initCheatMenu(env = {}) {
       PlayerInventory.hasSword = true;
       PlayerInventory.wood = 999;
       PlayerInventory.stone = 999;
+      PlayerInventory.clay = 999;
       PlayerInventory.hay = 999;
       PlayerInventory.torches = 99;
       syncPlayerStatsToPlayer(env.player, env.ui);

@@ -59,8 +59,10 @@ export class World {
     this.treeKit = new TreeKit();
     this._farTreeGeometry = new THREE.ConeGeometry(1.7, 6.8, 5, 1);
     this._rockGeometry = new THREE.IcosahedronGeometry(0.7, 0);
+    this._clayGeometry = new THREE.DodecahedronGeometry(0.65, 0);
     this._farTreeMaterial = new THREE.MeshStandardMaterial({ color: "#4c6445", roughness: 1, flatShading: true });
     this._rockMaterial = new THREE.MeshStandardMaterial({ color: "#777a70", roughness: 1, flatShading: true });
+    this._clayMaterial = new THREE.MeshStandardMaterial({ color: "#9c5737", roughness: 1, flatShading: true });
     setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, CONFIG.seed)));
     this._spawnX = CONFIG.player.startX;
     this._spawnZ = CONFIG.player.startZ;
@@ -276,7 +278,7 @@ export class World {
         const chunk = this.activeChunks[i];
         for (let m = 0; m < chunk.instancedMeshes.length; m++) {
           const mesh = chunk.instancedMeshes[m];
-          if (mesh.name === "Trees" || mesh.name === "Rocks") {
+          if (mesh.name === "Trees" || mesh.name === "Rocks" || mesh.name === "Clay") {
             this.environmentInstancedMeshes.push(mesh);
           }
         }
@@ -964,6 +966,7 @@ export class World {
     const speciesData = { oak: [], pine: [], birch: [], bush: [] };
     const farData = [];
     const rockData = [];
+    const clayData = [];
     const grassData = [];
     const size = this.chunkSize;
     const baseX = cx * size;
@@ -1004,6 +1007,21 @@ export class World {
       const rotation = random() * Math.PI * 2;
       const col = { x, z, radius: scale * 0.58, top: y + scale * 0.9, kind: "rock" };
       rockData.push({ x, y, z, scale, rotation, collider: col });
+      colliders.push(col);
+    }
+
+    const clayCount = 3 + Math.floor(random() * 5);
+    for (let i = 0; i < clayCount; i++) {
+      const x = baseX + 2 + random() * (size - 4);
+      const z = baseZ + 2 + random() * (size - 4);
+      const dx = x - this._spawnX;
+      const dz = z - this._spawnZ;
+      if (dx * dx + dz * dz < 18 * 18 || this._isSettlementClear(x, z)) continue;
+      const y = heights ? this.chunkGroundHeight(cx, cz, heights, x, z) : this.heightAt(x, z);
+      const scale = 0.45 + random() * 0.55;
+      const rotation = random() * Math.PI * 2;
+      const col = { x, z, radius: scale * 0.52, top: y + scale * 0.75, kind: "clay" };
+      clayData.push({ x, y, z, scale, rotation, collider: col });
       colliders.push(col);
     }
 
@@ -1075,6 +1093,22 @@ export class World {
       instancedMeshes.push(rocks);
     }
 
+    const clays = this._makeInstances(this._clayGeometry, this._clayMaterial, clayData, (dummy, item) => {
+      dummy.position.set(item.x, item.y + item.scale * 0.15, item.z);
+      dummy.rotation.set(item.rotation * 0.3, item.rotation, item.rotation * 0.5);
+      dummy.scale.set(item.scale * 1.15, item.scale * 0.65, item.scale * 1.05);
+    }, false);
+    if (clays) {
+      clays.name = "Clay";
+      clays.userData = {
+        isResourceMesh: true,
+        resourceType: "CLAY",
+        items: clayData,
+        harvested: new Map(),
+      };
+      instancedMeshes.push(clays);
+    }
+
     const grass = this._makeInstances(this.treeKit.grass.geometry, this.treeKit.grass.material, grassData, (dummy, item) => {
       dummy.position.set(item.x, item.y, item.z);
       dummy.rotation.set(0, item.rotation, 0);
@@ -1091,6 +1125,7 @@ export class World {
 
     for (let i = 0; i < treeMeshes.length; i++) nearMeshes.push(treeMeshes[i]);
     if (rocks) nearMeshes.push(rocks);
+    if (clays) nearMeshes.push(clays);
     if (grass) nearMeshes.push(grass);
     if (farTrees) farMeshes.push(farTrees);
 

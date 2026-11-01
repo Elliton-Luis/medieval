@@ -23,6 +23,7 @@ import {
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
 import { checkAltarInteraction } from "./cult.js";
+import { checkDemiurgeDiaryNearby, interactWithDemiurgeDiary, getDemiurgeDiaryHint } from "./demiurgeBook.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
@@ -88,12 +89,14 @@ export class InteractionSystem {
         !this.candle?.interact() &&
         !this.houses?.interact() &&
         !this._tryGatherHayBale() &&
+        !this._tryInteractDemiurgeDiary() &&
         !this._tryInteractAltar()
       ) {
         this._interactNearby();
       }
     }
     this._checkAltarNearby();
+    this._checkDemiurgeDiaryNearby();
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
@@ -153,6 +156,7 @@ export class InteractionSystem {
         coins: this.player.coins,
         wood: inv.wood,
         stone: inv.stone,
+        clay: inv.clay || 0,
         hay: inv.hay,
       },
     });
@@ -216,6 +220,16 @@ export class InteractionSystem {
       return true;
     }
     return false;
+  }
+
+  _checkDemiurgeDiaryNearby() {
+    if (checkDemiurgeDiaryNearby(this.player.root.position)) {
+      this.ui.setPrompt?.("✦ DIÁRIO DOS DEMIURGOS [E] Ler Códice Proibido");
+    }
+  }
+
+  _tryInteractDemiurgeDiary() {
+    return interactWithDemiurgeDiary(this.player.root.position, this.ui, this.audio, this.input);
   }
 
   _interactNearby() {
@@ -283,6 +297,7 @@ export class InteractionSystem {
           coins: this.player.coins,
           wood: PlayerInventory.wood,
           stone: PlayerInventory.stone,
+          clay: PlayerInventory.clay || 0,
           hay: PlayerInventory.hay,
         },
       });
@@ -357,6 +372,7 @@ export class InteractionSystem {
         { id: "arrows", label: `Flechas · ${pArrows} moedas`, disabled: this.player.coins < pArrows },
         { id: "bombs", label: `Duas bombas de mão · ${pBombs} moedas`, disabled: this.player.coins < pBombs },
         { id: "train:cha", label: `Cortesia e Retórica (+1 CAR, atual ${PlayerStats.cha}) · ${pTrainCha} moedas`, disabled: this.player.coins < pTrainCha },
+        { id: "rumor:demiurge_book", label: "✦ Boatos da Taverna: Indagar sobre o Diário dos Demiurgos" },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "farmer") {
@@ -422,6 +438,7 @@ export class InteractionSystem {
           disabled: this.player.coins < 20,
         },
         { id: "priest:guide", label: "Ouvir ensinamentos sobre os mistérios da Igreja" },
+        { id: "rumor:demiurge_book", label: "✦ Indagar sobre o Diário dos Demiurgos (Heresia)" },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "beggar") {
@@ -435,6 +452,7 @@ export class InteractionSystem {
           label: alreadyGave ? "Esmola já entregue · +1 Carisma recebido" : "Dar esmola ao pobre (+1 CAR) · 5 moedas",
           disabled: alreadyGave || this.player.coins < 5,
         },
+        { id: "rumor:demiurge_book", label: "✦ Sussurros da Rua: Indagar sobre o Diário dos Demiurgos" },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "guard") {
@@ -460,6 +478,10 @@ export class InteractionSystem {
           id: "rumor:cult",
           label: "Ouvir boatos sobre as sombras além dos muros",
         },
+        {
+          id: "rumor:demiurge_book",
+          label: "✦ Boatos do Submundo: Indagar sobre o Diário dos Demiurgos",
+        },
         ...(MissionState.activeId
           ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
           : []),
@@ -474,6 +496,7 @@ export class InteractionSystem {
         coins: this.player.coins,
         wood: PlayerInventory.wood,
         stone: PlayerInventory.stone,
+        clay: PlayerInventory.clay || 0,
         hay: PlayerInventory.hay,
       },
     });
@@ -525,6 +548,19 @@ export class InteractionSystem {
     if (action === "rumor:cult") {
       const rumor = CULTIST_RUMORS[Math.floor(Math.random() * CULTIST_RUMORS.length)];
       this._showNPCDialogue(rumor);
+      return;
+    }
+    if (action === "rumor:demiurge_book") {
+      const hint = getDemiurgeDiaryHint();
+      let speech = `«O aldeão olha ao redor temeroso e sussurra: "${hint}"»`;
+      if (this.activeNPC?.roleKey === "priest") {
+        speech = `«O sacerdote faz o sinal da cruz com horror: 'Não deves buscar tais blasfêmias... Mas dizem os que guardam a vigília: "${hint}"'»`;
+      } else if (this.activeNPC?.roleKey === "beggar") {
+        speech = `«O mendigo se aproxima trêmulo: 'Eu vi vultos na calada da noite, nobre viajante... "${hint}"'»`;
+      } else if (this.activeNPC?.roleKey === "thief") {
+        speech = `«O bandido sorri de soslaio: 'Procuras o livro proibido? Boas moedas pagam essa informação: "${hint}"'»`;
+      }
+      this._showNPCDialogue(speech);
       return;
     }
 

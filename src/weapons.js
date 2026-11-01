@@ -473,6 +473,7 @@ export class WeaponSystem {
     const parts = [];
     if (cost.wood) parts.push(`${cost.wood} Mad`);
     if (cost.stone) parts.push(`${cost.stone} Ped`);
+    if (cost.clay) parts.push(`${cost.clay} Barro`);
     if (cost.hay) parts.push(`${cost.hay} Feno`);
     const costStr = parts.join(", ");
 
@@ -687,6 +688,7 @@ export class WeaponSystem {
       const parts = [];
       if (cost.wood) parts.push(`${cost.wood} Madeira (tens ${PlayerInventory.wood})`);
       if (cost.stone) parts.push(`${cost.stone} Pedra (tens ${PlayerInventory.stone})`);
+      if (cost.clay) parts.push(`${cost.clay} Barro (tens ${PlayerInventory.clay || 0})`);
       if (cost.hay) parts.push(`${cost.hay} Feno (tens ${PlayerInventory.hay})`);
       this.ui.showToast(`Recursos insuficientes! Precisas de: ${parts.join(" · ")}`);
     }

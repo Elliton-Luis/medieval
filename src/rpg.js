@@ -275,6 +275,7 @@ export const PlayerInventory = {
   gold: 0,
   wood: 0,
   stone: 0,
+  clay: 0,
   hay: 0,
   torches: 0,
 
@@ -1427,6 +1428,10 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
   } else if (toolType === "PICKAXE" && hit.object.name === "Rocks") {
     const gainedStone = Math.floor(Math.random() * 2) + 1;
     PlayerInventory.stone += gainedStone;
+    const bonusClay = Math.random() < 0.35 ? 1 : 0;
+    if (bonusClay > 0) {
+      PlayerInventory.clay = (PlayerInventory.clay || 0) + bonusClay;
+    }
     playStoneMineSound();
 
     _registerHarvestedInstance(hit.object, hit.instanceId);
@@ -1440,7 +1445,27 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
     if (pt && _env.effects) {
       _env.effects.play("star", pt.x, (pt.y ?? 0) + 0.5, pt.z, "#d8dbd6", 0.95);
     }
-    _env.ui?.showToast?.(`+${gainedStone} Pedra (Pedras: ${PlayerInventory.stone})`);
+    const bonusText = bonusClay > 0 ? " · +1 Barro" : "";
+    _env.ui?.showToast?.(`+${gainedStone} Pedra${bonusText} (Pedras: ${PlayerInventory.stone})`);
+    syncPlayerStatsToPlayer();
+    return true;
+  } else if ((toolType === "PICKAXE" || toolType === "AXE" || !toolType) && hit.object.name === "Clay") {
+    const gainedClay = Math.floor(Math.random() * 3) + 2;
+    PlayerInventory.clay = (PlayerInventory.clay || 0) + gainedClay;
+    playStoneMineSound();
+
+    _registerHarvestedInstance(hit.object, hit.instanceId);
+
+    hit.object.getMatrixAt(hit.instanceId, _dummyMatrix);
+    _dummyMatrix.scale(_zeroScale);
+    hit.object.setMatrixAt(hit.instanceId, _dummyMatrix);
+    hit.object.instanceMatrix.needsUpdate = true;
+
+    const pt = hit.point || hit.object.userData?.items?.[hit.instanceId];
+    if (pt && _env.effects) {
+      _env.effects.play("dust", pt.x, (pt.y ?? 0) + 0.4, pt.z, "#9c5737", 1.8);
+    }
+    _env.ui?.showToast?.(`+${gainedClay} Barro recolhido (Total: ${PlayerInventory.clay})`);
     syncPlayerStatsToPlayer();
     return true;
   }
@@ -1531,6 +1556,44 @@ export const BUILD_COSTS = {
     desc: "Círculo de pedras com brasas ardentes e troncos rústicos para assento.",
     category: "VILA",
     icon: "🔥",
+  },
+  STONE_WALL_SMALL: {
+    wood: 0,
+    stone: 6,
+    clay: 0,
+    label: "Muro Pequeno de Pedra",
+    desc: "Mureta sólida de alvenaria de pedra lavrada com arremate superior nivelado.",
+    category: "DEFESA",
+    icon: "🧱",
+  },
+  STONE_WALL_LARGE: {
+    wood: 4,
+    stone: 16,
+    clay: 0,
+    label: "Muralha Grande de Pedra",
+    desc: "Alta muralha fortificada como as da cidade, com passadiço elevado, parapeito e ameias.",
+    category: "DEFESA",
+    icon: "🏰",
+  },
+  CLAY_WALL_SMALL: {
+    wood: 1,
+    stone: 0,
+    clay: 6,
+    hay: 2,
+    label: "Muro Pequeno de Barro",
+    desc: "Muro baixo de taipa e blocos de adobe de barro cozido com reforço de fibras.",
+    category: "DEFESA",
+    icon: "🧱",
+  },
+  CLAY_WALL_LARGE: {
+    wood: 4,
+    stone: 0,
+    clay: 14,
+    hay: 4,
+    label: "Muralha Grande de Barro",
+    desc: "Imponente muralha de barro batido e taipa de pilão com passadiço e ameias de argila.",
+    category: "DEFESA",
+    icon: "🛖",
   },
 };
 
@@ -2255,6 +2318,216 @@ function _buildPlayerCampfireMesh() {
   return group;
 }
 
+function _buildStoneWallSmallMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6e6e6a, roughness: 0.95, flatShading: true });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x565652, roughness: 0.92, flatShading: true });
+
+  // Corpo principal do muro (3.8m comprimento × 2.0m altura × 0.75m espessura)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.0, 0.75), stoneMat);
+  body.position.set(0, 1.0, 0);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // Pilares / contrafortes reforçados nas duas extremidades
+  for (const px of [-1.8, 1.8]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.55, 2.2, 0.95), capMat);
+    post.position.set(px, 1.1, 0);
+    post.castShadow = true;
+    group.add(post);
+  }
+
+  // Platibanda / acabamento em cantaria chanfrada no topo
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.2, 0.88), capMat);
+  cap.position.set(0, 2.08, 0);
+  cap.castShadow = true;
+  group.add(cap);
+
+  group.visible = false;
+  group.userData = { type: "STONE_WALL_SMALL", collidersRegistered: false };
+  return group;
+}
+
+function _buildStoneWallLargeMesh() {
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x686862, roughness: 0.96, flatShading: true });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x4e4e4a, roughness: 0.92, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9, flatShading: true });
+
+  // Fundação larga e resistente
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.8, 2.1), trimMat);
+  foundation.position.set(0, 0.4, 0);
+  foundation.castShadow = true;
+  foundation.receiveShadow = true;
+  group.add(foundation);
+
+  // Paredão maciço de cantaria (6.0m de comprimento, 4.4m até o passadiço, 1.8m espessura)
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(6.0, 4.4, 1.8), stoneMat);
+  wall.position.set(0, 3.0, 0);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  group.add(wall);
+
+  // Passadiço de topo (caminho de ronda)
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.22, 1.82), trimMat);
+  walkway.position.set(0, 5.25, 0);
+  group.add(walkway);
+
+  // Parapeito frontal defensivo (Z = +0.74)
+  const parapetFront = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.85, 0.32), stoneMat);
+  parapetFront.position.set(0, 5.75, 0.74);
+  parapetFront.castShadow = true;
+  group.add(parapetFront);
+
+  // Ameias / merlões clássicos como as muralhas da cidade
+  for (let m = -2; m <= 2; m++) {
+    const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.55, 0.36), trimMat);
+    merlon.position.set(m * 1.35, 6.42, 0.74);
+    merlon.castShadow = true;
+    group.add(merlon);
+  }
+
+  // Guarda-corpo de madeira atrás (Z = -0.8)
+  const railingBack = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.12, 0.12), timberMat);
+  railingBack.position.set(0, 6.1, -0.8);
+  group.add(railingBack);
+
+  for (const rx of [-2.7, -0.9, 0.9, 2.7]) {
+    const railPost = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.85, 0.12), timberMat);
+    railPost.position.set(rx, 5.75, -0.8);
+    group.add(railPost);
+  }
+
+  // Escada de acesso de madeira na parte traseira
+  for (const lx of [-0.4, 0.4]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 5.6, 0.12), timberMat);
+    rail.position.set(lx, 2.7, -1.02);
+    rail.rotation.x = -0.16;
+    group.add(rail);
+  }
+  for (let s = 1; s <= 9; s++) {
+    const rung = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.08), timberMat);
+    rung.position.set(0, s * 0.55, -0.95 + s * 0.08);
+    group.add(rung);
+  }
+
+  group.visible = false;
+  group.userData = { type: "STONE_WALL_LARGE", collidersRegistered: false };
+  return group;
+}
+
+function _buildClayWallSmallMesh() {
+  const group = new THREE.Group();
+  const clayMat = new THREE.MeshStandardMaterial({ color: 0x9e5535, roughness: 0.96, flatShading: true });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x82442a, roughness: 0.94, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x4a321c, roughness: 0.9, flatShading: true });
+
+  // Corpo do muro de adobe e barro (3.8m × 2.0m × 0.75m)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.95, 0.75), clayMat);
+  body.position.set(0, 1.0, 0);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // Vigas verticais de contenção de madeira embutidas
+  for (const px of [-1.8, 0, 1.8]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.2, 0.82), timberMat);
+    post.position.set(px, 1.1, 0);
+    post.castShadow = true;
+    group.add(post);
+  }
+
+  // Cobertura de proteção contra chuva em barro cozido no topo
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.18, 0.86), trimMat);
+  cap.position.set(0, 2.05, 0);
+  cap.castShadow = true;
+  group.add(cap);
+
+  group.visible = false;
+  group.userData = { type: "CLAY_WALL_SMALL", collidersRegistered: false };
+  return group;
+}
+
+function _buildClayWallLargeMesh() {
+  const group = new THREE.Group();
+  const clayMat = new THREE.MeshStandardMaterial({ color: 0x9a5232, roughness: 0.96, flatShading: true });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x7c3f24, roughness: 0.94, flatShading: true });
+  const timberMat = new THREE.MeshStandardMaterial({ color: 0x46301a, roughness: 0.9, flatShading: true });
+
+  // Base reforçada de taipa
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.8, 2.1), trimMat);
+  foundation.position.set(0, 0.4, 0);
+  foundation.castShadow = true;
+  foundation.receiveShadow = true;
+  group.add(foundation);
+
+  // Muralha de taipa de pilão / barro batido (6.0m de comprimento, 4.4m até o passadiço, 1.8m espessura)
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(6.0, 4.4, 1.8), clayMat);
+  wall.position.set(0, 3.0, 0);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  group.add(wall);
+
+  // Vigamentos horizontais de madeira estrutural
+  for (const wy of [1.6, 3.4]) {
+    const beamF = new THREE.Mesh(new THREE.BoxGeometry(6.1, 0.18, 0.14), timberMat);
+    beamF.position.set(0, wy, 0.91);
+    group.add(beamF);
+
+    const beamB = new THREE.Mesh(new THREE.BoxGeometry(6.1, 0.18, 0.14), timberMat);
+    beamB.position.set(0, wy, -0.91);
+    group.add(beamB);
+  }
+
+  // Passadiço de topo (caminho de ronda)
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.22, 1.82), trimMat);
+  walkway.position.set(0, 5.25, 0);
+  group.add(walkway);
+
+  // Parapeito frontal de barro (Z = +0.74)
+  const parapetFront = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.85, 0.32), clayMat);
+  parapetFront.position.set(0, 5.75, 0.74);
+  parapetFront.castShadow = true;
+  group.add(parapetFront);
+
+  // Ameias de adobe no topo
+  for (let m = -2; m <= 2; m++) {
+    const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.55, 0.36), trimMat);
+    merlon.position.set(m * 1.35, 6.42, 0.74);
+    merlon.castShadow = true;
+    group.add(merlon);
+  }
+
+  // Guarda-corpo de toras atrás
+  const railingBack = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.12, 0.12), timberMat);
+  railingBack.position.set(0, 6.1, -0.8);
+  group.add(railingBack);
+
+  for (const rx of [-2.7, -0.9, 0.9, 2.7]) {
+    const railPost = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.85, 0.12), timberMat);
+    railPost.position.set(rx, 5.75, -0.8);
+    group.add(railPost);
+  }
+
+  // Escada de acesso de madeira na parte traseira
+  for (const lx of [-0.4, 0.4]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 5.6, 0.12), timberMat);
+    rail.position.set(lx, 2.7, -1.02);
+    rail.rotation.x = -0.16;
+    group.add(rail);
+  }
+  for (let s = 1; s <= 9; s++) {
+    const rung = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.08), timberMat);
+    rung.position.set(0, s * 0.55, -0.95 + s * 0.08);
+    group.add(rung);
+  }
+
+  group.visible = false;
+  group.userData = { type: "CLAY_WALL_LARGE", collidersRegistered: false };
+  return group;
+}
+
 export function buildStructureMeshByType(type) {
   switch (type) {
     case "CABIN": return _buildPlayerCabinMesh();
@@ -2267,6 +2540,10 @@ export function buildStructureMeshByType(type) {
     case "WELL": return _buildPlayerWellMesh();
     case "TORCH_POST": return _buildPlayerTorchPostMesh();
     case "CAMPFIRE": return _buildPlayerCampfireMesh();
+    case "STONE_WALL_SMALL": return _buildStoneWallSmallMesh();
+    case "STONE_WALL_LARGE": return _buildStoneWallLargeMesh();
+    case "CLAY_WALL_SMALL": return _buildClayWallSmallMesh();
+    case "CLAY_WALL_LARGE": return _buildClayWallLargeMesh();
     default: return _buildPlayerHouseMesh();
   }
 }
@@ -2325,16 +2602,17 @@ export function updateBuildPreview(playerPos, playerRot, active, type = "HOUSE")
   const canAfford =
     PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
-    (cost.hay ? PlayerInventory.hay >= cost.hay : true);
+    (cost.hay ? PlayerInventory.hay >= cost.hay : true) &&
+    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true);
 
   const activeMat = canAfford ? _previewGreenMat : _previewRedMat;
 
   // Ajusta a distância frontal conforme a escala do edifício
   const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
     ? 2.6
-    : ["CABIN", "CORRAL", "BLACKSMITH_SHED"].includes(type)
+    : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
       ? 3.8
-      : 4.8;
+      : 5.0;
 
   const rotY = typeof playerRot === "number" ? playerRot : playerRot?.y ?? 0;
   _buildEuler.set(0, rotY, 0);
@@ -2569,6 +2847,15 @@ function _registerBuildingColliders(building, world = _env.world) {
     const top = by + 0.9;
     const bottom = by - 0.5;
     world.addOrientedBox(bx, bz, 1.6, 1.6, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "STONE_WALL_SMALL" || type === "CLAY_WALL_SMALL") {
+    const top = by + 2.3;
+    const bottom = by - 1.0;
+    world.addOrientedBox(bx, bz, 3.8, 0.85, ry, bottom, top, { move: true, shot: true, cam: false });
+  } else if (type === "STONE_WALL_LARGE" || type === "CLAY_WALL_LARGE") {
+    const top = by + 6.8;
+    const bottom = by - 1.5;
+    world.addOrientedBox(bx, bz, 6.0, 1.85, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedFloor?.(bx, bz, 6.0, 1.8, ry, by + 5.25);
   }
   building.userData.collidersRegistered = true;
 }
@@ -2587,7 +2874,8 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
   if (
     PlayerInventory.wood >= (cost.wood || 0) &&
     (cost.stone ? PlayerInventory.stone >= cost.stone : true) &&
-    (cost.hay ? PlayerInventory.hay >= cost.hay : true)
+    (cost.hay ? PlayerInventory.hay >= cost.hay : true) &&
+    (cost.clay ? (PlayerInventory.clay || 0) >= cost.clay : true)
   ) {
     const pool =
       playerBuildingsPool && playerBuildingsPool.length > 0
@@ -2604,6 +2892,7 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
 
     if (cost.wood) PlayerInventory.wood -= cost.wood;
     if (cost.stone) PlayerInventory.stone -= cost.stone;
+    if (cost.clay) PlayerInventory.clay = Math.max(0, (PlayerInventory.clay || 0) - cost.clay);
     if (cost.hay) {
       PlayerInventory.hay -= cost.hay;
       PlayerStats.hay = PlayerInventory.hay;
@@ -2618,9 +2907,9 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
 
     const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
       ? 2.6
-      : ["CABIN", "CORRAL", "BLACKSMITH_SHED"].includes(type)
+      : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
         ? 3.8
-        : 4.8;
+        : 5.0;
 
     _buildOffset.set(0, 0, fwdDist).applyEuler(_buildEuler);
     const bx = (playerPos.x ?? 0) + _buildOffset.x;
