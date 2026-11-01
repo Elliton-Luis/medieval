@@ -86,6 +86,7 @@ export class SleepSystem {
           con: PlayerStats.con,
           cha: PlayerStats.cha,
           spd: PlayerStats.spd,
+          morality: PlayerStats.morality ?? 0,
           hay: PlayerInventory.hay,
           wood: PlayerInventory.wood,
           stone: PlayerInventory.stone,

@@ -45,6 +45,7 @@ export class PauseMenu {
           <strong id="aim-assist-state">ATIVADO</strong>
         </div>
         <button id="pause-continue" type="button">CONTINUAR</button>
+        <button id="pause-intro" type="button" style="margin-top: 8px; font-size: 14px; background: #281e1888; border-color: #c9a24a66;">VER INTRODUÇÃO</button>
         <small>T alterna assist. mira · M música · Esc pausa</small>
       </div>`;
     container.append(layer);
@@ -90,6 +91,10 @@ export class PauseMenu {
     // ao soltar o controle de efeitos toca um som de exemplo
     sfx.addEventListener("change", () => audio.hit(false));
     layer.querySelector("#pause-continue").addEventListener("click", () => this.resume());
+    layer.querySelector("#pause-intro")?.addEventListener("click", () => {
+      this._close();
+      this.onPlayIntro?.();
+    });
     document.addEventListener("game-pointer-lock", (event) => this._onLock(event.detail));
   }
 

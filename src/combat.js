@@ -261,7 +261,7 @@ export class CombatSystem {
       syncPlayerStatsToPlayer(this.player, this.ui);
       this.effects.play("smoke", this.player.x, this.player.root.position.y + 0.8, this.player.z, "#d4c9ad", 1.6);
       this.audio.hit(true);
-      this.deathScreen?.start({ coinsLost: lost });
+      this.deathScreen?.start({ coinsLost: lost, morality: PlayerStats.morality ?? 0 });
     } else {
       this.ui.showToast(`Vitalidade ${this.player.health}/${this.player.maxHealth}`);
     }

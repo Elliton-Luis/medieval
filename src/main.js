@@ -93,6 +93,13 @@ import {
   updateEclipseLightning,
   updateMessenger,
 } from "./decay.js?v=19";
+import {
+  GameState,
+  startIntroSequence,
+  updateIntroSequence,
+  endIntroSequence,
+  createTallFigure,
+} from "./intro.js?v=20";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -210,6 +217,9 @@ interactions.hayBales = settlement.hay;
 initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs });
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
+pause.onPlayIntro = () => {
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui });
+};
 const damageFx = new DamageFx({ container: gameRoot, audio, player });
 combat.damageFx = damageFx;
 const sharedHouseMaterial = createSharedHouseMaterial();
@@ -240,7 +250,7 @@ dayNight.onNewDay = () => {
 };
 
 if (new URLSearchParams(location.search).has("debug")) {
-  window.__game = { WorldDecay, triggerDailyDecayCycle, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+  window.__game = { GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 }
 
 const saved = loadGame();
@@ -250,6 +260,7 @@ if (saved) {
     PlayerStats.con = saved.stats.con ?? PlayerStats.con;
     PlayerStats.cha = saved.stats.cha ?? PlayerStats.cha;
     PlayerStats.spd = saved.stats.spd ?? PlayerStats.spd;
+    PlayerStats.morality = saved.stats.morality ?? PlayerStats.morality;
     PlayerStats.hay = saved.stats.hay ?? PlayerStats.hay;
     PlayerInventory.hay = PlayerStats.hay;
     PlayerInventory.wood = saved.stats.wood ?? PlayerInventory.wood;
@@ -275,6 +286,11 @@ if (saved) {
   weapons._refreshWeaponHud();
 }
 
+const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
+if (shouldPlayIntro) {
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui });
+}
+
 function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -297,6 +313,20 @@ function frame(now) {
   // a tela de morte usa o tempo real; o jogo usa passos curtos e a câmera lenta
   deathScreen.update(elapsed);
   const dt = pause.open ? 0 : Math.min(elapsed, CONFIG.maxDelta) * deathScreen.timeScale;
+
+  if (GameState.isIntroPlaying) {
+    updateIntroSequence(dt, player, camera, world, audio, effects, ui);
+    world.updateAround(player.x, player.z);
+    effects.update(dt);
+    world.updateVisibility(camera, player.x, player.z);
+    dayNight.update(dt, player.x, player.z);
+    renderer.render(scene, camera);
+    if (!hasRendered) {
+      hasRendered = true;
+      window.setTimeout(() => ui.hideLoading(), 160);
+    }
+    return;
+  }
 
   if (input.consumeAimAssistPressed()) {
     const on = aim.toggleAssist();

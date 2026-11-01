@@ -105,6 +105,7 @@ export const PlayerStats = {
   spd: 10, // Multiplicador de velocidade e estamina
   gold: 0,
   hay: 0,
+  morality: 0, // -100 (Caos/Demiurgo) a +100 (Luz/Bondade)
 
   getMaxHp: () => PlayerStats.con * 10,
   getMaxHearts: () => Math.max(3, Math.round(PlayerStats.con * 0.5)),
@@ -504,22 +505,27 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
 
   if (wasProvenBandit) {
     // Era um criminoso comprovado (roubou algo)
+    PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + 5);
     if (isWitnessed) {
       PlayerStats.cha += 1; // Herói local, carisma sobe
-      _env.ui?.showToast("Justiça feita! Bandido abatido · +50 moedas · Carisma +1");
+      _env.ui?.showToast("Justiça feita! Bandido abatido · +50 moedas · Carisma +1 · Bondade +5");
     } else {
       // O Crime Perfeito: sem testemunhas, pega o ouro extra mas carisma não sobe nem desce
-      _env.ui?.showToast("Bandido abatido nas sombras · +50 moedas recuperadas");
+      _env.ui?.showToast("Bandido abatido nas sombras · +50 moedas recuperadas · Bondade +5");
     }
     // Dropa o loot extra (50 moedas)
     spawnLoot(deathPos, 50);
   } else {
     // Matou inocente (ou bandido que ainda não havia cometido crime — Falso Herói)
+    PlayerStats.morality = Math.max(-100, (PlayerStats.morality ?? 0) - 10);
     if (isWitnessed) {
       PlayerStats.cha = Math.max(1, PlayerStats.cha - 5);
       triggerWantedLevel(2); // Ganha 2 estrelas/escudos
-      _env.ui?.showToast("Assassinato testemunhado! Carisma -5 · Procurado +2");
+      _env.ui?.showToast("Assassinato testemunhado! Carisma -5 · Bondade -10 · Procurado +2");
       // Desperta o Mensageiro de Cinzas para ação maligna
+      triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
+    } else {
+      _env.ui?.showToast("Assassinato nas sombras · Bondade -10");
       triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     }
   }
@@ -916,6 +922,7 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
 
   resetWantedLevel(); // Despista guardas e zera procurado gratuitamente
   PlayerStats.cha = Math.min(20, PlayerStats.cha + 2); // Purifica a alma
+  PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + (voluntaryOffer >= 20 ? 15 : 5));
   playChoirSound(); // Efeito sonoro angelical
   if (_env.effects && _env.player) {
     _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
@@ -943,6 +950,7 @@ export function interactWithBeggar(playerPos, npcBeggar) {
     PlayerStats.gold -= 5;
     if (_env.player) _env.player.coins = PlayerStats.gold;
     PlayerStats.cha = Math.min(20, PlayerStats.cha + 1);
+    PlayerStats.morality = Math.min(100, (PlayerStats.morality ?? 0) + 10);
     obj.userData.hasReceivedAlms = true;
     obj.userData.state = "CHEERING"; // NPC comemora
     if (npcEntity) {

@@ -48,6 +48,23 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 const easeInOut = (t) => t * t * (3 - 2 * t);
 
+export const DEATH_MESSAGES = {
+  GOOD: [
+    "O Senhor teve misericórdia de ti.",
+    "A luz divina te guia de volta.",
+    "Tua alma pura recusa as sombras."
+  ],
+  EVIL: [
+    "O Demiurgo diz que não finalizastes tua missão.",
+    "A matéria ainda te aprisiona, retorne.",
+    "O abismo te cospe de volta ao caos."
+  ],
+  NEUTRAL: [
+    "ó vil e desditoso miserável.",
+    "A morte é apenas um contratempo."
+  ]
+};
+
 export class DeathScreen {
   constructor({ container, canvas, audio, cameraRig, input, onRespawn }) {
     this.container = container;
@@ -122,12 +139,18 @@ export class DeathScreen {
     this.black = layer.querySelector(".wasted-black");
   }
 
-  start({ coinsLost = 0 } = {}) {
+  start({ coinsLost = 0, morality = 0 } = {}) {
     if (this.state !== "idle") return;
     this.state = "dying";
     this.time = 0;
     this.scale = 1;
     this._shown = {};
+
+    let messages = DEATH_MESSAGES.NEUTRAL;
+    if (morality >= 20) messages = DEATH_MESSAGES.GOOD;
+    else if (morality <= -20) messages = DEATH_MESSAGES.EVIL;
+    this.subtitle.textContent = messages[Math.floor(Math.random() * messages.length)];
+
     this.coins.textContent = coinsLost > 0
       ? `Perdeste ${coinsLost} ${coinsLost === 1 ? "moeda" : "moedas"} de ouro`
       : "Nada tinhas a perder";

@@ -419,4 +419,31 @@ export class GameAudio {
     this._tone("sine", 880, 1320, 0.22, 0.14);
     this._tone("triangle", 1320, 1760, 0.28, 0.1, 0.08);
   }
+
+  // Som de impacto grave, sussurro espectral e susto da Entidade de 6 Olhos (Web Audio API)
+  supernaturalScare() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const t = ctx.currentTime;
+    // Impacto sub-grave profundo com queda rápida
+    this._tone("sawtooth", 90, 24, 1.4, 0.7);
+    this._tone("sine", 60, 20, 1.8, 0.9);
+    // Sussurro espectral e estalido
+    this._burst(1.2, 0.65, "bandpass", 1600, 300);
+    this._burst(0.4, 0.5, "highpass", 3200, 1200);
+
+    // Acorde dissonante de órgão espectral (Tritonus)
+    for (const freq of [110, 155.56, 220]) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(0.2, t + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0005, t + 1.8);
+      osc.connect(gain).connect(this.sfx);
+      osc.start(t);
+      osc.stop(t + 1.85);
+    }
+  }
 }
