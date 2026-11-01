@@ -1647,24 +1647,29 @@ function _buildPlayerHouseMesh() {
   const roofLen = Math.hypot(roofRun, roofPitch);
   const roofAng = Math.atan2(roofPitch, roofRun);
 
+  const roofGroup = new THREE.Group();
+  roofGroup.name = "HouseRoofGroup";
+  group.add(roofGroup);
+  group.roofGroup = roofGroup;
+
   for (const side of [-1, 1]) {
     const slope = new THREE.Mesh(new THREE.BoxGeometry(roofLen + 0.35, 0.16, 4.7), roofMat);
     slope.position.set(side * (roofRun * 0.5), 3.1 + roofPitch * 0.5, 0);
     slope.rotation.z = -side * roofAng;
     slope.castShadow = true;
-    group.add(slope);
+    roofGroup.add(slope);
   }
   // Cumeeira central reforçada
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 4.8), timberMat);
   ridge.position.set(0, 3.1 + roofPitch + 0.05, 0);
-  group.add(ridge);
+  roofGroup.add(ridge);
 
   // Frontões triangulares (Oitões) na frente e trás
   for (const fz of [-2.02, 2.02]) {
     const gable = new THREE.Mesh(new THREE.ConeGeometry(2.7, roofPitch, 4), plasterMat);
     gable.position.set(0, 3.1 + roofPitch * 0.46, fz);
     gable.rotation.y = Math.PI / 4;
-    group.add(gable);
+    roofGroup.add(gable);
   }
 
   // Chaminé de pedra lateral
@@ -1768,18 +1773,31 @@ function _buildPlayerCabinMesh() {
   group.add(header);
 
   // Telhado inclinado de duas águas
+  const roofGroup = new THREE.Group();
+  roofGroup.name = "CabinRoofGroup";
+  group.add(roofGroup);
+  group.roofGroup = roofGroup;
+
   for (const side of [-1, 1]) {
     const slope = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 3.4), roofMat);
     slope.position.set(side * 1.0, 2.8, 0);
     slope.rotation.z = -side * 0.48;
     slope.castShadow = true;
-    group.add(slope);
+    roofGroup.add(slope);
   }
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 3.5), timberMat);
   ridge.position.set(0, 3.25, 0);
-  group.add(ridge);
+  roofGroup.add(ridge);
 
-  // Interior: banqueta e tapete de caça
+  // Interior: cama rústica de campanha, banqueta e tapete de caça
+  const hayMat = new THREE.MeshStandardMaterial({ color: 0xd4b055, roughness: 0.9, flatShading: true });
+  const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 1.8), timberMat);
+  bedFrame.position.set(-1.0, 0.35, -0.4);
+  group.add(bedFrame);
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 1.65), hayMat);
+  mattress.position.set(-1.0, 0.52, -0.4);
+  group.add(mattress);
+
   const rug = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.02, 1.2), rugMat);
   rug.position.set(0, 0.31, 0);
   group.add(rug);
@@ -2435,14 +2453,27 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pBack = toW(0, -2.0);
     const pLeft = toW(-2.36, 0);
     const pRight = toW(2.36, 0);
-    const pFrontL = toW(-1.68, 2.0);
-    const pFrontR = toW(1.68, 2.0);
+    const pFrontL = toW(-1.85, 2.0);
+    const pFrontR = toW(1.85, 2.0);
 
-    world.addOrientedBox(pBack.x, pBack.z, 5.0, 0.34, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pRight.x, pRight.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.65, 0.34, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.65, 0.34, ry, bottom, top, { move: true, shot: true, cam: true });
+    // Registra piso interno e degrau frontal no world.floors para caminhar suavemente
+    world.addOrientedFloor?.(bx, bz, 4.8, 4.0, ry, by + 0.08);
+    const pStep = toW(0, 2.45);
+    world.addOrientedFloor?.(pStep.x, pStep.z, 2.2, 0.9, ry, by + 0.08);
+
+    world.addOrientedBox(pBack.x, pBack.z, 5.0, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pLeft.x, pLeft.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pRight.x, pRight.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
+    // Paredes frontais com vão de porta amplo (2.4m) livre de colisão
+    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+
+    // Registra cama para repouso
+    const bedPos = toW(-1.6, 0.9);
+    building.userData.bed = { x: bedPos.x, y: by + 0.45, z: bedPos.z };
+    building.userData.isResidence = true;
+    building.userData.hx = 2.4;
+    building.userData.hz = 2.0;
   } else if (type === "CORRAL") {
     const top = by + 1.5;
     const bottom = by - 1.0;
@@ -2451,6 +2482,8 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pRight = toW(2.5, 0);
     const pFrontL = toW(-1.7, 2.5);
     const pFrontR = toW(1.7, 2.5);
+
+    world.addOrientedFloor?.(bx, bz, 5.0, 5.0, ry, by + 0.04);
 
     world.addOrientedBox(pBack.x, pBack.z, 5.2, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
     world.addOrientedBox(pLeft.x, pLeft.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
@@ -2463,28 +2496,41 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pBack = toW(0, -1.35);
     const pLeft = toW(-1.7, 0);
     const pRight = toW(1.7, 0);
-    const pFrontL = toW(-1.15, 1.35);
-    const pFrontR = toW(1.15, 1.35);
+    const pFrontL = toW(-1.35, 1.35);
+    const pFrontR = toW(1.35, 1.35);
 
-    world.addOrientedBox(pBack.x, pBack.z, 3.6, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pRight.x, pRight.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.2, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.2, 0.3, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedFloor?.(bx, bz, 3.5, 2.9, ry, by + 0.25);
+    const pStep = toW(0, 1.5);
+    world.addOrientedFloor?.(pStep.x, pStep.z, 1.8, 0.7, ry, by + 0.15);
+
+    world.addOrientedBox(pBack.x, pBack.z, 3.6, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pLeft.x, pLeft.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pRight.x, pRight.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pFrontL.x, pFrontL.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pFrontR.x, pFrontR.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+
+    // Registra cama de campanha para repouso
+    const bedPos = toW(-1.0, -0.4);
+    building.userData.bed = { x: bedPos.x, y: by + 0.45, z: bedPos.z };
+    building.userData.isResidence = true;
+    building.userData.hx = 1.7;
+    building.userData.hz = 1.45;
   } else if (type === "BARN") {
     const top = by + 4.5;
     const bottom = by - 1.5;
     const pBack = toW(0, -2.3);
     const pLeft = toW(-2.9, 0);
     const pRight = toW(2.9, 0);
-    const pFrontL = toW(-1.95, 2.3);
-    const pFrontR = toW(1.95, 2.3);
+    const pFrontL = toW(-2.1, 2.3);
+    const pFrontR = toW(2.1, 2.3);
 
-    world.addOrientedBox(pBack.x, pBack.z, 6.0, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pRight.x, pRight.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.8, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.8, 0.35, ry, bottom, top, { move: true, shot: true, cam: true });
+    world.addOrientedFloor?.(bx, bz, 5.8, 4.6, ry, by + 0.1);
+
+    world.addOrientedBox(pBack.x, pBack.z, 6.0, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pLeft.x, pLeft.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pRight.x, pRight.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
+    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
   } else if (type === "WATCHTOWER") {
     const top = by + 6.8;
     const bottom = by - 1.0;
@@ -2585,7 +2631,10 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
     building.rotation.y = rotY;
     building.visible = true;
 
-    // Registra colisões no mundo físico
+    // Limpa árvores e pedras do terreno dentro da área da construção
+    _env.world?.clearObstaclesInRadius?.(bx, bz, fwdDist + 1.2);
+
+    // Registra colisões e pisos no mundo físico
     _registerBuildingColliders(building, _env.world);
 
     if (_env.effects) {
@@ -2596,6 +2645,10 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
     return building;
   }
   return false;
+}
+
+export function getPlayerResidences() {
+  return (_playerBuildingsPool || []).filter((b) => b.visible && b.userData.isResidence);
 }
 
 /**

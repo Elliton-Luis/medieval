@@ -221,6 +221,8 @@ interactions.candle = candle;
 interactions.houses = houses;
 combat.houses = houses;
 weapons.houses = houses;
+weapons.torches = torches;
+weapons.candle = candle;
 const horses = new HorseManager({ scene, world, effects, npcs, audio, player });
 horses.spawnHerd(30, 22, 3);
 horses.spawnOwned(settlement.houses);

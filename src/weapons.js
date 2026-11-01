@@ -483,8 +483,12 @@ export class WeaponSystem {
 
   _tryPlaceHeldItem() {
     const def = this.currentWeapon;
-    if (def.id === "fists") {
-      this.ui.showToast("Equipe uma tocha ou arma para fixar na parede ou chão!");
+    const isCandleActive = Boolean(this.candle && (this.candle.equipped || this.candle.lit));
+    const hasCandleInInv = Boolean(this.candle && this.candle.count > 0);
+    const hasTorchInInv = (PlayerInventory.torches || 0) > 0;
+
+    if (def.id === "fists" && !isCandleActive && !hasCandleInInv && !hasTorchInInv) {
+      this.ui.showToast("Equipe uma tocha, vela (V) ou arma para fixar no cenário!");
       return;
     }
 
@@ -498,23 +502,96 @@ export class WeaponSystem {
     const targetX = px + forwardX * reach;
     const targetZ = pz + forwardZ * reach;
     const isNearWall = this.world.isBlockedAt(targetX, targetZ, 0.45);
+    const ground = this.world.heightAt(targetX, targetZ);
 
     this.placedItems = this.placedItems || [];
+    const torchSys = this.torches || this.houses?.torches;
 
-    if (def.id === "torch") {
-      // Fixa Tocha
+    // 1. Fixar Vela (se estiver com vela ativa ou no inventário)
+    if (isCandleActive || (def.id === "fists" && hasCandleInInv && !hasTorchInInv)) {
+      if (!this.candle || this.candle.count <= 0) {
+        this.ui.showToast("Você não possui mais velas no inventário!");
+        return;
+      }
+      const placeY = isNearWall ? py - 0.2 : ground;
+
+      const candleGroup = new THREE.Group();
+      candleGroup.name = "PlacedCandle";
+
+      const waxMat = new THREE.MeshStandardMaterial({ color: 0xefe4c8, roughness: 0.9, flatShading: true });
+      const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.22, 8), waxMat);
+      wax.position.y = 0.11;
+      wax.castShadow = true;
+
+      const wick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.04, 4),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+      );
+      wick.position.y = 0.23;
+
+      const flameSprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: torchSys?.glow || this.candle?.torches?.glow,
+          color: "#ffd08a",
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      flameSprite.scale.set(0.38, 0.52, 1);
+      flameSprite.position.y = 0.32;
+
+      const candleLight = new THREE.PointLight(0xffb866, 2.8, 16, 1.8);
+      candleLight.position.set(0, 0.35, 0);
+
+      candleGroup.add(wax, wick, flameSprite, candleLight);
+      candleGroup.position.set(targetX, placeY, targetZ);
+      this.scene.add(candleGroup);
+
+      this.candle.count--;
+      if (this.candle.count <= 0) {
+        this.candle.equipped = false;
+        this.candle.lit = false;
+        if (this.candle.mesh) this.candle.mesh.visible = false;
+      }
+      this.candle._sync?.();
+
+      this.effects.play("glint", targetX, placeY + 0.3, targetZ, "#ffe48f", 1.2);
+      this.audio.coin?.();
+      this.ui.showToast("Vela de sebo colocada! Pressione E para recolher.");
+      this.placedItems.push({
+        id: "candle",
+        name: "Vela de Sebo",
+        x: targetX,
+        y: placeY,
+        z: targetZ,
+        model: candleGroup,
+      });
+      return;
+    }
+
+    // 2. Fixar Tocha
+    if (def.id === "torch" || (def.id === "fists" && hasTorchInInv)) {
       let placed;
       if (isNearWall) {
-        placed = this.houses?.torches?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false);
+        placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false);
       } else {
-        const ground = this.world.heightAt(targetX, targetZ);
-        placed = this.houses?.torches?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true);
+        placed = torchSys?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true);
       }
       this.effects.play("star", targetX, py, targetZ, "#ffa834", 1.2);
       this.audio.weaponSwing?.("chop", false);
       this.ui.showToast("Tocha fixada! Pressione E para recolher.");
+
+      if (def.id === "torch") {
+        this.unlock("torch", false);
+        this.selectSlot(1);
+      } else if (PlayerInventory.torches > 0) {
+        PlayerInventory.torches--;
+      }
+
       this.placedItems.push({
         id: "torch",
+        name: "Tocha",
         x: targetX,
         y: py,
         z: targetZ,
@@ -524,7 +601,6 @@ export class WeaponSystem {
     }
 
     // Fixa Arma na Parede / Expositor
-    const ground = this.world.heightAt(targetX, targetZ);
     const placeY = isNearWall ? py : ground + 0.5;
 
     const model = buildWeaponModel(def.id);
@@ -573,6 +649,13 @@ export class WeaponSystem {
           this.unlock("torch", false);
           this.equip("torch", false);
           this.ui.showToast("Tocha recolhida de volta ao inventário!");
+        } else if (item.id === "candle") {
+          if (item.model) item.model.parent?.remove(item.model);
+          if (this.candle) {
+            this.candle.count++;
+            this.candle._sync?.();
+          }
+          this.ui.showToast("Vela recolhida de volta ao inventário!");
         } else {
           if (item.model) item.model.parent?.remove(item.model);
           this.unlock(item.id, false);

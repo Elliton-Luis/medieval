@@ -133,7 +133,15 @@ export class World {
   heightAt(x, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
-      if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) return f.y;
+      if (f.rot) {
+        const relX = x - f.cx;
+        const relZ = z - f.cz;
+        const lx = relX * f.cos - relZ * f.sin;
+        const lz = relX * f.sin + relZ * f.cos;
+        if (Math.abs(lx) <= f.hx && Math.abs(lz) <= f.hz) return f.y;
+      } else if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) {
+        return f.y;
+      }
     }
     return this._proceduralHeightAt(x, z);
   }
@@ -142,7 +150,15 @@ export class World {
   chunkGroundHeight(cx, cz, heights, x, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
-      if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) return f.y;
+      if (f.rot) {
+        const relX = x - f.cx;
+        const relZ = z - f.cz;
+        const lx = relX * f.cos - relZ * f.sin;
+        const lz = relX * f.sin + relZ * f.cos;
+        if (Math.abs(lx) <= f.hx && Math.abs(lz) <= f.hz) return f.y;
+      } else if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) {
+        return f.y;
+      }
     }
     const size = this.chunkSize;
     const segments = CONFIG.chunkSegments;
@@ -180,7 +196,15 @@ export class World {
   raycastGround(x, y, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
-      if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) return f.y;
+      if (f.rot) {
+        const relX = x - f.cx;
+        const relZ = z - f.cz;
+        const lx = relX * f.cos - relZ * f.sin;
+        const lz = relX * f.sin + relZ * f.cos;
+        if (Math.abs(lx) <= f.hx && Math.abs(lz) <= f.hz) return f.y;
+      } else if (x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ) {
+        return f.y;
+      }
     }
     const size = this.chunkSize;
     const cx = Math.floor(x / size);
@@ -470,6 +494,41 @@ export class World {
       }
     }
     return box;
+  }
+
+  addOrientedFloor(cx, cz, width, depth, ry, y) {
+    const hx = width * 0.5;
+    const hz = depth * 0.5;
+    const cos = Math.cos(ry);
+    const sin = Math.sin(ry);
+    const extX = Math.abs(hx * cos) + Math.abs(hz * sin);
+    const extZ = Math.abs(hx * sin) + Math.abs(hz * cos);
+    const floor = {
+      rot: true,
+      cx,
+      cz,
+      hx,
+      hz,
+      cos,
+      sin,
+      minX: cx - extX,
+      maxX: cx + extX,
+      minZ: cz - extZ,
+      maxZ: cz + extZ,
+      y,
+    };
+    this.floors.push(floor);
+    return floor;
+  }
+
+  clearObstaclesInRadius(cx, cz, radius) {
+    const list = [];
+    this.spatialGrid.queryRadius(cx, cz, radius, list);
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      o.disabled = true;
+      o.radius = 0;
+    }
   }
 
   // Colisor retangular orientado (OBB) para construções rotacionadas sem criar barreiras invisíveis nos cantos.

@@ -7,6 +7,7 @@ import {
   interactWithChest,
   checkWitnesses,
   syncPlayerStatsToPlayer,
+  getPlayerResidences,
 } from "./rpg.js";
 
 export const _activeOccluders = [];
@@ -418,6 +419,40 @@ export class HouseSystem {
             _targetScratch.label = house.price > 0 ? `E · dormir (${house.price} moedas)` : "E · dormir";
             hasTarget = true;
           }
+        }
+      }
+    }
+
+    // Moradias construídas pelo jogador (Casas e Cabanas com cama e interior visível)
+    const residences = getPlayerResidences?.() || [];
+    for (let r = 0; r < residences.length; r++) {
+      const res = residences[r];
+      const rx = res.position.x;
+      const rz = res.position.z;
+      const ry = res.rotation.y;
+      const cos = Math.cos(ry);
+      const sin = Math.sin(ry);
+      const relX = player.x - rx;
+      const relZ = player.z - rz;
+      const lx = relX * cos - relZ * sin;
+      const lz = relX * sin + relZ * cos;
+      const hx = res.userData.hx || 2.4;
+      const hz = res.userData.hz || 2.0;
+
+      const isInside = Math.abs(lx) <= hx && Math.abs(lz) <= hz;
+      if (res.roofGroup) {
+        res.roofGroup.visible = !isInside;
+      }
+
+      if (res.userData.bed) {
+        const bedDistSq = (player.x - res.userData.bed.x) ** 2 + (player.z - res.userData.bed.z) ** 2;
+        if (bedDistSq < 2.5 * 2.5 && bedDistSq < nearestDistance) {
+          nearestDistance = bedDistSq;
+          _targetScratch.type = "bed";
+          _targetScratch.house = { price: 0, name: "Sua Moradia" };
+          _targetScratch.data = null;
+          _targetScratch.label = "E · dormir na sua moradia";
+          hasTarget = true;
         }
       }
     }
