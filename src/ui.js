@@ -114,6 +114,14 @@ export class GameUI {
         event.preventDefault();
         this.controls?.classList.toggle("hidden");
       }
+      if (event.code === "Escape" && !event.repeat) {
+        if (this.dialoguePanel && !this.dialoguePanel.hidden) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.closeDialogue();
+          return;
+        }
+      }
       if ((event.code === "KeyC" || event.code === "Escape") && !event.repeat) {
         if (this.buildPanel && !this.buildPanel.hidden) {
           event.preventDefault();

@@ -329,6 +329,12 @@ const DEMIURGE_MODAL_CSS = `
 }
 `;
 
+let _decayInput = null;
+
+export const DemiurgeModalState = {
+  isOpen: false,
+};
+
 function _injectDemiurgeStyles() {
   if (document.getElementById("demiurge-modal-styles")) return;
   const style = document.createElement("style");
@@ -337,8 +343,20 @@ function _injectDemiurgeStyles() {
   document.head.appendChild(style);
 }
 
-export function showDemiurgeModal(message, level = 1, onDismiss) {
+export function showDemiurgeModal(message, level = 1, onDismiss, input = null) {
   _injectDemiurgeStyles();
+
+  DemiurgeModalState.isOpen = true;
+  const activeInput = input || _decayInput;
+  if (activeInput?.setModalOpen) {
+    activeInput.setModalOpen(true);
+  }
+
+  if (document.pointerLockElement) {
+    try {
+      document.exitPointerLock();
+    } catch (_) {}
+  }
 
   if (!_demiurgeModalEl) {
     _demiurgeModalEl = document.createElement("div");
@@ -367,9 +385,14 @@ export function showDemiurgeModal(message, level = 1, onDismiss) {
     if (!_demiurgeModalEl.classList.contains("active")) return;
     _demiurgeModalEl.classList.remove("active");
     window.removeEventListener("keydown", onKeyDown);
-    if (document.pointerLockElement === null && window.__purisCanvas) {
-      // Reativa captura suave se necessário
+    DemiurgeModalState.isOpen = false;
+    if (activeInput?.setModalOpen) {
+      activeInput.setModalOpen(false);
     }
+    try {
+      const canvas = activeInput?.canvas || window.__purisCanvas || document.querySelector("canvas");
+      canvas?.requestPointerLock?.();
+    } catch (_) {}
     if (typeof onDismiss === "function") {
       onDismiss();
     }
@@ -712,7 +735,8 @@ export const CULT_MESSAGES = {
   ],
 };
 
-export function updateMessenger(dt, player, effects, ui, audio, world) {
+export function updateMessenger(dt, player, effects, ui, audio, world, input = null) {
+  if (input) _decayInput = input;
   if (!_messengerNPC || !_messengerNPC.visible || !player) return;
 
   const m = _messengerNPC;
@@ -803,27 +827,32 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
       }
 
       // Exibe a Profecia em Modal Gótico escuro que só fecha no ESC ou botão [X]
-      showDemiurgeModal(message, level, () => {
-        // Marca o Altar Ritual fora dos muros no Minimap e com Pilar de Luz
-        if (m.isEvilMessage) {
-          const altar = CultState?.altarTarget || (CULT_ALTARS && CULT_ALTARS[0]);
-          if (altar) {
-            spawnWaypointMarker({ x: altar.x, y: altar.y, z: altar.z });
-            ui?.showToast?.(
-              `✦ SANTUÁRIO DO DEMIURGO: O Altar nas matas do norte foi marcado em sua bússola! (Seita Nível ${level})`
-            );
+      showDemiurgeModal(
+        message,
+        level,
+        () => {
+          // Marca o Altar Ritual fora dos muros no Minimap e com Pilar de Luz
+          if (m.isEvilMessage) {
+            const altar = CultState?.altarTarget || (CULT_ALTARS && CULT_ALTARS[0]);
+            if (altar) {
+              spawnWaypointMarker({ x: altar.x, y: altar.y, z: altar.z });
+              ui?.showToast?.(
+                `✦ SANTUÁRIO DO DEMIURGO: O Altar nas matas do norte foi marcado em sua bússola! (Seita Nível ${level})`
+              );
+            }
           }
-        }
 
-        // Dissipação espetacular ao fechar o modal
-        if (effects) {
-          effects.play("dust", m.x, gy + 1.0, m.z, "#0c0814", 3.4);
-          effects.play("star", m.x, gy + 1.4, m.z, "#a822ee", 2.6);
-          effects.play("star", m.x, gy + 1.8, m.z, "#ff2244", 2.2);
-        }
-        m.visible = false;
-        m.root.visible = false;
-      });
+          // Dissipação espetacular ao fechar o modal
+          if (effects) {
+            effects.play("dust", m.x, gy + 1.0, m.z, "#0c0814", 3.4);
+            effects.play("star", m.x, gy + 1.4, m.z, "#a822ee", 2.6);
+            effects.play("star", m.x, gy + 1.8, m.z, "#ff2244", 2.2);
+          }
+          m.visible = false;
+          m.root.visible = false;
+        },
+        input
+      );
     }
   } else if (m.state === "DELIVERING") {
     // Enquanto o modal estiver aberto, ele fica flutuando suavemente encarando o jogador

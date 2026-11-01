@@ -93,6 +93,7 @@ import {
   triggerDailyDecayCycle,
   updateEclipseLightning,
   updateMessenger,
+  DemiurgeModalState,
 } from "./decay.js";
 import { initCheatMenu } from "./cheats.js";
 import {
@@ -320,7 +321,11 @@ function frame(now) {
   lastTime = now;
   // a tela de morte usa o tempo real; o jogo usa passos curtos e a câmera lenta
   deathScreen.update(elapsed);
-  const dt = pause.open ? 0 : Math.min(elapsed, CONFIG.maxDelta) * deathScreen.timeScale;
+  const isReading = Boolean(ui.dialoguePanel && !ui.dialoguePanel.hidden);
+  const isBuildMenu = Boolean(weapons.buildHubOpen || (ui.buildPanel && !ui.buildPanel.hidden));
+  const isDemiurge = Boolean(DemiurgeModalState.isOpen);
+  const isPaused = pause.open || isDemiurge || isReading || isBuildMenu;
+  const dt = isPaused ? 0 : Math.min(elapsed, CONFIG.maxDelta) * deathScreen.timeScale;
 
   if (GameState.isIntroPlaying) {
     updateIntroSequence(dt, player, camera, world, audio, effects, ui);
@@ -353,7 +358,7 @@ function frame(now) {
     updateCultistsLifeCycle(cultistsPool, player, npcs.npcs, weapons.firePool, dt, dayNight.isNight, settlement.cityData);
   }
   updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
-  updateMessenger(dt, player, effects, ui, audio, world);
+  updateMessenger(dt, player, effects, ui, audio, world, input);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay);
   interactions.update(dt);
   combat.update(dt);
