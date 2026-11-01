@@ -51,17 +51,18 @@ const easeInOut = (t) => t * t * (3 - 2 * t);
 export const DEATH_MESSAGES = {
   GOOD: [
     "O Senhor teve misericórdia de ti.",
-    "A luz divina te guia de volta.",
+    "A luz divina guia teus passos de volta.",
     "Tua alma pura recusa as sombras."
   ],
   EVIL: [
     "O Demiurgo diz que não finalizastes tua missão.",
-    "A matéria ainda te aprisiona, retorne.",
-    "O abismo te cospe de volta ao caos."
+    "A matéria ainda te aprisiona ao tormento da carne.",
+    "O abismo te cospe de volta ao caos dos viventes."
   ],
   NEUTRAL: [
     "ó vil e desditoso miserável.",
-    "A morte é apenas um contratempo."
+    "Tua carne pereceu sob o peso da terra.",
+    "O fôlego da vida esvaiu-se no pó."
   ]
 };
 
@@ -149,7 +150,7 @@ export class DeathScreen {
     if (customTitle && this.title) {
       this.title.textContent = customTitle;
     } else if (this.title) {
-      this.title.textContent = "DESFALECIDO";
+      this.title.textContent = "PERECESTE";
     }
 
     if (customSubtitle && this.subtitle) {
@@ -209,7 +210,11 @@ export class DeathScreen {
       // tela toda preta: renasce na igreja e começa a clarear
       if (this.time >= 1.1) {
         this._reset();
-        this.onRespawn?.();
+        try {
+          this.onRespawn?.();
+        } catch (err) {
+          console.error("Erro durante onRespawn:", err);
+        }
         this.input?.setModalOpen(false);
         this.audio.restoreWorld(1.2);
         this.state = "hold";

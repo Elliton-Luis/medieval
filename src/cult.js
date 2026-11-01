@@ -459,30 +459,44 @@ export class Cultist {
     this.roleKey = "cultist";
     this.name = "Cultista do Demiurgo";
     this.title = "A Ordem do Demiurgo";
-    this.alive = true;
+    this.alive = false;
     this.hostile = true;
+    this.temporary = true;
     this.health = 24;
     this.maxHealth = 24;
     this.meleeDamage = 2;
     this.meleeRange = 2.2;
-    this.task = "Vigiando a fogueira dos ermos com tocha rubra";
+    this.task = "Invocando as sombras do Demiurgo";
 
-    this.x = 0;
-    this.z = 0;
+    this.x = 9999;
+    this.z = 9999;
     this.floatPhase = Math.random() * Math.PI * 2;
     this._spellTimer = 0;
     this._attackTimer = 0;
 
     this.userData = {
       type: "CULTIST",
-      state: "CAMPING",
+      state: "DESPAWNED",
       anchor: new THREE.Vector3(),
       nextActionTime: 0,
       vanishTimer: 0,
-      isDead: false,
+      fleeTimer: 0,
+      isDead: true,
     };
 
+    this.root.visible = false;
     if (scene) scene.add(root);
+  }
+
+  endAlert() {
+    if (this.userData.state === "ATTACKING") {
+      this.userData.state = "CAMPING";
+      this.setSeatedPose(true);
+    }
+  }
+
+  takeHit(damage, fromX, fromZ, options = {}) {
+    return this.takeDamage(damage);
   }
 
   setSeatedPose(isSeated) {
@@ -599,19 +613,19 @@ export class Cultist {
     const distToPlayerSq = toPlayerX * toPlayerX + toPlayerZ * toPlayerZ;
     const distToPlayer = Math.sqrt(distToPlayerSq);
 
-    // 1. Deteção & Combate Real: se o jogador se aproximar de 20m, o cultista se levanta e ATACA!
-    if (distToPlayer <= 20) {
-      if (this.userData.state === "CAMPING") {
-        this.userData.state = "ATTACKING";
-        this.setSeatedPose(false);
-        this.task = "Em combate pela glória do Demiurgo";
-        if (this.effects) {
-          this.effects.play("dust", this.x, this.root.position.y + 0.5, this.z, "#1e1d24", 1.8);
-          this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#a822ee", 1.8);
-        }
+    // 1. Deteção & Reação ao Jogador:
+    // Ao chegar perto (<= 16m), os servos do Demiurgo sentados ao redor da fogueira se levantam e FOGEM nas sombras!
+    if (distToPlayer <= 16 && this.userData.state === "CAMPING") {
+      this.userData.state = "FLEEING";
+      this.userData.fleeTimer = 5.5;
+      this.setSeatedPose(false);
+      this.task = "Fugindo nas sombras do Demiurgo";
+      if (this.effects) {
+        this.effects.play("dust", this.x, this.root.position.y + 0.5, this.z, "#1e1d24", 1.8);
+        this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#a822ee", 1.8);
       }
     } else if (distToPlayer > 36 && this.userData.state === "ATTACKING") {
-      // Retorna para o acampamento
+      // Retorna para o acampamento se o jogador fugir para muito longe
       this.userData.state = "CAMPING";
       this.setSeatedPose(true);
       return;
@@ -621,6 +635,30 @@ export class Cultist {
       // Permanece sentado ao redor da fogueira com a tocha vermelha ardendo
       if (this.torchLight) {
         this.torchLight.intensity = 1.3 + Math.sin(time * 0.008 + this.floatPhase) * 0.35;
+      }
+      return;
+    }
+
+    if (this.userData.state === "FLEEING") {
+      this.setSeatedPose(false);
+      const d = Math.max(0.001, distToPlayer);
+      const cultSpeed = (CULTIST_SPEED + 2.2) * (CultState.speedMultiplier || 1.0);
+
+      // Corre na direção oposta ao jogador
+      this.x -= (toPlayerX / d) * (cultSpeed * dt);
+      this.z -= (toPlayerZ / d) * (cultSpeed * dt);
+
+      // Encarar a direção da fuga
+      const fleeYaw = Math.atan2(-toPlayerX, -toPlayerZ);
+      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, fleeYaw, 0.2);
+
+      const groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
+      this.root.position.set(this.x, groundY + 0.05 + Math.sin(this.floatPhase) * 0.04, this.z);
+
+      this.userData.fleeTimer = (this.userData.fleeTimer || 5.5) - dt;
+      if (this.userData.fleeTimer <= 0 || distToPlayer > 32) {
+        // Desaparece na escuridão
+        this.vanish(false);
       }
       return;
     }

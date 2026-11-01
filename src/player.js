@@ -84,7 +84,7 @@ export class Player {
     this.prayPose = 0;
     this.seatYaw = 0;
     this.prayHealTimer = 0;
-    this.invuln = 0;
+    this.invuln = 3.0; // Proteção contra dano inicial nos primeiros segundos
     this.staggerTimer = 0;
     this.crouchPose = 0;
     this.hitHeight = 1.85;
@@ -837,6 +837,7 @@ export class Player {
     this.dead = false;
     this.deathTime = 0;
     this.blockLocked = false;
+    this.invuln = 3.0; // Proteção ao despertar na igreja
     this.model.rotation.x = 0;
     this.model.rotation.z = 0;
     this.model.position.set(0, 0, 0);

@@ -1273,7 +1273,7 @@ export class NPCSystem {
   // A testemunha chegou ao guarda: a guarda inteira da região parte atrás do jogador.
   _report(reporter) {
     const guard = reporter.reportTarget;
-    reporter.endAlert();
+    if (typeof reporter.endAlert === "function") reporter.endAlert();
     this.effects?.play("star", reporter.x, reporter.root.position.y + 1.8, reporter.z, "#ffd88a", 1);
     this.addWantedPoints(0.6);
     for (let i = 0; i < this.npcs.length; i++) {
@@ -1292,7 +1292,11 @@ export class NPCSystem {
     this.onClear?.();
     for (let i = 0; i < this.npcs.length; i++) {
       const npc = this.npcs[i];
-      if (npc.alive && !npc.temporary && npc.mode !== "work") npc.endAlert();
+      if (npc && npc.alive && !npc.temporary && npc.mode !== "work") {
+        if (typeof npc.endAlert === "function") {
+          npc.endAlert();
+        }
+      }
     }
     this.onWantedChange?.(0);
   }
