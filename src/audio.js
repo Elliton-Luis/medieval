@@ -361,6 +361,52 @@ export class GameAudio {
     this._burst(0.09, 0.3, "bandpass", 2200, 850);
   }
 
+  // Canto gregoriano denso e épico para o final "Ira Dei" (Dies Irae / Coral da Cruzada Sagrada)
+  playEpicChoir() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    // Harmonia modal dórica sacra (Ré Menor / Dies Irae): Ré1 (73Hz), Lá1 (110Hz), Ré2 (146Hz), Fá2 (174Hz), Lá2 (220Hz), Ré3 (293Hz), Fá3 (349Hz), Lá3 (440Hz)
+    const notes = [
+      { f: 73.42, type: "sawtooth", gain: 0.18, cut: 320, dur: 9.5 },
+      { f: 110.0, type: "sawtooth", gain: 0.22, cut: 450, dur: 9.5 },
+      { f: 146.83, type: "triangle", gain: 0.28, cut: 750, dur: 9.2 },
+      { f: 174.61, type: "sine", gain: 0.24, cut: 900, dur: 9.0 },
+      { f: 220.0, type: "sine", gain: 0.32, cut: 1200, dur: 8.8 },
+      { f: 293.66, type: "triangle", gain: 0.26, cut: 1600, dur: 8.5 },
+      { f: 349.23, type: "sine", gain: 0.22, cut: 1900, dur: 8.2 },
+      { f: 440.0, type: "sine", gain: 0.18, cut: 2400, dur: 8.0 },
+    ];
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      const osc = ctx.createOscillator();
+      osc.type = n.type;
+      osc.frequency.setValueAtTime(n.f, now);
+      // LFO sutil para vibrato vocal humano
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 4.8 + i * 0.2;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = n.f * 0.008;
+      lfo.connect(osc.frequency);
+      lfo.start(now);
+      lfo.stop(now + n.dur);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(n.cut, now);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(n.gain, now + 1.2);
+      gain.gain.setValueAtTime(n.gain, now + n.dur - 3.0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.dur);
+
+      osc.connect(filter).connect(gain).connect(this.sfx);
+      osc.start(now);
+      osc.stop(now + n.dur);
+    }
+  }
+
   choir() {
     if (!this.context) return;
     const ctx = this.context;

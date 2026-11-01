@@ -285,12 +285,27 @@ export class Player {
     dCapeInner.rotation.x = -0.1;
     this.demiurgeGroup.add(dCapeInner);
 
-    // Espaldadeiras / Hombreras com pontas imponentes
+    // Espaldadeiras / Hombreras com pontas góticas e espinhos de obsidiana
     for (const side of [-1, 1]) {
-      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 5), matPurpleCloak);
-      sp.position.set(side * 0.32, 1.48, -0.02);
-      sp.rotation.z = side * 0.45;
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 5), matPurpleCloak);
+      sp.position.set(side * 0.34, 1.50, -0.02);
+      sp.rotation.z = side * 0.52;
       this.demiurgeGroup.add(sp);
+
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.32, 4), matCrimsonTrim);
+      spike.position.set(side * 0.44, 1.58, -0.04);
+      spike.rotation.z = side * 0.72;
+      spike.rotation.x = -0.22;
+      this.demiurgeGroup.add(spike);
+    }
+
+    // Bainha inferior pontiaguda e denteada do manto
+    for (let p = 0; p < 6; p++) {
+      const pAngle = (p / 6) * Math.PI * 2;
+      const pointMesh = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.28, 4), p % 2 === 0 ? matPurpleCloak : matCrimsonTrim);
+      pointMesh.position.set(Math.cos(pAngle) * 0.42, 0.14, Math.sin(pAngle) * 0.42);
+      pointMesh.rotation.x = Math.PI; // Ponta apontando para baixo
+      this.demiurgeGroup.add(pointMesh);
     }
 
     // 3. Capuz Místico e Máscara Cerimonial na cabeça do jogador
@@ -303,10 +318,25 @@ export class Player {
     dHood.position.set(0, 0.08, -0.02);
     this.demiurgeHeadGroup.add(dHood);
 
-    // Máscara cerimonial gótica com fendas de bico e queixo afilado
-    const dMask = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.36, 5), matGnosticMask);
-    dMask.rotation.x = Math.PI * 0.52;
-    dMask.position.set(0, -0.04, 0.22);
+    // Cauda pontiaguda longa na traseira do capuz (Liripipe gótico)
+    const dHoodTail = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.55, 5), matPurpleCloak);
+    dHoodTail.position.set(0, 0.09, -0.28);
+    dHoodTail.rotation.x = -Math.PI * 0.64;
+    this.demiurgeHeadGroup.add(dHoodTail);
+
+    // Chifres/espinhos de obsidiana pontudos no capuz
+    for (const side of [-1, 1]) {
+      const dHorn = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.38, 4), matCrimsonTrim);
+      dHorn.position.set(side * 0.16, 0.25, -0.08);
+      dHorn.rotation.x = -0.45;
+      dHorn.rotation.z = side * 0.45;
+      this.demiurgeHeadGroup.add(dHorn);
+    }
+
+    // Máscara cerimonial gótica com bico longo e queixo afilado pontiagudo
+    const dMask = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 5), matGnosticMask);
+    dMask.rotation.x = Math.PI * 0.58;
+    dMask.position.set(0, -0.06, 0.25);
     this.demiurgeHeadGroup.add(dMask);
 
     // Olhos brancos brilhantes ameaçadores da máscara

@@ -509,19 +509,39 @@ export function buildDemiurgeMessengerMesh() {
   capeLining.position.set(0, 1.15, -0.015);
   model.add(capeLining);
 
-  // Gola pontiaguda e ombreiras sombrias
-  const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.62, 7), cloakPurple);
-  mantle.position.set(0, 1.55, -0.03);
+  // Gola alta pontiaguda e ombreiras com espinhos góticos
+  const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.68, 7), cloakPurple);
+  mantle.position.set(0, 1.56, -0.03);
   mantle.rotation.y = Math.PI;
   model.add(mantle);
 
-  const collarTrim = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.58, 7), liningCrimson);
-  collarTrim.position.set(0, 1.53, -0.03);
+  const collarTrim = new THREE.Mesh(new THREE.ConeGeometry(0.50, 0.64, 7), liningCrimson);
+  collarTrim.position.set(0, 1.54, -0.03);
   collarTrim.rotation.y = Math.PI;
   collarTrim.scale.set(0.98, 0.98, 0.98);
   model.add(collarTrim);
 
-  // 3. Capuz profundo inclinado para a frente
+  // Pontas afiladas de gola alta erguendo-se atrás da cabeça
+  for (const side of [-1, 1]) {
+    const collarSpike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 4), cloakPurple);
+    collarSpike.position.set(side * 0.22, 1.82, -0.16);
+    collarSpike.rotation.x = -0.35;
+    collarSpike.rotation.z = side * 0.38;
+    model.add(collarSpike);
+  }
+
+  // Ombreiras com espinhos duplos de obsidiana
+  for (const side of [-1, 1]) {
+    for (let s = 0; s < 2; s++) {
+      const pSpike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38 + s * 0.1, 4), darkSpikes);
+      pSpike.position.set(side * (0.34 + s * 0.08), 1.52 + s * 0.08, -0.04 - s * 0.06);
+      pSpike.rotation.z = side * (0.65 + s * 0.15);
+      pSpike.rotation.x = -0.2;
+      model.add(pSpike);
+    }
+  }
+
+  // 3. Capuz profundo com ponta traseira longa (Liripipe gótico pontudo)
   const hood = new THREE.Mesh(
     new THREE.SphereGeometry(0.25, 9, 7, 0, Math.PI * 2, 0, Math.PI * 0.75),
     cloakPurple
@@ -529,6 +549,12 @@ export function buildDemiurgeMessengerMesh() {
   hood.position.set(0, 1.82, 0.02);
   hood.rotation.x = 0.28;
   model.add(hood);
+
+  // Ponta afilada traseira do capuz
+  const hoodPoint = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.68, 5), cloakPurple);
+  hoodPoint.position.set(0, 1.84, -0.32);
+  hoodPoint.rotation.x = -Math.PI * 0.62;
+  model.add(hoodPoint);
 
   // Borda carmesim do capuz
   const hoodRim = new THREE.Mesh(
@@ -540,19 +566,25 @@ export function buildDemiurgeMessengerMesh() {
   hoodRim.rotation.z = Math.PI * 0.9;
   model.add(hoodRim);
 
-  // Chifres/espinhos curvados de obsidiana
+  // Chifres/espinhos curvados de obsidiana mais compridos e afilados
   for (const side of [-1, 1]) {
-    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.36, 5), darkSpikes);
-    horn.position.set(side * 0.18, 1.95, -0.08);
-    horn.rotation.x = -0.45;
-    horn.rotation.z = side * 0.42;
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.48, 5), darkSpikes);
+    horn.position.set(side * 0.20, 2.02, -0.10);
+    horn.rotation.x = -0.55;
+    horn.rotation.z = side * 0.48;
     model.add(horn);
   }
 
-  // 4. Rosto abissal (Vazio de escuridão pura)
+  // 4. Rosto abissal e Máscara Pontiaguda com Bico Afilado de Arconte
   const faceVoid = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), voidFace);
   faceVoid.position.set(0, 1.78, 0.08);
   model.add(faceVoid);
+
+  // Máscara com queixo afilado e bico pontudo herético
+  const pointedBeak = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.44, 5), darkSpikes);
+  pointedBeak.position.set(0, 1.72, 0.25);
+  pointedBeak.rotation.x = Math.PI * 0.58;
+  model.add(pointedBeak);
 
   // 5. Olhos Brancos Incandescentes e Ameaçadores
   const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), whiteEyes);

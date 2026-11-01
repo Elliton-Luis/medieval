@@ -153,6 +153,7 @@ export function openCheatModal(env) {
         <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
         <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas / Templário)</button>
         <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Roupa do Demiurgo (Capa & Máscara)</button>
+        <button class="cheat-btn" data-cheat="holyEnding">✝️ O Final Bom: A Ira de Deus (Ira Dei / Triunfo Sagrado)</button>
         <button class="cheat-btn" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
         <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem para Massacre</button>
         <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
@@ -199,6 +200,7 @@ export function openCheatModal(env) {
       else if (type === "armor2") window.CheatMenu.equipArmor(2);
       else if (type === "armor3") window.CheatMenu.equipArmor(3);
       else if (type === "demiurgeRobe") window.CheatMenu.giveDemiurgeRobe();
+      else if (type === "holyEnding") window.CheatMenu.triggerHolyEnding();
       else if (type === "apocalypse") window.CheatMenu.triggerApocalypse();
       else if (type === "spawnWerewolf") window.CheatMenu.spawnWerewolf();
       else if (type === "summonMessenger") window.CheatMenu.summonMessenger();
@@ -331,6 +333,15 @@ export function initCheatMenu(env = {}) {
         unlockDemiurgeAttire(env.player, env.ui, env.audio);
       });
       return "Roupa do Demiurgo equipada";
+    },
+
+    triggerHolyEnding() {
+      import("./holyEnding.js").then(({ triggerDeusVultEnding }) => {
+        triggerDeusVultEnding(window.__game || env);
+        env.ui?.showToast?.("✝️ CHEAT: A Ira de Deus foi invocada! Triunfo Católico!");
+        console.log("✝️ CHEAT: Ira Dei / Triunfo Sagrado iniciado");
+      });
+      return "Ira Dei iniciada";
     },
 
     triggerApocalypse() {
