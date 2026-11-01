@@ -6,22 +6,24 @@ import {
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
 import { WEAPON_LIST } from "./weapondata.js";
+import { CRYSTAL_PALETTE, applyTorchColor } from "./crystals.js";
 
 let _cheatModalEl = null;
+let _activeEnv = null;
 
 const CHEAT_MODAL_CSS = `
 #cheat-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 6, 14, 0.82);
-  backdrop-filter: blur(5px);
+  background: rgba(8, 5, 12, 0.86);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100000;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.22s ease;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 #cheat-modal-overlay.active {
@@ -29,34 +31,37 @@ const CHEAT_MODAL_CSS = `
   pointer-events: auto;
 }
 .cheat-panel {
-  background: linear-gradient(180deg, #1f1828 0%, #120e18 100%);
+  background: linear-gradient(180deg, #1b1424 0%, #100b17 100%);
   border: 2px solid #8e54e9;
-  border-radius: 8px;
-  box-shadow: 0 0 30px rgba(142, 84, 233, 0.4), inset 0 0 20px rgba(0, 0, 0, 0.8);
-  padding: 24px 28px;
-  max-width: 520px;
-  width: 90%;
+  border-radius: 10px;
+  box-shadow: 0 0 35px rgba(142, 84, 233, 0.45), inset 0 0 25px rgba(0, 0, 0, 0.85);
+  padding: 20px 24px;
+  max-width: 660px;
+  width: 92%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   color: #f0e6ff;
   position: relative;
-  animation: cheat-pop 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  animation: cheat-pop 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 @keyframes cheat-pop {
-  from { transform: scale(0.9); opacity: 0; }
+  from { transform: scale(0.92); opacity: 0; }
   to { transform: scale(1.0); opacity: 1; }
 }
 .cheat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(142, 84, 233, 0.4);
-  padding-bottom: 12px;
-  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(142, 84, 233, 0.35);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
 }
 .cheat-title {
   margin: 0;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: 1.2px;
   color: #c9a9ff;
   display: flex;
   align-items: center;
@@ -66,9 +71,9 @@ const CHEAT_MODAL_CSS = `
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ff8888;
-  font-size: 18px;
-  width: 30px;
-  height: 30px;
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
   border-radius: 4px;
   cursor: pointer;
   display: flex;
@@ -80,42 +85,141 @@ const CHEAT_MODAL_CSS = `
   background: #ff4444;
   color: #fff;
 }
+
+/* Abas de Navegação */
+.cheat-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+.cheat-tab-btn {
+  background: rgba(142, 84, 233, 0.12);
+  border: 1px solid rgba(142, 84, 233, 0.35);
+  border-radius: 6px;
+  color: #c5b4e3;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.cheat-tab-btn:hover {
+  background: rgba(142, 84, 233, 0.25);
+  color: #ffffff;
+}
+.cheat-tab-btn.active {
+  background: #8e54e9;
+  border-color: #bb86fc;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(142, 84, 233, 0.6);
+}
+
+/* Painel de Recursos em Tempo Real */
+.cheat-status-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(142, 84, 233, 0.25);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #d8cce8;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  line-height: 1.4;
+}
+.cheat-status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cheat-status-val {
+  font-weight: 700;
+  color: #ffd700;
+}
+
+/* Área de Conteúdo das Abas */
+.cheat-body {
+  overflow-y: auto;
+  max-height: 56vh;
+  padding-right: 6px;
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #8e54e9 #1b1424;
+}
+.cheat-body::-webkit-scrollbar {
+  width: 6px;
+}
+.cheat-body::-webkit-scrollbar-track {
+  background: #120e18;
+}
+.cheat-body::-webkit-scrollbar-thumb {
+  background: #8e54e9;
+  border-radius: 3px;
+}
+
+.cheat-tab-content {
+  display: none;
+}
+.cheat-tab-content.active {
+  display: block;
+}
+
 .cheat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 .cheat-btn {
-  background: rgba(142, 84, 233, 0.15);
-  border: 1px solid rgba(142, 84, 233, 0.5);
+  background: rgba(142, 84, 233, 0.14);
+  border: 1px solid rgba(142, 84, 233, 0.45);
   border-radius: 6px;
-  color: #eee0ff;
-  padding: 11px 14px;
-  font-size: 13.5px;
+  color: #ede2ff;
+  padding: 9px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.18s ease;
+  transition: all 0.16s ease;
   text-align: left;
 }
 .cheat-btn:hover {
-  background: rgba(142, 84, 233, 0.45);
+  background: rgba(142, 84, 233, 0.38);
   border-color: #bb86fc;
   color: #ffffff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(142, 84, 233, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(142, 84, 233, 0.3);
 }
 .cheat-btn:active {
   transform: translateY(0);
 }
+.cheat-btn.full-width {
+  grid-column: 1 / -1;
+}
+.cheat-btn.highlight {
+  background: rgba(255, 215, 0, 0.18);
+  border-color: #ffd700;
+  color: #ffe688;
+}
+.cheat-btn.highlight:hover {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffffff;
+}
+
 .cheat-tip {
-  font-size: 12px;
+  font-size: 11.5px;
   color: #9f8fb5;
   text-align: center;
   margin: 0;
+  padding-top: 4px;
 }
 `;
 
@@ -127,7 +231,43 @@ function _injectCheatStyles() {
   document.head.appendChild(style);
 }
 
+function _updateStatusDisplays() {
+  if (!_cheatModalEl) return;
+  const woodEl = _cheatModalEl.querySelector("#cs-wood");
+  const stoneEl = _cheatModalEl.querySelector("#cs-stone");
+  const clayEl = _cheatModalEl.querySelector("#cs-clay");
+  const hayEl = _cheatModalEl.querySelector("#cs-hay");
+  const goldEl = _cheatModalEl.querySelector("#cs-gold");
+  const torchesEl = _cheatModalEl.querySelector("#cs-torches");
+  const potionsEl = _cheatModalEl.querySelector("#cs-potions");
+  const candleEl = _cheatModalEl.querySelector("#cs-candles");
+  const crystalsEl = _cheatModalEl.querySelector("#cs-crystals");
+  const torchColorEl = _cheatModalEl.querySelector("#cs-torch-color");
+
+  if (woodEl) woodEl.textContent = String(PlayerInventory.wood || 0);
+  if (stoneEl) stoneEl.textContent = String(PlayerInventory.stone || 0);
+  if (clayEl) clayEl.textContent = String(PlayerInventory.clay || 0);
+  if (hayEl) hayEl.textContent = String(PlayerInventory.hay || 0);
+  if (goldEl) goldEl.textContent = String(PlayerInventory.gold || 0);
+  if (torchesEl) torchesEl.textContent = String(PlayerInventory.torches || 0);
+
+  const potCount = _activeEnv?.player?.potions ?? 0;
+  if (potionsEl) potionsEl.textContent = String(potCount);
+
+  const candleCount = _activeEnv?.candle?.count ?? window.__game?.candle?.count ?? 0;
+  if (candleEl) candleEl.textContent = String(candleCount);
+
+  const cry = PlayerInventory.crystals || {};
+  if (crystalsEl) {
+    crystalsEl.textContent = `🟢${cry.green || 0} 🔵${cry.blue || 0} 🌸${cry.pink || 0} 🔴${cry.red || 0} ⚪${cry.white || 0} 🟣${cry.purple || 0}`;
+  }
+
+  const curColor = CRYSTAL_PALETTE[PlayerInventory.torchColor]?.name || PlayerInventory.torchColor || "Fogo Comum";
+  if (torchColorEl) torchColorEl.textContent = curColor;
+}
+
 export function openCheatModal(env) {
+  _activeEnv = env || window.__game || {};
   _injectCheatStyles();
 
   if (!_cheatModalEl) {
@@ -139,31 +279,144 @@ export function openCheatModal(env) {
   _cheatModalEl.innerHTML = `
     <div class="cheat-panel" role="dialog" aria-modal="true">
       <div class="cheat-header">
-        <h2 class="cheat-title">🥔 CHEAT MENU · PURIS DEBUG</h2>
+        <h2 class="cheat-title">🥔 CHEAT MENU · PURIS RECURSOS & DEBUG</h2>
         <button class="cheat-close-btn" id="cheat-btn-close" aria-label="Fechar">✕</button>
       </div>
-      <div class="cheat-grid">
-        <button class="cheat-btn" data-cheat="maxAllItems" style="grid-column: 1 / -1; background: rgba(255, 215, 0, 0.22); border-color: #ffd700; color: #ffe688;">🎒 Encher Todos os Itens & Arsenal (Max)</button>
-        <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
-        <button class="cheat-btn" data-cheat="giveAllWeapons">⚔️ Liberar Todo o Arsenal</button>
-        <button class="cheat-btn" data-cheat="makeMeRich">💰 +10.000 Ouro</button>
-        <button class="cheat-btn" data-cheat="setSpeed">🏃 Super Velocidade (2.5x)</button>
-        <button class="cheat-btn" data-cheat="forgiveSins">🕊️ Perdoar Pecados & Voto</button>
-        <button class="cheat-btn" data-cheat="killAllEnemies">💀 Exterminar Inimigos Próximos</button>
-        <button class="cheat-btn" data-cheat="armor0">🛡️ Armadura 0 (Camponês)</button>
-        <button class="cheat-btn" data-cheat="armor1">🛡️ Armadura 1 (Couro)</button>
-        <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
-        <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas / Templário)</button>
-        <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Roupa do Demiurgo (Capa & Máscara)</button>
-        <button class="cheat-btn" data-cheat="holyEnding">✝️ O Final Bom: A Trombeta e Assunção Sagrada</button>
-        <button class="cheat-btn" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
-        <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem para Massacre</button>
-        <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
+
+      <!-- Barra de Abas -->
+      <div class="cheat-tabs">
+        <button class="cheat-tab-btn active" data-tab="quick">🌟 Ações Rápidas</button>
+        <button class="cheat-tab-btn" data-tab="resources">🪵 Recursos & Matérias</button>
+        <button class="cheat-tab-btn" data-tab="crystals">💎 Cristais & Tochas</button>
+        <button class="cheat-tab-btn" data-tab="ammo">🏹 Consumíveis & Munição</button>
+        <button class="cheat-tab-btn" data-tab="weapons">⚔️ Arsenal & Armaduras</button>
+        <button class="cheat-tab-btn" data-tab="events">⚡ Poderes & Eventos</button>
       </div>
-      <p class="cheat-tip">Você também pode executar <code>window.CheatMenu.godMode()</code> diretamente no console.</p>
+
+      <!-- Status em Tempo Real -->
+      <div class="cheat-status-box">
+        <div class="cheat-status-item">🪵 Mad: <span class="cheat-status-val" id="cs-wood">0</span></div>
+        <div class="cheat-status-item">🪨 Ped: <span class="cheat-status-val" id="cs-stone">0</span></div>
+        <div class="cheat-status-item">🏺 Barro: <span class="cheat-status-val" id="cs-clay">0</span></div>
+        <div class="cheat-status-item">🌾 Feno: <span class="cheat-status-val" id="cs-hay">0</span></div>
+        <div class="cheat-status-item">🪙 Ouro: <span class="cheat-status-val" id="cs-gold">0</span></div>
+        <div class="cheat-status-item">🔦 Tochas: <span class="cheat-status-val" id="cs-torches">0</span></div>
+        <div class="cheat-status-item">🧪 Poções: <span class="cheat-status-val" id="cs-potions">0</span></div>
+        <div class="cheat-status-item">🕯️ Velas: <span class="cheat-status-val" id="cs-candles">0</span></div>
+        <div class="cheat-status-item">🔥 Tocha: <span class="cheat-status-val" id="cs-torch-color">Laranja</span></div>
+        <div class="cheat-status-item">💎 Cristais: <span class="cheat-status-val" id="cs-crystals">--</span></div>
+      </div>
+
+      <!-- Conteúdo das Abas -->
+      <div class="cheat-body">
+
+        <!-- ABA 1: RÁPIDAS -->
+        <div class="cheat-tab-content active" id="tab-quick">
+          <div class="cheat-grid">
+            <button class="cheat-btn highlight full-width" data-cheat="maxAllItems">🎒 Encher Todos os Itens, Recursos, Arsenal & Atributos (Max)</button>
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllResources">📦 Dar +500 de Todos os Recursos de Construção & Forja</button>
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllCrystals">💎 Dar +20 de Todos os Cristais Místicos para Tochas</button>
+            <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
+            <button class="cheat-btn" data-cheat="makeMeRich">💰 +10.000 Ouro</button>
+            <button class="cheat-btn" data-cheat="giveAllWeapons">⚔️ Liberar Todo o Arsenal</button>
+            <button class="cheat-btn" data-cheat="giveAllAmmo">🏹 Max Todas as Munições (99)</button>
+            <button class="cheat-btn" data-cheat="forgiveSins">🕊️ Perdoar Pecados & Voto</button>
+            <button class="cheat-btn" data-cheat="killAllEnemies">💀 Exterminar Inimigos Próximos</button>
+            <button class="cheat-btn" data-cheat="giveDemiurgeDiary">📖 Obter Livro do Demiurgo (L)</button>
+            <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Traje do Culto</button>
+          </div>
+        </div>
+
+        <!-- ABA 2: RECURSOS & MATÉRIAS-PRIMAS -->
+        <div class="cheat-tab-content" id="tab-resources">
+          <div class="cheat-grid">
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllResources">📦 +500 em Todos os Recursos (Madeira, Pedra, Barro, Feno, Tochas)</button>
+            <button class="cheat-btn" data-cheat="wood_100">🪵 +100 Madeira</button>
+            <button class="cheat-btn" data-cheat="wood_999">🪵 Max Madeira (999)</button>
+            <button class="cheat-btn" data-cheat="stone_100">🪨 +100 Pedra</button>
+            <button class="cheat-btn" data-cheat="stone_999">🪨 Max Pedra (999)</button>
+            <button class="cheat-btn" data-cheat="clay_100">🏺 +100 Barro / Argila</button>
+            <button class="cheat-btn" data-cheat="clay_999">🏺 Max Barro (999)</button>
+            <button class="cheat-btn" data-cheat="hay_50">🌾 +50 Feno</button>
+            <button class="cheat-btn" data-cheat="hay_999">🌾 Max Feno (999)</button>
+            <button class="cheat-btn" data-cheat="torches_25">🔦 +25 Tochas</button>
+            <button class="cheat-btn" data-cheat="torches_99">🔦 Max Tochas (99)</button>
+            <button class="cheat-btn" data-cheat="gold_5k">🪙 +5.000 Ouro</button>
+            <button class="cheat-btn" data-cheat="gold_50k">🪙 +50.000 Ouro</button>
+          </div>
+        </div>
+
+        <!-- ABA 3: CRISTAIS MÍSTICOS & TOCHAS -->
+        <div class="cheat-tab-content" id="tab-crystals">
+          <div class="cheat-grid">
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllCrystals">💎 +20 de Todos os Cristais Místicos (6 Cores)</button>
+            <button class="cheat-btn" data-cheat="cry_green">🟢 +10 Esmeralda (Verde)</button>
+            <button class="cheat-btn" data-cheat="set_torch_green">🔥 Infundir Tocha: Verde</button>
+            <button class="cheat-btn" data-cheat="cry_blue">🔵 +10 Safira (Azul)</button>
+            <button class="cheat-btn" data-cheat="set_torch_blue">🔥 Infundir Tocha: Azul</button>
+            <button class="cheat-btn" data-cheat="cry_pink">🌸 +10 Quartzo (Rosa)</button>
+            <button class="cheat-btn" data-cheat="set_torch_pink">🔥 Infundir Tocha: Rosa</button>
+            <button class="cheat-btn" data-cheat="cry_red">🔴 +10 Rubi (Vermelho)</button>
+            <button class="cheat-btn" data-cheat="set_torch_red">🔥 Infundir Tocha: Vermelho</button>
+            <button class="cheat-btn" data-cheat="cry_white">⚪ +10 Diamante (Branco)</button>
+            <button class="cheat-btn" data-cheat="set_torch_white">🔥 Infundir Tocha: Branco</button>
+            <button class="cheat-btn" data-cheat="cry_purple">🟣 +10 Ametista (Roxo)</button>
+            <button class="cheat-btn" data-cheat="set_torch_purple">🔥 Infundir Tocha: Roxo</button>
+            <button class="cheat-btn full-width" data-cheat="set_torch_orange">🔥 Restaurar Tocha Comum (Laranja)</button>
+          </div>
+        </div>
+
+        <!-- ABA 4: CONSUMÍVEIS & MUNIÇÃO -->
+        <div class="cheat-tab-content" id="tab-ammo">
+          <div class="cheat-grid">
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllAmmo">🏹 Max Todas as Munições & Consumíveis (99 de tudo)</button>
+            <button class="cheat-btn" data-cheat="potions_10">🧪 +10 Poções de Cura</button>
+            <button class="cheat-btn" data-cheat="potions_99">🧪 Max Poções (99)</button>
+            <button class="cheat-btn" data-cheat="candles_20">🕯️ +20 Velas de Cera</button>
+            <button class="cheat-btn" data-cheat="candles_99">🕯️ Max Velas (99)</button>
+            <button class="cheat-btn" data-cheat="arrows_50">🏹 +50 Flechas (Arco)</button>
+            <button class="cheat-btn" data-cheat="bolts_50">🎯 +50 Virotes (Besta)</button>
+            <button class="cheat-btn" data-cheat="bombs_25">💣 +25 Bombas Incendiárias</button>
+            <button class="cheat-btn" data-cheat="knives_25">🗡️ +25 Facas de Arremesso</button>
+            <button class="cheat-btn full-width" data-cheat="oil_25">🛢️ +25 Potes de Óleo Inflamável</button>
+          </div>
+        </div>
+
+        <!-- ABA 5: ARSENAL & ARMADURAS -->
+        <div class="cheat-tab-content" id="tab-weapons">
+          <div class="cheat-grid">
+            <button class="cheat-btn highlight full-width" data-cheat="giveAllWeapons">⚔️ Liberar Todo o Arsenal & Forja Nível 5</button>
+            <button class="cheat-btn" data-cheat="armor0">🛡️ Armadura 0 (Camponês)</button>
+            <button class="cheat-btn" data-cheat="armor1">🛡️ Armadura 1 (Couro)</button>
+            <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
+            <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas Templárias)</button>
+            <button class="cheat-btn" data-cheat="giveTools">🪓 Machado & Picareta de Trabalho</button>
+            <button class="cheat-btn" data-cheat="giveDemiurgeDiary">📖 Diário do Demiurgo (Livro do Barro)</button>
+            <button class="cheat-btn full-width" data-cheat="demiurgeRobe">👑 Vestir Traje Completo do Demiurgo (Capa & Máscara)</button>
+          </div>
+        </div>
+
+        <!-- ABA 6: EVENTOS & PODERES -->
+        <div class="cheat-tab-content" id="tab-events">
+          <div class="cheat-grid">
+            <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
+            <button class="cheat-btn" data-cheat="setSpeed">🏃 Super Velocidade (2.5x)</button>
+            <button class="cheat-btn" data-cheat="forgiveSins">🕊️ Perdoar Pecados & Voto</button>
+            <button class="cheat-btn" data-cheat="killAllEnemies">💀 Exterminar Inimigos Próximos</button>
+            <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem nos Ermos</button>
+            <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
+            <button class="cheat-btn full-width" data-cheat="holyEnding">✝️ O Final Bom: A Trombeta e Assunção Sagrada</button>
+            <button class="cheat-btn full-width" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
+          </div>
+        </div>
+
+      </div>
+
+      <p class="cheat-tip">Digite <code>POTATO</code> ou <code>CHIEFS</code> no teclado a qualquer hora para abrir este menu, ou use o console: <code>window.CheatMenu.giveAllResources()</code>.</p>
     </div>
   `;
 
+  _updateStatusDisplays();
   _cheatModalEl.classList.add("active");
 
   const close = () => {
@@ -187,28 +440,213 @@ export function openCheatModal(env) {
     if (e.target === _cheatModalEl) close();
   });
 
+  // Alternância de Abas
+  const tabBtns = _cheatModalEl.querySelectorAll(".cheat-tab-btn");
+  tabBtns.forEach((tb) => {
+    tb.addEventListener("click", () => {
+      const targetTab = tb.getAttribute("data-tab");
+      tabBtns.forEach((b) => b.classList.remove("active"));
+      tb.classList.add("active");
+
+      const contents = _cheatModalEl.querySelectorAll(".cheat-tab-content");
+      contents.forEach((c) => c.classList.remove("active"));
+      const activeContent = _cheatModalEl.querySelector(`#tab-${targetTab}`);
+      if (activeContent) activeContent.classList.add("active");
+    });
+  });
+
+  // Manipulação de cliques de Cheats
   const buttons = _cheatModalEl.querySelectorAll(".cheat-btn");
   buttons.forEach((b) => {
     b.addEventListener("click", (e) => {
       const type = e.currentTarget.getAttribute("data-cheat");
-      if (type === "maxAllItems") window.CheatMenu.maxAllItems();
-      else if (type === "godMode") window.CheatMenu.godMode();
-      else if (type === "giveAllWeapons") window.CheatMenu.giveAllWeapons();
-      else if (type === "makeMeRich") window.CheatMenu.makeMeRich();
-      else if (type === "setSpeed") window.CheatMenu.setSpeed(2.5);
-      else if (type === "forgiveSins") window.CheatMenu.forgiveSins();
-      else if (type === "killAllEnemies") window.CheatMenu.killAllEnemies();
-      else if (type === "armor0") window.CheatMenu.equipArmor(0);
-      else if (type === "armor1") window.CheatMenu.equipArmor(1);
-      else if (type === "armor2") window.CheatMenu.equipArmor(2);
-      else if (type === "armor3") window.CheatMenu.equipArmor(3);
-      else if (type === "demiurgeRobe") window.CheatMenu.giveDemiurgeRobe();
-      else if (type === "holyEnding") window.CheatMenu.triggerHolyEnding();
-      else if (type === "apocalypse") window.CheatMenu.triggerApocalypse();
-      else if (type === "spawnWerewolf") window.CheatMenu.spawnWerewolf();
-      else if (type === "summonMessenger") window.CheatMenu.summonMessenger();
+      _handleCheatAction(type);
+      _updateStatusDisplays();
     });
   });
+}
+
+function _handleCheatAction(type) {
+  if (!window.CheatMenu) return;
+  switch (type) {
+    case "maxAllItems":
+      window.CheatMenu.maxAllItems();
+      break;
+    case "giveAllResources":
+      window.CheatMenu.giveAllResources(500);
+      break;
+    case "giveAllCrystals":
+      window.CheatMenu.giveCrystals(20);
+      break;
+    case "giveAllWeapons":
+      window.CheatMenu.giveAllWeapons();
+      break;
+    case "giveAllAmmo":
+      window.CheatMenu.giveAllAmmo(99);
+      break;
+    case "godMode":
+      window.CheatMenu.godMode();
+      break;
+    case "makeMeRich":
+      window.CheatMenu.makeMeRich(10000);
+      break;
+    case "setSpeed":
+      window.CheatMenu.setSpeed(2.5);
+      break;
+    case "forgiveSins":
+      window.CheatMenu.forgiveSins();
+      break;
+    case "killAllEnemies":
+      window.CheatMenu.killAllEnemies();
+      break;
+    case "armor0":
+      window.CheatMenu.equipArmor(0);
+      break;
+    case "armor1":
+      window.CheatMenu.equipArmor(1);
+      break;
+    case "armor2":
+      window.CheatMenu.equipArmor(2);
+      break;
+    case "armor3":
+      window.CheatMenu.equipArmor(3);
+      break;
+    case "giveTools":
+      window.CheatMenu.giveTools();
+      break;
+    case "giveDemiurgeDiary":
+      window.CheatMenu.giveDemiurgeDiary();
+      break;
+    case "demiurgeRobe":
+      window.CheatMenu.giveDemiurgeRobe();
+      break;
+    case "holyEnding":
+      window.CheatMenu.triggerHolyEnding();
+      break;
+    case "apocalypse":
+      window.CheatMenu.triggerApocalypse();
+      break;
+    case "spawnWerewolf":
+      window.CheatMenu.spawnWerewolf();
+      break;
+    case "summonMessenger":
+      window.CheatMenu.summonMessenger();
+      break;
+
+    // Recursos específicos
+    case "wood_100":
+      window.CheatMenu.giveWood(100);
+      break;
+    case "wood_999":
+      window.CheatMenu.setResource("wood", 999);
+      break;
+    case "stone_100":
+      window.CheatMenu.giveStone(100);
+      break;
+    case "stone_999":
+      window.CheatMenu.setResource("stone", 999);
+      break;
+    case "clay_100":
+      window.CheatMenu.giveClay(100);
+      break;
+    case "clay_999":
+      window.CheatMenu.setResource("clay", 999);
+      break;
+    case "hay_50":
+      window.CheatMenu.giveHay(50);
+      break;
+    case "hay_999":
+      window.CheatMenu.setResource("hay", 999);
+      break;
+    case "torches_25":
+      window.CheatMenu.giveTorches(25);
+      break;
+    case "torches_99":
+      window.CheatMenu.setResource("torches", 99);
+      break;
+    case "gold_5k":
+      window.CheatMenu.giveGold(5000);
+      break;
+    case "gold_50k":
+      window.CheatMenu.giveGold(50000);
+      break;
+
+    // Cristais específicos
+    case "cry_green":
+      window.CheatMenu.giveCrystal("green", 10);
+      break;
+    case "cry_blue":
+      window.CheatMenu.giveCrystal("blue", 10);
+      break;
+    case "cry_pink":
+      window.CheatMenu.giveCrystal("pink", 10);
+      break;
+    case "cry_red":
+      window.CheatMenu.giveCrystal("red", 10);
+      break;
+    case "cry_white":
+      window.CheatMenu.giveCrystal("white", 10);
+      break;
+    case "cry_purple":
+      window.CheatMenu.giveCrystal("purple", 10);
+      break;
+
+    // Infusão de Tochas
+    case "set_torch_green":
+      window.CheatMenu.setTorchColor("green");
+      break;
+    case "set_torch_blue":
+      window.CheatMenu.setTorchColor("blue");
+      break;
+    case "set_torch_pink":
+      window.CheatMenu.setTorchColor("pink");
+      break;
+    case "set_torch_red":
+      window.CheatMenu.setTorchColor("red");
+      break;
+    case "set_torch_white":
+      window.CheatMenu.setTorchColor("white");
+      break;
+    case "set_torch_purple":
+      window.CheatMenu.setTorchColor("purple");
+      break;
+    case "set_torch_orange":
+      window.CheatMenu.setTorchColor("orange");
+      break;
+
+    // Consumíveis e Munições
+    case "potions_10":
+      window.CheatMenu.givePotions(10);
+      break;
+    case "potions_99":
+      window.CheatMenu.setPotions(99);
+      break;
+    case "candles_20":
+      window.CheatMenu.giveCandles(20);
+      break;
+    case "candles_99":
+      window.CheatMenu.setCandles(99);
+      break;
+    case "arrows_50":
+      window.CheatMenu.giveAmmo("arrows", 50);
+      break;
+    case "bolts_50":
+      window.CheatMenu.giveAmmo("bolts", 50);
+      break;
+    case "bombs_25":
+      window.CheatMenu.giveAmmo("bombs", 25);
+      break;
+    case "knives_25":
+      window.CheatMenu.giveAmmo("knives", 25);
+      break;
+    case "oil_25":
+      window.CheatMenu.giveAmmo("oil", 25);
+      break;
+
+    default:
+      console.warn("Ação de cheat desconhecida:", type);
+      break;
+  }
 }
 
 /**
@@ -216,7 +654,261 @@ export function openCheatModal(env) {
  * e via sequência de teclado ('POTATO' ou 'CHIEFS') durante o jogo.
  */
 export function initCheatMenu(env = {}) {
-  window.CheatMenu = {
+  _activeEnv = env;
+
+  const cheatObj = {
+    open() {
+      openCheatModal(env);
+    },
+
+    close() {
+      if (_cheatModalEl) _cheatModalEl.classList.remove("active");
+    },
+
+    giveWood(amount = 100) {
+      PlayerInventory.wood = (PlayerInventory.wood || 0) + amount;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🪵 CHEAT: +${amount} Madeiras recebidas! (Total: ${PlayerInventory.wood})`);
+      return PlayerInventory.wood;
+    },
+
+    giveStone(amount = 100) {
+      PlayerInventory.stone = (PlayerInventory.stone || 0) + amount;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🪨 CHEAT: +${amount} Pedras recebidas! (Total: ${PlayerInventory.stone})`);
+      return PlayerInventory.stone;
+    },
+
+    giveClay(amount = 100) {
+      PlayerInventory.clay = (PlayerInventory.clay || 0) + amount;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🏺 CHEAT: +${amount} Barro / Argila recebidos! (Total: ${PlayerInventory.clay})`);
+      return PlayerInventory.clay;
+    },
+
+    giveHay(amount = 50) {
+      PlayerInventory.hay = (PlayerInventory.hay || 0) + amount;
+      PlayerStats.hay = PlayerInventory.hay;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🌾 CHEAT: +${amount} Feno recebido! (Total: ${PlayerInventory.hay})`);
+      return PlayerInventory.hay;
+    },
+
+    giveTorches(amount = 25) {
+      PlayerInventory.torches = (PlayerInventory.torches || 0) + amount;
+      if (env.weapons) {
+        env.weapons.unlock?.("torch", false);
+      }
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🔦 CHEAT: +${amount} Tochas recebidas! (Total: ${PlayerInventory.torches})`);
+      return PlayerInventory.torches;
+    },
+
+    giveGold(amount = 5000) {
+      PlayerStats.gold = (PlayerStats.gold || 0) + amount;
+      PlayerInventory.gold = (PlayerInventory.gold || 0) + amount;
+      if (env.player) env.player.coins = (env.player.coins || 0) + amount;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`🪙 CHEAT: +${amount} Moedas de Ouro recebidas! (Total: ${PlayerInventory.gold})`);
+      return PlayerInventory.gold;
+    },
+
+    setResource(type, amount) {
+      if (type === "wood") PlayerInventory.wood = amount;
+      else if (type === "stone") PlayerInventory.stone = amount;
+      else if (type === "clay") PlayerInventory.clay = amount;
+      else if (type === "hay") {
+        PlayerInventory.hay = amount;
+        PlayerStats.hay = amount;
+      } else if (type === "torches") {
+        PlayerInventory.torches = amount;
+        if (env.weapons) env.weapons.unlock?.("torch", false);
+      }
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`📦 CHEAT: ${type.toUpperCase()} ajustado para ${amount}!`);
+      return amount;
+    },
+
+    giveResource(type, amount = 100) {
+      if (type === "wood") return this.giveWood(amount);
+      if (type === "stone") return this.giveStone(amount);
+      if (type === "clay") return this.giveClay(amount);
+      if (type === "hay") return this.giveHay(amount);
+      if (type === "torches" || type === "torch") return this.giveTorches(amount);
+      if (type === "gold" || type === "coins") return this.giveGold(amount);
+      console.warn("Tipo de recurso não reconhecido:", type);
+      return false;
+    },
+
+    giveAllResources(amount = 500) {
+      PlayerInventory.wood = (PlayerInventory.wood || 0) + amount;
+      PlayerInventory.stone = (PlayerInventory.stone || 0) + amount;
+      PlayerInventory.clay = (PlayerInventory.clay || 0) + amount;
+      PlayerInventory.hay = (PlayerInventory.hay || 0) + amount;
+      PlayerStats.hay = PlayerInventory.hay;
+      PlayerInventory.torches = Math.max(99, (PlayerInventory.torches || 0) + 50);
+      PlayerInventory.gold = (PlayerInventory.gold || 0) + amount * 10;
+      PlayerStats.gold = PlayerInventory.gold;
+      if (env.player) env.player.coins = PlayerInventory.gold;
+      if (env.weapons) env.weapons.unlock?.("torch", false);
+
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`📦 CHEAT: +${amount} em Todos os Recursos de Construção & Ouro adicionados!`);
+      return "Todos os recursos concedidos";
+    },
+
+    giveCrystal(color, amount = 10) {
+      PlayerInventory.crystals = PlayerInventory.crystals || {
+        green: 0,
+        blue: 0,
+        pink: 0,
+        red: 0,
+        white: 0,
+        purple: 0,
+      };
+      if (color in PlayerInventory.crystals) {
+        PlayerInventory.crystals[color] = (PlayerInventory.crystals[color] || 0) + amount;
+        const info = CRYSTAL_PALETTE[color] || { name: color, label: color };
+        applyTorchColor(color, env.weapons);
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`💎 CHEAT: +${amount} ${info.name}! Tocha infundida com chama ${info.label.toUpperCase()}!`);
+        return PlayerInventory.crystals[color];
+      }
+      return 0;
+    },
+
+    giveCrystals(amount = 20) {
+      PlayerInventory.crystals = PlayerInventory.crystals || {};
+      const colors = ["green", "blue", "pink", "red", "white", "purple"];
+      for (const c of colors) {
+        PlayerInventory.crystals[c] = (PlayerInventory.crystals[c] || 0) + amount;
+      }
+      env.audio?.coin?.();
+      env.ui?.showToast?.(`💎 CHEAT: +${amount} de Cada Cristal Místico (Verde, Azul, Rosa, Vermelho, Branco, Roxo)!`);
+      return PlayerInventory.crystals;
+    },
+
+    setTorchColor(color) {
+      applyTorchColor(color, env.weapons);
+      const info = CRYSTAL_PALETTE[color] || { name: color, label: color };
+      env.audio?.weaponSwing?.("slash", false);
+      env.ui?.showToast?.(`🔥 CHEAT: Tocha infundida com a chama ${info.label.toUpperCase()} (${info.name})!`);
+      return color;
+    },
+
+    givePotions(amount = 10) {
+      if (env.player) {
+        env.player.potions = Math.min(99, (env.player.potions || 0) + amount);
+        syncPlayerStatsToPlayer(env.player, env.ui);
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`🧪 CHEAT: +${amount} Poções de Cura recebidas! (Total: ${env.player.potions})`);
+        return env.player.potions;
+      }
+      return 0;
+    },
+
+    setPotions(amount = 99) {
+      if (env.player) {
+        env.player.potions = amount;
+        syncPlayerStatsToPlayer(env.player, env.ui);
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`🧪 CHEAT: Poções ajustadas para ${amount}!`);
+        return amount;
+      }
+      return 0;
+    },
+
+    giveCandles(amount = 20) {
+      const c = env.candle || window.__game?.candle;
+      if (c) {
+        c.count = Math.min(99, (c.count || 0) + amount);
+        c._sync?.();
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`🕯️ CHEAT: +${amount} Velas de Cera recebidas! (Total: ${c.count})`);
+        return c.count;
+      }
+      return 0;
+    },
+
+    setCandles(amount = 99) {
+      const c = env.candle || window.__game?.candle;
+      if (c) {
+        c.count = amount;
+        c._sync?.();
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`🕯️ CHEAT: Velas ajustadas para ${amount}!`);
+        return amount;
+      }
+      return 0;
+    },
+
+    giveAmmo(type, amount = 50) {
+      if (!env.weapons) return 0;
+      env.weapons.ammo = env.weapons.ammo || {};
+      if (type in env.weapons.ammo || type in env.weapons) {
+        env.weapons.ammo[type] = Math.min(99, (env.weapons.ammo[type] || 0) + amount);
+        env.weapons[type] = env.weapons.ammo[type];
+        env.weapons._refreshWeaponHud?.();
+        env.audio?.coin?.();
+        env.ui?.showToast?.(`🏹 CHEAT: +${amount} munição de ${type.toUpperCase()}! (Total: ${env.weapons[type]})`);
+        return env.weapons[type];
+      }
+      return 0;
+    },
+
+    giveAllAmmo(amount = 99) {
+      if (env.weapons) {
+        env.weapons.ammo = env.weapons.ammo || {};
+        const types = ["arrows", "bolts", "bombs", "knives", "oil"];
+        for (const t of types) {
+          env.weapons.ammo[t] = amount;
+          env.weapons[t] = amount;
+        }
+        env.weapons._refreshWeaponHud?.();
+      }
+      if (env.player) {
+        env.player.potions = amount;
+      }
+      const c = env.candle || window.__game?.candle;
+      if (c) {
+        c.count = amount;
+        c._sync?.();
+      }
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.ui?.showToast?.("🏹 CHEAT: Todas as munições, poções e velas no máximo (99)!");
+      return "Todas as munições maximizadas";
+    },
+
+    giveTools() {
+      PlayerInventory.hasAxe = true;
+      PlayerInventory.hasPickaxe = true;
+      PlayerInventory.hasSword = true;
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.weaponSwing?.("chop", false);
+      env.ui?.showToast?.("🪓 CHEAT: Machado, Picareta e Espada concedidos!");
+      return "Ferramentas concedidas";
+    },
+
+    giveDemiurgeDiary() {
+      PlayerInventory.hasDemiurgeDiary = true;
+      import("./demiurgeBook.js").then((book) => {
+        book.setDemiurgeDiaryCollected?.(true);
+      }).catch((e) => console.warn(e));
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.choir?.();
+      env.ui?.showToast?.("📖 CHEAT: Códice do Demiurgo (O Tractatus de Carcere) recebido! Tecla L para ler.");
+      return "Diário do Demiurgo entregue";
+    },
+
     maxAllItems() {
       // 1. Desbloqueia e restaura durabilidade de todas as 24+ armas existentes
       if (env.weapons) {
@@ -247,7 +939,7 @@ export function initCheatMenu(env = {}) {
           "greatsword",
           "heavycrossbow",
           "musket",
-          "bomb"
+          "bomb",
         ];
         env.weapons.equip?.("greatsword", false);
         env.weapons._refreshWeaponHud?.();
@@ -267,6 +959,7 @@ export function initCheatMenu(env = {}) {
       PlayerInventory.torches = 99;
       PlayerInventory.gold = 99999;
       PlayerStats.gold = 99999;
+      PlayerStats.hay = 999;
 
       // 3. Poções e Velas ao máximo
       if (env.candle) {
@@ -323,21 +1016,8 @@ export function initCheatMenu(env = {}) {
 
     giveAllWeapons() {
       if (env.weapons) {
-        const allWeps = [
-          "shortsword",
-          "broadsword",
-          "claymore",
-          "axe",
-          "pickaxe",
-          "torch",
-          "makeshift_spear",
-          "makeshift_club",
-          "bow",
-          "crossbow",
-          "bomb",
-        ];
-        for (const w of allWeps) {
-          env.weapons.unlock?.(w, true);
+        for (const w of WEAPON_LIST) {
+          env.weapons.unlock?.(w.id, true);
         }
         env.weapons.arrows = 99;
         env.weapons.bolts = 99;
@@ -359,8 +1039,7 @@ export function initCheatMenu(env = {}) {
       return "Arsenal liberado";
     },
 
-    makeMeRich() {
-      const bonus = 10000;
+    makeMeRich(bonus = 10000) {
       PlayerStats.gold += bonus;
       PlayerInventory.gold += bonus;
       if (env.player) env.player.coins += bonus;
@@ -372,7 +1051,6 @@ export function initCheatMenu(env = {}) {
     },
 
     setSpeed(mult = 2.5) {
-      // Ajusta PlayerStats.spd para refletir a velocidade
       PlayerStats.spd = Math.round(10 + (mult - 1.0) / 0.03);
       env.ui?.showToast?.(`🏃 CHEAT: Velocidade ajustada para ${mult}x!`);
       console.log(`🏃 CHEAT: Velocidade ajustada para ${mult}x`);
@@ -509,12 +1187,14 @@ export function initCheatMenu(env = {}) {
     },
   };
 
+  window.CheatMenu = cheatObj;
+  window.openCheatModal = () => openCheatModal(env);
+
   // Detector de Sequência de Teclado ("POTATO" ou "CHIEFS")
   let keySequence = "";
   let lastKeyTimestamp = 0;
 
   window.addEventListener("keydown", (e) => {
-    // Ignora inputs em caixas de texto
     const target = e.target;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
       return;
@@ -544,7 +1224,7 @@ export function initCheatMenu(env = {}) {
   window.__cheats = window.CheatMenu;
 
   console.log(
-    "%c[PURIS CHEATS] Ativado! Digite 'POTATO' durante o jogo ou use o console 'window.CheatMenu'",
+    "%c[PURIS CHEATS] Ativado! Digite 'POTATO' durante o jogo, clique no Pause (Esc) ou use 'window.CheatMenu'",
     "color: #bb86fc; font-weight: bold; font-size: 13px;"
   );
 }

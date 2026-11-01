@@ -19,7 +19,8 @@ Depois abra `http://localhost:4173`.
 - **Mira e Aim Assist (`T` para ligar/desligar)**: retícula sempre visível na tela com feedback tátil colorido (vermelho vivo sobre alvos e dourado radiante quando travada com colchetes de lock-on no inimigo). A mira permanece cravada no inimigo durante disparos consecutivos, transitando suavemente para o próximo alvo se o inimigo for derrotado.
 - **Armas `1`–`9`**: escolhe o slot; apertar o mesmo número de novo alterna entre as armas dele. A **roda do mouse** troca de arma e **Shift + roda** dá zoom na câmera
 - `Q` (segurar): escudo, só com armas de uma mão · `F`: monta/desmonta perto de um cavalo (também bloqueia, como antes) · `R`: poção · `E`: interagir/pegar · `H`: assobiar · `V`: vela
-- `M`: liga/desliga a música · `Esc`: pausa (volumes de música e de efeitos separados)
+- `M`: liga/desliga a música · `Esc`: pausa (volumes de música e de efeitos separados + botão do Cheat Menu)
+- **Menu de Cheats**: Digite `POTATO` ou `CHIEFS` a qualquer momento durante o jogo, clique no botão **Cheat Menu** dentro da tela de pausa (`Esc`), ou execute comandos pelo console via `window.CheatMenu`
 
 ## Reino de Caldera
 
@@ -163,6 +164,47 @@ A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do prim
   - **Diamante**: Chama Branca de Luz Pura (`#eaf4ff`) e luz branca pura (`0xffffff`).
   - **Ametista**: Chama Roxa do Vazio / Demiurgo (`#aa22ff`) e luz púrpura mística (`0xbb33ff`).
 - **Infusão Imediata e via Menu de Criação (`I`)**: Coletar um cristal infunde a tocha imediatamente com aquela cor. No menu de criação (`I`), o jogador pode alternar livremente entre qualquer uma das chamas já descobertas, alterando os cones de fogo 3D em mãos e a cor da luz dinâmica `PointLight`.
+
+## Menu de Cheats e Central de Recursos (`POTATO`, `Esc` ou Console)
+
+Acesso total e irrestrito a todos os recursos, itens, munições, poderes e eventos do jogo através do modal visual de cheats ou da API `window.CheatMenu`:
+- **Formas de Acesso**:
+  - Digite a sequência `POTATO` ou `CHIEFS` no teclado a qualquer momento durante a gameplay.
+  - Pressione `Esc` para pausar e clique no botão **🥔 CHEAT MENU (RECURSOS & ITENS)**.
+  - Execute no console do navegador: `window.CheatMenu.open()`.
+- **Exibição em Tempo Real**: O topo do menu mostra os totais em estoque do jogador (Madeira, Pedra, Barro, Feno, Ouro, Tochas, Poções, Velas, Cor da Tocha e Cristais), atualizando instantaneamente a cada clique.
+- **Categorias e Recursos Disponíveis**:
+  - **Recursos de Construção & Matérias-Primas**:
+    - Madeira (`wood`): +100 ou Max 999
+    - Pedra (`stone`): +100 ou Max 999
+    - Barro / Argila (`clay`): +100 ou Max 999
+    - Feno (`hay`): +50 ou Max 999
+    - Tochas (`torches`): +25 ou Max 99
+    - Ouro (`gold`): +5.000 ou +50.000 moedas
+    - *Pacote Completo*: +500 em todos os recursos de construção com um único clique.
+  - **Cristais Místicos & Tochas Coloridas**:
+    - Pacote com +20 de todos os cristais (6 cores).
+    - +10 unidades individuais de Esmeralda (Verde), Safira (Azul), Quartzo Rosa (Rosa), Rubi (Vermelho), Diamante (Branco) e Ametista (Roxo).
+    - Infusão imediata da tocha em mãos para qualquer uma das chamas mágicas (ou restauração para a chama comum laranja).
+  - **Consumíveis & Munição**:
+    - Poções de Cura (+10 ou Max 99).
+    - Velas de Cera (+20 ou Max 99).
+    - Flechas, Virotes, Bombas de Mão, Facas de Arremesso e Potes de Óleo (+25 a +50 ou Max 99 de tudo).
+  - **Arsenal & Equipamentos**:
+    - Desbloqueio e durabilidade máxima de todas as 24+ armas existentes.
+    - Equipar armaduras do nível 0 (Camponês) ao nível 3 (Placas Templárias).
+    - Conceder ferramentas de trabalho (Machado e Picareta).
+    - Conceder o livro profano do Demiurgo (*O Tractatus de Carcere*) para leitura com a tecla `L`.
+    - Vestir o traje completo do Culto do Demiurgo (Manto e Máscara com chifres).
+  - **Poderes, Moralidade & Eventos**:
+    - Modo Deus (vida infinita e invulnerabilidade).
+    - Super Velocidade (2.5x).
+    - Perdoar todos os pecados, zerar procurado e restaurar o Voto Templário.
+    - Exterminar inimigos e feras próximos.
+    - Invocar Lobisomem nos ermos.
+    - Invocar o Mensageiro do Demiurgo.
+    - Disparar o Final Bom (*Ira Dei* / Triunfo Sagrado).
+    - Disparar o Mal Final (*Apocalipse* / Descida do Demiurgo).
 
 ## Fase 1
 
