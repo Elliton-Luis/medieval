@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import { PlayerStats } from "./rpg.js";
+import { showVictoryEndingModal } from "./gameEndingScreen.js";
 
 // ============================================================================
 // O Final "Ira Dei": O Triunfo Católico e o Julgamento Final (Otimizado)
-// A Cruzada Divina, Fogo Sagrado nos Hereges e a Espada de Luz no Altar
+// Trombeta do Apocalipse, Fogo Sagrado nos Hereges, Assunção Celestial e Vitória
 // ============================================================================
 
 const _holyGold = new THREE.Color(0xffaa00);
@@ -13,16 +14,18 @@ const _sunColor = new THREE.Color(0xfff5e6);
 export const HolyEndingState = {
   active: false,
   timer: 0,
-  phase: 0, // 0: Flash/Smite/Descida, 1: Fala 1 de Miguel, 2: Cura e Purificação, 3: Fala 2 Triunfo
+  phase: 0, // 0: Descida com Trombeta, 1: Fala 1 São Miguel, 2: Assunção aos Céus, 3: Fala 2 Triunfo, 4: Tela Final
   swordGroup: null,
   michael: null,
+  ascensionPillar: null,
   initialHemiIntensity: 1.0,
   env: null,
+  ended: false,
 };
 
 /**
  * Constrói o modelo majestoso e detalhado de São Miguel Arcanjo.
- * Armadura dourada celestial, asas radiantes de penas brancas e douradas, auréola e espada de luz.
+ * Armadura dourada celestial, asas radiantes, auréola, espada de fogo e a Trombeta do Apocalipse.
  */
 export function buildArchangelMichaelMesh() {
   const root = new THREE.Group();
@@ -30,8 +33,8 @@ export function buildArchangelMichaelMesh() {
 
   const goldArmorMat = new THREE.MeshStandardMaterial({
     color: 0xffd700,
-    metalness: 0.82,
-    roughness: 0.28,
+    metalness: 0.85,
+    roughness: 0.25,
     emissive: 0xaa7700,
     emissiveIntensity: 0.8,
   });
@@ -104,14 +107,12 @@ export function buildArchangelMichaelMesh() {
   cloak.rotation.x = 0.15;
   model.add(cloak);
 
-  // 3. Braços e Espada Flamejante de São Miguel
-  // Braço Esquerdo repousando
+  // 3. Braços e Armamentos (Espada Flamejante e Trombeta do Apocalipse)
   const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.95, 6), goldArmorMat);
   armL.position.set(-0.48, 1.6, 0.05);
   armL.rotation.z = 0.22;
   model.add(armL);
 
-  // Braço Direito erguendo a Espada da Justiça
   const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.95, 6), goldArmorMat);
   armR.position.set(0.48, 1.7, 0.12);
   armR.rotation.z = -0.35;
@@ -136,7 +137,56 @@ export function buildArchangelMichaelMesh() {
 
   model.add(swordGroup);
 
-  // 4. Asas Majestosas de São Miguel (Envergadura 6.2 metros)
+  // 4. A Trombeta do Apocalipse de São Miguel Arcanjo (Flâmula com Cruz Vermelha)
+  const trumpetGroup = new THREE.Group();
+  trumpetGroup.name = "ApocalypseTrumpet";
+
+  // Tubo dourado longo e reto
+  const trumpetTube = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.048, 1.55, 8), goldArmorMat);
+  trumpetTube.position.y = 0.78;
+  trumpetGroup.add(trumpetTube);
+
+  // Campânula alargada da trombeta
+  const trumpetBell = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.048, 0.38, 12), goldArmorMat);
+  trumpetBell.position.y = 1.65;
+  trumpetGroup.add(trumpetBell);
+
+  // Anel dourado na borda da campânula
+  const bellLip = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.02, 6, 20), goldArmorMat);
+  bellLip.rotation.x = Math.PI * 0.5;
+  bellLip.position.y = 1.84;
+  trumpetGroup.add(bellLip);
+
+  // Flâmula de seda com a Cruz Vermelha pendurada na trombeta
+  const trumpetBanner = new THREE.Group();
+  trumpetBanner.position.set(0, 0.92, -0.16);
+
+  const bannerCloth = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.75), whiteClothMat);
+  bannerCloth.position.y = -0.38;
+  trumpetBanner.add(bannerCloth);
+
+  const tCrossV = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.58), crimsonCloakMat);
+  tCrossV.position.set(0, -0.38, 0.005);
+  trumpetBanner.add(tCrossV);
+
+  const tCrossH = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.1), crimsonCloakMat);
+  tCrossH.position.set(0, -0.28, 0.005);
+  trumpetBanner.add(tCrossH);
+
+  trumpetGroup.add(trumpetBanner);
+
+  // Brilho divino emitido pela boca da trombeta ao soar o Apocalipse
+  const trumpetLight = new THREE.PointLight(0xfff099, 8.0, 30, 2.0);
+  trumpetLight.position.set(0, 1.95, 0);
+  trumpetGroup.add(trumpetLight);
+
+  // Posiciona a trombeta erguida à boca de São Miguel
+  trumpetGroup.position.set(0.18, 2.3, 0.38);
+  trumpetGroup.rotation.x = -1.35;
+  trumpetGroup.rotation.z = -0.15;
+  model.add(trumpetGroup);
+
+  // 5. Asas Majestosas de São Miguel (Envergadura 6.2 metros)
   const wingGroupL = new THREE.Group();
   wingGroupL.position.set(-0.25, 1.9, -0.2);
   for (let f = 0; f < 6; f++) {
@@ -159,17 +209,16 @@ export function buildArchangelMichaelMesh() {
   }
   model.add(wingGroupR);
 
-  // Luz Sagrada própria emitida por São Miguel (dobrada)
+  // Luz Sagrada própria emitida por São Miguel
   const holyLight = new THREE.PointLight(0xffea88, 6.5, 45, 1.6);
   holyLight.position.set(0, 2.2, 0.5);
   model.add(holyLight);
 
-  return { root, model, wingGroupL, wingGroupR, swordGroup, holyLight, cloak };
+  return { root, model, wingGroupL, wingGroupR, swordGroup, trumpetGroup, trumpetLight, holyLight, cloak, armR };
 }
 
 /**
  * Cria a manifestação física do poder divino cravada na Igreja (Cruz Flamejante / Espada de Luz).
- * Geometria aditiva estática otimizada sem sobrecarga de shaders.
  */
 export function spawnHolySword(churchAnchorPos, scene) {
   const group = new THREE.Group();
@@ -221,18 +270,73 @@ export function spawnHolySword(churchAnchorPos, scene) {
 }
 
 /**
+ * Cria o colossal pilar de luz celestial da Assunção aos Céus que envolve o jogador.
+ */
+export function spawnAscensionPillar(playerPos, scene) {
+  const group = new THREE.Group();
+  group.name = "AscensionLightPillar";
+  group.position.set(playerPos.x, playerPos.y, playerPos.z);
+
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xffe688,
+    transparent: true,
+    opacity: 0.5,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.82,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  // Coluna externa dourada translúcida e núcleo branco ofuscante
+  const outer = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 160, 16, 1, true), beamMat);
+  outer.position.y = 80;
+  group.add(outer);
+
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 160, 12, 1, true), coreMat);
+  inner.position.y = 80;
+  group.add(inner);
+
+  // Anéis de glória flutuantes que sobem em direção aos céus
+  const rings = [];
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xffea00,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  for (let i = 0; i < 4; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.5 - i * 0.35, 0.12, 6, 20), ringMat);
+    ring.rotation.x = Math.PI * 0.5;
+    ring.position.y = 1.0 + i * 4.5;
+    group.add(ring);
+    rings.push(ring);
+  }
+
+  if (scene) scene.add(group);
+  return { group, rings };
+}
+
+/**
  * Incendeia todos os hereges e bestas no mapa simultaneamente com fogo sagrado.
- * Otimizado: Aplica chamas reais aos alvos em raio de 40m; alvos distantes sofrem morte instantânea.
  */
 export function smiteHeretics(monstersPool, cultistsPool, firePool, time, playerPos, effects) {
   const px = playerPos ? (playerPos.x ?? playerPos.position?.x ?? 0) : 0;
   const pz = playerPos ? (playerPos.z ?? playerPos.position?.z ?? 0) : 0;
 
   const smite = (entity) => {
-    if (!entity || !entity.root?.visible && !entity.visible) return;
+    if (!entity || (!entity.root?.visible && !entity.visible)) return;
     if (entity.userData?.isDead) return;
 
-    // Trava o inimigo no lugar (paralisia divina absoluta)
     entity.userData = entity.userData || {};
     entity.userData.state = "STUNNED";
     entity.userData.isDead = true;
@@ -244,7 +348,6 @@ export function smiteHeretics(monstersPool, cultistsPool, firePool, time, player
     const dSq = (ex - px) ** 2 + (ez - pz) ** 2;
 
     if (dSq <= 40 * 40 && Array.isArray(firePool)) {
-      // Aplica até 2 chamas do pool sagrado cobrindo o herege
       for (let i = 0; i < 2; i++) {
         const holyFire = firePool.find((f) => !f.visible);
         if (holyFire) {
@@ -262,12 +365,10 @@ export function smiteHeretics(monstersPool, cultistsPool, firePool, time, player
         effects.play("flame", ex, ey + 0.6, ez, "#ffffff", 1.8);
       }
     } else {
-      // Inimigos distantes sofrem aniquilação instantânea sem sobrecarregar a GPU
       if (entity.root) entity.root.visible = false;
       else entity.visible = false;
     }
 
-    // Despawn final após o julgamento
     setTimeout(() => {
       if (entity.vanish) entity.vanish(false);
       else {
@@ -282,7 +383,7 @@ export function smiteHeretics(monstersPool, cultistsPool, firePool, time, player
 }
 
 /**
- * Dispara o clímax Católico (A Ira de Deus).
+ * Dispara o clímax Católico (A Trombeta do Apocalipse e a Assunção Celestial).
  */
 export function triggerDeusVultEnding(env = {}) {
   const {
@@ -291,13 +392,11 @@ export function triggerDeusVultEnding(env = {}) {
     hemisphere,
     audio,
     ui,
-    dayNight,
     monstersPool,
     cultistsPool,
     firePool,
     settlement,
     player,
-    cameraRig,
     effects,
   } = env;
 
@@ -305,13 +404,15 @@ export function triggerDeusVultEnding(env = {}) {
   HolyEndingState.timer = 0;
   HolyEndingState.phase = 0;
   HolyEndingState.env = env;
+  HolyEndingState.ended = false;
   HolyEndingState.initialHemiIntensity = hemisphere ? hemisphere.intensity : 1.0;
 
-  // 1. Toca canto gregoriano épico solene (Dies Irae) em volume triunfante
-  audio?.playEpicChoir?.();
+  // 1. Toca a Trombeta do Apocalipse, o sino e o coro majestoso
+  audio?.playTrumpetFanfare?.();
   audio?.churchBell?.();
+  audio?.playEpicChoir?.();
 
-  // 2. Estouro Branco do Céu (A Abertura dos Céus)
+  // 2. Estouro Branco do Céu (Abertura dos Céus)
   if (scene && scene.fog) {
     scene.fog.color.copy(_pureWhite);
     scene.fog.density = 0.048;
@@ -321,7 +422,7 @@ export function triggerDeusVultEnding(env = {}) {
   }
   if (hemisphere) {
     hemisphere.color.copy(_holyGold);
-    hemisphere.intensity = 5.0; // Flash sagrado intencional
+    hemisphere.intensity = 5.0; // Flash sagrado
   }
 
   // 3. Incendeia os hereges e feras com o Fogo Sagrado
@@ -345,29 +446,29 @@ export function triggerDeusVultEnding(env = {}) {
 
   if (!HolyEndingState.michael) {
     const michaelData = buildArchangelMichaelMesh();
-    // Posiciona na frente do jogador a 6 metros e 40 metros no ar
-    const mx = px + Math.sin(yaw) * 6.0;
-    const mz = pz + Math.cos(yaw) * 6.0;
+    // Posiciona na frente do jogador a 6.5 metros e 42 metros no ar
+    const mx = px + Math.sin(yaw) * 6.5;
+    const mz = pz + Math.cos(yaw) * 6.5;
     michaelData.root.position.set(mx, py + 42, mz);
-    michaelData.targetY = py + 2.0;
+    michaelData.targetY = py + 2.2;
     michaelData.root.lookAt(px, py + 1.6, pz);
 
     if (scene) scene.add(michaelData.root);
     HolyEndingState.michael = michaelData;
   }
 
-  ui?.showToast?.("✝️ «NON NOBIS DOMINE, NON NOBIS... SED NOMINI TUO DA GLORIAM!»");
+  ui?.showToast?.("🎺 «A TROMBETA DO APOCALIPSE RESSÔA DOS CÉUS!»");
 }
 
 /**
- * Atualização do ciclo de julgamento divino frame a frame.
+ * Atualização do ciclo divino frame a frame (Trombeta, Assunção e Vitória).
  */
 export function updateDeusVultEnding(dt, env = HolyEndingState.env) {
   if (!HolyEndingState.active || !env) return;
 
   HolyEndingState.timer += dt;
   const t = HolyEndingState.timer;
-  const { hemisphere, scene, renderer, dayNight, ui, audio, cameraRig, player, effects } = env;
+  const { hemisphere, scene, renderer, dayNight, ui, audio, cameraRig, player, effects, camera } = env;
   const px = player ? (player.x ?? player.position?.x ?? 0) : 0;
   const pz = player ? (player.z ?? player.position?.z ?? 0) : 0;
   const py = player ? (player.root?.position?.y ?? 0) : 0;
@@ -385,21 +486,37 @@ export function updateDeusVultEnding(dt, env = HolyEndingState.env) {
     m.wingGroupR.rotation.z = -0.55 - flap;
 
     // Desce suavemente até pairar majestosamente diante do jogador
-    m.root.position.y = THREE.MathUtils.lerp(m.root.position.y, (m.targetY || py + 2.0) + Math.sin(t * 2.2) * 0.14, dt * 1.6);
+    m.root.position.y = THREE.MathUtils.lerp(
+      m.root.position.y,
+      (m.targetY || py + 2.2) + Math.sin(t * 2.2) * 0.14,
+      dt * 1.6
+    );
     m.root.lookAt(px, py + 1.6, pz);
 
-    if (Math.random() < 0.25 && effects) {
-      effects.play("star", m.root.position.x + (Math.random() - 0.5) * 2.5, m.root.position.y + 1.8, m.root.position.z + (Math.random() - 0.5) * 2.5, "#ffd700", 1.5);
+    // Na descida inicial, São Miguel sopra a Trombeta com brilho radiante
+    if (t < 3.5) {
+      if (m.trumpetLight) m.trumpetLight.intensity = 8.0 + Math.sin(t * 12) * 2.0;
+      if (effects && Math.random() < 0.4) {
+        effects.play("star", m.root.position.x, m.root.position.y + 2.4, m.root.position.z, "#ffd700", 2.0);
+      }
+    } else {
+      // Abaixa a trombeta e ergue a Espada da Justiça
+      if (m.trumpetGroup) {
+        m.trumpetGroup.position.y = THREE.MathUtils.lerp(m.trumpetGroup.position.y, 1.45, dt * 2.5);
+        m.trumpetGroup.rotation.x = THREE.MathUtils.lerp(m.trumpetGroup.rotation.x, 0.2, dt * 2.5);
+      }
+      if (m.trumpetLight) m.trumpetLight.intensity = THREE.MathUtils.lerp(m.trumpetLight.intensity, 0, dt * 3.0);
+      if (m.swordGroup) {
+        m.swordGroup.rotation.x = THREE.MathUtils.lerp(m.swordGroup.rotation.x, -1.6, dt * 2.5);
+      }
     }
   }
 
-  // Decaimento suave da luz de 5.0 para 1.5 estável ao longo de 4 segundos
+  // Transição da iluminação e névoa celestial
   if (hemisphere && t <= 4.2) {
     const p = Math.min(1.0, t / 4.0);
-    hemisphere.intensity = THREE.MathUtils.lerp(5.0, 1.45, p);
+    hemisphere.intensity = THREE.MathUtils.lerp(5.0, 1.5, p);
   }
-
-  // Transição da névoa de branco puro para o amanhecer celestial dourado
   if (scene && scene.fog && t <= 6.0) {
     const p = Math.min(1.0, t / 5.0);
     scene.fog.color.lerp(_sunColor, p * 0.1);
@@ -407,60 +524,114 @@ export function updateDeusVultEnding(dt, env = HolyEndingState.env) {
     if (renderer) renderer.setClearColor(scene.fog.color);
   }
 
-  // Fase 1 (t = 2.4s): São Miguel proclama o fim do mal por Jesus Cristo
-  if (t >= 2.4 && HolyEndingState.phase === 0) {
+  // Fase 1 (t = 3.2s): São Miguel proclama o fim do mal por Jesus Cristo
+  if (t >= 3.2 && HolyEndingState.phase === 0) {
     HolyEndingState.phase = 1;
-    ui?.showToast?.("⚔️ SÃO MIGUEL ARCANJO: «Não temam, povos da terra o mal foi derrotado, por Nosso Senhor Jesus Cristo!»");
+    ui?.showToast?.("⚔️ SÃO MIGUEL ARCANJO: «Não temam, povos da terra! O mal foi derrotado por Nosso Senhor Jesus Cristo!»");
     audio?.churchBell?.();
     if (cameraRig) cameraRig.addShake(0.22);
   }
 
-  // Fase 2 (t = 5.8s): Cura divina cósmica e purificação completa de todo problema
-  if (t >= 5.8 && HolyEndingState.phase === 1) {
+  // Fase 2 (t = 6.0s): Corta para a Cutscene da Assunção aos Céus
+  if (t >= 6.0 && HolyEndingState.phase === 1) {
     HolyEndingState.phase = 2;
 
-    // São Miguel ergue a espada flamejante aos céus
-    if (HolyEndingState.michael?.swordGroup) {
-      HolyEndingState.michael.swordGroup.rotation.x = -1.6;
-    }
-
-    // Cura completa do jogador (vitalidade máxima, remove nocaute, perdoa voto)
+    // Purifica o jogador e renova os votos
     if (player) {
       player.health = player.maxHealth;
-      player.knockedOut = false;
+      player.knockedOut = true; // Trava controle para a cutscene
       player.dead = false;
-      player.invuln = 10;
+      player.invuln = 999;
     }
     PlayerStats.hp = PlayerStats.getMaxHp();
     PlayerStats.hasBrokenVow = false;
     PlayerStats.morality = 100;
 
-    // Purifica o reino, cessa o eclipse e restaura manhã ensolarada
+    // Remove o eclipse e restaura céu glorioso de manhã
     import("./decay.js").then(({ WorldDecay }) => {
       WorldDecay.isEclipse = false;
     }).catch(() => {});
 
     if (dayNight) {
       dayNight.isNight = false;
-      dayNight.progress = 0.33; // Manhã ensolarada radiante
+      dayNight.progress = 0.33;
     }
 
-    if (effects) {
-      for (let s = 0; s < 12; s++) {
-        const ang = (s / 12) * Math.PI * 2;
-        effects.play("star", px + Math.cos(ang) * 4, py + 1.5, pz + Math.sin(ang) * 4, "#ffd700", 2.5);
+    // Spawna a colossal Coluna de Luz da Assunção sobre o jogador
+    if (!HolyEndingState.ascensionPillar && scene) {
+      HolyEndingState.ascensionPillar = spawnAscensionPillar({ x: px, y: py, z: pz }, scene);
+    }
+
+    ui?.showToast?.("✨ «A ASSUNÇÃO CELESTIAL: Teu fôlego mortal se desfaz e és assunto aos Céus Eternos!»");
+    audio?.playEpicChoir?.();
+  }
+
+  // Execução da Cutscene de Assunção (t >= 6.0s)
+  if (HolyEndingState.phase >= 2) {
+    // 1. Elevação corporal do jogador em direção aos céus
+    if (player && player.root) {
+      player.root.position.y += dt * 3.4;
+
+      // Braços estendidos em beatífica contemplação celestial
+      if (player.leftArm) player.leftArm.rotation.set(-1.15, 0, -0.42);
+      if (player.rightArm) player.rightArm.rotation.set(-1.15, 0, 0.42);
+      if (player.leftForearm) player.leftForearm.rotation.set(-0.25, 0, 0);
+      if (player.rightForearm) player.rightForearm.rotation.set(-0.25, 0, 0);
+
+      // Partículas sagradas girando ao redor do jogador
+      if (effects && Math.random() < 0.6) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = 0.6 + Math.random() * 1.8;
+        effects.play(
+          "star",
+          px + Math.cos(ang) * rad,
+          player.root.position.y + 1.2,
+          pz + Math.sin(ang) * rad,
+          "#ffd700",
+          1.8
+        );
       }
     }
 
-    ui?.showToast?.("✨ GRAÇA SAGRADA: O reino foi curado, os votos renovados e todas as enfermidades sanadas!");
+    // 2. Anéis flutuantes da coluna de luz subindo
+    if (HolyEndingState.ascensionPillar?.rings) {
+      for (const ring of HolyEndingState.ascensionPillar.rings) {
+        ring.position.y += dt * 8.5;
+        if (ring.position.y > 45) {
+          ring.position.y = 1.0;
+        }
+      }
+    }
+
+    // 3. Câmera cinematográfica orbital focando o personagem subindo aos céus
+    if (camera) {
+      if (cameraRig) cameraRig.frozen = true;
+      const camOrbit = t * 0.38;
+      const camDist = 9.2;
+      const camY = Math.max(py + 1.8, (player?.root?.position?.y || py) - 2.0);
+      camera.position.set(px + Math.sin(camOrbit) * camDist, camY, pz + Math.cos(camOrbit) * camDist);
+      camera.lookAt(px, (player?.root?.position?.y || py) + 1.0, pz);
+    }
   }
 
-  // Fase 3 (t = 8.8s): Proclamação da Vitória Definitiva
-  if (t >= 8.8 && HolyEndingState.phase === 2) {
+  // Fase 3 (t = 10.0s): Segunda proclamação de São Miguel saudando a alma assumida
+  if (t >= 10.0 && HolyEndingState.phase === 2) {
     HolyEndingState.phase = 3;
-    ui?.showToast?.("☀️ SÃO MIGUEL ARCANJO: «O mal perdeu, o mal foi derrotado!»");
-    audio?.playEpicChoir?.();
+    ui?.showToast?.("☀️ SÃO MIGUEL ARCANJO: «Vinde, bendito de meu Pai, entrar no Reino que vos está preparado!»");
     audio?.churchBell?.();
-    if (cameraRig) cameraRig.addShake(0.15);
+    audio?.playEpicChoir?.();
+  }
+
+  // Fase 4 (t = 14.2s): O jogo acaba de vez! Exibe a tela de vitória sagrada com reset e exportar
+  if (t >= 14.2 && !HolyEndingState.ended) {
+    HolyEndingState.ended = true;
+    HolyEndingState.phase = 4;
+
+    showVictoryEndingModal({
+      type: "HOLY",
+      title: "A ASSUNÇÃO CELESTIAL",
+      subtitle: "O TRIUNFO DOS JUSTOS E A ENTRADA NO REINO DOS CÉUS",
+      quote: "«Combati o bom combate, acabei a carreira, guardei a fé. Ao soar da trombeta do Apocalipse, a alma e o corpo do servo fiel foram assumidos em triunfo aos Céus Eternos na glória de Nosso Senhor Jesus Cristo.»",
+    });
   }
 }

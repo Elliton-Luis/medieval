@@ -5,6 +5,7 @@ import {
   equipArmor,
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
+import { WEAPON_LIST } from "./weapondata.js";
 
 let _cheatModalEl = null;
 
@@ -142,6 +143,7 @@ export function openCheatModal(env) {
         <button class="cheat-close-btn" id="cheat-btn-close" aria-label="Fechar">✕</button>
       </div>
       <div class="cheat-grid">
+        <button class="cheat-btn" data-cheat="maxAllItems" style="grid-column: 1 / -1; background: rgba(255, 215, 0, 0.22); border-color: #ffd700; color: #ffe688;">🎒 Encher Todos os Itens & Arsenal (Max)</button>
         <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
         <button class="cheat-btn" data-cheat="giveAllWeapons">⚔️ Liberar Todo o Arsenal</button>
         <button class="cheat-btn" data-cheat="makeMeRich">💰 +10.000 Ouro</button>
@@ -153,7 +155,7 @@ export function openCheatModal(env) {
         <button class="cheat-btn" data-cheat="armor2">🛡️ Armadura 2 (Cota de Malha)</button>
         <button class="cheat-btn" data-cheat="armor3">🛡️ Armadura 3 (Placas / Templário)</button>
         <button class="cheat-btn" data-cheat="demiurgeRobe">👑 Vestir Roupa do Demiurgo (Capa & Máscara)</button>
-        <button class="cheat-btn" data-cheat="holyEnding">✝️ O Final Bom: A Ira de Deus (Ira Dei / Triunfo Sagrado)</button>
+        <button class="cheat-btn" data-cheat="holyEnding">✝️ O Final Bom: A Trombeta e Assunção Sagrada</button>
         <button class="cheat-btn" data-cheat="apocalypse">☄️ O Mal Final: Descida do Demiurgo (Apocalipse)</button>
         <button class="cheat-btn" data-cheat="spawnWerewolf">🐺 Invocar Lobisomem para Massacre</button>
         <button class="cheat-btn" data-cheat="summonMessenger">👁️ Invocar Mensageiro do Demiurgo</button>
@@ -189,7 +191,8 @@ export function openCheatModal(env) {
   buttons.forEach((b) => {
     b.addEventListener("click", (e) => {
       const type = e.currentTarget.getAttribute("data-cheat");
-      if (type === "godMode") window.CheatMenu.godMode();
+      if (type === "maxAllItems") window.CheatMenu.maxAllItems();
+      else if (type === "godMode") window.CheatMenu.godMode();
       else if (type === "giveAllWeapons") window.CheatMenu.giveAllWeapons();
       else if (type === "makeMeRich") window.CheatMenu.makeMeRich();
       else if (type === "setSpeed") window.CheatMenu.setSpeed(2.5);
@@ -214,6 +217,79 @@ export function openCheatModal(env) {
  */
 export function initCheatMenu(env = {}) {
   window.CheatMenu = {
+    maxAllItems() {
+      // 1. Desbloqueia e restaura durabilidade de todas as 24+ armas existentes
+      if (env.weapons) {
+        for (const w of WEAPON_LIST) {
+          env.weapons.unlock?.(w.id, false);
+          if (w.maxDurability) {
+            env.weapons.setWeaponDurability?.(w.id, w.maxDurability);
+          }
+        }
+        if (env.weapons.ammo) {
+          env.weapons.ammo.arrows = 99;
+          env.weapons.ammo.bolts = 99;
+          env.weapons.ammo.bombs = 99;
+          env.weapons.ammo.knives = 99;
+          env.weapons.ammo.oil = 99;
+        }
+        env.weapons.arrows = 99;
+        env.weapons.bolts = 99;
+        env.weapons.bombs = 99;
+        env.weapons.knives = 99;
+        env.weapons.oil = 99;
+        env.weapons.equip?.("greatsword", false);
+        env.weapons._refreshWeaponHud?.();
+      }
+
+      // 2. Inventário e recursos de construção/crafting ao máximo
+      PlayerInventory.hasAxe = true;
+      PlayerInventory.hasPickaxe = true;
+      PlayerInventory.hasSword = true;
+      PlayerInventory.hasDemiurgeRobe = true;
+      PlayerInventory.wood = 999;
+      PlayerInventory.stone = 999;
+      PlayerInventory.clay = 999;
+      PlayerInventory.hay = 999;
+      PlayerInventory.torches = 99;
+      PlayerInventory.gold = 99999;
+      PlayerStats.gold = 99999;
+
+      // 3. Poções e Velas ao máximo
+      if (env.candle) {
+        env.candle.count = 99;
+        env.candle._sync?.();
+      }
+      if (window.__game?.candle) {
+        window.__game.candle.count = 99;
+        window.__game.candle._sync?.();
+      }
+
+      if (env.player) {
+        env.player.coins = 99999;
+        env.player.potions = 99;
+        env.player.maxHealth = Math.max(14, env.player.maxHealth);
+        env.player.health = env.player.maxHealth;
+      }
+
+      // 4. Armadura máxima de placas templárias e atributos no nível 20
+      equipArmor(3, env.player);
+      PlayerStats.str = 20;
+      PlayerStats.con = 20;
+      PlayerStats.cha = 20;
+      PlayerStats.spd = 20;
+      PlayerStats.weaponLevel = 5;
+      PlayerStats.hp = PlayerStats.getMaxHp();
+      PlayerStats.maxHp = PlayerStats.getMaxHp();
+
+      syncPlayerStatsToPlayer(env.player, env.ui);
+      env.audio?.coin?.();
+      env.audio?.choir?.();
+      env.ui?.showToast?.("🎒 CHEAT: Todos os itens, recursos, munições e armas maximizados!");
+      console.log("🎒 CHEAT: Inventário, armas e atributos no nível máximo!");
+      return "Todos os itens maximizados";
+    },
+
     godMode() {
       if (env.player) {
         env.player.godMode = !env.player.godMode;
@@ -451,6 +527,8 @@ export function initCheatMenu(env = {}) {
       }
     }
   });
+
+  window.__cheats = window.CheatMenu;
 
   console.log(
     "%c[PURIS CHEATS] Ativado! Digite 'POTATO' durante o jogo ou use o console 'window.CheatMenu'",

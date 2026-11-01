@@ -400,7 +400,7 @@ function frame(now) {
   }
   updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
   updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig });
-  updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig, player, effects });
+  updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig, player, effects, camera });
   updateMessenger(dt, player, effects, ui, audio, world, input);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay, isCutscene);
   interactions.update(dt);

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js";
 import { spawnWaypointMarker } from "./rpg.js";
+import { showVictoryEndingModal } from "./gameEndingScreen.js";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
@@ -1417,13 +1418,12 @@ export function updateDemiurgeCataclysm(dt, env) {
       }
     }
 
-    if (deathScreen) {
-      deathScreen.start({
-        customTitle: "O FIM DA CRIAÇÃO MATERIAL",
-        customSubtitle: "O Demiurgo colidiu contra a terra e consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre.",
-        coinsLost: 99999,
-        morality: -100,
-      });
-    }
+    // Fim definitivo do jogo: não há mais terra, a criação material ruiu
+    showVictoryEndingModal({
+      type: "DEMIURGE",
+      title: "O FIM DA CRIAÇÃO MATERIAL",
+      subtitle: "A TERRA E A MATÉRIA FORAM TOTALMENTE CONSUMIDAS",
+      quote: "«O Demiurgo colidiu contra a terra e consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre. Não há mais terra, corpos ou sofrimento.»",
+    });
   }
 }

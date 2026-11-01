@@ -526,4 +526,64 @@ export class GameAudio {
       osc.stop(t + 3.1);
     }
   }
+
+  // Toque majestoso e solene da Trombeta do Apocalipse de São Miguel Arcanjo
+  playTrumpetFanfare() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const t0 = ctx.currentTime;
+
+    // Sequência de notas da fanfarra sacra triunfante
+    const notes = [
+      { f: 261.63, start: 0.0, dur: 0.32, gain: 0.35 },  // Dó4
+      { f: 392.00, start: 0.32, dur: 0.32, gain: 0.38 }, // Sol4
+      { f: 523.25, start: 0.64, dur: 0.45, gain: 0.42 }, // Dó5
+      { f: 659.25, start: 1.09, dur: 0.45, gain: 0.42 }, // Mi5
+      { f: 783.99, start: 1.54, dur: 5.5,  gain: 0.52 }, // Sol5 (Clímax solene prolongado)
+      { f: 1046.50, start: 1.54, dur: 5.5, gain: 0.28 }, // Dó6 (Harmônico celestial)
+    ];
+
+    for (const n of notes) {
+      const noteStart = t0 + n.start;
+      const noteEnd = noteStart + n.dur;
+
+      // 1. Oscilador dente-de-serra rico em harmônicos de metal
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(n.f, noteStart);
+
+      // Vibrato nas notas mais longas
+      if (n.dur > 1.0) {
+        const lfo = ctx.createOscillator();
+        lfo.frequency.setValueAtTime(5.2, noteStart);
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(n.f * 0.012, noteStart);
+        lfo.connect(osc.frequency);
+        lfo.start(noteStart);
+        lfo.stop(noteEnd);
+      }
+
+      // 2. Filtro biquad para timbre metálico de trombeta de bronze/ouro
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(2800, noteStart);
+      filter.Q.value = 2.4;
+
+      // 3. Envelope com ataque de sopro de metal rápido e sustain nobre
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, noteStart);
+      gain.gain.linearRampToValueAtTime(n.gain, noteStart + 0.06);
+      if (n.dur > 1.0) {
+        gain.gain.setValueAtTime(n.gain, noteEnd - 1.2);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+      } else {
+        gain.gain.setValueAtTime(n.gain * 0.9, noteEnd - 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+      }
+
+      osc.connect(filter).connect(gain).connect(this.sfx);
+      osc.start(noteStart);
+      osc.stop(noteEnd);
+    }
+  }
 }
