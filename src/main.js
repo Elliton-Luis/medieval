@@ -94,6 +94,7 @@ import {
   updateEclipseLightning,
   updateMessenger,
   DemiurgeModalState,
+  DemiurgeCataclysm,
   triggerDemiurgeCataclysm,
   updateDemiurgeCataclysm,
 } from "./decay.js";

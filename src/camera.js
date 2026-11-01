@@ -49,6 +49,21 @@ export class ThirdPersonCamera {
     this.recoil = Math.min(0.18, this.recoil + amount * 0.75);
   }
 
+  // Encaixa e redefine imediatamente a câmera atrás do jogador (ex: ao terminar cutscene ou renascer)
+  snap(player) {
+    if (!player) return;
+    this.frozen = false;
+    this._initialized = true;
+    this._pivot.set(player.x, player.root.position.y + 1.45, player.z);
+    this._smoothLookX = 0;
+    this._smoothLookY = 0;
+    this.yaw = 0;
+    this.pitch = CONFIG.camera.pitch;
+    this.distance = CONFIG.camera.distance;
+    this.shake = 0;
+    this.recoil = 0;
+  }
+
   // Galope: só a intensidade vem de fora; o balanço usa uma fase própria, lenta e contínua.
   setRide(strength) {
     this.rideTarget = strength;
