@@ -302,6 +302,7 @@ if (saved) {
     PlayerStats.cha = saved.stats.cha ?? PlayerStats.cha;
     PlayerStats.spd = saved.stats.spd ?? PlayerStats.spd;
     PlayerStats.morality = saved.stats.morality ?? PlayerStats.morality;
+    PlayerStats.lastMessengerTier = saved.stats.lastMessengerTier ?? 0;
     if (typeof saved.stats.sacrifices === "number") {
       CultState.syncLevel(saved.stats.sacrifices);
     }

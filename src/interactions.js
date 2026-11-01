@@ -76,6 +76,14 @@ export class InteractionSystem {
       return;
     }
 
+    if (this.input.consumeWeaponsCodexPressed?.()) {
+      if (document.pointerLockElement) document.exitPointerLock();
+      import("./weaponsScreen.js").then(({ openWeaponsScreen }) => {
+        openWeaponsScreen(window.__game || this);
+      });
+      return;
+    }
+
     if (this.input.consumeHayBaitPressed()) {
       this._tryDropHayBait();
     }
@@ -116,6 +124,10 @@ export class InteractionSystem {
     const canCorral = inv.wood >= BUILD_COSTS.CORRAL.wood && inv.hay >= BUILD_COSTS.CORRAL.hay;
 
     const actions = [
+      {
+        id: "view:weapons_codex",
+        label: "⚔️ Compêndio de Armas (Dano, Velocidade, Melhorias & Status)",
+      },
       {
         id: "craft:makeshift_spear",
         label: "Criar Lança Improvisada (3 Madeira · 10 usos de durabilidade)",
@@ -561,6 +573,14 @@ export class InteractionSystem {
         speech = `«O bandido sorri de soslaio: 'Procuras o livro proibido? Boas moedas pagam essa informação: "${hint}"'»`;
       }
       this._showNPCDialogue(speech);
+      return;
+    }
+
+    if (action === "view:weapons_codex") {
+      this.ui.closeDialogue();
+      import("./weaponsScreen.js").then(({ openWeaponsScreen }) => {
+        openWeaponsScreen(window.__game || this);
+      });
       return;
     }
 

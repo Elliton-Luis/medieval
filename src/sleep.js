@@ -90,6 +90,7 @@ export class SleepSystem {
           cha: PlayerStats.cha,
           spd: PlayerStats.spd,
           morality: PlayerStats.morality ?? 0,
+          lastMessengerTier: PlayerStats.lastMessengerTier ?? 0,
           sacrifices: CultState?.sacrifices ?? 0,
           hay: PlayerInventory.hay,
           wood: PlayerInventory.wood,

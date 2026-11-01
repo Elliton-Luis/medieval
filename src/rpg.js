@@ -159,28 +159,66 @@ export function getEvilPercent() {
   return Math.max(0, Math.min(100, Math.round(50 - (morality / 2))));
 }
 
-export function addEvil(amount = 2, reason = null) {
-  const currentMorality = PlayerStats.morality ?? 0;
-  PlayerStats.morality = Math.max(-100, Math.min(100, currentMorality - amount * 2));
+const _evilHistory = new Map();
+const EVIL_WINDOW_MS = 5 * 60 * 1000; // 5 minutos (300.000 ms)
+const MAX_EVIL_REPEATS = 8; // Máximo 8x no período
 
-  // Culto do Demiurgo progride com atos vis
-  CultState?.addApocalypseProgress?.(amount * 0.25);
+export function checkMessengerEvilProgression(evil) {
+  if (evil < 65) return;
+  // O mensageiro só pode aparecer a cada 15% de maldade (a partir de 65%: 65%, 80%, 95%)
+  const currentTier = Math.floor((evil - 50) / 15);
+  const lastTier = PlayerStats.lastMessengerTier || 0;
 
-  const evil = getEvilPercent();
-  const ui = _env.ui || window.__game?.ui;
-  if (reason && ui) {
-    ui.showToast(`🌑 Maldade ${evil}% (+${Math.round(amount)}%) · ${reason}`);
-  }
-
-  // O Mensageiro do Demiurgo se manifesta após atos hediondos ou quando a corrupção aumenta
-  if (amount >= 2.5 || evil >= 60) {
+  if (currentTier > lastTier) {
+    PlayerStats.lastMessengerTier = currentTier;
     const player = _env.player || window.__game?.player;
     const scene = _env.scene || window.__game?.scene;
     const world = _env.world || window.__game?.world;
     if (player && scene) {
-      triggerCultistMessenger(player, scene, world, true);
+      triggerCultistMessenger(player, scene, world, true, true);
     }
   }
+}
+
+export function addEvil(amount = 2, reason = null) {
+  const now = performance.now();
+  const key = reason ? String(reason).trim().toLowerCase() : "geral";
+
+  let history = _evilHistory.get(key) || [];
+  history = history.filter((t) => now - t < EVIL_WINDOW_MS);
+
+  const ui = _env.ui || window.__game?.ui;
+
+  // Se já atingiu 8x nos últimos 5 minutos, na 9x já não conta!
+  if (history.length >= MAX_EVIL_REPEATS) {
+    _evilHistory.set(key, history);
+    if (reason && ui) {
+      ui.showToast(`🌑 ${reason}: limite de maldade repetida atingido (8x em 5min). Nada somado.`);
+    }
+    return getEvilPercent();
+  }
+
+  // Registra o uso
+  history.push(now);
+  _evilHistory.set(key, history);
+
+  // A coisa mais má que você pode fazer é 2%
+  const effectiveAmount = Math.min(2.0, Math.max(0.1, Number(amount) || 1.0));
+
+  const currentMorality = PlayerStats.morality ?? 0;
+  // 1% de maldade = 2 pontos de moralidade
+  PlayerStats.morality = Math.max(-100, Math.min(100, currentMorality - effectiveAmount * 2));
+
+  CultState?.addApocalypseProgress?.(effectiveAmount * 0.15);
+
+  const evil = getEvilPercent();
+
+  if (reason && ui) {
+    ui.showToast(`🌑 Maldade ${evil}% (+${effectiveAmount.toFixed(1)}%) [${history.length}/${MAX_EVIL_REPEATS} em 5min] · ${reason}`);
+  }
+
+  // Verifica se cruzou um novo patamar de 15% (65%, 80%, 95%)
+  checkMessengerEvilProgression(evil);
 
   return evil;
 }
@@ -707,15 +745,12 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
       PlayerStats.cha = Math.max(1, PlayerStats.cha - 5);
       triggerWantedLevel(2); // Ganha 2 estrelas/escudos
       _env.ui?.showToast(
-        `Assassinato! Bondade -10 · Sacrifício #${sacCount} da Seita (Nível ${cultTier}) · Procurado +2`
+        `Assassinato! Bondade reduzida · Sacrifício #${sacCount} da Seita (Nível ${cultTier}) · Procurado +2`
       );
-      // Desperta o Mensageiro de Cinzas para ação maligna
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     } else {
       _env.ui?.showToast(
-        `Assassinato nas sombras · Bondade -10 · Sacrifício #${sacCount} da Seita (Nível ${cultTier})`
+        `Assassinato nas sombras · Sacrifício #${sacCount} da Seita (Nível ${cultTier})`
       );
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     }
   }
 
@@ -1119,10 +1154,6 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
   if (_env.effects && _env.player) {
     _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
   }
-  if (voluntaryOffer >= 20) {
-    // Oferta generosa atrai a mensagem virtuosa do Cátaro
-    triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
-  }
   syncPlayerStatsToPlayer();
   return true;
 }
@@ -1151,9 +1182,6 @@ export function interactWithBeggar(playerPos, npcBeggar) {
       _env.effects?.play("star", npcEntity.x, npcEntity.root.position.y + 1.8, npcEntity.z, "#ffd86b", 1.1);
     }
     _env.audio?.coin?.();
-    if (Math.random() < 0.5) {
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
-    }
     syncPlayerStatsToPlayer();
     return true;
   }
@@ -2970,27 +2998,18 @@ export function sellResourcesToNPC(npcType) {
     PlayerStats.hay = PlayerInventory.hay;
     PlayerInventory.gold += 10; // Vende feno
     _env.audio?.coin?.();
-    if (Math.random() < 0.5) {
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
-    }
     syncPlayerStatsToPlayer();
     return true;
   } else if (npcType === "BLACKSMITH" && PlayerInventory.wood >= 10) {
     PlayerInventory.wood -= 10;
     PlayerInventory.gold += 25; // Vende lenha para a fornalha
     _env.audio?.coin?.();
-    if (Math.random() < 0.5) {
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
-    }
     syncPlayerStatsToPlayer();
     return true;
   } else if (npcType === "STONE" && PlayerInventory.stone >= 5) {
     PlayerInventory.stone -= 5;
     PlayerInventory.gold += 15; // Vende pedras brutas/minério
     _env.audio?.coin?.();
-    if (Math.random() < 0.5) {
-      triggerCultistMessenger(_env.player, _env.scene, _env.world, false);
-    }
     syncPlayerStatsToPlayer();
     return true;
   }

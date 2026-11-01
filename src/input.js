@@ -21,6 +21,7 @@ export class InputManager {
     this.hayBaitPressed = false;
     this.buildModePressed = false;
     this.craftMenuPressed = false;
+    this.weaponsCodexPressed = false;
     this.weaponSelection = 0;
     this.modalOpen = false;
     this.locked = false;
@@ -36,6 +37,7 @@ export class InputManager {
       if ((event.code === "AltLeft" || event.code === "KeyX") && !event.repeat) this.dodgePressed = true;
       if (event.code === "KeyC" && !event.repeat) this.buildModePressed = true;
       if (event.code === "KeyI" && !event.repeat) this.craftMenuPressed = true;
+      if (event.code === "KeyB" && !event.repeat) this.weaponsCodexPressed = true;
       if (event.code === "KeyV" && !event.repeat) this.candlePressed = true;
       if (event.code === "KeyH" && !event.repeat) this.whistlePressed = true;
       if (event.code === "KeyF" && !event.repeat) this.mountPressed = true;
@@ -201,6 +203,12 @@ export class InputManager {
   consumeCraftMenuPressed() {
     const pressed = this.craftMenuPressed;
     this.craftMenuPressed = false;
+    return pressed;
+  }
+
+  consumeWeaponsCodexPressed() {
+    const pressed = this.weaponsCodexPressed;
+    this.weaponsCodexPressed = false;
     return pressed;
   }
 

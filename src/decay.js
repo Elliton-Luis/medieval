@@ -751,7 +751,7 @@ function _ensureMessenger(scene) {
 /**
  * Disparado ao cometer um crime hediondo ou ato virtuoso.
  */
-export function triggerCultistMessenger(player, scene, world, isEvilAction = true) {
+export function triggerCultistMessenger(player, scene, world, isEvilAction = true, force = false) {
   const activePlayer = player || window.__game?.player;
   const activeScene = scene || window.__game?.scene;
   const activeWorld = world || window.__game?.world;
@@ -759,6 +759,13 @@ export function triggerCultistMessenger(player, scene, world, isEvilAction = tru
   if (!activePlayer || !activeScene) return;
   const messenger = _ensureMessenger(activeScene);
   if (!messenger || messenger.visible) return; // Não sobrepõe mensageiros
+
+  const now = performance.now();
+  // Só pode aparecer em intervalos raros (mínimo 180s), a menos que forçado por marco de 15% ou cheat
+  if (!force && messenger.lastSpawnTime && now - messenger.lastSpawnTime < 180000) {
+    return;
+  }
+  messenger.lastSpawnTime = now;
 
   const px = activePlayer.x ?? activePlayer.root?.position?.x ?? 0;
   const py = activePlayer.root?.position?.y ?? 0;
