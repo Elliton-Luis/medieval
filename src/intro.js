@@ -21,81 +21,207 @@ let _tallFigure = null;
 let _entitySpawnedZ = 0;
 
 // ============================================================================
-// 2. A Entidade de 6 Olhos (Alta, Fina, Cabeça Alongada e Ombros com Garras)
+// 2. A Entidade de 5 Olhos: O Corpo Seco (Figura Alta, Magra e Esquelética)
 // ============================================================================
 export function createTallFigure() {
   const group = new THREE.Group();
-  group.name = "TallFigure_6Eyes";
+  group.name = "CorpoSeco_5Eyes";
 
-  const figureMat = new THREE.MeshBasicMaterial({ color: 0x060508 });
+  // Textura e material de carne mumificada ressequida, osso escuro e tendões secos
+  const dryFleshMat = new THREE.MeshBasicMaterial({ color: 0x09080b });
+  const boneAccentMat = new THREE.MeshBasicMaterial({ color: 0x181414 });
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffea00 }); // Amarelo vibrante penetrante na névoa
 
-  // 1. Corpo/Tronco esguio (altura 3.8m, raio 0.26m nos ombros, 0.18m na cintura)
-  const bodyGeo = new THREE.CylinderGeometry(0.26, 0.18, 3.8, 8);
-  const body = new THREE.Mesh(bodyGeo, figureMat);
-  body.position.y = 2.1;
-  group.add(body);
-
-  // 2. Pescoço longo e fino
-  const neckGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.7, 6);
-  const neck = new THREE.Mesh(neckGeo, figureMat);
-  neck.position.y = 4.25;
-  group.add(neck);
-
-  // 3. Ombros pontiagudos e braços longos que descem quase até o solo
+  // --------------------------------------------------------------------------
+  // 1. Pernas Longas, Emaciadas e Articuladas (Digitígradas / Esqueléticas)
+  // --------------------------------------------------------------------------
   for (const side of [-1, 1]) {
-    const shoulderGeo = new THREE.ConeGeometry(0.16, 0.45, 5);
-    const shoulder = new THREE.Mesh(shoulderGeo, figureMat);
-    shoulder.position.set(side * 0.42, 3.9, 0);
-    shoulder.rotation.z = side * -0.4;
-    group.add(shoulder);
+    // Coxa fina e ressequida
+    const thighGeo = new THREE.CylinderGeometry(0.055, 0.045, 1.35, 5);
+    const thigh = new THREE.Mesh(thighGeo, dryFleshMat);
+    thigh.position.set(side * 0.18, 1.95, -0.05);
+    thigh.rotation.x = -0.18;
+    group.add(thigh);
 
-    const armGeo = new THREE.CylinderGeometry(0.06, 0.04, 3.6, 6);
-    const arm = new THREE.Mesh(armGeo, figureMat);
-    arm.position.set(side * 0.48, 2.2, 0);
-    arm.rotation.z = side * -0.05;
-    group.add(arm);
+    // Joelho nodoso saliente de cartilagem seca
+    const kneeGeo = new THREE.DodecahedronGeometry(0.07, 0);
+    const knee = new THREE.Mesh(kneeGeo, boneAccentMat);
+    knee.position.set(side * 0.18, 1.32, 0.08);
+    group.add(knee);
 
-    // Garras finas nas pontas das mãos
-    for (let c = -1; c <= 1; c++) {
-      const clawGeo = new THREE.ConeGeometry(0.02, 0.28, 4);
-      const claw = new THREE.Mesh(clawGeo, figureMat);
-      claw.position.set(side * 0.48 + c * 0.04, 0.35, 0.02);
-      claw.rotation.x = 0.2;
+    // Canela longa, arqueada para trás
+    const shinGeo = new THREE.CylinderGeometry(0.042, 0.032, 1.45, 5);
+    const shin = new THREE.Mesh(shinGeo, dryFleshMat);
+    shin.position.set(side * 0.18, 0.65, -0.02);
+    shin.rotation.x = 0.16;
+    group.add(shin);
+
+    // Pé esquelético comprido com dedos secos cravados no solo
+    const footGeo = new THREE.BoxGeometry(0.09, 0.04, 0.38);
+    const foot = new THREE.Mesh(footGeo, dryFleshMat);
+    foot.position.set(side * 0.18, 0.03, 0.12);
+    group.add(foot);
+
+    // Garras finas dos pés
+    for (const fx of [-0.03, 0, 0.03]) {
+      const toeClaw = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.12, 4), boneAccentMat);
+      toeClaw.position.set(side * 0.18 + fx, 0.03, 0.31);
+      toeClaw.rotation.x = Math.PI * 0.5;
+      group.add(toeClaw);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 2. Pelve Estreita e Coluna Vertebral Ressequida com Vértebras Salientes
+  // --------------------------------------------------------------------------
+  const pelvisGeo = new THREE.BoxGeometry(0.32, 0.18, 0.22);
+  const pelvis = new THREE.Mesh(pelvisGeo, dryFleshMat);
+  pelvis.position.set(0, 2.58, 0);
+  group.add(pelvis);
+
+  // Coluna lombar e dorsal curva e fina
+  const spineGeo = new THREE.CylinderGeometry(0.055, 0.065, 1.25, 6);
+  const spine = new THREE.Mesh(spineGeo, dryFleshMat);
+  spine.position.set(0, 3.22, -0.04);
+  spine.rotation.x = 0.15; // Curvado para a frente em postura predatória
+  group.add(spine);
+
+  // Vértebras pontiagudas salientes nas costas (corcunda do Corpo Seco)
+  for (let v = 0; v < 6; v++) {
+    const vertGeo = new THREE.ConeGeometry(0.035, 0.18, 4);
+    const vert = new THREE.Mesh(vertGeo, boneAccentMat);
+    vert.position.set(0, 2.75 + v * 0.22, -0.12 - (v * 0.02));
+    vert.rotation.x = -Math.PI * 0.42;
+    group.add(vert);
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. Tórax Esquelético e Costelas Proeminentes (Pele Grudada no Osso)
+  // --------------------------------------------------------------------------
+  const sternumGeo = new THREE.BoxGeometry(0.18, 0.95, 0.16);
+  const sternum = new THREE.Mesh(sternumGeo, dryFleshMat);
+  sternum.position.set(0, 3.42, 0.04);
+  sternum.rotation.x = 0.15;
+  group.add(sternum);
+
+  // Costelas individuais salientes contornando o tórax emaciado
+  for (let r = 0; r < 4; r++) {
+    const ry = 3.15 + r * 0.22;
+    const rScale = 0.85 + (r === 2 ? 0.25 : r * 0.1);
+    for (const side of [-1, 1]) {
+      const ribGeo = new THREE.BoxGeometry(0.14 * rScale, 0.035, 0.24 * rScale);
+      const rib = new THREE.Mesh(ribGeo, boneAccentMat);
+      rib.position.set(side * (0.13 * rScale), ry, 0.02);
+      rib.rotation.z = side * -0.22;
+      rib.rotation.y = side * 0.15;
+      group.add(rib);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 4. Clavículas Pontiagudas, Escápulas e Braços Longos Desproporcionais
+  // --------------------------------------------------------------------------
+  const clavicleGeo = new THREE.BoxGeometry(0.68, 0.06, 0.09);
+  const clavicle = new THREE.Mesh(clavicleGeo, boneAccentMat);
+  clavicle.position.set(0, 3.96, 0.06);
+  group.add(clavicle);
+
+  for (const side of [-1, 1]) {
+    // Escápula saliente para cima como galho seco
+    const scapulaGeo = new THREE.ConeGeometry(0.09, 0.38, 4);
+    const scapula = new THREE.Mesh(scapulaGeo, dryFleshMat);
+    scapula.position.set(side * 0.32, 4.12, -0.06);
+    scapula.rotation.z = side * -0.45;
+    scapula.rotation.x = -0.25;
+    group.add(scapula);
+
+    // Braço superior muito fino (úmero)
+    const upperArmGeo = new THREE.CylinderGeometry(0.045, 0.038, 1.45, 5);
+    const upperArm = new THREE.Mesh(upperArmGeo, dryFleshMat);
+    upperArm.position.set(side * 0.42, 3.25, 0.02);
+    upperArm.rotation.z = side * -0.12;
+    upperArm.rotation.x = 0.12;
+    group.add(upperArm);
+
+    // Cotovelo pontiagudo
+    const elbowGeo = new THREE.DodecahedronGeometry(0.055, 0);
+    const elbow = new THREE.Mesh(elbowGeo, boneAccentMat);
+    elbow.position.set(side * 0.48, 2.52, 0.12);
+    group.add(elbow);
+
+    // Antebraço esguio que desce quase até o chão
+    const forearmGeo = new THREE.CylinderGeometry(0.038, 0.028, 1.55, 5);
+    const forearm = new THREE.Mesh(forearmGeo, dryFleshMat);
+    forearm.position.set(side * 0.52, 1.76, 0.08);
+    forearm.rotation.z = side * -0.06;
+    group.add(forearm);
+
+    // Mão seca e garras compridas de galho
+    for (let c = -1; c <= 2; c++) {
+      const clawGeo = new THREE.ConeGeometry(0.018, 0.42, 4);
+      const claw = new THREE.Mesh(clawGeo, boneAccentMat);
+      claw.position.set(side * 0.52 + c * 0.035, 0.82, 0.06 + Math.abs(c) * 0.02);
+      claw.rotation.x = 0.28 + c * 0.05;
+      claw.rotation.z = side * (0.08 + c * 0.06);
       group.add(claw);
     }
   }
 
-  // 4. Cabeça Fina e Comprida (alongada verticalmente com 1.4m de comprimento e 0.26m de largura)
-  const headGeo = new THREE.BoxGeometry(0.24, 1.4, 0.32);
-  const head = new THREE.Mesh(headGeo, figureMat);
-  head.position.set(0, 5.0, 0);
+  // --------------------------------------------------------------------------
+  // 5. Pescoço Longo, Fino e Projetado para a Frente
+  // --------------------------------------------------------------------------
+  const neckGeo = new THREE.CylinderGeometry(0.085, 0.11, 0.85, 6);
+  const neck = new THREE.Mesh(neckGeo, dryFleshMat);
+  neck.position.set(0, 4.38, 0.14);
+  neck.rotation.x = 0.24; // Pescoço esticado e inclinado para encarar a presa
+  group.add(neck);
+
+  // --------------------------------------------------------------------------
+  // 6. Cabeça Comprida, Afilada e Ressequida (Crânio Cadavérico do Corpo Seco)
+  // --------------------------------------------------------------------------
+  const headGeo = new THREE.BoxGeometry(0.22, 1.15, 0.32);
+  const head = new THREE.Mesh(headGeo, dryFleshMat);
+  head.position.set(0, 5.05, 0.26);
+  head.rotation.x = 0.14;
   group.add(head);
 
-  // Topo do crânio afilado/cônico
-  const skullGeo = new THREE.ConeGeometry(0.16, 0.55, 5);
-  const skull = new THREE.Mesh(skullGeo, figureMat);
-  skull.position.set(0, 5.85, 0);
+  // Mandíbula alongada e pontiaguda afilando para baixo
+  const jawGeo = new THREE.ConeGeometry(0.12, 0.55, 5);
+  const jaw = new THREE.Mesh(jawGeo, dryFleshMat);
+  jaw.position.set(0, 4.48, 0.25);
+  jaw.rotation.x = Math.PI * 0.95;
+  group.add(jaw);
+
+  // Topo do crânio afilado e pontiagudo
+  const skullGeo = new THREE.ConeGeometry(0.13, 0.48, 5);
+  const skull = new THREE.Mesh(skullGeo, dryFleshMat);
+  skull.position.set(0, 5.75, 0.22);
   group.add(skull);
 
-  // 5. 6 Olhos Amarelos Emissivos dispostos em 3 pares ao longo do rosto frontal (+Z)
-  const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-  const eyePositions = [
-    // Par superior (testa)
-    [-0.08, 5.4, 0.17],
-    [0.08, 5.4, 0.17],
-    // Par central (meio da face)
-    [-0.09, 5.05, 0.17],
-    [0.09, 5.05, 0.17],
-    // Par inferior (mandíbula)
-    [-0.07, 4.7, 0.17],
-    [0.07, 4.7, 0.17],
+  // --------------------------------------------------------------------------
+  // 7. OS 5 OLHOS AMARELOS PENETRANTES ("O BICHO DE 5 OLHOS")
+  // --------------------------------------------------------------------------
+  // Disposição mística pentagonal perturbadora:
+  // - 1 Olho Central Superior na Testa
+  // - 2 Olhos Intermediários nas Órbitas
+  // - 2 Olhos Inferiores na Mandíbula/Bochecha
+  const fiveEyePositions = [
+    // 1. Olho Central Superior (testa)
+    { x: 0, y: 5.38, z: 0.44, size: 0.095 },
+    // 2. Olho Intermediário Esquerdo
+    { x: -0.09, y: 5.08, z: 0.43, size: 0.08 },
+    // 3. Olho Intermediário Direito
+    { x: 0.09, y: 5.08, z: 0.43, size: 0.08 },
+    // 4. Olho Inferior Esquerdo (mandíbula)
+    { x: -0.065, y: 4.78, z: 0.41, size: 0.07 },
+    // 5. Olho Inferior Direito (mandíbula)
+    { x: 0.065, y: 4.78, z: 0.41, size: 0.07 },
   ];
 
-  eyePositions.forEach((pos) => {
-    const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(pos[0], pos[1], pos[2]);
-    group.add(eye);
+  fiveEyePositions.forEach((pos) => {
+    const eyeMesh = new THREE.Mesh(new THREE.BoxGeometry(pos.size, pos.size, pos.size * 0.8), eyeMat);
+    eyeMesh.position.set(pos.x, pos.y, pos.z);
+    group.add(eyeMesh);
   });
 
   group.visible = false;
@@ -370,7 +496,7 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
     }
   }
   // --------------------------------------------------------------------------
-  // ÂNGULO 5 (9.6s a 12.0s): Ele vira para frente: A Entidade dos 6 Olhos surge!
+  // ÂNGULO 5 (9.6s a 12.0s): Ele vira para frente: O Corpo Seco de 5 Olhos surge!
   // --------------------------------------------------------------------------
   else if (t < 12.0) {
     // 1. O jogador vira a cabeça para a frente em choque absoluto
@@ -388,7 +514,7 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
 
       if (effects) {
         effects.play("dust", player.x, ey + 2.5, _entitySpawnedZ, "#05070a", 4.0);
-        effects.play("star", player.x, ey + 4.9, _entitySpawnedZ, "#ffea00", 2.8);
+        effects.play("star", player.x, ey + 5.1, _entitySpawnedZ, "#ffea00", 3.2);
       }
     }
 
@@ -397,20 +523,20 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
       // Contra-plongée dramático: câmera atrás do ombro do player apontando para cima
       _camTarget.set(player.x + 0.6 + shakeLightX, groundY + 1.3 + shakeLightY, player.z - 1.0);
       camera.position.copy(_camTarget);
-      // Foca na cabeça comprida iluminada pelos 6 olhos amarelos
-      camera.lookAt(_tallFigure.position.x, _tallFigure.position.y + 5.0, _tallFigure.position.z);
+      // Foca na cabeça comprida esquelética iluminada pelos 5 olhos amarelos
+      camera.lookAt(_tallFigure.position.x, _tallFigure.position.y + 5.08, _tallFigure.position.z);
     } else {
       // Em 10.6s: A figura inclina o torso macabramente para a frente
       _tallFigure.rotation.x = THREE.MathUtils.lerp(_tallFigure.rotation.x, -0.28, 6.0 * dt);
 
-      // Câmera é engolida pela aproximação imediata dos 6 olhos
+      // Câmera é engolida pela aproximação imediata dos 5 olhos amarelos
       _camTarget.set(
         _tallFigure.position.x + shakeHeavyX * 1.6,
-        _tallFigure.position.y + 4.95 + shakeHeavyY * 1.6,
+        _tallFigure.position.y + 5.05 + shakeHeavyY * 1.6,
         _tallFigure.position.z - 1.15
       );
       camera.position.lerp(_camTarget, 0.22);
-      camera.lookAt(_tallFigure.position.x, _tallFigure.position.y + 5.0, _tallFigure.position.z);
+      camera.lookAt(_tallFigure.position.x, _tallFigure.position.y + 5.08, _tallFigure.position.z);
 
       if (t >= 10.6 && GameState.introPhase < 2) {
         GameState.introPhase = 2;
