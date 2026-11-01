@@ -92,7 +92,9 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
     if (rollApocalypse && window.__game) {
       triggerDemiurgeCataclysm(window.__game);
     } else {
-      const rollEclipse = Math.random() * 100 < (currentApocalypseChance * 0.6) || WorldDecay.daysPassed >= 16;
+      // O Eclipse só pode surgir a partir do Dia 5 E com corrupção avançada (>= 25%), nunca precocemente no Dia 2
+      const canEclipse = WorldDecay.daysPassed >= 5 && (currentApocalypseChance >= 25 || WorldDecay.daysPassed >= 16);
+      const rollEclipse = canEclipse && (Math.random() * 100 < (currentApocalypseChance * 0.6) || WorldDecay.daysPassed >= 18);
       if (rollEclipse) {
         WorldDecay.isEclipse = true;
         WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo

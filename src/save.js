@@ -19,3 +19,12 @@ export function loadGame() {
     return null;
   }
 }
+
+export function clearSave() {
+  try {
+    localStorage.removeItem(KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}

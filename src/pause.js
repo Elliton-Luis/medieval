@@ -46,6 +46,7 @@ export class PauseMenu {
         </div>
         <button id="pause-continue" type="button">CONTINUAR</button>
         <button id="pause-intro" type="button" style="margin-top: 8px; font-size: 14px; background: #281e1888; border-color: #c9a24a66;">VER INTRODUÇÃO</button>
+        <button id="pause-reset-save" type="button" style="margin-top: 8px; font-size: 13px; background: #3f181888; border-color: #e0484888; color: #ffb0b0;">RESETAR SAVE (NOVO JOGO)</button>
         <small>T alterna assist. mira · M música · Esc pausa</small>
       </div>`;
     container.append(layer);
@@ -94,6 +95,15 @@ export class PauseMenu {
     layer.querySelector("#pause-intro")?.addEventListener("click", () => {
       this._close();
       this.onPlayIntro?.();
+    });
+    layer.querySelector("#pause-reset-save")?.addEventListener("click", () => {
+      if (confirm("Tem certeza que deseja apagar todo o progresso do save e reiniciar o jogo?")) {
+        try {
+          localStorage.removeItem("gta-medieval-save-v1");
+          localStorage.removeItem("gta-medieval-audio-v1");
+        } catch (_) {}
+        window.location.reload();
+      }
     });
     document.addEventListener("game-pointer-lock", (event) => this._onLock(event.detail));
   }

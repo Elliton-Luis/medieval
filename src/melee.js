@@ -8,6 +8,7 @@ const tokens = new Set();
 const env = { npcs: null, combat: null, effects: null };
 const out = { mx: 0, mz: 0, speed: 0 };
 const sep = { x: 0, z: 0 };
+const _sepCandidates = [];
 
 export function setMeleeEnv(value) {
   Object.assign(env, value);
@@ -39,11 +40,13 @@ export function pruneTokens() {
   }
 }
 
-// Empurra para longe de aliados e do jogador (steering de separação).
+// Empurra para longe de aliados e do jogador (steering de separação acelerado por Spatial Hash Grid O(1)).
 export function separation(e, px, pz) {
   sep.x = 0;
   sep.z = 0;
-  const list = env.npcs ? env.npcs.npcs : [];
+  const list = env.npcs?.queryNearby
+    ? env.npcs.queryNearby(e.x, e.z, 2.5, _sepCandidates)
+    : env.npcs ? env.npcs.npcs : [];
   for (let i = 0; i < list.length; i++) {
     const o = list[i];
     if (o === e || !o.alive || o.removed || o.roleKey === "horse" || !(o.hostile || o.roleKey === "guard")) continue;

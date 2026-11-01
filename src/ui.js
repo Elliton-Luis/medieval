@@ -1,5 +1,7 @@
 import { KINGDOM_NAME, locationAt } from "./kingdom.js";
 import { drawWeaponIcon } from "./weapondata.js";
+import { PlayerStats } from "./rpg.js";
+import { CultState } from "./cult.js";
 
 export class GameUI {
   constructor(renderer) {
@@ -12,6 +14,8 @@ export class GameUI {
     this.healthNum = document.getElementById("health-num");
     this.coins = document.getElementById("coins");
     this.potions = document.getElementById("potions");
+    this.evilFill = document.getElementById("evil-bar-fill");
+    this.evilVal = document.getElementById("evil-val");
     this.weaponName = document.getElementById("weapon-name");
     this.weaponAmmo = document.getElementById("weapon-ammo");
     this.nearbyCard = document.getElementById("nearby-card");
@@ -177,6 +181,11 @@ export class GameUI {
     } else {
       this.nearbyCard.hidden = true;
     }
+    const morality = PlayerStats?.morality ?? 0;
+    const apoc = CultState?.apocalypseChance ?? 0;
+    const evilPercent = Math.max(0, Math.min(100, Math.round(Math.max(-morality, apoc))));
+    if (this.evilFill) this.evilFill.style.width = `${evilPercent}%`;
+    if (this.evilVal) this.evilVal.textContent = `${evilPercent}%`;
     this._frames = 0;
     this._timeSinceUpdate = 0;
     this._lastFrameTime = performance.now();

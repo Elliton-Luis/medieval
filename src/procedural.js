@@ -610,11 +610,20 @@ export class Werewolf extends NPC {
       this.deadTime = 0;
       this.root.scale.setScalar(1);
       this.userData.isDead = false;
+      if (this.npcSystem?.spatialGrid) {
+        this.npcSystem.spatialGrid.remove(this);
+        this.npcSystem.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius || 0.62);
+      }
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
     } else {
       releaseToken(this);
       this.alive = false;
       this.removed = true;
       this.userData.state = "IDLE";
+      if (this.npcSystem?.spatialGrid) {
+        this.npcSystem.spatialGrid.remove(this);
+      }
     }
   }
 
@@ -715,8 +724,21 @@ export class Werewolf extends NPC {
   update(dt, playerX = 0, playerZ = 0) {
     if (this.removed || !this.root.visible) return;
     if (!this.alive) {
+      if (this.npcSystem?.spatialGrid) this.npcSystem.spatialGrid.remove(this);
       this._updateDead(dt, playerX, playerZ);
       return;
+    }
+
+    // Spatial Hash Grid O(1): atualiza o registro do lobisomem ao se mover no mundo
+    const curCX = Math.floor(this.x * 0.0625);
+    const curCZ = Math.floor(this.z * 0.0625);
+    if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
+      if (this.npcSystem?.spatialGrid) {
+        this.npcSystem.spatialGrid.remove(this);
+        this.npcSystem.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius || 0.62);
+      }
+      this._spatialCX = curCX;
+      this._spatialCZ = curCZ;
     }
 
     this.animTime += dt;
@@ -786,6 +808,19 @@ export class Werewolf extends NPC {
           import("./cult.js").then(({ CultState }) => {
             CultState?.addApocalypseProgress?.(2);
           }).catch(() => {});
+        }
+        // Alerta os guardas da guarnição para investirem em socorro das presas e cavalos
+        if (this.npcSystem && Array.isArray(this.npcSystem.npcs)) {
+          for (let g = 0; g < this.npcSystem.npcs.length; g++) {
+            const guard = this.npcSystem.npcs[g];
+            if (guard && guard.alive && guard.roleKey === "guard") {
+              const gd = Math.hypot(guard.x - this.x, guard.z - this.z);
+              if (gd < 42) {
+                guard.targetThreat = this;
+                guard.startAlert("hunt", 25, this.x, this.z);
+              }
+            }
+          }
         }
       }
     }

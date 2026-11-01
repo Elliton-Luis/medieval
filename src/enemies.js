@@ -25,15 +25,15 @@ const WAVES = [
   { footman: 3, archer: 3, crossbow: 3, knight: 2 },
   { footman: 4, archer: 4, crossbow: 4, knight: 3, cannoneer: 2 },
 ];
-const MAX_ACTIVE = 28;
+const MAX_ACTIVE = 10;
 const FLASH_COLOR = new THREE.Color("#85764a");
 const ZERO_COLOR = new THREE.Color("#000000");
 const _lookTarget = new THREE.Vector3();
 
-function addPart(parent, geometry, material, x, y, z) {
+function addPart(parent, geometry, material, x, y, z, castShadow = false) {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
+  if (castShadow) mesh.castShadow = true;
   parent.add(mesh);
   return mesh;
 }
@@ -598,6 +598,11 @@ export class EnemyDirector {
     this.spawnTimer = 0;
     this.fire = new EnemyFire(scene, world, this);
     npcSystem.onClear = () => this.standDown();
+
+    // Pre-aquecimento do pool de soldados para evitar stutter/GC durante a perseguição
+    for (const r of ["footman", "footman", "archer", "crossbow"]) {
+      this._soldier(r);
+    }
   }
 
   _count(role) {

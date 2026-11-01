@@ -419,6 +419,17 @@ export class NPC {
     } else if (this.roleKey === "guard") {
       this.task = "Patrulhando o portão";
       if (!this.moving) this.model.rotation.y += Math.sin(this.animTime * 0.55) * dt * 0.18;
+      if ((this._guardThreatCheckTimer = (this._guardThreatCheckTimer || 0) - dt) <= 0) {
+        this._guardThreatCheckTimer = 0.5;
+        const threat = this._findNearbyThreat(32);
+        if (threat) {
+          this.targetThreat = threat;
+          const tx = threat.x ?? threat.root?.position?.x ?? 0;
+          const tz = threat.z ?? threat.root?.position?.z ?? 0;
+          this.startAlert("hunt", 20, tx, tz);
+          this.npcSystem?.onAlert?.(`⚔️ ${this.name} avista ${threat.name || "a fera das trevas"} e investe para proteger o povo!`);
+        }
+      }
     } else if (this.roleKey === "priest") {
       this.task = "Abençoando os fiéis e ouvindo confissões";
       if (!this.moving) {
@@ -726,6 +737,32 @@ export class NPC {
     this.rightArm.rotation.z = 0;
   }
 
+  // Busca ameacas proximas a civis ou cavalos (lobisomens, cultistas ou ladroes) num raio determinado
+  _findNearbyThreat(radius = 32) {
+    if (!this.npcSystem || !Array.isArray(this.npcSystem.npcs)) return null;
+    const rSq = radius * radius;
+    const list = this.npcSystem.npcs;
+    let closest = null;
+    let closestDistSq = rSq;
+    for (let i = 0; i < list.length; i++) {
+      const other = list[i];
+      if (!other || !other.alive || other.removed || other === this) continue;
+      const isWerewolf = other.roleKey === "werewolf" || Boolean(other.userData?.isWerewolf);
+      const isCultist = other.roleKey === "cultist" || other.userData?.type === "CULTIST";
+      const isWanted = Boolean(other.root?.userData?.isWantedByGuards);
+      if (isWerewolf || isCultist || isWanted) {
+        const ox = other.x ?? other.root?.position?.x ?? 0;
+        const oz = other.z ?? other.root?.position?.z ?? 0;
+        const dSq = (ox - this.x) ** 2 + (oz - this.z) ** 2;
+        if (dSq < closestDistSq) {
+          closestDistSq = dSq;
+          closest = other;
+        }
+      }
+    }
+    return closest;
+  }
+
   // Fuga, denúncia ao guarda mais próximo ou perseguição (guardas).
   _updateAlert(dt, playerX, playerZ) {
     this.animTime += dt;
@@ -761,13 +798,34 @@ export class NPC {
     let arrived = false;
     const isNight = Boolean(this.npcSystem?.isNight);
     const isPlayerLit = Boolean(this.npcSystem ? this.npcSystem.isPlayerLit : true);
-    const distSq = (playerX - this.x) ** 2 + (playerZ - this.z) ** 2;
-    const hasTorch = Boolean(this.root.userData.hasTorch);
-    // Mesmo o guarda com tocha só enxerga até o limite da luz da tocha (16m) se o jogador estiver no escuro
-    const torchReachesPlayer = hasTorch && distSq < TORCH_VISION_RANGE_SQ;
-    const hasDirectVision = !isNight || torchReachesPlayer || isPlayerLit || distSq < 9.0;
 
-    if (this.mode === "hunt") {
+    // Prioridade da Guarda: abater lobisomens, cultistas ou bestas que ameacem o povo ou cavalos
+    let isGuardingAgainstThreat = false;
+    let threatTarget = null;
+    if (this.roleKey === "guard") {
+      if (this.targetThreat && (!this.targetThreat.alive || this.targetThreat.removed)) {
+        this.targetThreat = null;
+      }
+      if (!this.targetThreat && (this.threatScanTimer = (this.threatScanTimer || 0) - dt) <= 0) {
+        this.threatScanTimer = 0.45;
+        this.targetThreat = this._findNearbyThreat(34);
+      }
+      if (this.targetThreat && this.targetThreat.alive && !this.targetThreat.removed) {
+        threatTarget = this.targetThreat;
+        isGuardingAgainstThreat = true;
+      }
+    }
+
+    const targetPosX = isGuardingAgainstThreat ? (threatTarget.x ?? threatTarget.root?.position?.x ?? 0) : playerX;
+    const targetPosZ = isGuardingAgainstThreat ? (threatTarget.z ?? threatTarget.root?.position?.z ?? 0) : playerZ;
+
+    const distSq = (targetPosX - this.x) ** 2 + (targetPosZ - this.z) ** 2;
+    const distToTarget = Math.sqrt(distSq);
+    const hasTorch = Boolean(this.root.userData.hasTorch);
+    const torchReachesTarget = hasTorch && distSq < TORCH_VISION_RANGE_SQ;
+    const hasDirectVision = isGuardingAgainstThreat || !isNight || torchReachesTarget || isPlayerLit || distSq < 9.0;
+
+    if (this.mode === "hunt" && !isGuardingAgainstThreat) {
       const loseRangeSq = isNight ? (hasTorch ? 22 * 22 : 13 * 13) : 42 * 42;
       if (!hasDirectVision && distSq > TORCH_VISION_RANGE_SQ) {
         this.lostTimer += dt * (distSq > 28 * 28 ? 1.8 : 1.0);
@@ -776,7 +834,6 @@ export class NPC {
       } else {
         this.lostTimer = Math.max(0, this.lostTimer - dt * 2);
       }
-      // Se o jogador se afastou o suficiente e o guarda perdeu o rastro por completo, ele desiste e volta à patrulha
       if (this.lostTimer > 6.5 || (isNight && !hasDirectVision && distSq > 36 * 36)) {
         this.lostTimer = 0;
         this.endAlert();
@@ -784,8 +841,30 @@ export class NPC {
       }
     }
 
-    if (this.mode === "flee") {
-      // Fuga determinística: corre em direção à âncora de residência (home) ou ao portão mais próximo
+    if (isGuardingAgainstThreat) {
+      // Guarda em investida direta contra a besta/abominação
+      dirX = targetPosX - this.x;
+      dirZ = targetPosZ - this.z;
+      if (distToTarget <= 2.2) {
+        speed = 0;
+        if ((this.guardAttackCooldown = (this.guardAttackCooldown || 0) - dt) <= 0) {
+          this.guardAttackCooldown = 1.0;
+          this.swingTimer = 0.35;
+          const hitDirX = dirX / Math.max(0.01, distToTarget);
+          const hitDirZ = dirZ / Math.max(0.01, distToTarget);
+          const killed = threatTarget.takeHit?.(3, hitDirX, hitDirZ, 3.5, 0.4);
+          if (this.effects) {
+            this.effects.play("slash", this.x + hitDirX * 1.2, this.root.position.y + 1.2, this.z + hitDirZ * 1.2, "#ffe08a", 1.6);
+          }
+          if (killed) {
+            this.npcSystem?.onAlert?.(`⚔️ ${this.name} exterminou ${threatTarget.name || "a abominação"} em defesa do povo!`);
+            this.targetThreat = null;
+          }
+        }
+      } else {
+        speed = 4.4;
+      }
+    } else if (this.mode === "flee") {
       const safeAnchor = getDeterministicFleeTarget(this);
       if (safeAnchor && (safeAnchor.x - this.x) ** 2 + (safeAnchor.z - this.z) ** 2 > 1.8 * 1.8) {
         dirX = safeAnchor.x - this.x;
@@ -806,15 +885,12 @@ export class NPC {
       speed = 4.6;
       arrived = dirX * dirX + dirZ * dirZ < 2.4 * 2.4;
     } else if (!hasDirectVision && this.mode === "hunt") {
-      // Perseguição sem visão direta (mesmo com tocha se o jogador estiver fora do raio da tocha): desvio angular
       _playerPosVec.set(playerX, 0, playerZ);
       const drift = updateGuardTracking(this.root, _playerPosVec, isPlayerLit, isNight, dt, false);
       dirX = drift.x;
       dirZ = drift.z;
-      // Reduz levemente a velocidade quando perdido longe no escuro
       speed = distSq > 24 * 24 ? GUARD_SPEED * 0.78 : GUARD_SPEED;
     } else if (this.meleeRange > 0) {
-      // guarda em combate com visão direta: espera a vez, prepara o golpe (visível) e recua depois
       this.root.userData.driftAngle = 0;
       const think = meleeThink(this, dt, playerX, playerZ);
       dirX = think.mx;
@@ -899,6 +975,7 @@ export class NPC {
     if (this.health > 0) return false;
     this.alive = false;
     this.root.userData.isDead = true;
+    if (this.npcSystem?.spatialGrid) this.npcSystem.spatialGrid.remove(this);
     releaseToken(this);
     releaseGuardTorch(this.root);
     this._ragdollTime = 0;
