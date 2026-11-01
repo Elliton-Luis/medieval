@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { triggerCultistMessenger } from "./decay.js?v=19";
+import { CultState } from "./cult.js?v=20";
 
 // ============================================================================
 // 1. Parâmetros e Cache de Vetores (Zero-GC)
@@ -518,14 +519,21 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
   } else {
     // Matou inocente (ou bandido que ainda não havia cometido crime — Falso Herói)
     PlayerStats.morality = Math.max(-100, (PlayerStats.morality ?? 0) - 10);
+    const cultTier = CultState?.recordSacrifice?.() || 1;
+    const sacCount = CultState?.sacrifices || 1;
+
     if (isWitnessed) {
       PlayerStats.cha = Math.max(1, PlayerStats.cha - 5);
       triggerWantedLevel(2); // Ganha 2 estrelas/escudos
-      _env.ui?.showToast("Assassinato testemunhado! Carisma -5 · Bondade -10 · Procurado +2");
+      _env.ui?.showToast(
+        `Assassinato! Bondade -10 · Sacrifício #${sacCount} da Seita (Nível ${cultTier}) · Procurado +2`
+      );
       // Desperta o Mensageiro de Cinzas para ação maligna
       triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     } else {
-      _env.ui?.showToast("Assassinato nas sombras · Bondade -10");
+      _env.ui?.showToast(
+        `Assassinato nas sombras · Bondade -10 · Sacrifício #${sacCount} da Seita (Nível ${cultTier})`
+      );
       triggerCultistMessenger(_env.player, _env.scene, _env.world, true);
     }
   }

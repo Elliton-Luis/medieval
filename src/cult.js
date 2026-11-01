@@ -52,6 +52,64 @@ const _rotEuler = new THREE.Euler();
 export const CULT_ALTARS = [];
 
 // ============================================================================
+// Estado de Poder e Sacrifícios da Seita Cátara (A Ordem do Demiurgo)
+// ============================================================================
+export const CultState = {
+  sacrifices: 0,
+  level: 1, // Tier 1 a 4
+  speedMultiplier: 1.0,
+  damageBonus: 0,
+  altarTarget: null,
+
+  recordSacrifice() {
+    this.sacrifices++;
+    if (this.sacrifices >= 10) {
+      this.level = 4;
+      this.speedMultiplier = 1.75;
+      this.damageBonus = 4;
+    } else if (this.sacrifices >= 6) {
+      this.level = 3;
+      this.speedMultiplier = 1.5;
+      this.damageBonus = 2;
+    } else if (this.sacrifices >= 3) {
+      this.level = 2;
+      this.speedMultiplier = 1.25;
+      this.damageBonus = 1;
+    } else {
+      this.level = 1;
+      this.speedMultiplier = 1.1;
+      this.damageBonus = 0;
+    }
+    return this.level;
+  },
+
+  syncLevel(sacrifices = 0) {
+    this.sacrifices = Number(sacrifices) || 0;
+    if (this.sacrifices >= 10) {
+      this.level = 4;
+      this.speedMultiplier = 1.75;
+      this.damageBonus = 4;
+    } else if (this.sacrifices >= 6) {
+      this.level = 3;
+      this.speedMultiplier = 1.5;
+      this.damageBonus = 2;
+    } else if (this.sacrifices >= 3) {
+      this.level = 2;
+      this.speedMultiplier = 1.25;
+      this.damageBonus = 1;
+    } else if (this.sacrifices >= 1) {
+      this.level = 1;
+      this.speedMultiplier = 1.1;
+      this.damageBonus = 0;
+    } else {
+      this.level = 1;
+      this.speedMultiplier = 1.0;
+      this.damageBonus = 0;
+    }
+  },
+};
+
+// ============================================================================
 // 2. Geração de Pistas Estáticas e Altares Rituais (InstancedMesh)
 // ============================================================================
 export function createCultistCluesMeshes(scene) {
@@ -107,6 +165,9 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         "Símbolos do Demiurgo gravados no osso e cera negra... Uma presença herética esteve aqui recentemente.",
     };
     CULT_ALTARS.push(altarData);
+    if (!CultState.altarTarget) {
+      CultState.altarTarget = altarData;
+    }
 
     // Constrói o visual do Altar Ritual no mundo
     if (scene) {
@@ -368,10 +429,11 @@ export class Cultist {
     }
 
     if (this.userData.state === "VANISHING") {
-      // Corre para a neblina na direção oposta ao jogador
+      // Corre para a neblina na direção oposta ao jogador (acelerado pelo poder da seita)
+      const currentFlee = CULTIST_FLEE_SPEED * (CultState.speedMultiplier || 1.0);
       const awayLen = Math.hypot(dx, dz) || 1;
-      const stepX = (dx / awayLen) * (CULTIST_FLEE_SPEED * dt);
-      const stepZ = (dz / awayLen) * (CULTIST_FLEE_SPEED * dt);
+      const stepX = (dx / awayLen) * (currentFlee * dt);
+      const stepZ = (dz / awayLen) * (currentFlee * dt);
       this.x += stepX;
       this.z += stepZ;
 
@@ -431,8 +493,9 @@ export class Cultist {
     const tDist = _targetDir.length();
     if (tDist > 0.1) {
       _targetDir.normalize();
-      this.x += _targetDir.x * (CULTIST_SPEED * dt);
-      this.z += _targetDir.z * (CULTIST_SPEED * dt);
+      const currentSpeed = CULTIST_SPEED * (CultState.speedMultiplier || 1.0);
+      this.x += _targetDir.x * (currentSpeed * dt);
+      this.z += _targetDir.z * (currentSpeed * dt);
 
       const targetYaw = Math.atan2(_targetDir.x, _targetDir.z);
       this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.06);

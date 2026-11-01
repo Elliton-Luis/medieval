@@ -86,7 +86,8 @@ import {
   spawnCultistClues,
   createCultistsPool,
   updateCultistsLifeCycle,
-} from "./cult.js?v=19";
+  CultState,
+} from "./cult.js?v=20";
 import {
   WorldDecay,
   triggerDailyDecayCycle,
@@ -250,7 +251,7 @@ dayNight.onNewDay = () => {
 };
 
 if (new URLSearchParams(location.search).has("debug")) {
-  window.__game = { GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+  window.__game = { CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 }
 
 const saved = loadGame();
@@ -261,6 +262,9 @@ if (saved) {
     PlayerStats.cha = saved.stats.cha ?? PlayerStats.cha;
     PlayerStats.spd = saved.stats.spd ?? PlayerStats.spd;
     PlayerStats.morality = saved.stats.morality ?? PlayerStats.morality;
+    if (typeof saved.stats.sacrifices === "number") {
+      CultState.syncLevel(saved.stats.sacrifices);
+    }
     PlayerStats.hay = saved.stats.hay ?? PlayerStats.hay;
     PlayerInventory.hay = PlayerStats.hay;
     PlayerInventory.wood = saved.stats.wood ?? PlayerInventory.wood;

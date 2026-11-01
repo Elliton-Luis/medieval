@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { buildCultistMesh } from "./cult.js?v=19";
+import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js?v=20";
+import { spawnWaypointMarker } from "./rpg.js?v=20";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
@@ -83,8 +84,9 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
       ui?.showToast?.("✦ O sangue arrefece no horizonte. O Eclipse cessou por ora.");
     }
   } else {
-    // 5% de chance de sorteio do Eclipse na virada da meia-noite
-    const rollEclipse = Math.random() < 0.05 || WorldDecay.daysPassed >= 20;
+    // Sorteio do Eclipse na virada da meia-noite (ampliado pelo nível da seita)
+    const cultBonus = CultState ? Math.min(0.35, (CultState.level - 1) * 0.1) : 0;
+    const rollEclipse = Math.random() < (0.05 + cultBonus) || WorldDecay.daysPassed >= 20;
     if (rollEclipse) {
       WorldDecay.isEclipse = true;
       WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo
@@ -256,6 +258,29 @@ export function triggerCultistMessenger(player, scene, world, isEvilAction = tru
   messenger.timer = performance.now() + 18000; // 18 segundos de timeout
 }
 
+export const CULT_MESSAGES = {
+  EVIL_TIER_1: [
+    "«Sinto o estalar da carne impura se partindo! O Demiurgo contempla teus atos com deleite. Não temas a culpa, mortal... tu apenas arrancaste a casca podre daquela alma. Caminhe até as matas ao norte, além dos muros... nosso Altar sussurra teu nome.»",
+    "«A matéria é a verdadeira prisão deste mundo, e tua lâmina começou a libertá-la! Nossos irmãos nas sombras já celebram tua crueldade. Busque nosso círculo ritual nos ermos do norte.»",
+  ],
+  EVIL_TIER_2: [
+    "«Magnífico! O cárcere de carne deste vilarejo está ruindo sob teus golpes! Nossos irmãos sentem o pulsar do sangue no solo. O Santuário das Cinzas nos ermos do norte te aguarda; siga o feixe rubro em tua bússola. A Grande Noite se aproxima!»",
+    "«Mais uma casca vazia tombou! Nossa seita ganha força a cada gota de sangue. Nossos servos já deslizam velozes pela floresta. Venha ao Santuário ao norte... há oferendas à tua espera!»",
+  ],
+  EVIL_TIER_3: [
+    "«Bendito sejas, Flagelo da Criação! Cada vida ceifada enfraquece o véu da mentira e alimenta o Olho que tudo vê. As tochas do nosso círculo ardem em chamas carmesins em tua honra! Nossos sacerdotes agora caçam com fúria sobrenatural pela floresta!»",
+    "«O próprio ar treme com tua sede de sangue! A seita agora é uma tempestade nos ermos. O Demiurgo te observa do firmamento escuro. O Santuário ao norte já se prepara para coroar o teu rastro de morte!»",
+  ],
+  EVIL_TIER_4: [
+    "«Tu és o Avatar da Aniquilação! As muralhas da cidade não passarão de cinzas ao vento! O Demiurgo rasgou o céu e nossa irmandade curva-se à tua lâmina. O Santuário Eterno ao norte é teu trono nos ermos... queime este reino até não sobrar vida!»",
+    "«O Sol já sangra no horizonte! O poder do culto atingiu o ápice graças às tuas mãos! Vá ao Santuário nas profundezas da mata do norte e reivindique a glória do caos supremo!»",
+  ],
+  GOOD: [
+    "«Independente da tua falsa bondade, a carne continua aprisionando tua essência no mundo material.»",
+    "«Tua esmola adia a dor do mundo, mas não cura o mal da existência terrena.»",
+  ],
+};
+
 export function updateMessenger(dt, player, effects, ui, audio, world) {
   if (!_messengerNPC || !_messengerNPC.visible || !player) return;
 
@@ -281,15 +306,34 @@ export function updateMessenger(dt, player, effects, ui, audio, world) {
     const gy = world ? world.heightAt(m.x, m.z) : 0;
     m.root.position.set(m.x, gy + 0.05 + Math.sin(m.floatPhase) * 0.04, m.z);
 
-    // Chegou a 3.2 metros: entrega a profecia cerimonial (Opção 3A)
+    // Chegou a 3.2 metros: entrega a profecia cerimonial evolutiva
     if (distSq < 10.24) {
       m.state = "DELIVERED";
-      const message = m.isEvilMessage
-        ? "«Bom serviço. O Demiurgo lhe aguarda nas cinzas.»"
-        : "«Independente da tua traição, eu vou trazer a paz ao mundo.»";
+      let pool = CULT_MESSAGES.GOOD;
+      const level = CultState?.level || 1;
+      if (m.isEvilMessage) {
+        if (level >= 4) pool = CULT_MESSAGES.EVIL_TIER_4;
+        else if (level === 3) pool = CULT_MESSAGES.EVIL_TIER_3;
+        else if (level === 2) pool = CULT_MESSAGES.EVIL_TIER_2;
+        else pool = CULT_MESSAGES.EVIL_TIER_1;
+      }
 
+      const message = pool[Math.floor(Math.random() * pool.length)];
       ui?.showToast?.(`✦ MENSAGEIRO DOS CÁTAROS: ${message}`);
       if (audio?.hit) audio.hit(false);
+
+      // Marca o Altar Ritual fora dos muros no Minimap e com Pilar de Luz
+      if (m.isEvilMessage) {
+        const altar = CultState?.altarTarget || (CULT_ALTARS && CULT_ALTARS[0]);
+        if (altar) {
+          spawnWaypointMarker({ x: altar.x, y: altar.y, z: altar.z });
+          window.setTimeout(() => {
+            ui?.showToast?.(
+              `✦ SANTUÁRIO DO DEMIURGO: O Altar nas matas do norte foi marcado em sua bússola! (Seita Nível ${level})`
+            );
+          }, 1400);
+        }
+      }
 
       // Desfaz-se em cinzas e névoa negra após a mensagem
       if (effects) {
