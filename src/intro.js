@@ -6,13 +6,12 @@ import { CONFIG } from "./config.js";
 // ============================================================================
 export const GameState = {
   isIntroPlaying: false,
-  introPhase: 0, // 0: Fuga na floresta noturna | 1: A Entidade surge | 2: Jump scare & Escuridão | 3: Concluído
+  introPhase: 0,
   introTimer: 0,
 };
 
 const _camTarget = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
-const _tempVec = new THREE.Vector3();
 
 let _introEnv = null;
 let _fadeOverlay = null;
@@ -153,7 +152,7 @@ function _ensureUIElements() {
     _fadeOverlay = document.createElement("div");
     _fadeOverlay.className = "intro-fade-black";
     _fadeOverlay.style.cssText =
-      "position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:9999;transition:opacity 0.8s ease-in-out;";
+      "position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:9999;transition:opacity 0.6s ease-in-out;";
     document.body.appendChild(_fadeOverlay);
   }
 
@@ -189,7 +188,7 @@ function _attachSkipListener() {
 // ============================================================================
 export function startIntroSequence(env) {
   _introEnv = env;
-  const { scene, world, player, cameraRig, audio, input, dayNight } = env;
+  const { scene, world, player, cameraRig, input, dayNight } = env;
 
   _ensureUIElements();
   _attachSkipListener();
@@ -207,13 +206,6 @@ export function startIntroSequence(env) {
       _introWolves.push(beast);
     }
   }
-
-  // Salva estado atmosférico anterior para restaurar com perfeição ao despertar
-  _prevAtmosphere = {
-    progress: dayNight?.progress ?? 0.25,
-    fogDensity: scene.fog ? scene.fog.density : CONFIG.fogDensity,
-    fogColor: scene.fog ? scene.fog.color.getHex() : 0xaebfae,
-  };
 
   // FORÇA NOITE PROFUNDA E MUITA NEBLINA DE PESADELO
   if (dayNight) {
@@ -241,13 +233,13 @@ export function startIntroSequence(env) {
   player.x = startX;
   player.z = startZ;
   player.root.position.set(startX, startY, startZ);
-  if (player.model) player.model.rotation.y = 0; // Correndo em direção a Z+ (sul, rumo à cidade)
+  if (player.model) player.model.rotation.y = 0; // Olhando para o sul (rumo aos portões)
 
   // 3 bichos perseguindo em formação triangular na escuridão
-  _introWolves[0].position.set(startX - 3.2, world.heightAt(startX - 3.2, startZ - 9), startZ - 9);
+  _introWolves[0].position.set(startX - 2.8, world.heightAt(startX - 2.8, startZ - 9), startZ - 9);
   _introWolves[0].visible = true;
 
-  _introWolves[1].position.set(startX + 3.0, world.heightAt(startX + 3.0, startZ - 13), startZ - 13);
+  _introWolves[1].position.set(startX + 2.8, world.heightAt(startX + 2.8, startZ - 13), startZ - 13);
   _introWolves[1].visible = true;
 
   _introWolves[2].position.set(startX, world.heightAt(startX, startZ - 16), startZ - 16);
@@ -257,15 +249,10 @@ export function startIntroSequence(env) {
 
   if (_skipPrompt) _skipPrompt.style.opacity = "0.9";
   if (_fadeOverlay) _fadeOverlay.style.opacity = "0";
-
-  if (audio?.supernaturalScare) {
-    // Leve sussurro espectral no início da fuga
-    window.setTimeout(() => audio.pain?.(), 300);
-  }
 }
 
 // ============================================================================
-// 6. Atualização por Frame na Neblina Noturna
+// 6. Atualização por Frame (Direção Cinematográfica: 5 Ângulos Dramáticos)
 // ============================================================================
 export function updateIntroSequence(dt, player, camera, world, audio, effects, ui) {
   if (!GameState.isIntroPlaying) return;
@@ -273,24 +260,23 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
   GameState.introTimer += dt;
   const t = GameState.introTimer;
 
-  // 1. Jogador corre desesperadamente na floresta (6.4 m/s) rumo aos portões
+  // 1. O Jogador corre ininterruptamente a 6.4 m/s em direção aos portões (Z+)
   const runSpeed = 6.4;
   player.z += runSpeed * dt;
-  player.x += Math.sin(t * 1.8) * 0.2 * dt;
+  player.x += Math.sin(t * 1.6) * 0.15 * dt;
   const groundY = world ? world.heightAt(player.x, player.z) : 0;
   player.root.position.set(player.x, groundY, player.z);
-  if (player.model) player.model.rotation.y = 0;
 
   if (player.animTime !== undefined) {
-    player.animTime += dt * 15;
+    player.animTime += dt * 16;
   }
 
-  // 2. Os 3 bichos com 3 olhos vermelhos perseguem a 5.8 m/s
+  // 2. Os Bichos de 3 Olhos Vermelhos correm atrás a 5.9 m/s
   for (let i = 0; i < _introWolves.length; i++) {
     const beast = _introWolves[i];
     if (!beast.visible) continue;
 
-    beast.position.z += 5.8 * dt;
+    beast.position.z += 5.9 * dt;
     const by = world ? world.heightAt(beast.position.x, beast.position.z) : 0;
     beast.position.y = by;
     beast.lookAt(player.x, groundY + 0.6, player.z);
@@ -302,61 +288,101 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
     }
   }
 
-  // FASE 0: Corrida Desesperada na Neblina Noturna (0 a 6.0s)
-  if (GameState.introPhase === 0) {
-    // Câmera frontal dramática focando o jogador correndo em direção à tela
-    _camTarget.set(player.x, groundY + 1.55, player.z + 5.5);
-    camera.position.lerp(_camTarget, 0.14);
+  // Tremores orgânicos de câmera (Handheld camera shake contínuo)
+  const shakeLightX = Math.sin(t * 11) * 0.025 + Math.cos(t * 17) * 0.015;
+  const shakeLightY = Math.cos(t * 13) * 0.02 + Math.sin(t * 19) * 0.012;
+  const shakeHeavyX = (Math.sin(t * 22) + Math.cos(t * 31) * 0.5) * 0.06;
+  const shakeHeavyY = (Math.cos(t * 26) + Math.sin(t * 37) * 0.5) * 0.055;
+
+  // --------------------------------------------------------------------------
+  // ÂNGULO 1 (0.0s a 2.8s): Player correndo de frente, vindo em direção à câmera
+  // --------------------------------------------------------------------------
+  if (t < 2.8) {
+    if (player.model) player.model.rotation.y = 0;
+    _camTarget.set(player.x + shakeHeavyX, groundY + 1.45 + shakeHeavyY, player.z + 5.2);
+    camera.position.copy(_camTarget);
     camera.lookAt(player.x, groundY + 1.15, player.z);
+  }
+  // --------------------------------------------------------------------------
+  // ÂNGULO 2 (2.8s a 5.2s): Corte seco para lateral (Tracking de Perfil)
+  // --------------------------------------------------------------------------
+  else if (t < 5.2) {
+    if (player.model) player.model.rotation.y = 0;
+    _camTarget.set(player.x - 4.6 + shakeHeavyX * 0.6, groundY + 1.25 + shakeHeavyY * 0.7, player.z + 0.5);
+    camera.position.copy(_camTarget);
+    camera.lookAt(player.x, groundY + 1.1, player.z);
+  }
+  // --------------------------------------------------------------------------
+  // ÂNGULO 3 (5.2s a 7.2s): Corte seco para os 3 olhos vermelhos das criaturas
+  // --------------------------------------------------------------------------
+  else if (t < 7.2) {
+    if (player.model) player.model.rotation.y = 0;
+    const beast = _introWolves[0] || player;
+    const bPos = beast.position;
+    _camTarget.set(bPos.x + shakeHeavyX * 0.8, bPos.y + 1.18 + shakeHeavyY * 0.8, bPos.z + 1.55);
+    camera.position.copy(_camTarget);
+    camera.lookAt(bPos.x, bPos.y + 1.05, bPos.z);
 
-    if (t >= 6.0) {
-      GameState.introPhase = 1;
-      // Surge a Entidade de 6 Olhos alta e esguia na névoa atrás a 18 metros
-      const figZ = player.z - 18;
-      const figX = player.x + (Math.random() - 0.5) * 1.5;
-      const figY = world ? world.heightAt(figX, figZ) : 0;
-      _tallFigure.position.set(figX, figY, figZ);
-      _tallFigure.visible = true;
-
-      if (effects) {
-        effects.play("dust", figX, figY + 2.0, figZ, "#05070a", 3.4);
-        effects.play("star", figX, figY + 4.8, figZ, "#ffd200", 2.2);
-      }
+    if (t > 5.25 && t < 5.35 && audio?.pain) {
+      audio.pain();
     }
   }
-  // FASE 1: A Entidade Alta Avança Velozmente (6.0 a 8.5s)
-  else if (GameState.introPhase === 1) {
-    _tallFigure.lookAt(camera.position.x, _tallFigure.position.y, camera.position.z);
-    _tallFigure.translateZ(16.5 * dt);
+  // --------------------------------------------------------------------------
+  // ÂNGULO 4 (7.2s a 9.6s): POV correndo junto + Player olhando para trás em pânico
+  // --------------------------------------------------------------------------
+  else if (t < 9.6) {
+    _camTarget.set(player.x + shakeHeavyX * 1.3, groundY + 1.5 + shakeHeavyY * 1.2, player.z + 2.8);
+    camera.position.copy(_camTarget);
+    camera.lookAt(player.x, groundY + 1.2, player.z);
 
-    const ty = world ? world.heightAt(_tallFigure.position.x, _tallFigure.position.z) : 0;
-    _tallFigure.position.y = ty;
+    // O jogador vira a cabeça e corpo para trás por cima do ombro
+    if (player.model) {
+      player.model.rotation.y = THREE.MathUtils.lerp(player.model.rotation.y, Math.PI * 0.7, 0.12);
+    }
+  }
+  // --------------------------------------------------------------------------
+  // ÂNGULO 5 (9.6s a 12.0s): Ele vira para frente: O Bicho dos 6 Olhos surge!
+  // --------------------------------------------------------------------------
+  else if (t < 12.0) {
+    // O jogador vira de volta para a frente em choque
+    if (player.model) {
+      player.model.rotation.y = THREE.MathUtils.lerp(player.model.rotation.y, 0, 0.25);
+    }
 
-    // Trepidação perturbadora na câmera
-    camera.position.x += (Math.random() - 0.5) * 0.08;
-    camera.position.y += (Math.random() - 0.5) * 0.08;
+    // A Entidade surge diretamente na frente dele
+    if (!_tallFigure.visible) {
+      _tallFigure.position.set(player.x, groundY, player.z + 5.2);
+      _tallFigure.visible = true;
+      if (effects) {
+        effects.play("dust", player.x, groundY + 2.5, player.z + 5.2, "#05070a", 3.8);
+        effects.play("star", player.x, groundY + 4.8, player.z + 5.2, "#ffd200", 2.6);
+      }
+    }
 
-    if (t >= 8.5) {
-      GameState.introPhase = 2;
+    if (t < 10.4) {
+      // Ângulo contra-plongée dramático olhando a figura gigantesca
+      _camTarget.set(player.x + shakeLightX, groundY + 1.1 + shakeLightY, player.z + 1.8);
+      camera.position.copy(_camTarget);
+      camera.lookAt(_tallFigure.position.x, groundY + 4.2, _tallFigure.position.z);
+    } else {
+      // A figura projeta a cabeça comprida com os 6 olhos na lente da câmera
+      _tallFigure.lookAt(camera.position.x, _tallFigure.position.y, camera.position.z);
+      _tallFigure.translateZ(14.0 * dt);
 
-      // Jump scare: a cabeça fina e comprida com os 6 olhos amarelos cola na lente da câmera
-      camera.getWorldDirection(_camDir);
-      _tallFigure.position.copy(camera.position).addScaledVector(_camDir, 0.9);
-      _tallFigure.position.y -= 4.6; // Centraliza a cabeça comprida com os 6 olhos na lente
-      _tallFigure.lookAt(camera.position);
+      camera.position.x += shakeHeavyX * 1.5;
+      camera.position.y += shakeHeavyY * 1.5;
 
-      if (audio?.supernaturalScare) audio.supernaturalScare();
+      if (t >= 10.5 && GameState.introPhase < 2) {
+        GameState.introPhase = 2;
+        if (audio?.supernaturalScare) audio.supernaturalScare();
+      }
 
-      if (_fadeOverlay) {
+      if (t >= 11.2 && _fadeOverlay) {
         _fadeOverlay.style.opacity = "1";
       }
     }
-  }
-  // FASE 2: Escuridão e Transição para o Amanhecer (8.5 a 10.0s)
-  else if (GameState.introPhase === 2) {
-    if (t >= 10.0) {
-      endIntroSequence();
-    }
+  } else {
+    endIntroSequence();
   }
 }
 
@@ -380,7 +406,6 @@ export function endIntroSequence() {
     const { player, world, cameraRig, input, ui, dayNight, scene } = _introEnv;
 
     // SPAWN NA ESTRADA PRINCIPAL DO LADO DE FORA DO PORTÃO (Saída 100% garantida)
-    // O Portão de Caldera fica em z = -48. A estrada externa em z = -62 é ampla e desimpedida.
     const safeSpawnX = 0;
     const safeSpawnZ = -62;
     const safeGroundY = world ? world.heightAt(safeSpawnX, safeSpawnZ) : 0;
