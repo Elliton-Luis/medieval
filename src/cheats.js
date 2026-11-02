@@ -490,6 +490,7 @@ export function openCheatModal(env) {
         <!-- ABA 7: EVENTOS & PODERES -->
         <div class="cheat-tab-content" id="tab-events">
           <div class="cheat-grid">
+            <button class="cheat-btn full-width highlight" data-cheat="toggleDebugScreen">📊 Alternar Tela de Debug F3 (Estatísticas do Jogo)</button>
             <button class="cheat-btn" data-cheat="godMode">⚡ Modo Deus (Vida Infinita)</button>
             <button class="cheat-btn" data-cheat="setSpeed">🏃 Super Velocidade (2.5x)</button>
             <button class="cheat-btn" data-cheat="forgiveSins">🕊️ Perdoar Pecados & Voto</button>
@@ -646,6 +647,10 @@ function _handleCheatAction(type) {
       break;
     case "giveAllAmmo":
       window.CheatMenu.giveAllAmmo(99);
+      break;
+    case "toggleDebugScreen":
+      window.CheatMenu.toggleDebugScreen();
+      close();
       break;
     case "godMode":
       window.CheatMenu.godMode();
@@ -1283,6 +1288,13 @@ export function initCheatMenu(env = {}) {
       env.ui?.showToast?.("🎒 CHEAT: Todos os itens, recursos, munições e armas maximizados!");
       console.log("🎒 CHEAT: Inventário, armas e atributos no nível máximo!");
       return "Todos os itens maximizados";
+    },
+
+    toggleDebugScreen() {
+      if (typeof window.toggleDebugScreen === "function") {
+        return window.toggleDebugScreen();
+      }
+      return false;
     },
 
     godMode() {

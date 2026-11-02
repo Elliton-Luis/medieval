@@ -995,3 +995,73 @@ kbd { display: inline-block; padding: 3px 6px; border: 1px solid #e8e1c933; bord
   background: #383434;
   color: #fff;
 }
+
+/* ============================================================================
+   Tela de Debug F3 (Estilo Minecraft com Estatísticas Completas de Engine)
+   ============================================================================ */
+.debug-screen {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99999;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #eeeeee;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.debug-screen[hidden] {
+  display: none !important;
+}
+.debug-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 48vw;
+}
+.debug-col-right {
+  align-items: flex-end;
+  text-align: right;
+}
+.debug-line {
+  background: rgba(8, 12, 10, 0.74);
+  padding: 2px 7px;
+  border-radius: 3px;
+  width: fit-content;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  border-left: 2.5px solid rgba(210, 169, 105, 0.55);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(2px);
+}
+.debug-col-right .debug-line {
+  border-left: none;
+  border-right: 2.5px solid rgba(72, 153, 90, 0.65);
+}
+.debug-highlight {
+  color: #f0cf7a;
+  font-weight: 700;
+}
+.debug-good {
+  color: #8be09f;
+  font-weight: 700;
+}
+.debug-warn {
+  color: #e0cf8b;
+  font-weight: 700;
+}
+.debug-alert {
+  color: #ff7878;
+  font-weight: 700;
+}
+.debug-cyan {
+  color: #8ad8ff;
+  font-weight: 700;
+}
+.debug-purple {
+  color: #d4a8ff;
+  font-weight: 700;
+}

@@ -45,10 +45,11 @@ export class PauseMenu {
           <strong id="aim-assist-state">ATIVADO</strong>
         </div>
         <button id="pause-continue" type="button">CONTINUAR</button>
-        <button id="pause-cheats" type="button" style="margin-top: 8px; font-size: 13.5px; background: #351c4a88; border-color: #9d5de8aa; color: #eedaff; font-weight: 700;">🥔 CHEAT MENU (RECURSOS & ITENS)</button>
-        <button id="pause-intro" type="button" style="margin-top: 8px; font-size: 14px; background: #281e1888; border-color: #c9a24a66;">VER INTRODUÇÃO</button>
-        <button id="pause-reset-save" type="button" style="margin-top: 8px; font-size: 13px; background: #3f181888; border-color: #e0484888; color: #ffb0b0;">RESETAR SAVE (NOVO JOGO)</button>
-        <small>T alterna assist. mira · M música · Esc pausa</small>
+        <button id="pause-debug" type="button" style="margin-top: 8px; font-size: 13.5px; background: #18283488; border-color: #4a90c988; color: #d0e8ff; font-weight: 700;">📊 TELA DE DEBUG F3 (ESTATÍSTICAS)</button>
+        <button id="pause-cheats" type="button" style="margin-top: 6px; font-size: 13.5px; background: #351c4a88; border-color: #9d5de8aa; color: #eedaff; font-weight: 700;">🥔 CHEAT MENU (RECURSOS & ITENS)</button>
+        <button id="pause-intro" type="button" style="margin-top: 6px; font-size: 14px; background: #281e1888; border-color: #c9a24a66;">VER INTRODUÇÃO</button>
+        <button id="pause-reset-save" type="button" style="margin-top: 6px; font-size: 13px; background: #3f181888; border-color: #e0484888; color: #ffb0b0;">RESETAR SAVE (NOVO JOGO)</button>
+        <small>F3 debug · T assist. mira · M música · Esc pausa</small>
       </div>`;
     container.append(layer);
     this.layer = layer;
@@ -93,6 +94,12 @@ export class PauseMenu {
     // ao soltar o controle de efeitos toca um som de exemplo
     sfx.addEventListener("change", () => audio.hit(false));
     layer.querySelector("#pause-continue").addEventListener("click", () => this.resume());
+    layer.querySelector("#pause-debug")?.addEventListener("click", () => {
+      this.resume();
+      if (typeof window.toggleDebugScreen === "function") {
+        window.toggleDebugScreen();
+      }
+    });
     layer.querySelector("#pause-cheats")?.addEventListener("click", () => {
       this._close();
       if (typeof window.openCheatModal === "function") {
