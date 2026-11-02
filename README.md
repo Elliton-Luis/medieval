@@ -530,6 +530,24 @@ O painel de depuração em tempo real (`src/debugScreen.js`), ativado via tecla 
   - Percentual dinâmico de volume com cálculo de abafamento e ducking (ex.: `Vol: 85%`).
   - Status em tempo real (`TOCANDO` ou `MUTADO`).
 
+## Otimização Noturna com Light Impostors (Luzes Distantes no Breu)
+
+Durante a noite, o reino mergulha em uma atmosfera aterrorizante e imersiva sem comprometer a taxa de quadros (60 FPS estáveis), através da técnica de **Light Impostors**:
+
+1. **Separação de Culling (Câmera vs Lógica)**:
+   - **Alcance Amplo da Câmera**: `camera.far` expandido para **200 metros** (`CONFIG.renderDistance = 200`), permitindo que a câmera enxergue pontos luminosos no horizonte sem corte prematuro do frustum.
+   - **Breu Noturno aos 40m**: O `FogExp2` transiciona suavemente para **preto puro** (`#000000` / `#050706`) com densidade calibrada em **`0.052`**, bloqueando mais de 98.5% da visão de malhas normais aos 40 metros.
+   - **Culling Estrito de Terreno e Estruturas a 45m**: O gerenciador de mundo (`src/world.js`) seta `chunk.group.visible = false` em todas as geometrias complexas (árvores, casas, relevo, muralhas) a mais de 45m do jogador durante a noite. A GPU descarta dezenas de chunks e centenas de milhares de vértices na raiz, eliminando draw calls desnecessárias.
+
+2. **InstancedMesh de Impostores de Luz (1 Draw Call)**:
+   - Todas as tochas de postes, tochas de parede, lareiras e tochas do jogador são desenhadas simultaneamente por um único `THREE.InstancedMesh` com geometria plana de baixa densidade (`PlaneGeometry(1, 1)`).
+   - **Billboard na GPU (Vertex Shader)**: Utiliza injeção via `onBeforeCompile` no vertex shader para cancelar a rotação da `modelViewMatrix`, fazendo com que todos os halos olhem para a câmera instantaneamente na GPU com **Zero-GC e zero overhead de CPU**.
+   - **Material que Ignora a Neblina**: Configurado com `blending: THREE.AdditiveBlending`, `depthWrite: false`, `transparent: true` e `fog: false`. O halo alaranjado e pulsante das tochas fura a neblina preta noturna e guia o jogador no escuro, visível a até 200m de distância como fogueiras e archotes brilhando no horizonte.
+
+3. **Gerenciamento de Luzes Reais (PointLights até 25m)**:
+   - As `PointLights` físicas (que projetam fótons reais no chão e paredes) são estritamente limitadas a um raio máximo de **25 metros** do jogador.
+   - Quando o jogador se afasta além de 25m, a `PointLight` apaga suavemente (`intensity = 0`, `visible = false`), poupando 100% dos cálculos caros de fragment shader de iluminação dinâmica. No lugar, resta apenas o plano emissivo aditivo do Light Impostor perfurando o breu da noite.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

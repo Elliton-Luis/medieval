@@ -227,6 +227,58 @@ export class TorchSystem {
     this.group = new THREE.Group();
     scene.add(this.group);
 
+    // =========================================================================
+    // Light Impostors: InstancedMesh de Halos de Luz (Glows que perfuram o breu)
+    // =========================================================================
+    const impostorPlaneGeo = new THREE.PlaneGeometry(1, 1);
+    this.impostorMaterial = new THREE.MeshBasicMaterial({
+      map: this.glow,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false, // CRÍTICO: ignora a neblina preta noturna para perfurar o breu
+    });
+
+    // Injeta rotação para a câmera (Billboard) diretamente no vertex shader da GPU
+    this.impostorMaterial.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <project_vertex>",
+        `
+        vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+        vec2 scale = vec2(
+          length( vec3( modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z ) ),
+          length( vec3( modelMatrix[1].x, modelMatrix[1].y, modelMatrix[1].z ) )
+        );
+        mvPosition.xy += position.xy * scale;
+        gl_Position = projectionMatrix * mvPosition;
+        `
+      );
+    };
+
+    this.maxImpostors = 512;
+    this.impostorMesh = new THREE.InstancedMesh(impostorPlaneGeo, this.impostorMaterial, this.maxImpostors);
+    this.impostorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.impostorMesh.frustumCulled = false;
+    scene.add(this.impostorMesh);
+
+    // Vetores e matrizes auxiliares Zero-GC
+    this._impostorMatrix = new THREE.Matrix4();
+    this._impostorPos = new THREE.Vector3();
+    this._impostorScale = new THREE.Vector3();
+    this._impostorQuat = new THREE.Quaternion();
+    this._impostorColor = new THREE.Color();
+    this._prevActiveImpostors = 0;
+
+    for (let i = 0; i < this.maxImpostors; i++) {
+      this._impostorPos.set(0, -9999, 0);
+      this._impostorScale.set(0, 0, 0);
+      this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+      this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
+    }
+    this.impostorMesh.instanceMatrix.needsUpdate = true;
+
     // fagulhas
     this.emberPositions = new Float32Array(EMBERS * 3);
     this.emberVelocity = new Float32Array(EMBERS * 3);
@@ -437,39 +489,91 @@ export class TorchSystem {
     const pz = player.z;
     const candidates = this.pending;
     candidates.length = 0;
-    for (const source of this.sources) {
+
+    // Regra estrita: PointLights reais só iluminam o chão e paredes a até 25m do jogador
+    const POINTLIGHT_ACTIVATION_DIST = 25.0;
+    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 625 m²
+
+    const impostorsCount = Math.min(this.sources.length, this.maxImpostors);
+
+    for (let i = 0; i < this.sources.length; i++) {
+      const source = this.sources[i];
       const dx = source.x - px;
       const dz = source.z - pz;
       const d = dx * dx + dz * dz;
       const on = this._isOn(source);
-      const near = d < 160 * 160;
+      const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
+
+      // 1. Gerenciamento de PointLight dedicada (ex: tochas colocadas pelo jogador)
       if (source.pointLight) {
-        source.pointLight.visible = on && near;
-        if (on && near) {
+        source.pointLight.visible = nearPointLight;
+        if (nearPointLight) {
           source.pointLight.intensity = 36.0 * flicker;
         } else {
           source.pointLight.intensity = 0;
         }
       }
+
+      // Sprites individuais legados são desativados para delegar 100% ao InstancedMesh (1 Draw Call)
       if (source.sprite) {
-        source.sprite.visible = on && near;
-        if (on && near) {
-          const baseScale = source.kind === "hearth" ? 2.4 : (source.isPost ? 2.1 : 1.7);
-          const s = baseScale * flicker;
-          source.sprite.scale.set(s, s * 1.35, 1);
-          source.sprite.material.opacity = 0.88 + 0.12 * flicker;
+        source.sprite.visible = false;
+      }
+
+      // 2. Atualização das matrizes do InstancedMesh de Light Impostors
+      if (i < this.maxImpostors) {
+        if (on) {
+          const baseScale = source.kind === "hearth" ? 3.4 : (source.isPost ? 2.4 : 1.9);
+          // Halos distantes recebem um boost leve de escala para perfurar o breu com clareza visual
+          const dist = Math.sqrt(d);
+          const distScaleBoost = dist > 25.0 ? Math.min(2.4, 1.0 + (dist - 25.0) * 0.007) : 1.0;
+          const s = baseScale * flicker * distScaleBoost;
+
+          this._impostorPos.set(source.x, source.y + 0.14, source.z);
+          this._impostorScale.set(s, s * 1.35, 1.0);
+          this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+          this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
+
+          if (source.lightColor !== undefined) {
+            this._impostorColor.set(source.lightColor);
+          } else {
+            this._impostorColor.setHex(0xffaa50);
+          }
+          this.impostorMesh.setColorAt(i, this._impostorColor);
+        } else {
+          // Tocha apagada de dia: move para fora do mundo
+          this._impostorPos.set(0, -9999, 0);
+          this._impostorScale.set(0, 0, 0);
+          this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+          this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
         }
       }
-      if (!on || d > 115 * 115 || !source.light) continue;
-      // lareiras só iluminam de noite ou quando o jogador está dentro da casa
+
+      // 3. Seleção de fontes para o pool de PointLights reais gerais:
+      // ESTRITAMENTE <= 25m. Além de 25m, a luz apaga e resta apenas o plano Impostor no breu.
+      if (!nearPointLight || !source.light) continue;
+      // Lareiras de dia só iluminam quem está dentro da casa
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
       source.d = d;
       candidates.push(source);
     }
+
+    // Limpa instâncias do InstancedMesh caso o número total de tochas tenha reduzido
+    for (let i = impostorsCount; i < this._prevActiveImpostors; i++) {
+      this._impostorPos.set(0, -9999, 0);
+      this._impostorScale.set(0, 0, 0);
+      this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+      this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
+    }
+    this._prevActiveImpostors = impostorsCount;
+
+    this.impostorMesh.instanceMatrix.needsUpdate = true;
+    if (this.impostorMesh.instanceColor) this.impostorMesh.instanceColor.needsUpdate = true;
+
     candidates.sort(_sortByDist);
     const chosenCount = Math.min(candidates.length, MAX_LIGHTS);
-    // mantém as luzes presas às mesmas fontes para não piscar ao trocar (Zero-GC)
+
+    // Mantém as PointLights presas às mesmas fontes para evitar oscilação visual
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const light = this.lights[i];
       const src = light.userData.source;
@@ -478,7 +582,11 @@ export class TorchSystem {
       for (let j = 0; j < chosenCount; j++) {
         if (candidates[j] === src) { stillChosen = true; break; }
       }
-      if (!stillChosen) light.userData.source = null;
+      if (!stillChosen) {
+        light.userData.source = null;
+        light.intensity = 0;
+        light.visible = false;
+      }
     }
     for (let j = 0; j < chosenCount; j++) {
       const source = candidates[j];
@@ -496,21 +604,28 @@ export class TorchSystem {
           if (this.lights[i].intensity < 1) { free = this.lights[i]; break; }
         }
       }
-      if (free) free.userData.source = source;
+      if (free) {
+        free.userData.source = source;
+        free.visible = true;
+      }
     }
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const light = this.lights[i];
       const source = light.userData.source;
-      const flicker = source ? 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase) : 1;
-      const target = source ? (source.kind === "hearth" ? 220 : 340) * flicker : 0;
+      if (!source) {
+        light.intensity = 0;
+        light.visible = false;
+        continue;
+      }
+      const flicker = 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase);
+      const target = (source.kind === "hearth" ? 220 : 340) * flicker;
+      light.visible = true;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
-      if (source) {
-        light.position.set(source.x, source.y + 0.25, source.z);
-        if (source.lightColor !== undefined) {
-          light.color.setHex(source.lightColor);
-        } else {
-          light.color.setHex(0xffaa50);
-        }
+      light.position.set(source.x, source.y + 0.25, source.z);
+      if (source.lightColor !== undefined) {
+        light.color.setHex(source.lightColor);
+      } else {
+        light.color.setHex(0xffaa50);
       }
     }
 

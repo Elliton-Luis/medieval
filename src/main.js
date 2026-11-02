@@ -137,8 +137,8 @@ const INITIAL_FOG_COLOR = "#1a1e24";
 scene.background = new THREE.Color(INITIAL_FOG_COLOR);
 scene.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, CONFIG.fogDensity);
 
-// Otimização "Silent Hill": limite de visão da câmera (far = 105m) sincronizado com a neblina densa
-const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance || 105);
+// Câmera ampla (far = 200m) permitindo que Light Impostors perfurem a escuridão no horizonte
+const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance || 200);
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
   alpha: false,
@@ -188,6 +188,7 @@ npcs.camera = camera;
 const input = new InputManager(renderer.domElement);
 const cameraRig = new ThirdPersonCamera(camera, world);
 const dayNight = new DayNightCycle(scene, sun, hemisphere);
+world.dayNight = dayNight;
 const ui = new GameUI(renderer);
 const explosions = new ExplosionSystem(scene, world, (x, z, power) => cameraRig.shakeAt(x, z, power, player.x, player.z));
 const aim = new AimSystem(camera, world, npcs, input, ui);

@@ -95,9 +95,18 @@ export class DayNightCycle {
     this.scene.background.copy(this.currentColor);
     if (renderer) renderer.setClearColor(this.currentColor);
     if (this.scene.fog) {
-      this.scene.fog.color.copy(this.currentColor);
-      // Neblina calibrada no limite de 105m: opacidade total antes do corte de câmera
-      this.scene.fog.density = 0.0315 + 0.0055 * (night * night);
+      if (night > 0.55) {
+        // Noite escura absoluta: neblina preta pura (0x000000) bloqueando a visão das malhas normais aos 40m
+        const nightT = (night - 0.55) / 0.45;
+        this.currentColor.lerp(new THREE.Color(0x000000), nightT * 0.98);
+        this.scene.background.copy(this.currentColor);
+        if (renderer) renderer.setClearColor(this.currentColor);
+        this.scene.fog.color.copy(this.currentColor);
+        this.scene.fog.density = THREE.MathUtils.lerp(0.032, 0.052, nightT);
+      } else {
+        this.scene.fog.color.copy(this.currentColor);
+        this.scene.fog.density = 0.0315 + 0.0055 * (night * night);
+      }
     }
 
     // Luz ambiente e sol/lua única com transição suave sem alocação GC

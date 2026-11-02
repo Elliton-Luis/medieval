@@ -138,7 +138,12 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
     const currentSky = daylight > 0.5 ? _tempSkyDay : _tempSkyNight;
 
     if (scene.fog) {
-      scene.fog.density = 0.008 + decay * 0.016;
+      if (isNight) {
+        // Preserva o breu noturno aos 40m para o sistema de Light Impostors
+        scene.fog.density = THREE.MathUtils.lerp(0.048, 0.056, decay);
+      } else {
+        scene.fog.density = 0.018 + decay * 0.016;
+      }
     }
     if (dayNight.sun && decay > 0.3) {
       dayNight.sun.color.lerp(_sunDecayColor, decay * 0.5);
