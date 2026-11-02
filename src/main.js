@@ -495,6 +495,5 @@ function frame(now) {
     window.setTimeout(() => ui.hideLoading(), 160);
   }
 }
-}
 
 requestAnimationFrame(frame);
