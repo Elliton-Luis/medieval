@@ -197,13 +197,18 @@ export function getMusicCredits() {
 }
 
 const SUPPORTS_VORBIS = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
-const FADE = 2.0;
-const HOLD = 2.2; // Tempo que um novo contexto calmo deve durar para disparar o crossfade
+const FADE_OUT_DURATION = 1.4; // Fade-out suave da música saindo (silêncio antes da próxima)
+const FADE_IN_DURATION = 1.4;  // Fade-in suave da nova música
+const FADE_URGENT_OUT = 0.6;   // Fade-out rápido para combate/tensão
+const FADE_URGENT_IN = 0.8;    // Fade-in rápido para combate/tensão
+const HOLD = 2.8;              // Tempo de confirmação para trocar para contexto calmo
+const MIN_TRACK_STAY = 4.0;    // Tempo mínimo que uma música toca antes de aceitar troca calma
 const OPEN_FIELD_NAMES = new Set(["Pradaria de Caldera", "Estrada Real"]);
-const EVICTION_TIME = 16.0; // Descarrega a faixa da RAM 16s após o término do fade-out
+const EVICTION_TIME = 16.0;    // Descarrega a faixa da RAM 16s após o término do fade-out
 
 /**
  * Diretor de Música Dinâmica com Carregamento Sob Demanda e Descarregamento de Memória (Zero-Leak).
+ * Garante rigorosamente UMA ÚNICA FAIXA por vez no mixer, eliminando qualquer overlap de músicas.
  */
 export class MusicDirector {
   constructor({
@@ -235,6 +240,13 @@ export class MusicDirector {
 
     this.tracks = new Map();
     this.current = null;
+    this.currentKey = null;
+    this.targetKey = null;
+    this.fadingOutTrack = null;
+    this.fadePhase = "idle"; // "idle" | "fading_out" | "fading_in"
+    this.phaseTimer = 0;
+    this.phaseDuration = FADE_IN_DURATION;
+    this.startVolume = 0;
     this.context = "explore";
     this.pending = null;
     this.pendingTime = 0;
@@ -246,6 +258,10 @@ export class MusicDirector {
     this.time = 0;
     this.override = null;
     this.pausedForDefeat = false;
+    this._trackStartedTime = -999;
+    this._threatActive = false;
+    this._cityActive = false;
+    this._ghostCampActive = false;
 
     // Pré-carrega o som de descoberta no construtor para evitar I/O no frame
     try {
@@ -301,37 +317,85 @@ export class MusicDirector {
       element,
       source,
       gain,
-      stopAt: 0,
+      currentVolume: 0,
       evictAt: 0,
     };
     this.tracks.set(key, track);
     return track;
   }
 
-  _ramp(track, target) {
-    if (!track.gain || !this.audio.context) return;
-    const param = track.gain.gain;
-    const now = this.audio.context.currentTime;
-    param.cancelScheduledValues(now);
-    param.setValueAtTime(param.value, now);
-    param.linearRampToValueAtTime(target, now + FADE);
+  _applyTrackVolume(track, vol) {
+    if (!track) return;
+    const clamped = Math.max(0, Math.min(1, vol));
+    track.currentVolume = clamped;
+    if (track.gain && this.audio.context) {
+      try {
+        const param = track.gain.gain;
+        param.cancelScheduledValues(this.audio.context.currentTime);
+        param.setValueAtTime(clamped, this.audio.context.currentTime);
+      } catch (_) {}
+    }
+    if (track.element) {
+      try {
+        track.element.volume = clamped;
+      } catch (_) {}
+    }
   }
 
-  _switchTo(key) {
+  /**
+   * Chaveia para uma nova faixa de música garantindo transição suave e ZERO overlap.
+   * A faixa atual desce suavemente até o silêncio total antes que a próxima comece.
+   */
+  _switchTo(key, urgent = false) {
     if (!this.audio.context || this.pausedForDefeat) return;
-    const next = this._track(key);
-    if (this.current && this.current !== next) {
-      this._ramp(this.current, 0);
-      this.current.stopAt = this.time + FADE + 0.15;
-      this.current.evictAt = this.time + FADE + EVICTION_TIME;
+
+    // Se já é a faixa atual e estamos estáveis ou subindo volume, nada a fazer
+    if (this.currentKey === key && this.fadePhase !== "fading_out") return;
+
+    // Se estávamos fazendo fade out da mesma faixa e ela foi solicitada de volta:
+    // podemos reverter o fade de volta para fade-in a partir do volume atual
+    if (this.fadingOutTrack && this.fadingOutTrack.key === key && this.fadePhase === "fading_out") {
+      this.current = this.fadingOutTrack;
+      this.currentKey = key;
+      this.targetKey = key;
+      this.fadingOutTrack = null;
+      this.fadePhase = "fading_in";
+      this.startVolume = this.current.currentVolume || 0;
+      this.phaseTimer = 0;
+      this.phaseDuration = urgent ? FADE_URGENT_IN : FADE_IN_DURATION;
+      return;
     }
-    next.stopAt = 0;
-    next.evictAt = 0;
-    if (next.element.paused) {
+
+    this.targetKey = key;
+
+    // Se já houver uma faixa ativa com som, iniciamos fade out suave nela primeiro
+    if (this.current && this.current.currentVolume > 0.01) {
+      this.fadingOutTrack = this.current;
+      this.current = null;
+      this.fadePhase = "fading_out";
+      this.startVolume = this.fadingOutTrack.currentVolume;
+      this.phaseTimer = 0;
+      this.phaseDuration = urgent ? FADE_URGENT_OUT : FADE_OUT_DURATION;
+      // Nenhuma outra faixa toca enquanto esta estiver diminuindo (overlap zero)
+    } else {
+      // Se não havia faixa tocando, inicia direto o fade in na nova faixa
+      if (this.current) {
+        this._applyTrackVolume(this.current, 0);
+        try { this.current.element.pause(); } catch (_) {}
+      }
+      const next = this._track(key);
+      this.current = next;
+      this.currentKey = key;
+      this.fadingOutTrack = null;
+      this._applyTrackVolume(next, 0);
+      try { next.element.currentTime = 0; } catch (_) {}
       next.element.play().catch(() => {});
+      this.fadePhase = "fading_in";
+      this.startVolume = 0;
+      this.phaseTimer = 0;
+      this.phaseDuration = urgent ? FADE_URGENT_IN : FADE_IN_DURATION;
+      this._trackStartedTime = this.time;
     }
-    this._ramp(next, 1);
-    this.current = next;
   }
 
   setOverride(key) {
@@ -339,25 +403,38 @@ export class MusicDirector {
     if (key) {
       this.context = key;
       this.pending = null;
-      this._switchTo(key);
+      this._switchTo(key, true);
     } else {
       this.context = this._detect();
       this.pending = null;
-      this._switchTo(this.context);
+      this._switchTo(this.context, true);
     }
   }
 
   pauseForDefeat() {
     this.pausedForDefeat = true;
     if (this.current) {
-      this._ramp(this.current, 0);
+      this.fadingOutTrack = this.current;
+      this.current = null;
+      this.fadePhase = "fading_out";
+      this.startVolume = this.fadingOutTrack.currentVolume || 1.0;
+      this.phaseTimer = 0;
+      this.phaseDuration = 0.5;
+    }
+    for (const [k, track] of this.tracks.entries()) {
+      if (track !== this.fadingOutTrack) {
+        this._applyTrackVolume(track, 0);
+        try { track.element.pause(); } catch (_) {}
+      }
     }
   }
 
   resumeAfterDefeat() {
     this.pausedForDefeat = false;
+    this.fadePhase = "idle";
+    this.fadingOutTrack = null;
     this.context = this._detect();
-    this._switchTo(this.context);
+    this._switchTo(this.context, true);
   }
 
   playDiscovery() {
@@ -373,13 +450,14 @@ export class MusicDirector {
    * Retorna metadados da faixa musical sendo reproduzida no momento para o painel de debug F3.
    */
   getCurrentTrackInfo() {
-    const key = this.override || this.context || "none";
+    const key = this.override || this.currentKey || this.context || "none";
     const catalog = TRACK_CATALOG[key];
     const isPlaying = Boolean(this.current && this.current.element && !this.current.element.paused);
     const title = catalog ? catalog.title : (key === "none" ? "Silêncio" : key);
     const file = catalog ? (catalog.mp3 || catalog.ogg || catalog.wav || "") : "";
     const fileName = file ? file.split("/").pop() : "";
-    const volumePct = Math.round((this.current ? (this.current.gain || 0) : 0) * (this.audio?.settings?.music ?? 0.6) * 100);
+    const curVol = (this.current ? (this.current.currentVolume ?? 0) : 0);
+    const volumePct = Math.round(curVol * (this.audio?.settings?.music ?? 0.6) * 100);
     return {
       key,
       title,
@@ -388,6 +466,7 @@ export class MusicDirector {
       isPlaying,
       volumePct,
       role: catalog?.role || "Ambiente",
+      phase: this.fadePhase,
     };
   }
 
@@ -395,7 +474,11 @@ export class MusicDirector {
     if (!this.player) return false;
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
-    const maxDistSq = 35 * 35;
+    // Histerese anti-flapping: ativa aos 28m, só desativa ao se afastar além dos 42m
+    const threshold = this._threatActive ? 42 : 28;
+    const thresholdSq = threshold * threshold;
+
+    let found = false;
 
     // 1. Feras (lobos, wendigos, etc.)
     if (this.beasts?.beasts) {
@@ -404,33 +487,43 @@ export class MusicDirector {
         if (!b || !b.mesh || !b.mesh.visible || b.dead) continue;
         const dx = b.mesh.position.x - px;
         const dz = b.mesh.position.z - pz;
-        if (dx * dx + dz * dz < maxDistSq) return true;
+        if (dx * dx + dz * dz < thresholdSq) {
+          found = true;
+          break;
+        }
       }
     }
 
     // 2. Monstros do MonstersPool (Ghouls, Lobisomens, etc.)
-    if (this.monstersPool) {
+    if (!found && this.monstersPool) {
       for (let i = 0; i < this.monstersPool.length; i++) {
         const m = this.monstersPool[i];
         if (!m || !m.root || !m.root.visible || m.dead || m.isDead) continue;
         const dx = m.root.position.x - px;
         const dz = m.root.position.z - pz;
-        if (dx * dx + dz * dz < maxDistSq) return true;
+        if (dx * dx + dz * dz < thresholdSq) {
+          found = true;
+          break;
+        }
       }
     }
 
     // 3. Cultistas hostis
-    if (this.cultistsPool) {
+    if (!found && this.cultistsPool) {
       for (let i = 0; i < this.cultistsPool.length; i++) {
         const c = this.cultistsPool[i];
         if (!c || !c.root || !c.root.visible || c.isDead) continue;
         const dx = c.root.position.x - px;
         const dz = c.root.position.z - pz;
-        if (dx * dx + dz * dz < maxDistSq) return true;
+        if (dx * dx + dz * dz < thresholdSq) {
+          found = true;
+          break;
+        }
       }
     }
 
-    return false;
+    this._threatActive = found;
+    return found;
   }
 
   _isGhostTownOrCultCampNearby() {
@@ -438,30 +531,44 @@ export class MusicDirector {
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
 
+    // Histerese anti-flapping para vilas fantasmas e acampamentos cultistas
+    const townThreshold = this._ghostCampActive ? 68 : 48;
+    const campThreshold = this._ghostCampActive ? 56 : 38;
+
+    let found = false;
     // Cidades Fantasmas (ActiveGhostTowns)
     const towns = this.activeGhostTowns || ActiveGhostTowns;
     if (towns && towns.length > 0) {
+      const sq = townThreshold * townThreshold;
       for (let i = 0; i < towns.length; i++) {
         const t = towns[i];
         if (!t?.center) continue;
         const dx = px - t.center.x;
         const dz = pz - t.center.z;
-        if (dx * dx + dz * dz < 55 * 55) return true;
+        if (dx * dx + dz * dz < sq) {
+          found = true;
+          break;
+        }
       }
     }
 
     // Acampamentos Cultistas (CULT_CAMP_GROUPS)
-    if (CULT_CAMP_GROUPS && CULT_CAMP_GROUPS.length > 0) {
+    if (!found && CULT_CAMP_GROUPS && CULT_CAMP_GROUPS.length > 0) {
+      const sq = campThreshold * campThreshold;
       for (let i = 0; i < CULT_CAMP_GROUPS.length; i++) {
         const camp = CULT_CAMP_GROUPS[i];
         if (!camp) continue;
         const dx = px - camp.position.x;
         const dz = pz - camp.position.z;
-        if (dx * dx + dz * dz < 45 * 45) return true;
+        if (dx * dx + dz * dz < sq) {
+          found = true;
+          break;
+        }
       }
     }
 
-    return false;
+    this._ghostCampActive = found;
+    return found;
   }
 
   _isEclipseOrCataclysm() {
@@ -476,15 +583,24 @@ export class MusicDirector {
     const { x, z } = this.player;
     if (!OPEN_FIELD_NAMES.has(locationAt(x, z))) return true;
 
+    // Histerese anti-flapping para cidades procedurais (entra com 52m, sai com 75m)
+    const threshold = this._cityActive ? 75 : 52;
+    const thresholdSq = threshold * threshold;
+
+    let found = false;
     if (this.activeCities) {
       for (const city of this.activeCities.values()) {
         if (!city?.center) continue;
         const dx = x - city.center.x;
         const dz = z - city.center.z;
-        if (dx * dx + dz * dz < 60 * 60) return true;
+        if (dx * dx + dz * dz < thresholdSq) {
+          found = true;
+          break;
+        }
       }
     }
-    return false;
+    this._cityActive = found;
+    return found;
   }
 
   _detect() {
@@ -563,18 +679,84 @@ export class MusicDirector {
     this.time += dt;
     if (!this.started || !this.audio.context || this.pausedForDefeat) return;
 
-    // Gerenciamento de Memória & Pausa de Faixas Inativas (Zero-Leak)
-    for (const [key, track] of this.tracks.entries()) {
-      if (track === this.current) continue;
+    // -------------------------------------------------------------------------
+    // MÁQUINA DE TRANSIÇÃO SUAVE (GARANTIA DE UMA ÚNICA FAIXA POR VEZ)
+    // -------------------------------------------------------------------------
+    if (this.fadePhase === "fading_out") {
+      this.phaseTimer += dt;
+      const progress = Math.min(1, this.phaseTimer / this.phaseDuration);
+      const vol = Math.max(0, this.startVolume * (1 - progress));
+      if (this.fadingOutTrack) {
+        this._applyTrackVolume(this.fadingOutTrack, vol);
+      }
+      if (progress >= 1) {
+        // Silêncio completo atingido pela faixa anterior!
+        if (this.fadingOutTrack) {
+          this._applyTrackVolume(this.fadingOutTrack, 0);
+          try { this.fadingOutTrack.element.pause(); } catch (_) {}
+          this.fadingOutTrack.evictAt = this.time + EVICTION_TIME;
+          this.fadingOutTrack = null;
+        }
 
-      // 1. Pausa o elemento ao término do crossfade
-      if (track.stopAt && this.time >= track.stopAt) {
-        track.stopAt = 0;
-        if (!track.element.paused) track.element.pause();
+        // Agora sim a próxima faixa pode começar a subir, sem nenhum overlap
+        if (this.targetKey) {
+          const next = this._track(this.targetKey);
+          this.current = next;
+          this.currentKey = this.targetKey;
+          this._applyTrackVolume(next, 0);
+          try { next.element.currentTime = 0; } catch (_) {}
+          next.element.play().catch(() => {});
+          this.fadePhase = "fading_in";
+          this.phaseTimer = 0;
+          this.phaseDuration = FADE_IN_DURATION;
+          this.startVolume = 0;
+          this._trackStartedTime = this.time;
+        } else {
+          this.fadePhase = "idle";
+        }
+      }
+    } else if (this.fadePhase === "fading_in") {
+      this.phaseTimer += dt;
+      const progress = Math.min(1, this.phaseTimer / this.phaseDuration);
+      const vol = Math.min(1, progress);
+      if (this.current) {
+        this._applyTrackVolume(this.current, vol);
+        if (this.current.element.paused) {
+          this.current.element.play().catch(() => {});
+        }
+      }
+      if (progress >= 1) {
+        if (this.current) this._applyTrackVolume(this.current, 1);
+        this.fadePhase = "idle";
+      }
+    } else if (this.fadePhase === "idle") {
+      if (this.current) {
+        if (this.current.currentVolume !== 1) this._applyTrackVolume(this.current, 1);
+        if (this.current.element.paused) {
+          this.current.element.play().catch(() => {});
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // TRAVA ANTI-OVERLAP TOTAL & DESCARREGAMENTO DE MEMÓRIA (ZERO-LEAK)
+    // -------------------------------------------------------------------------
+    for (const [key, track] of this.tracks.entries()) {
+      const isAllowedPlaying =
+        (this.fadePhase === "fading_out" && track === this.fadingOutTrack) ||
+        ((this.fadePhase === "fading_in" || this.fadePhase === "idle") && track === this.current);
+
+      if (!isAllowedPlaying) {
+        if (track.currentVolume > 0) {
+          this._applyTrackVolume(track, 0);
+        }
+        if (!track.element.paused) {
+          try { track.element.pause(); } catch (_) {}
+        }
       }
 
-      // 2. Descarrega da memória (Eviction) após 16 segundos sem uso
-      if (track.evictAt && this.time >= track.evictAt) {
+      // Descarrega da memória (Eviction) após 16 segundos sem uso
+      if (!isAllowedPlaying && track.evictAt && this.time >= track.evictAt) {
         try {
           track.element.pause();
           track.element.removeAttribute("src");
@@ -607,18 +789,19 @@ export class MusicDirector {
     if (this.override) {
       if (this.context !== this.override) {
         this.context = this.override;
-        this._switchTo(this.override);
+        this._switchTo(this.override, true);
       }
       return;
     }
 
     const detected = this._detect();
-    if (detected === this.context) {
+    const currentActiveOrTarget = this.targetKey || this.context;
+    if (detected === currentActiveOrTarget) {
       this.pending = null;
       return;
     }
 
-    // Urgências que mudam a música instantaneamente sem esperar HOLD
+    // Urgências que mudam a música com prioridade máxima
     const urgent =
       detected === "eclipse" ||
       detected === "chase" ||
@@ -638,10 +821,13 @@ export class MusicDirector {
     }
 
     this.pendingTime += 0.4;
-    if (urgent || this.pendingTime >= HOLD) {
+    const timeSinceStarted = this.time - this._trackStartedTime;
+    const canSwitchCalm = this.pendingTime >= HOLD && timeSinceStarted >= MIN_TRACK_STAY;
+
+    if (urgent || canSwitchCalm) {
       this.context = detected;
       this.pending = null;
-      this._switchTo(detected);
+      this._switchTo(detected, urgent);
     }
   }
 }
