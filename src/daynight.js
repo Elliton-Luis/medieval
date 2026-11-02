@@ -15,7 +15,7 @@ export class DayNightCycle {
     this.scene = scene;
     this.sun = sun;
     this.hemisphere = hemisphere;
-    this.progress = 0.36;
+    this.progress = 0.45; // Inicia em pleno dia (~10h48) com sol alto e tochas apagadas, sem oscilações no spawn
     this.dayColor = new THREE.Color("#8fa093");
     this.nightColor = new THREE.Color(0x0a0f16);
     this.dawnColor = new THREE.Color("#9e7c65");
@@ -25,7 +25,7 @@ export class DayNightCycle {
     this.isNight = false;
     this._lastClock = "";
     this._lastMinute = -1;
-    this._prevProgress = 0.36;
+    this._prevProgress = 0.45;
     this.onNewDay = null;
 
     // Astro Celeste Fixo no Firmamento (Sol/Lua Primordial sempre visível no mesmo ângulo e direção)

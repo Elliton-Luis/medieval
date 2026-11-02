@@ -196,6 +196,7 @@ export class TorchSystem {
     this._lastSortX = -9999;
     this._lastSortZ = -9999;
     this._sortTimer = 0;
+    this._lightStepTimer = 0; // Fila sequencial de acendimento (uma a uma da mais próxima à mais distante)
     this.stickGeometry = new THREE.CylinderGeometry(0.035, 0.05, 0.62, 6);
     this.headGeometry = new THREE.CylinderGeometry(0.075, 0.05, 0.2, 6);
     this.stickMaterial = new THREE.MeshStandardMaterial({ color: "#4a3626", roughness: 1, flatShading: true });
@@ -219,18 +220,29 @@ export class TorchSystem {
       fog: false, // CRÍTICO: ignora a neblina preta noturna para perfurar o breu
     });
 
-    // Injeta rotação para a câmera (Billboard) diretamente no vertex shader da GPU
+    // Injeta rotação para a câmera (Billboard) diretamente no vertex shader da GPU com suporte a InstancedMesh
     this.impostorMaterial.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
         "#include <project_vertex>",
         `
-        vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
-        vec2 scale = vec2(
-          length( vec3( modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z ) ),
-          length( vec3( modelMatrix[1].x, modelMatrix[1].y, modelMatrix[1].z ) )
-        );
-        mvPosition.xy += position.xy * scale;
-        gl_Position = projectionMatrix * mvPosition;
+        #ifdef USE_INSTANCING
+          vec4 instCenter = instanceMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+          vec4 mvPosition = modelViewMatrix * instCenter;
+          vec2 scale = vec2(
+            length( vec3( instanceMatrix[0].x, instanceMatrix[0].y, instanceMatrix[0].z ) ),
+            length( vec3( instanceMatrix[1].x, instanceMatrix[1].y, instanceMatrix[1].z ) )
+          );
+          mvPosition.xy += position.xy * scale;
+          gl_Position = projectionMatrix * mvPosition;
+        #else
+          vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+          vec2 scale = vec2(
+            length( vec3( modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z ) ),
+            length( vec3( modelMatrix[1].x, modelMatrix[1].y, modelMatrix[1].z ) )
+          );
+          mvPosition.xy += position.xy * scale;
+          gl_Position = projectionMatrix * mvPosition;
+        #endif
         `
       );
     };
@@ -238,6 +250,7 @@ export class TorchSystem {
     this.maxImpostors = 512;
     this.impostorMesh = new THREE.InstancedMesh(impostorPlaneGeo, this.impostorMaterial, this.maxImpostors);
     this.impostorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.impostorMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.maxImpostors * 3), 3);
     this.impostorMesh.frustumCulled = false;
     scene.add(this.impostorMesh);
 
@@ -360,11 +373,11 @@ export class TorchSystem {
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      fog: false, // Perfora a neblina noturna
+      fog: false,
     }));
     sprite.scale.set(spriteScale, spriteScale * 1.35, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
-    sprite.visible = isAlwaysLit;
+    sprite.visible = false; // Renderizado via InstancedMesh (impostorMesh) para zero draw calls
     this.scene.add(sprite);
 
     const source = {
@@ -375,6 +388,7 @@ export class TorchSystem {
       phase: Math.random() * 6.28,
       kind: "torch",
       alwaysOn: isAlwaysLit,
+      isLit: Boolean(isAlwaysLit),
       light: true,
       group,
       lightColor: pal.flameHex,
@@ -416,8 +430,9 @@ export class TorchSystem {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: "#ffb060", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     sprite.scale.set(1.0, 1.2, 1);
     sprite.position.set(x, y + 0.3, z);
+    sprite.visible = false;
     this.scene.add(sprite);
-    const source = { x, y: y + 0.3, z, sprite, phase: Math.random() * 6.28, kind: "hearth", alwaysOn: true, light: true, house };
+    const source = { x, y: y + 0.3, z, sprite, phase: Math.random() * 6.28, kind: "hearth", alwaysOn: true, isLit: true, light: true, house };
     this.sources.push(source);
     return source;
   }
@@ -438,32 +453,73 @@ export class TorchSystem {
   }
 
   _isOn(source) {
-    return source.alwaysOn || (this.lit && this.rain < 0.7);
+    return source.alwaysOn || (source.isLit && this.rain < 0.7);
   }
 
   update(dt, player) {
     this.time += dt;
-    // acendem ao anoitecer e apagam ao amanhecer (com histerese)
+    const px = player.x;
+    const pz = player.z;
+
+    // Regra: Tochas acendem e apagam UMA A UMA, da mais próxima à mais distante, sem paralelismo
     const daylight = this.dayNight.daylight;
-    if (!this.lit && daylight < 0.42) this.lit = true;
-    else if (this.lit && daylight > 0.55) this.lit = false;
-    this.headMaterial.emissiveIntensity = this.lit ? 4.8 : 0.05;
-    for (let s = 0; s < this.sources.length; s++) {
-      const src = this.sources[s];
-      if (src.headMaterial) {
-        src.headMaterial.emissiveIntensity = (src.alwaysOn || this.lit) ? 5.8 : 0.05;
+    const wantsLit = daylight < 0.42;
+    const wantsUnlit = daylight > 0.55;
+
+    this._lightStepTimer += dt;
+    if (this._lightStepTimer >= 0.05) {
+      this._lightStepTimer = 0;
+
+      if (wantsLit) {
+        // Encontra a tocha desligada MAIS PRÓXIMA do jogador para acender primeiro
+        let bestSrc = null;
+        let bestDistSq = Infinity;
+        for (let s = 0; s < this.sources.length; s++) {
+          const src = this.sources[s];
+          if (src.alwaysOn || src.isLit) continue;
+          const dx = src.x - px;
+          const dz = src.z - pz;
+          const d = dx * dx + dz * dz;
+          if (d < bestDistSq) {
+            bestDistSq = d;
+            bestSrc = src;
+          }
+        }
+        if (bestSrc) {
+          bestSrc.isLit = true;
+          if (bestSrc.headMaterial) bestSrc.headMaterial.emissiveIntensity = 5.8;
+        }
+      } else if (wantsUnlit) {
+        // Encontra a tocha ligada MAIS DISTANTE do jogador para apagar primeiro ao amanhecer
+        let bestSrc = null;
+        let maxDistSq = -1;
+        for (let s = 0; s < this.sources.length; s++) {
+          const src = this.sources[s];
+          if (src.alwaysOn || !src.isLit) continue;
+          const dx = src.x - px;
+          const dz = src.z - pz;
+          const d = dx * dx + dz * dz;
+          if (d > maxDistSq) {
+            maxDistSq = d;
+            bestSrc = src;
+          }
+        }
+        if (bestSrc) {
+          bestSrc.isLit = false;
+          if (bestSrc.headMaterial) bestSrc.headMaterial.emissiveIntensity = 0.05;
+        }
       }
     }
 
-    const px = player.x;
-    const pz = player.z;
     const candidates = this.pending;
     candidates.length = 0;
 
     // Regra: PointLights reais iluminam em um raio curto de até 25m do jogador.
-    // Acima disso, halos e billboards aditivos perfuram o breu sem custo de sombreamento ou recompilação.
+    // Acima disso, o InstancedMesh (impostorMesh) perfura o breu sem custo de sombreamento ou recompilação.
     const POINTLIGHT_ACTIVATION_DIST = 25.0;
     const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 625 m²
+
+    let activeImpostorCount = 0;
 
     for (let i = 0; i < this.sources.length; i++) {
       const source = this.sources[i];
@@ -474,17 +530,26 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
-      // 1. Halo / Chama do Sprite: compensa a distância e perfura a neblina escura (fog=false)
-      if (source.sprite) {
-        source.sprite.visible = on;
-        if (on) {
-          const baseScale = source.kind === "hearth" ? 3.4 : (source.isPost ? 2.4 : 1.9);
-          const dist = Math.sqrt(d);
-          // Escala cresce com a distância para manter legibilidade visual clara de 100m a 200m
-          const distScaleBoost = Math.min(8.0, Math.max(1.0, 1.0 + dist * 0.035));
-          const s = baseScale * flicker * distScaleBoost;
-          source.sprite.scale.set(s, s * 1.35, 1);
+      // 1. Light Impostors (InstancedMesh na GPU com 1 draw call para todas as tochas do mundo):
+      if (on && activeImpostorCount < this.maxImpostors) {
+        const dist = Math.sqrt(d);
+        const baseScale = source.kind === "hearth" ? 2.8 : (source.isPost ? 2.2 : 1.7);
+        // Escala cresce com a distância para manter leitura clara a 100m–200m
+        const distScaleBoost = Math.min(8.0, Math.max(1.0, 1.0 + dist * 0.035));
+        const s = baseScale * flicker * distScaleBoost;
+
+        this._impostorPos.set(source.x, source.y + 0.35, source.z);
+        this._impostorScale.set(s, s * 1.35, 1);
+        this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+        this.impostorMesh.setMatrixAt(activeImpostorCount, this._impostorMatrix);
+
+        if (source.lightColor !== undefined) {
+          this._impostorColor.setHex(source.lightColor);
+        } else {
+          this._impostorColor.setHex(0xffaa50);
         }
+        this.impostorMesh.setColorAt(activeImpostorCount, this._impostorColor);
+        activeImpostorCount++;
       }
 
       // 2. Seleção de fontes para o pool de PointLights reais de curta distância:
@@ -493,6 +558,21 @@ export class TorchSystem {
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
       source.d = d;
       candidates.push(source);
+    }
+
+    // Zera e oculta instâncias de impostor que deixaram de ser ativas
+    if (activeImpostorCount < this._prevActiveImpostors) {
+      for (let k = activeImpostorCount; k < this._prevActiveImpostors; k++) {
+        this._impostorPos.set(0, -9999, 0);
+        this._impostorScale.set(0, 0, 0);
+        this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
+        this.impostorMesh.setMatrixAt(k, this._impostorMatrix);
+      }
+    }
+    this._prevActiveImpostors = activeImpostorCount;
+    this.impostorMesh.instanceMatrix.needsUpdate = true;
+    if (this.impostorMesh.instanceColor) {
+      this.impostorMesh.instanceColor.needsUpdate = true;
     }
 
     // Ordenação sob demanda: evita sort() a cada quadro se o jogador estiver parado ou houver poucas fontes
