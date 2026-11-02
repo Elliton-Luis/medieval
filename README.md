@@ -268,6 +268,64 @@ Todas as feras e abominações sobrenaturais só aparecem e atuam estritamente d
 - **48 Nós de Cristais Místicos**: Espalhados em anéis concêntricos (próximos a 35m–85m, intermediários a 90m–160m e distantes a 170m–270m) em todas as 6 cores (Esmeralda, Safira, Quartzo Rosa, Rubi, Diamante e Ametista), permitindo infundir a tocha com chamas coloridas dinâmicas.
 - **7 Cidades Fantasmas Devastadas**: Ruínas procedurais de guerra (Norvânia, Cairn, Valdor, Oakhaven, Kren, Corvos e Morvath) com muros caídos, sangue seco, flechas e ossadas, onde é possível vasculhar a praça central para resgatar o *Tractatus de Carcere* e suas páginas faltantes.
 
+## Sistema de Construção e Modo Demolição (Tecla C)
+
+- **Hub de Arquitetura Medieval**: Pressionar `C` abre o catálogo com 10 projetos medievais estruturados em categorias (*Habitação & Vila* e *Defesa & Trabalho*), incluindo Cabanas, Casas de Enxaimel com dois pisos, Celeiros, Currais, Torres de Vigia, Forjas, Poços, Fogueiras e Muralhas de Pedra e Barro.
+- **Projeção e Rotação em 15°**: Rotação com a roda do mouse, teclas `Q`/`E` ou movimento suave do mouse enquanto a câmera permanece fixa. Clique com botão esquerdo ou `E` ergue a obra no relevo com fundações sólidas e colisores físicos OBB.
+- **Modo Demolição / Destruir Obra**:
+  - Acessível pelo botão **🔨 Destruir / Demolir Construção** ou pela aba **🔨 DEMOLIÇÃO** no catálogo (`C`).
+  - **Seleção Prévia Obrigatória**: A mira do jogador detecta qualquer construção erguida pelo jogador a até 30m. Ao mirar, um contorno âmbar indica o alvo. Ao clicar com o botão esquerdo ou apertar `E`, a construção é **selecionada**, passando a piscar em vermelho vivo pulsante.
+  - **Exclusão Segura**: O botão na tela `[ 💥 DELETAR CONSTRUÇÃO ]` fica ativo. Clicar nele ou apertar `E` / `Delete` / `Espaço` faz a construção desaparecer imediatamente do mundo, desativando todos os colisores físicos e pisos e tocando som de quebra com explosão de poeira e detritos.
+  - Também permite selecionar e deletar itens fixados no cenário (tochas em paredes, velas e armas).
+
+## Tela de Debug F3 (Estatísticas Completas da Engine e Mundo)
+
+- **Ativação por Atalho `F3`**: Pressione `F3` (ou `Shift + F3`) a qualquer momento, ou acione pelo menu de pausa (`Esc`) e pelo Cheat Menu (`POTATO`).
+- **Arquitetura Zero-GC**: Painel translúcido em duas colunas atualizado a ~12 Hz (80ms) reutilizando nós DOM pré-alocados, sem gerar alocações ou sobrecarga no loop de renderização.
+- **Coluna Esquerda (Engine, Performance e Navegação)**:
+  - FPS em tempo real com média, mínimo, máximo e tempo de quadro em ms (`fps (ms) · min/max`).
+  - Consumo de memória Heap JS via `performance.memory` com percentual do limite da aba.
+  - Coordenadas espaciais precisas do jogador `XYZ` (3 casas decimais).
+  - Identificação de Chunk atual `[cx, cz]` e total de chunks ativos no raio de streaming.
+  - Direção de bússola (*Norte / Sul / Leste / Oeste*) com graus exatos de `Yaw` e `Pitch`.
+  - Altura do solo em Y com distinção entre terreno procedural e pisos de construções.
+  - Relógio do mundo (`HH:MM`), ciclo dia/noite e percentual de iluminação solar.
+  - Status do jogador: HP, Stamina, Moedas de Ouro, Nível de Procurado e Postura (a pé, montado ou furtivo).
+- **Coluna Direita (GPU, Renderização, Entidades e Estruturas)**:
+  - Resolução do canvas e limite de corte da câmera (`camera.far`).
+  - Total de chamadas de desenho (*Draw Calls*) e contagem de polígonos/triângulos no quadro.
+  - Total de geometrias e texturas alocadas na memória da GPU pelo Three.js.
+  - Total de entidades simuladas no mundo aberto.
+  - Censo detalhado de NPCs (aldeões, guardas de patrulha e mendigos vivos).
+  - Contagem de inimigos e feras nos ermos (seita cátara, wendigos e bestas noturnas).
+  - População de cavalos no mundo e montarias ativas.
+  - Quantidade de casas e vilas geradas pelo mapa procedural, com distância e nome da cidade mais próxima.
+  - Contagem de construções do jogador ativas no cenário e itens fixados.
+  - Quantidade de caixas orientadas (OBBs) e pisos registrados no Spatial Hash Grid de física.
+  - Tochas dinâmicas ativas e arma em mãos.
+
+## Sistema de Neblina Densa e Culling Espacial (O Truque "Silent Hill")
+
+Usar a neblina visual para justificar o não carregamento de partes distantes do cenário é uma das técnicas clássicas mais eficientes de otimização para jogos de mundo aberto. Para que a GPU fique extremamente leve, a neblina visual está matematicamente sincronizada com o limite de corte da câmera (`camera.far`), o frustum de sombras e o raio de culling dos chunks:
+
+1. **Sincronização entre Neblina e Corte de Câmera (`camera.far = 105m`)**:
+   - O plano de corte distante da câmera principal (`camera.far`) foi fixado em 105 metros. A GPU descarta (cull/clip) 100% de todos os vértices e triângulos além dessa distância antes da rasterização.
+   - A neblina exponencial (`THREE.FogExp2`) foi calibrada com densidade de `0.0315` de dia até `0.037` à noite. A 95–100m de distância, a opacidade da névoa atinge 99.98%, tornando qualquer objeto 100% invisível antes de alcançar o limite de corte da câmera.
+   - A cor do horizonte (`scene.fog.color`), o fundo (`scene.background`) e a cor de limpeza do renderizador (`renderer.setClearColor`) permanecem estritamente idênticas em todas as horas do dia e da noite, criando a ilusão de um horizonte infinito sem bordas ou cortes bruscos.
+   - **Proibido Skybox**: O uso de textura plana uniforme na cor exata da neblina evita que silhuetas de árvores e morros sumam recortadas contra o céu no limite do `camera.far`.
+
+2. **Culling Espacial de Chunks e InstancedMesh**:
+   - O gerenciador de mundo (`World.updateVisibility`) descarta chunks inteiros que estejam além do raio de corte da neblina (`distanceSq > maxFogCullSq = 110²`), desativando a visibilidade de grupos inteiros de terreno e milhares de árvores e rochas instanciadas (`chunk.group.visible = false`).
+   - Todos os cálculos de distância utilizam distância euclidiana ao quadrado (`distanceSq`), eliminando chamadas desnecessárias a `Math.sqrt` no loop principal (Zero-GC).
+
+3. **Otimização do Frustum de Sombras (Shadow Frustum)**:
+   - A câmera ortográfica da luz solar direcional (`sun.shadow.camera`) foi concentrada no raio imediato de 28 metros ao redor do jogador (`SHADOW_BOUNDS = 28`, `near = 1`, `far = 80`).
+   - Evita calcular sombras de montanhas e árvores ocultas pela neblina a centenas de metros, concentrando a resolução do shadow map (512x512 PCFSoft) exatamente onde os olhos do jogador conseguem enxergar com máxima nitidez.
+
+4. **Spawns de Monstros no Limiar da Neblina (78m–88m)**:
+   - Criaturas noturnas (Lobisomens, Gulur, Necron, Hexoculus e Polyphonia) surgem estrategicamente no anel de 78 a 88 metros de distância do jogador.
+   - O jogador ouve os passos e uivos na escuridão e assiste à silhueta do monstro emergir lentamente da névoa densa à medida que ele se aproxima, gerando suspense cinematográfico e horror clássico sem modelos complexos ou pop-ins repentinos.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

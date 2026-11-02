@@ -19,7 +19,7 @@ const _tempVec = new THREE.Vector3();
 const _dummy = new THREE.Object3D();
 
 const CHANCE_WEREWOLF = 0.05;
-const SPAWN_DISTANCE = 45; // Distância cega do jogador
+const SPAWN_DISTANCE = 82; // Spawna no limiar da neblina densa (78m-86m) para emergir como silhueta no suspense estilo Silent Hill
 
 let _sharedHouseMaterial = null;
 let _wildernessTimer = 0;

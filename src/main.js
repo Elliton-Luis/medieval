@@ -129,10 +129,12 @@ import {
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#aebfae");
-scene.fog = new THREE.FogExp2("#aebfae", CONFIG.fogDensity);
+const INITIAL_FOG_COLOR = "#1a1e24";
+scene.background = new THREE.Color(INITIAL_FOG_COLOR);
+scene.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, CONFIG.fogDensity);
 
-const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, 240);
+// Otimização "Silent Hill": limite de visão da câmera (far = 105m) sincronizado com a neblina densa
+const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance || 105);
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
   alpha: false,
@@ -143,6 +145,7 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(INITIAL_FOG_COLOR);
 setupAtmosphere(scene, renderer);
 renderer.shadowMap.enabled = true;
 // PCFSoft com mapa de sombra 512x512 para altíssimo desempenho em GPUs integradas
@@ -159,13 +162,13 @@ const sun = new THREE.DirectionalLight("#ffe1ae", 1.5);
 sun.position.set(35, 65, 30);
 sun.castShadow = true;
 sun.shadow.mapSize.set(512, 512); // Otimizado: 512x512 reduz fillrate em 75%
-const SHADOW_BOUNDS = 32; // Frustum culling ortográfico de 32m focado no jogador
+const SHADOW_BOUNDS = 28; // Frustum culling ortográfico de 28m concentrado onde importa
 sun.shadow.camera.left = -SHADOW_BOUNDS;
 sun.shadow.camera.right = SHADOW_BOUNDS;
 sun.shadow.camera.top = SHADOW_BOUNDS;
 sun.shadow.camera.bottom = -SHADOW_BOUNDS;
-sun.shadow.camera.near = 5;
-sun.shadow.camera.far = 120;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 80;
 sun.shadow.bias = -0.0006;
 sun.shadow.normalBias = 0.04;
 scene.add(sun);

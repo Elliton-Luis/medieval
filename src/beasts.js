@@ -1359,7 +1359,8 @@ export class BeastManager {
   spawnRandomBiters(cx, cz, count = 4) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 75 + Math.random() * 140;
+      // Spawna no limiar da neblina (78m-88m) para o jogador avistar apenas a silhueta se aproximando
+      const radius = 78 + Math.random() * 10;
       const bx = cx + Math.cos(angle) * radius;
       const bz = cz + Math.sin(angle) * radius;
 

@@ -16,9 +16,9 @@ export class DayNightCycle {
     this.sun = sun;
     this.hemisphere = hemisphere;
     this.progress = 0.36;
-    this.dayColor = new THREE.Color("#aebfae");
-    this.nightColor = new THREE.Color(0x060913);
-    this.dawnColor = new THREE.Color("#be9273");
+    this.dayColor = new THREE.Color("#8fa093");
+    this.nightColor = new THREE.Color(0x0a0f16);
+    this.dawnColor = new THREE.Color("#9e7c65");
     this.currentColor = new THREE.Color();
     this.solarAngle = 0;
     this.daylight = 1;
@@ -93,10 +93,11 @@ export class DayNightCycle {
     const horizon = Math.max(0, 1 - Math.abs(elevation) * 3.4);
     this.currentColor.lerp(this.dawnColor, horizon * 0.24);
     this.scene.background.copy(this.currentColor);
+    if (renderer) renderer.setClearColor(this.currentColor);
     if (this.scene.fog) {
       this.scene.fog.color.copy(this.currentColor);
-      // Neblina mais densa ao fundo para parecer longe e cortar geometria distante sem pop-in
-      this.scene.fog.density = CONFIG.fogDensity + (0.028 - CONFIG.fogDensity) * (night * night);
+      // Neblina calibrada no limite de 105m: opacidade total antes do corte de câmera
+      this.scene.fog.density = 0.0315 + 0.0055 * (night * night);
     }
 
     // Luz ambiente e sol/lua única com transição suave sem alocação GC

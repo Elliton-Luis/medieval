@@ -946,6 +946,8 @@ export class World {
     const camX = camera.position.x;
     const camZ = camera.position.z;
     const safeRadiusSq = 56 * 56; // Raio seguro cobrindo o chunk atual sob o jogador e câmera (chunkSize=64)
+    // Culling Espacial "Silent Hill": além de 112m, tudo está 100% oculto na neblina e é descartado
+    const maxFogCullSq = this.viewDistanceSq;
 
     for (let i = 0; i < this.activeChunks.length; i++) {
       const chunk = this.activeChunks[i];
@@ -958,6 +960,14 @@ export class World {
         chunk.group.visible = true;
         chunk.near.visible = distanceSq < this.lodDistanceSq * 1.5;
         chunk.far.visible = distanceSq >= this.lodDistanceSq * 1.5;
+        continue;
+      }
+
+      // Otimização "Silent Hill": se o chunk estiver além da distância de corte da neblina, GPU descarta direto
+      if (distanceSq > maxFogCullSq) {
+        chunk.group.visible = false;
+        chunk.near.visible = false;
+        chunk.far.visible = false;
         continue;
       }
 

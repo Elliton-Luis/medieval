@@ -302,8 +302,9 @@ export class DebugScreen {
     const activeTorchesCount = torches?.torches?.length ?? 0;
     const curWeaponName = weapons?.currentWeapon?.name ?? "Desarmado";
 
+    const farDist = camera?.far ? camera.far.toFixed(0) : "105";
     // Preenchimento da Coluna Direita
-    this._rightLines[0].innerHTML = `Tela: <span class="debug-highlight">${canvasW}x${canvasH}</span> (WebGL2 Three.js)`;
+    this._rightLines[0].innerHTML = `Tela: <span class="debug-highlight">${canvasW}x${canvasH}</span> (WebGL2 · Far: <span class="debug-cyan">${farDist}m</span> · Culling Neblina)`;
     this._rightLines[1].innerHTML = `Draw Calls: <span class="debug-good">${calls}</span> · Polígonos: <span class="debug-cyan">${triangles.toLocaleString()}</span>`;
     this._rightLines[2].innerHTML = `Geometrias GPU: <span class="debug-highlight">${geometries}</span> · Texturas: <span class="debug-highlight">${textures}</span>`;
     this._rightLines[3].innerHTML = `Entidades no Mundo: <span class="debug-cyan">${totalSimulatedEntities}</span> simuladas`;
