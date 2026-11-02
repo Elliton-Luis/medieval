@@ -40,7 +40,7 @@ const CSS = `
 @keyframes wasted-blink { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
 .wasted-black { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .9s ease; }
 .wasted-black.show { opacity: 1; }
-#game.wasted > .place, #game.wasted > .radar, #game.wasted > .vitals, #game.wasted > .hotbar, #game.wasted > .nearby-card,
+#game.wasted .hud-top-left, #game.wasted > .place, #game.wasted > .radar, #game.wasted > .vitals, #game.wasted > .hotbar, #game.wasted > .nearby-card,
 #game.wasted > .controls-card, #game.wasted > .readout, #game.wasted > .prompt, #game.wasted > .toast, #game.wasted > .reticle, #game.wasted > .notice { opacity: 0 !important; pointer-events: none; transition: opacity .6s; }
 `;
 

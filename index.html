@@ -32,63 +32,59 @@
         </div>
       </div>
 
-      <section class="place" aria-live="polite">
-        <span class="eyebrow" id="location-label">REINO DE CALDERA</span>
-        <strong id="location">Pradaria de Caldera</strong>
-        <span class="place-meta"><span id="clock">08:42</span><span class="sep">·</span><span id="weather-label">CÉU LIMPO</span></span>
-      </section>
+      <!-- Container Canto Superior Esquerdo: Fluxo vertical sem sobreposições -->
+      <div class="hud-top-left" id="hud-top-left">
+        <section class="vitals" aria-label="Estado do personagem">
+          <div class="vitals-crest" aria-hidden="true">✦</div>
+          <div class="vitals-body">
+            <div class="vitals-row"><span class="eyebrow">VITALIDADE</span><strong id="health" class="hearts">♥♥♥♥♥</strong><span id="health-num" class="health-num">5/5</span></div>
+            <div class="vitals-row small vitals-stats-row">
+              <span class="stat coins"><i class="glyph">◈</i><strong id="coins">0</strong><small>moedas</small></span>
+              <span class="stat potions"><i class="glyph">⚗</i><strong id="potions">1</strong><small>poções</small></span>
+              <span class="stat candle" id="candle-stat"><i class="glyph">✧</i><strong id="candle-count">1</strong><small>vela <span id="candle-text">guardada</span></small></span>
+              <button id="toggle-resources-btn" class="resources-toggle-btn" type="button" title="Expandir/recolher estoque de Madeira, Pedra, Barro e Feno" aria-expanded="false">
+                <i class="glyph">📦</i><span>Recursos</span><small class="arrow">▾</small>
+              </button>
+            </div>
+            <!-- Gaveta de Recursos Oculta por padrão (Madeira, Pedra, Barro, Feno) -->
+            <div class="vitals-resources-drawer" id="vitals-resources-drawer" hidden>
+              <span class="stat wood" title="Madeira coletada com o Machado (2)"><i class="glyph">♣</i><strong id="wood-count">0</strong><small>madeira</small></span>
+              <span class="stat stone" title="Pedra minerada com a Picareta (3)"><i class="glyph">◆</i><strong id="stone-count">0</strong><small>pedra</small></span>
+              <span class="stat clay" title="Barro recolhido para erguer muros de taipa e adobe"><i class="glyph">☲</i><strong id="clay-count">0</strong><small>barro</small></span>
+              <span class="stat hay" title="Pressione G para largar isca de feno"><i class="glyph">❖</i><strong id="hay-count">0</strong><small>feno (G)</small></span>
+            </div>
+            <div class="vitals-row small"><span class="eyebrow" id="rpg-stats">FOR 10 · CON 10 · CAR 10 · VEL 10</span></div>
+            <div class="vitals-row evil-meter-row" id="evil-row" style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <span class="eyebrow" style="color: #ff5566; display: flex; align-items: center; gap: 3px; font-size: 11px;">🌑 MALDADE</span>
+              <div class="evil-track" style="flex: 1; height: 6px; background: #180d11; border: 1px solid #772233; border-radius: 3px; overflow: hidden; position: relative;">
+                <div id="evil-bar-fill" style="width: 50%; height: 100%; background: linear-gradient(90deg, #991122, #ee2244, #aa11cc); transition: width 0.35s ease;"></div>
+              </div>
+              <strong id="evil-val" style="font-family: ui-monospace, monospace; font-size: 11px; color: #ff8899; min-width: 32px; text-align: right;">50%</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- Localização e Horário: posicionado com separação limpa abaixo dos vitais -->
+        <section class="place" aria-live="polite">
+          <span class="eyebrow" id="location-label">REINO DE CALDERA</span>
+          <strong id="location">Pradaria de Caldera</strong>
+          <span class="place-meta"><span id="clock">08:42</span><span class="sep">·</span><span id="weather-label">CÉU LIMPO</span></span>
+        </section>
+
+        <aside id="controls-card" class="controls-card">
+          <span class="eyebrow">CONTROLES <em>· K oculta</em></span>
+          <div class="control-row"><kbd>W A S D</kbd><span>mover</span><kbd>SHIFT</kbd><span>correr</span><kbd>SPACE</kbd><span>pular</span></div>
+          <div class="control-row"><kbd>CLIQUE ESQ</kbd><span>usar ferramenta / atacar</span><kbd>BOTÃO DIR</kbd><span>mirar / bloquear</span><kbd>T</kbd><span>assist. mira</span></div>
+          <div class="control-row"><kbd>1</kbd><span>mãos / tocha</span><kbd>2</kbd><span>machado</span><kbd>3</kbd><span>picareta</span><kbd>4–9</kbd><span>armas</span></div>
+          <div class="control-row"><kbd>C</kbd><span>modo construção</span><kbd>I</kbd><span>menu crafting</span><kbd>E</kbd><span>interagir</span><kbd>F</kbd><span>montar</span><kbd>H</kbd><span>assobiar</span><kbd>G</kbd><span>isca feno</span><kbd>ALT</kbd><span>rolar</span><kbd>U</kbd><span>furtivo</span><kbd>V</kbd><span>vela</span></div>
+        </aside>
+      </div>
 
       <section class="radar" aria-label="Mapa">
         <div class="radar-frame"><canvas id="minimap" width="224" height="224"></canvas><span class="radar-n">N</span></div>
         <div class="wanted-block" id="wanted-block"><span class="eyebrow">PROCURADO</span><strong id="wanted">—</strong></div>
         <div class="radar-meta"><span id="coordinates">X 0 · Z 0</span><span><span id="fps">--</span> FPS</span></div>
       </section>
-
-      <section class="vitals" aria-label="Estado do personagem">
-        <div class="vitals-crest" aria-hidden="true">✦</div>
-        <div class="vitals-body">
-          <div class="vitals-row"><span class="eyebrow">VITALIDADE</span><strong id="health" class="hearts">♥♥♥♥♥</strong><span id="health-num" class="health-num">5/5</span></div>
-          <div class="vitals-row small">
-            <span class="stat coins"><i class="glyph">◈</i><strong id="coins">0</strong><small>moedas</small></span>
-            <span class="stat wood" title="Madeira coletada com o Machado (2)"><i class="glyph">♣</i><strong id="wood-count">0</strong><small>madeira</small></span>
-            <span class="stat stone" title="Pedra minerada com a Picareta (3)"><i class="glyph">◆</i><strong id="stone-count">0</strong><small>pedra</small></span>
-            <span class="stat clay" title="Barro recolhido para erguer muros de taipa e adobe"><i class="glyph">☲</i><strong id="clay-count">0</strong><small>barro</small></span>
-            <span class="stat hay" title="Pressione G para largar isca de feno"><i class="glyph">❖</i><strong id="hay-count">0</strong><small>feno (G)</small></span>
-            <span class="stat potions"><i class="glyph">⚗</i><strong id="potions">1</strong><small>poções</small></span>
-            <span class="stat candle" id="candle-stat"><i class="glyph">✧</i><strong id="candle-count">1</strong><small>vela <span id="candle-text">guardada</span></small></span>
-          </div>
-          <div class="vitals-row small"><span class="eyebrow" id="rpg-stats">FOR 10 · CON 10 · CAR 10 · VEL 10</span></div>
-          <div class="vitals-row evil-meter-row" id="evil-row" style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-            <span class="eyebrow" style="color: #ff5566; display: flex; align-items: center; gap: 3px; font-size: 11px;">🌑 MALDADE</span>
-            <div class="evil-track" style="flex: 1; height: 6px; background: #180d11; border: 1px solid #772233; border-radius: 3px; overflow: hidden; position: relative;">
-              <div id="evil-bar-fill" style="width: 50%; height: 100%; background: linear-gradient(90deg, #991122, #ee2244, #aa11cc); transition: width 0.35s ease;"></div>
-            </div>
-            <strong id="evil-val" style="font-family: ui-monospace, monospace; font-size: 11px; color: #ff8899; min-width: 32px; text-align: right;">50%</strong>
-          </div>
-        </div>
-      </section>
-
-      <div class="charge" id="charge-bar" hidden><i id="charge-fill"></i></div>
-      <div class="stealth-tag" id="stealth-tag" hidden>◐ FURTIVO · cavalos não fogem</div>
-      <div class="stamina" id="stamina-bar" hidden><span>FÔLEGO DO CAVALO</span><div><i id="stamina-fill"></i></div></div>
-
-      <section class="hotbar" id="hotbar" aria-label="Armas">
-        <div class="weapon-title"><strong id="weapon-name">ESPADA</strong><small id="weapon-ammo">CORPO A CORPO</small></div>
-        <div class="slots" id="slots"></div>
-      </section>
-
-      <section id="nearby-card" class="nearby-card" aria-live="polite" hidden>
-        <span id="nearby-portrait" class="nearby-portrait" aria-hidden="true"></span>
-        <div><span class="eyebrow" id="nearby-task">RESIDENTE</span><strong id="nearby-name">—</strong><small id="nearby-role">—</small><div id="nearby-health" class="npc-health" hidden><span id="nearby-health-fill"></span></div></div>
-      </section>
-
-      <aside id="controls-card" class="controls-card">
-        <span class="eyebrow">CONTROLES <em>· K oculta</em></span>
-        <div class="control-row"><kbd>W A S D</kbd><span>mover</span><kbd>SHIFT</kbd><span>correr</span><kbd>SPACE</kbd><span>pular</span></div>
-        <div class="control-row"><kbd>CLIQUE ESQ</kbd><span>usar ferramenta / atacar</span><kbd>BOTÃO DIR</kbd><span>mirar / bloquear</span><kbd>T</kbd><span>assist. mira</span></div>
-        <div class="control-row"><kbd>1</kbd><span>mãos / tocha</span><kbd>2</kbd><span>machado</span><kbd>3</kbd><span>picareta</span><kbd>4–9</kbd><span>armas</span></div>
-        <div class="control-row"><kbd>C</kbd><span>modo construção</span><kbd>I</kbd><span>menu crafting</span><kbd>E</kbd><span>interagir</span><kbd>F</kbd><span>montar</span><kbd>H</kbd><span>assobiar</span><kbd>G</kbd><span>isca feno</span><kbd>ALT</kbd><span>rolar</span><kbd>U</kbd><span>furtivo</span><kbd>V</kbd><span>vela</span></div>
-      </aside>
       <div class="readout"><span class="status-dot"></span><span id="world-status">MUNDO CARREGADO</span><span class="sep">/</span><span id="chunk-count">0 REGIÕES</span></div>
 
       <div id="loading" class="loading"><span class="loading-seal">✦</span><span>PREPARANDO AS TERRAS...</span></div>

@@ -348,6 +348,16 @@ Otimização de visibilidade em 3 camadas na GPU e CPU para dispositivos modesto
 - **Sprite de Fogo Nítido e Flamejante**: O halo do fogo foi redimensionado (escala 1.4x) com material emissivo intenso (2.5x) que assume a tonalidade do cristal equipado (laranja, azul, verde, púrpura, rubi, etc.).
 - **Ciclo de Vida Limpo (Recolher / Demolir)**: Tanto ao recolher a tocha com `E` quanto ao destruí-la no Modo de Construção/Demolição, a luz pontual, o grupo 3D e o sprite de fogo são removidos e descartados sem vazamento de memória.
 
+## Reformulação da HUD e Separação de Elementos (Canto Superior Esquerdo)
+
+- **Fluxo Vertical Sem Sobreposições (`.hud-top-left`)**: Os módulos do canto superior esquerdo (Vitalidade, Localização/Horário e Controles) agora utilizam um container flexbox com empilhamento vertical automático e espaçamento garantido de 14px. O menu com o nome da região, horário e clima (`.place`) nunca mais colide ou fica por baixo da caixa de vida e atributos.
+- **Menu de Vitalidade Enxuto e Focado**:
+  - Exibe estritamente o essencial de combate e sobrevivência: **Vitalidade** (corações e numérico), **Moedas de Ouro**, **Poções**, **Vela**, **Atributos RPG** (FOR, CON, CAR, VEL) e a barra de **Maldade**.
+- **Gaveta Expansível de Recursos (Madeira, Pedra, Barro e Feno)**:
+  - Os materiais de construção e coleta foram transferidos para uma gaveta expansível discreta acionada pelo botão interativo `[📦 Recursos ▾]`.
+  - Permanece recolhida por padrão para manter a tela limpa e imersiva. Ao clicar, expande suavemente com os contadores de Madeira, Pedra, Barro e Feno. A preferência do jogador é persistida automaticamente no `localStorage`.
+  - Todos os recursos continuam disponíveis para consulta detalhada no menu de artesanato e inventário (`I`).
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

@@ -92,6 +92,22 @@ export class GameUI {
     this.woodCount = document.getElementById("wood-count");
     this.stoneCount = document.getElementById("stone-count");
     this.clayCount = document.getElementById("clay-count");
+    this.toggleResourcesBtn = document.getElementById("toggle-resources-btn");
+    this.resourcesDrawer = document.getElementById("vitals-resources-drawer");
+    if (this.toggleResourcesBtn && this.resourcesDrawer) {
+      const isExpanded = localStorage.getItem("puris_resources_expanded") === "1";
+      this.resourcesDrawer.hidden = !isExpanded;
+      this.toggleResourcesBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      this.toggleResourcesBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.resourcesDrawer.hidden = !this.resourcesDrawer.hidden;
+        const expanded = !this.resourcesDrawer.hidden;
+        this.toggleResourcesBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+        try {
+          localStorage.setItem("puris_resources_expanded", expanded ? "1" : "0");
+        } catch {}
+      });
+    }
     this.rpgStats = document.getElementById("rpg-stats");
     this.staminaFill = document.getElementById("stamina-fill");
     this.staminaBar = document.getElementById("stamina-bar");
