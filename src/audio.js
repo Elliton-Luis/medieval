@@ -23,6 +23,18 @@ export class GameAudio {
     this.onUnlock = [];
     this.sfxBuffers = new Map();
     this.beastStepBuffers = [];
+    this.punchHeavyBuffers = [];
+    this.punchMediumBuffers = [];
+    this.impactHeavyBuffers = [];
+    this.impactSmallBuffers = [];
+    this.knifeDrawBuffers = [];
+    this.knifeSliceBuffers = [];
+    this.musketShotBuffers = [];
+    this.breakGlassBuffers = [];
+    this.breakWoodBuffers = [];
+    this.explosionBlastBuffers = [];
+    this.explosionCrunchBuffers = [];
+    this.explosionDeepBuffers = [];
     this._sfxLoadingStarted = false;
     const unlock = () => this._unlock();
     for (const type of ["pointerdown", "keydown", "mousedown", "click"]) window.addEventListener(type, unlock);
@@ -74,11 +86,29 @@ export class GameAudio {
         });
     };
 
+    const loadBatch = (targetList, urls) => {
+      for (const url of urls) {
+        fetch(encodeURI(url))
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.arrayBuffer();
+          })
+          .then((buf) => this.context.decodeAudioData(buf))
+          .then((decoded) => {
+            targetList.push(decoded);
+          })
+          .catch((err) => {
+            console.warn(`[Audio] Falha ao carregar som ${url}:`, err);
+          });
+      }
+    };
+
     load("sword", "audio/sfx/sword.wav");
     load("knife", "audio/sfx/knife.wav");
     load("grassStep", "audio/sfx/footsteps_grass.flac");
     load("wolfHowl", "audio/sfx/wolf_howl.mp3");
 
+    // Passos de feras
     for (let i = 0; i < 8; i++) {
       const stepUrl = `audio/sfx/beast_steps/${i}.ogg`;
       fetch(encodeURI(stepUrl))
@@ -94,6 +124,69 @@ export class GameAudio {
           console.warn(`[Audio] Falha ao carregar passo de fera ${i}:`, err);
         });
     }
+
+    // Novos conjuntos medievais: combate corporal, socos e impactos
+    loadBatch(
+      this.punchHeavyBuffers,
+      [0, 1, 2, 3, 4].map((i) => `audio/sfx/combat/punch_heavy_${i}.wav`)
+    );
+    loadBatch(
+      this.punchMediumBuffers,
+      [0, 1, 2, 3, 4].map((i) => `audio/sfx/combat/punch_medium_${i}.wav`)
+    );
+    loadBatch(
+      this.impactHeavyBuffers,
+      [1, 2].map((i) => `audio/sfx/combat/impact_heavy_${i}.wav`)
+    );
+    loadBatch(
+      this.impactSmallBuffers,
+      [1, 2, 3].map((i) => `audio/sfx/combat/impact_small_${i}.wav`)
+    );
+    loadBatch(
+      this.knifeDrawBuffers,
+      [1, 2, 3].map((i) => `audio/sfx/combat/knife_draw_${i}.wav`)
+    );
+    loadBatch(
+      this.knifeSliceBuffers,
+      [1, 2].map((i) => `audio/sfx/combat/knife_slice_${i}.wav`)
+    );
+
+    // Disparos e mosquetes
+    loadBatch(
+      this.musketShotBuffers,
+      [
+        "audio/sfx/ranged/shot_short.wav",
+        "audio/sfx/ranged/shot_1.wav",
+        "audio/sfx/ranged/shot_2.wav",
+        "audio/sfx/ranged/shot_3.wav",
+        "audio/sfx/ranged/shot_4.wav",
+        "audio/sfx/ranged/shot_heavy_1.wav",
+        "audio/sfx/ranged/shot_heavy_2.wav",
+        "audio/sfx/ranged/shot_heavy_3.wav",
+      ]
+    );
+
+    // Destruição: quebra de madeira, vidro e explosões
+    loadBatch(
+      this.breakWoodBuffers,
+      [1, 2].map((i) => `audio/sfx/destruction/break_wood_${i}.wav`)
+    );
+    loadBatch(
+      this.breakGlassBuffers,
+      [1, 2, 3].map((i) => `audio/sfx/destruction/break_glass_${i}.wav`)
+    );
+    loadBatch(
+      this.explosionBlastBuffers,
+      [1, 2, 3].map((i) => `audio/sfx/destruction/explosion_blast_${i}.wav`)
+    );
+    loadBatch(
+      this.explosionCrunchBuffers,
+      [0, 1, 2, 3, 4].map((i) => `audio/sfx/destruction/explosion_crunch_${i}.wav`)
+    );
+    loadBatch(
+      this.explosionDeepBuffers,
+      [0, 1].map((i) => `audio/sfx/destruction/explosion_deep_${i}.wav`)
+    );
   }
 
   playBuffer(buffer, volume = 1.0, pitchVariation = 0.05) {
@@ -121,6 +214,11 @@ export class GameAudio {
   }
 
   playKnife() {
+    if (this.knifeSliceBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.knifeSliceBuffers.length);
+      this.playBuffer(this.knifeSliceBuffers[idx], 0.8, 0.08);
+      return true;
+    }
     const buf = this.sfxBuffers.get("knife");
     if (buf) {
       this.playBuffer(buf, 0.8, 0.1);
@@ -129,10 +227,69 @@ export class GameAudio {
     return false;
   }
 
+  playKnifeDraw() {
+    if (this.knifeDrawBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.knifeDrawBuffers.length);
+      this.playBuffer(this.knifeDrawBuffers[idx], 0.7, 0.08);
+      return true;
+    }
+    return false;
+  }
+
+  playPunch(heavy = false) {
+    const list = heavy ? this.punchHeavyBuffers : this.punchMediumBuffers;
+    if (list && list.length > 0) {
+      const idx = Math.floor(Math.random() * list.length);
+      this.playBuffer(list[idx], heavy ? 0.82 : 0.65, 0.08);
+      return true;
+    }
+    return false;
+  }
+
+  playMusketShot() {
+    if (this.musketShotBuffers && this.musketShotBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.musketShotBuffers.length);
+      this.playBuffer(this.musketShotBuffers[idx], 0.92, 0.06);
+      return true;
+    }
+    return false;
+  }
+
+  playWoodBreak() {
+    if (this.breakWoodBuffers && this.breakWoodBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.breakWoodBuffers.length);
+      this.playBuffer(this.breakWoodBuffers[idx], 0.78, 0.08);
+      return true;
+    }
+    return false;
+  }
+
+  playGlassBreak() {
+    if (this.breakGlassBuffers && this.breakGlassBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.breakGlassBuffers.length);
+      this.playBuffer(this.breakGlassBuffers[idx], 0.75, 0.08);
+      return true;
+    }
+    return false;
+  }
+
+  // Tocha flamejante no ar (som ardente de labareda de fogo, estalos e deslocamento de calor)
+  torchSwing(heavy = false) {
+    if (!this.context) return;
+    const v = heavy ? 1.25 : 1.0;
+    // Labareda flamejante: ruído com filtro bandpass ressonante que desce simulando a chama cortando o vento
+    this._burst(heavy ? 0.35 : 0.25, 0.44 * v, "bandpass", 1250, 260);
+    // Estalo sutil de fagulhas e brasas ardentes
+    this._burst(0.18, 0.24 * v, "highpass", 2600, 1200);
+    // Corpo quente grave de deslocamento de ar aquecido
+    this._tone("sine", 85, 36, heavy ? 0.22 : 0.16, 0.25 * v);
+  }
+
+  // Passos: volume reduzido e ajustado para ser suave e imersivo
   playGrassStep(run = false, strength = 1.0) {
     const buf = this.sfxBuffers.get("grassStep");
     if (buf) {
-      const vol = (run ? 0.75 : 0.48) * strength;
+      const vol = (run ? 0.36 : 0.22) * strength;
       this.playBuffer(buf, vol, 0.12);
       return true;
     }
@@ -317,24 +474,24 @@ export class GameAudio {
     this._tone("sine", 56, 34, 0.15, 0.38 * strength, 0.2);
   }
 
-  // Passos: som real de passos na grama/terra (passos_grama.flac) + batida grave de apoio.
+  // Passos: som real de passos na grama/terra (passos_grama.flac) + batida suave de apoio.
   step(run, strength = 1) {
     if (this.playGrassStep(run, strength)) {
       if (this.context) {
-        const v = (run ? 0.35 : 0.2) * strength;
-        this._tone("sine", 95 + Math.random() * 20, 45, 0.07, v);
+        const v = (run ? 0.12 : 0.06) * strength;
+        this._tone("sine", 95 + Math.random() * 20, 45, 0.06, v);
       }
       return;
     }
     if (!this.context) return;
-    const v = (run ? 0.8 : 0.55) * strength * (0.8 + Math.random() * 0.4);
-    this._burst(0.09, v, "lowpass", 650 + Math.random() * 450, 180);
-    this._tone("sine", 105 + Math.random() * 25, 50, 0.09, v * 0.55);
+    const v = (run ? 0.40 : 0.24) * strength * (0.8 + Math.random() * 0.4);
+    this._burst(0.08, v, "lowpass", 550 + Math.random() * 350, 160);
+    this._tone("sine", 100 + Math.random() * 20, 45, 0.08, v * 0.4);
   }
 
   land() {
-    this._burst(0.14, 0.9, "lowpass", 600, 120);
-    this._tone("sine", 85, 38, 0.14, 0.7);
+    this._burst(0.12, 0.65, "lowpass", 550, 120);
+    this._tone("sine", 85, 38, 0.12, 0.5);
   }
 
   _burst(duration, volume, filterType, freqStart, freqEnd, delay = 0) {
@@ -371,14 +528,38 @@ export class GameAudio {
 
   explosion(distance = 0) {
     const v = Math.max(0, 1 - distance / 120);
-    this._tone("sine", 95, 28, 0.9, 0.95 * v);
-    this._burst(1.5, 0.9 * v, "lowpass", 1400, 60);
-    this._burst(0.35, 0.5 * v, "highpass", 1800, 600);
-    this._burst(0.8, 0.35 * v, "bandpass", 500, 90, 0.18);
+    if (v <= 0.01) return;
+
+    // Dispara camadas acústicas gravadas de destruição e explosão
+    let playedReal = false;
+    if (this.explosionBlastBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.explosionBlastBuffers.length);
+      this.playBuffer(this.explosionBlastBuffers[idx], 0.85 * v, 0.06);
+      playedReal = true;
+    }
+    if (this.explosionCrunchBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.explosionCrunchBuffers.length);
+      this.playBuffer(this.explosionCrunchBuffers[idx], 0.72 * v, 0.06);
+      playedReal = true;
+    }
+    if (this.explosionDeepBuffers.length > 0) {
+      const idx = Math.floor(Math.random() * this.explosionDeepBuffers.length);
+      this.playBuffer(this.explosionDeepBuffers[idx], 0.88 * v, 0.04);
+      playedReal = true;
+    }
+
+    // Camada de apoio sintetizada
+    this._tone("sine", 95, 28, 0.9, (playedReal ? 0.45 : 0.95) * v);
+    this._burst(1.3, (playedReal ? 0.4 : 0.9) * v, "lowpass", 1400, 60);
+    if (!playedReal) {
+      this._burst(0.35, 0.5 * v, "highpass", 1800, 600);
+      this._burst(0.8, 0.35 * v, "bandpass", 500, 90, 0.18);
+    }
   }
 
   shot(kind) {
     if (kind === "musket") {
+      if (this.playMusketShot()) return;
       this._burst(0.5, 0.8, "lowpass", 3200, 180);
       this._tone("sine", 140, 45, 0.25, 0.5);
     } else if (kind === "bow") {
@@ -394,11 +575,25 @@ export class GameAudio {
     this._burst(heavy ? 0.28 : 0.2, heavy ? 0.28 : 0.2, "bandpass", 700, heavy ? 1800 : 2400);
   }
 
-  // Golpe no ar conforme o tipo da arma (suporta samples reais de espada.wav e faca.wav).
+  // Golpe no ar conforme o tipo da arma (suporta samples reais de espada.wav, faca.wav, tocha e socos).
   weaponSwing(kind = "slash", heavy = false, weaponId = null) {
-    if (weaponId === "knife" || weaponId === "dagger" || weaponId === "knives" || kind === "knife") {
+    // 1. Tocha: som ardente de labareda de fogo no ar (elimina som de faca/espada)
+    if (weaponId === "torch" || kind === "torch" || kind === "fire") {
+      this.torchSwing(heavy);
+      return;
+    }
+
+    // 2. Punhos: socos contundentes corporais
+    if (weaponId === "fists" || kind === "punch") {
+      if (this.playPunch(heavy)) return;
+    }
+
+    // 3. Facas e adagas: cortes e golpes leves
+    if (weaponId === "knife" || weaponId === "dagger" || weaponId === "knives" || kind === "knife" || kind === "stab") {
       if (this.playKnife()) return;
     }
+
+    // 4. Espadas e alabardas: corte de lâminas
     if (
       weaponId === "shortsword" ||
       weaponId === "longsword" ||

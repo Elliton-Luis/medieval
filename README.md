@@ -465,16 +465,28 @@ Anteriormente, as cidades e vilas à noite ficavam excessivamente escuras porque
 
 Incorporados novos arquivos de áudio de alta fidelidade gravados para combate, movimentação e criaturas (`audio/sfx/`), pré-carregados e decodificados em `AudioBuffer`s de baixa latência pelo `GameAudio` (`src/audio.js`):
 
-- **Passos Reais na Relva e Terra (`audio/sfx/footsteps_grass.flac`)**:
-  - Movimentação do jogador agora reproduz passos nítidos de calçados sobre o solo e vegetação, com pitch aleatório dinâmico (`0.94 - 1.06`) e volume sincronizado com a passada anatômica e velocidade de corrida.
+- **Passos Equilibrados e Suaves na Relva (`audio/sfx/footsteps_grass.flac`)**:
+  - Volume de passos ao andar, caminhar e correr reduzido e rebalanceado (~45% mais suave), com subgrave sutil e pitch aleatório (`0.94 - 1.06`), proporcionando uma caminhada imersiva e natural que não encobre os sons ambientes.
+- **Tocha Flamejante Realista (Som de Fogo e Labareda no Ar)**:
+  - Ataque e golpes com a Tocha Mágica agora reproduzem o som inconfundível de uma tocha de fogo sendo brandida no ar (whoosh ardente de ar quente com estalo de faíscas e brasas), eliminando completamente o antigo som de faca/corte metálico.
 - **Golpes de Espadas e Lâminas (`audio/sfx/sword.wav`)**:
   - Ataques com Espada Curta, Espada Longa, Montante e Alabarda tocam som encorpado de corte afiado no ar, distinguindo golpes normais e golpes pesados carregados.
-- **Cortes Ágeis de Facas e Adagas (`audio/sfx/knife.wav`)**:
+- **Cortes Ágeis e Saque de Facas (`audio/sfx/combat/knife_slice_*.wav`, `knife_draw_*.wav`)**:
   - Ataques rápidos com Faca, Adaga e Facas de Arremesso disparam áudio cortante e metálico de alta agilidade.
+- **Socos Corporais Desarmados (`audio/sfx/combat/punch_heavy_*.wav`, `punch_medium_*.wav`)**:
+  - Combate desarmado (Mãos/Punhos) reproduz impactos contundentes de socos médios e pesados na luta corporal.
+- **Disparos Pesados de Mosquete e Artilharia (`audio/sfx/ranged/shot_*.wav`, `shot_heavy_*.wav`)**:
+  - Tiro devastador de mosquete com estampido real de pólvora e eco acústico.
+- **Destruição de Móveis e Frascos (`audio/sfx/destruction/break_wood_*.wav`, `break_glass_*.wav`)**:
+  - Mesas, bancos de madeira e potes de vidro/cerâmica estilhaçam com áudios autênticos de quebra.
+- **Explosões Multicamadas (`audio/sfx/destruction/explosion_blast_*.wav`, `explosion_crunch_*.wav`, `explosion_deep_*.wav`)**:
+  - Bombas de mão e barris explodem com impacto triplo: blast inicial, crunch de estilhaços e onda de choque grave profunda.
 - **Uivos e Rosnados de Feras (`audio/sfx/wolf_howl.mp3`)**:
-  - Criaturas predadoras dos ermos (como o Necron e Lobisomens) soltam rosnados e uivos ao avistarem o jogador e engajarem em investida feroz, além de uivos atmosféricos distantes ecoando periodicamente na neblina durante noites e eclipses.
+  - Criaturas predadoras dos ermos soltam rosnados e uivos ao avistarem o jogador e engajarem em investida feroz.
 - **Passadas Pesadas de Predadores (`audio/sfx/beast_steps/{0..7}.ogg`)**:
   - Banco de 8 variações dinâmicas de passos de garras e patas pesadas reproduzidos cadenciadamente durante as perseguições em alta velocidade das criaturas nos ermos.
+- **Filtragem Temática Medieval**:
+  - Excluídos todos os efeitos sonoros futuristas e sci-fi (lasers, pistolas e fuzis de raio, zap launchers e bombas de gravidade), mantendo a integridade e coesão de alta fantasia medieval sombria do projeto.
 
 ## Telas de Carregamento Assíncronas (Zero-Stutter Offscreen Shader Compilation)
 
