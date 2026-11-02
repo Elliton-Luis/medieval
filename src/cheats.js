@@ -33,12 +33,12 @@ const CHEAT_MODAL_CSS = `
 .cheat-panel {
   background: linear-gradient(180deg, #1b1424 0%, #100b17 100%);
   border: 2px solid #8e54e9;
-  border-radius: 10px;
-  box-shadow: 0 0 35px rgba(142, 84, 233, 0.45), inset 0 0 25px rgba(0, 0, 0, 0.85);
-  padding: 20px 24px;
-  max-width: 660px;
-  width: 92%;
-  max-height: 88vh;
+  border-radius: 12px;
+  box-shadow: 0 0 45px rgba(142, 84, 233, 0.5), inset 0 0 25px rgba(0, 0, 0, 0.85);
+  padding: 22px 28px;
+  max-width: 1020px;
+  width: 95%;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   color: #f0e6ff;
@@ -55,11 +55,11 @@ const CHEAT_MODAL_CSS = `
   align-items: center;
   border-bottom: 1px solid rgba(142, 84, 233, 0.35);
   padding-bottom: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .cheat-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: 1.2px;
   color: #c9a9ff;
@@ -86,37 +86,38 @@ const CHEAT_MODAL_CSS = `
   color: #fff;
 }
 
-/* Abas de Navegação */
+/* Abas de Navegação: Todas as categorias visíveis simultaneamente sem corte ou scroll quebrado */
 .cheat-tabs {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  scrollbar-width: thin;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .cheat-tab-btn {
-  background: rgba(142, 84, 233, 0.12);
-  border: 1px solid rgba(142, 84, 233, 0.35);
+  background: rgba(142, 84, 233, 0.14);
+  border: 1px solid rgba(142, 84, 233, 0.38);
   border-radius: 6px;
   color: #c5b4e3;
-  padding: 6px 12px;
-  font-size: 12.5px;
+  padding: 8px 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
+  flex: 0 0 auto;
 }
 .cheat-tab-btn:hover {
-  background: rgba(142, 84, 233, 0.25);
+  background: rgba(142, 84, 233, 0.32);
+  border-color: #bb86fc;
   color: #ffffff;
 }
 .cheat-tab-btn.active {
   background: #8e54e9;
   border-color: #bb86fc;
   color: #ffffff;
-  box-shadow: 0 0 10px rgba(142, 84, 233, 0.6);
+  box-shadow: 0 0 12px rgba(142, 84, 233, 0.7);
 }
 
 /* Painel de Recursos em Tempo Real */
@@ -124,13 +125,13 @@ const CHEAT_MODAL_CSS = `
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(142, 84, 233, 0.25);
   border-radius: 6px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  font-size: 12px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
   color: #d8cce8;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 8px 16px;
   align-items: center;
   line-height: 1.4;
 }
@@ -147,9 +148,9 @@ const CHEAT_MODAL_CSS = `
 /* Área de Conteúdo das Abas */
 .cheat-body {
   overflow-y: auto;
-  max-height: 56vh;
-  padding-right: 6px;
-  margin-bottom: 12px;
+  max-height: 58vh;
+  padding-right: 8px;
+  margin-bottom: 14px;
   scrollbar-width: thin;
   scrollbar-color: #8e54e9 #1b1424;
 }
@@ -173,15 +174,15 @@ const CHEAT_MODAL_CSS = `
 
 .cheat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
 }
 .cheat-btn {
   background: rgba(142, 84, 233, 0.14);
   border: 1px solid rgba(142, 84, 233, 0.45);
   border-radius: 6px;
   color: #ede2ff;
-  padding: 9px 12px;
+  padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -224,11 +225,13 @@ const CHEAT_MODAL_CSS = `
 `;
 
 function _injectCheatStyles() {
-  if (document.getElementById("cheat-modal-styles")) return;
-  const style = document.createElement("style");
-  style.id = "cheat-modal-styles";
+  let style = document.getElementById("cheat-modal-styles");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "cheat-modal-styles";
+    document.head.appendChild(style);
+  }
   style.textContent = CHEAT_MODAL_CSS;
-  document.head.appendChild(style);
 }
 
 function _updateStatusDisplays() {
@@ -572,7 +575,7 @@ export function openCheatModal(env) {
       sliderLabel.textContent = `${curHour.toString().padStart(2, "0")}:00`;
     }
     slider.addEventListener("input", () => {
-      sliderLabel.textContent = `${slider.value.padStart(2, "0")}:00`;
+      sliderLabel.textContent = `${String(slider.value).padStart(2, "0")}:00`;
     });
     btnApplySlider?.addEventListener("click", () => {
       window.CheatMenu?.setTime(Number(slider.value), 0);
