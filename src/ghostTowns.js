@@ -629,45 +629,70 @@ export function generateGhostTown(townConfig, scene, world) {
     // Decompõe as paredes individuais mantendo o vão da porta arrombada completamente livre para o jogador entrar
     if (world?.addOrientedBox) {
       const top = by + (isDestroyed ? 2.4 : 3.6);
-      const bottom = by - 0.5;
+      const bottom = by - 1.2;
       const cosY = Math.cos(houseYaw);
       const sinY = Math.sin(houseYaw);
+      const toW = (lx, lz) => ({
+        x: bx + lx * cosY + lz * sinY,
+        z: bz - lx * sinY + lz * cosY,
+      });
 
-      // Parede Traseira (z = -2.2)
-      world.addOrientedBox(bx + sinY * 2.2, bz + cosY * 2.2, 5.2, 0.35, houseYaw, bottom, top, {
+      // 1. Parede Traseira (z = -2.2)
+      const pBack = toW(0, -2.2);
+      world.addOrientedBox(pBack.x, pBack.z, 5.2, 0.35, houseYaw, bottom, top, {
         move: true,
         shot: true,
-        cam: true,
+        cam: false,
       });
-      // Parede Esquerda (x = -2.6)
-      world.addOrientedBox(bx - cosY * 2.6, bz + sinY * 2.6, 0.35, 4.4, houseYaw, bottom, top, {
+
+      // 2. Parede Esquerda (x = -2.6)
+      const pLeft = toW(-2.6, 0);
+      world.addOrientedBox(pLeft.x, pLeft.z, 0.35, 4.4, houseYaw, bottom, top, {
         move: true,
         shot: true,
-        cam: true,
+        cam: false,
       });
-      // Parede Direita (x = 2.6)
-      world.addOrientedBox(bx + cosY * 2.6, bz - sinY * 2.6, 0.35, 4.4, houseYaw, bottom, top, {
+
+      // 3. Parede Direita (x = 2.6)
+      const pRight = toW(2.6, 0);
+      world.addOrientedBox(pRight.x, pRight.z, 0.35, 4.4, houseYaw, bottom, top, {
         move: true,
         shot: true,
-        cam: true,
+        cam: false,
       });
-      // Fachada Frontal Esquerda (x = -1.77, z = 2.2)
-      world.addOrientedBox(bx - cosY * 1.77 - sinY * 2.2, bz + sinY * 1.77 - cosY * 2.2, 1.66, 0.35, houseYaw, bottom, top, {
+
+      // 4. Fachada Frontal Esquerda (x = -1.77, z = 2.2)
+      const pFrontL = toW(-1.77, 2.2);
+      world.addOrientedBox(pFrontL.x, pFrontL.z, 1.66, 0.35, houseYaw, bottom, top, {
         move: true,
         shot: true,
-        cam: true,
+        cam: false,
       });
-      // Fachada Frontal Direita (x = 1.77, z = 2.2)
-      world.addOrientedBox(bx + cosY * 1.77 - sinY * 2.2, bz - sinY * 1.77 - cosY * 2.2, 1.66, 0.35, houseYaw, bottom, top, {
+
+      // 5. Fachada Frontal Direita (x = 1.77, z = 2.2)
+      const pFrontR = toW(1.77, 2.2);
+      world.addOrientedBox(pFrontR.x, pFrontR.z, 1.66, 0.35, houseYaw, bottom, top, {
         move: true,
         shot: true,
-        cam: true,
+        cam: false,
       });
-      // O vão frontal central de 1.88m fica livre para permitir acesso ao interior da casa
+
+      // 6. Colisão do Baú / Mesa arruinada no interior
+      const pChest = toW(-1.35, -0.97);
+      world.addOrientedBox(pChest.x, pChest.z, 0.85, 0.55, houseYaw, by + 0.35, by + 0.95, {
+        move: true,
+        shot: true,
+        cam: false,
+      });
     }
 
-    if (world?.addFloor) {
-      world.addFloor(bx, by + 0.38, bz, 5.0, 4.2, houseYaw);
+    if (world?.addOrientedFloor) {
+      // Piso interno de madeira elevado
+      world.addOrientedFloor(bx, bz, 5.0, 4.2, houseYaw, by + 0.38);
+      // Soleira / degrau na entrada frontal
+      const sinY = Math.sin(houseYaw);
+      const cosY = Math.cos(houseYaw);
+      world.addOrientedFloor(bx + 2.35 * sinY, bz + 2.35 * cosY, 2.0, 0.8, houseYaw, by + 0.18);
     }
 
     // Registra a casa na lista de locais exploráveis com despojos

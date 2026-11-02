@@ -1505,6 +1505,7 @@ export function initCheatMenu(env = {}) {
         const sx = px + Math.sin(ang) * 12;
         const sz = pz + Math.cos(ang) * 12;
         const g = new Gulur(env.scene, env.world, env.effects, env.combat, p, env.npcs, sx, sz);
+        g._forceSpawned = true;
         g.root.visible = true;
         if (window.__game?.beasts) window.__game.beasts.walkers.push(g);
         if (env.npcs?.npcs && !env.npcs.npcs.includes(g)) env.npcs.npcs.push(g);

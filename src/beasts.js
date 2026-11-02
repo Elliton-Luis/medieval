@@ -3,6 +3,51 @@ import { spawnLoot, addGood } from "./rpg.js";
 import { WorldDecay } from "./decay.js";
 
 // ============================================================================
+// Texturas Suaves para Efeitos de Brilho e Aura (Zero-GC)
+// ============================================================================
+let _yellowGlowTexture = null;
+function getYellowGlowTexture() {
+  if (!_yellowGlowTexture) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0.0, "rgba(255, 255, 220, 1.0)");
+    g.addColorStop(0.2, "rgba(255, 235, 60, 0.9)");
+    g.addColorStop(0.5, "rgba(255, 190, 20, 0.45)");
+    g.addColorStop(0.8, "rgba(220, 140, 10, 0.12)");
+    g.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    _yellowGlowTexture = new THREE.CanvasTexture(canvas);
+    _yellowGlowTexture.colorSpace = THREE.SRGBColorSpace;
+  }
+  return _yellowGlowTexture;
+}
+
+let _auraMistTexture = null;
+function getAuraMistTexture() {
+  if (!_auraMistTexture) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+    g.addColorStop(0.0, "rgba(255, 240, 90, 0.52)");
+    g.addColorStop(0.25, "rgba(255, 215, 50, 0.36)");
+    g.addColorStop(0.55, "rgba(230, 170, 25, 0.16)");
+    g.addColorStop(0.82, "rgba(180, 120, 10, 0.04)");
+    g.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+    _auraMistTexture = new THREE.CanvasTexture(canvas);
+    _auraMistTexture.colorSpace = THREE.SRGBColorSpace;
+  }
+  return _auraMistTexture;
+}
+
+// ============================================================================
 // Materiais Otimizados para as Criaturas Sobrenaturais (Zero-GC)
 // ============================================================================
 const _shadowBodyMat = new THREE.MeshStandardMaterial({
@@ -19,7 +64,41 @@ const _thinLegMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
-// Olhos amarelos brilhantes do Gulur (Bicho Altão)
+// Materiais próprios do Gulur com emissive e iluminação sutil para destaque noturno
+const _gulurBodyMat = new THREE.MeshStandardMaterial({
+  color: 0x1f1d24,
+  roughness: 0.85,
+  metalness: 0.12,
+  emissive: 0x2e2307,
+  emissiveIntensity: 0.45,
+  flatShading: true,
+});
+
+const _gulurLegMat = new THREE.MeshStandardMaterial({
+  color: 0x17151c,
+  roughness: 0.85,
+  metalness: 0.12,
+  emissive: 0x241c05,
+  emissiveIntensity: 0.40,
+  flatShading: true,
+});
+
+// Olhos amarelos intensos e brilhantes do Gulur (Bicho Altão)
+const _gulurGlowingEyeMat = new THREE.MeshBasicMaterial({
+  color: 0xffff33,
+  toneMapped: false,
+});
+
+const _gulurAuraMeshMat = new THREE.MeshBasicMaterial({
+  color: 0xffd533,
+  transparent: true,
+  opacity: 0.16,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+});
+
+// Olhos amarelos brilhantes gerais
 const _glowingYellowEyeMat = new THREE.MeshBasicMaterial({
   color: 0xffea00,
   toneMapped: false,
@@ -106,7 +185,7 @@ export class Gulur {
     this.root.add(this.bodyGroup);
 
     // Tronco e costelas do quadrúpede
-    const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 3.8), _shadowBodyMat);
+    const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 3.8), _gulurBodyMat);
     torsoMesh.castShadow = true;
     this.bodyGroup.add(torsoMesh);
 
@@ -127,7 +206,7 @@ export class Gulur {
     }
 
     // Caixa torácica esguia / flancos
-    const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.8), _shadowBodyMat);
+    const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.8), _gulurBodyMat);
     chestMesh.position.set(0, -0.1, -0.9);
     this.bodyGroup.add(chestMesh);
 
@@ -136,23 +215,23 @@ export class Gulur {
     this.neck.position.set(0, 0.4, -1.9);
     this.bodyGroup.add(this.neck);
 
-    const neckMesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 1.2), _shadowBodyMat);
+    const neckMesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 1.2), _gulurBodyMat);
     neckMesh.position.set(0, 0.4, -0.4);
     neckMesh.rotation.x = -0.35;
     this.neck.add(neckMesh);
 
     // Cabeça alongada com focinho canino
-    const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.65, 1.4), _shadowBodyMat);
+    const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.65, 1.4), _gulurBodyMat);
     headMesh.position.set(0, 0.95, -0.95);
     this.neck.add(headMesh);
 
     // Focinho esguio
-    const snoutMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.9), _shadowBodyMat);
+    const snoutMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.9), _gulurBodyMat);
     snoutMesh.position.set(0, 0.85, -1.7);
     this.neck.add(snoutMesh);
 
     // Mandíbula inferior com presas aterradoras
-    const jawMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.22, 0.85), _shadowBodyMat);
+    const jawMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.22, 0.85), _gulurBodyMat);
     jawMesh.position.set(0, 0.55, -1.65);
     this.neck.add(jawMesh);
     for (let f of [-0.18, 0.18]) {
@@ -162,21 +241,97 @@ export class Gulur {
       this.neck.add(fang);
     }
 
-    // Olhos Amarelos Brilhantes com Fendas de Pupila Predatória Negra
-    const eyeGeo = new THREE.SphereGeometry(0.12, 6, 5);
-    const leftEye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
+    // Olhos Amarelos Intensos e Brilhantes com Halos Espetaculares e Fendas de Pupila Predatória Negra
+    const eyeGeo = new THREE.SphereGeometry(0.24, 10, 8);
+    const leftEye = new THREE.Mesh(eyeGeo, _gulurGlowingEyeMat);
     leftEye.position.set(0.38, 1.15, -1.35);
     this.neck.add(leftEye);
 
-    const rightEye = new THREE.Mesh(eyeGeo, _glowingYellowEyeMat);
+    const rightEye = new THREE.Mesh(eyeGeo, _gulurGlowingEyeMat);
     rightEye.position.set(-0.38, 1.15, -1.35);
     this.neck.add(rightEye);
 
+    // Halos luminosos aditivos nos olhos para visibilidade de longo alcance
+    const eyeGlowTex = getYellowGlowTexture();
+    const eyeSpriteMat = new THREE.SpriteMaterial({
+      map: eyeGlowTex,
+      color: 0xffea22,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const leftEyeHalo = new THREE.Sprite(eyeSpriteMat.clone());
+    leftEyeHalo.scale.set(1.8, 1.8, 1.0);
+    leftEyeHalo.position.set(0, 0, -0.12);
+    leftEye.add(leftEyeHalo);
+
+    const rightEyeHalo = new THREE.Sprite(eyeSpriteMat.clone());
+    rightEyeHalo.scale.set(1.8, 1.8, 1.0);
+    rightEyeHalo.position.set(0, 0, -0.12);
+    rightEye.add(rightEyeHalo);
+
+    this.eyeHalos = [leftEyeHalo, rightEyeHalo];
+
+    // Fenda vertical de pupila preta predadora
     for (const eyeMesh of [leftEye, rightEye]) {
-      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.05), _pupilMat);
-      pupil.position.set(0, 0, 0.11);
+      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.28, 0.08), _pupilMat);
+      pupil.position.set(0, 0, -0.20);
       eyeMesh.add(pupil);
     }
+
+    // ========================================================================
+    // Leve Aura Amarela Etérea do Gulur (Luz, Halo, Casulo 3D e Motes)
+    // ========================================================================
+    // 1. Luz pontual suave banhando o dorso e pernas superiores do colosso
+    this.auraLight = new THREE.PointLight(0xffea44, 2.8, 28, 1.6);
+    this.auraLight.position.set(0, 0.4, -0.5);
+    this.bodyGroup.add(this.auraLight);
+
+    // 2. Halo/Sprite de neblina de aura suave em volta do corpo
+    const auraMistTex = getAuraMistTexture();
+    const auraSpriteMat = new THREE.SpriteMaterial({
+      map: auraMistTex,
+      color: 0xffe244,
+      transparent: true,
+      opacity: 0.36,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.auraSprite = new THREE.Sprite(auraSpriteMat);
+    this.auraSprite.scale.set(13.5, 10.0, 1.0);
+    this.auraSprite.position.set(0, 0.2, 0);
+    this.bodyGroup.add(this.auraSprite);
+
+    // 3. Casulo 3D translúcido envolvente do torso
+    const auraMeshGeo = new THREE.CylinderGeometry(1.6, 1.3, 4.4, 12, 1, true);
+    auraMeshGeo.rotateX(Math.PI / 2);
+    this.auraMesh = new THREE.Mesh(auraMeshGeo, _gulurAuraMeshMat);
+    this.auraMesh.position.set(0, 0.1, -0.2);
+    this.bodyGroup.add(this.auraMesh);
+
+    // 4. Motes / partículas douradas flutuantes ao redor do corpo
+    const moteCount = 14;
+    const moteGeo = new THREE.BufferGeometry();
+    const motePos = new Float32Array(moteCount * 3);
+    for (let m = 0; m < moteCount; m++) {
+      motePos[m * 3 + 0] = (Math.random() - 0.5) * 4.2;
+      motePos[m * 3 + 1] = (Math.random() - 0.5) * 3.2;
+      motePos[m * 3 + 2] = (Math.random() - 0.5) * 5.2;
+    }
+    moteGeo.setAttribute("position", new THREE.BufferAttribute(motePos, 3));
+    const moteMat = new THREE.PointsMaterial({
+      map: eyeGlowTex,
+      color: 0xffe633,
+      size: 0.85,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.auraMotes = new THREE.Points(moteGeo, moteMat);
+    this.bodyGroup.add(this.auraMotes);
 
     // 4 Pernas Finas Colossais (16 metros de altura cada) com Esporões Ósseos
     this.legs = [];
@@ -193,7 +348,7 @@ export class Gulur {
       this.bodyGroup.add(legRoot);
 
       // Coxa superior finíssima
-      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 8.2, 5), _thinLegMat);
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 8.2, 5), _gulurLegMat);
       upper.position.set(0, -4.1, 0);
       legRoot.add(upper);
 
@@ -202,7 +357,7 @@ export class Gulur {
       kneeGroup.position.set(0, -8.2, 0);
       legRoot.add(kneeGroup);
 
-      const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.11, 5, 4), _thinLegMat);
+      const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.11, 5, 4), _gulurLegMat);
       kneeGroup.add(kneeJoint);
 
       const kneeSpur = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.35, 4), _boneSpineMat);
@@ -211,7 +366,7 @@ export class Gulur {
       kneeGroup.add(kneeSpur);
 
       // Canela inferior finíssima até o solo
-      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.035, 8.2, 5), _thinLegMat);
+      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.035, 8.2, 5), _gulurLegMat);
       lower.position.set(0, -4.1, 0);
       kneeGroup.add(lower);
 
@@ -261,8 +416,9 @@ export class Gulur {
   }
 
   update(dt, isNight = false) {
-    // Só aparece e existe estritamente à noite
-    if (!isNight) {
+    // Só aparece e existe estritamente à noite (ou se invocado via comando de teste)
+    const active = isNight || Boolean(this._forceSpawned);
+    if (!active) {
       if (this.root.visible) {
         this.root.visible = false;
         if (this.npcs?.spatialGrid && this._inGrid) {
@@ -284,6 +440,21 @@ export class Gulur {
           this.legs[i].legRoot.rotation.z = THREE.MathUtils.lerp(this.legs[i].legRoot.rotation.z, (i % 2 === 0 ? 0.8 : -0.8), dt * 3);
           this.legs[i].kneeGroup.rotation.x = THREE.MathUtils.lerp(this.legs[i].kneeGroup.rotation.x, 1.2, dt * 3);
         }
+        // Desvanece a aura e as luzes durante o colapso
+        if (this.auraLight) {
+          this.auraLight.intensity = Math.max(0, this.auraLight.intensity - dt * 1.5);
+        }
+        if (this.auraSprite) {
+          this.auraSprite.material.opacity = Math.max(0, this.auraSprite.material.opacity - dt * 0.18);
+        }
+        if (this.auraMesh) {
+          this.auraMesh.material.opacity = Math.max(0, this.auraMesh.material.opacity - dt * 0.1);
+        }
+        if (this.eyeHalos) {
+          for (let i = 0; i < this.eyeHalos.length; i++) {
+            this.eyeHalos[i].scale.multiplyScalar(Math.max(0, 1.0 - dt * 1.2));
+          }
+        }
       } else if (this.deadTime > 5.0) {
         this.root.visible = false;
       }
@@ -291,6 +462,35 @@ export class Gulur {
     }
 
     if (!this.root.visible) this.root.visible = true;
+
+    // Pulsação suave e respiração etérea da Aura Amarela e dos Olhos
+    const tNow = performance.now() * 0.002;
+    const auraPulse = 1.0 + Math.sin(tNow * 1.8) * 0.08;
+    if (this.auraSprite) {
+      this.auraSprite.scale.set(13.5 * auraPulse, 10.0 * auraPulse, 1.0);
+      this.auraSprite.material.opacity = 0.36 + Math.sin(tNow * 1.2) * 0.06;
+    }
+    if (this.auraMesh) {
+      this.auraMesh.rotation.y += dt * 0.25;
+      this.auraMesh.material.opacity = 0.16 + Math.sin(tNow * 2.0) * 0.04;
+    }
+    if (this.eyeHalos) {
+      const eyeFlicker = 1.8 + Math.sin(tNow * 3.2) * 0.15;
+      for (let i = 0; i < this.eyeHalos.length; i++) {
+        this.eyeHalos[i].scale.set(eyeFlicker, eyeFlicker, 1.0);
+      }
+    }
+    if (this.auraMotes) {
+      const pArr = this.auraMotes.geometry.attributes.position.array;
+      const count = pArr.length / 3;
+      for (let i = 0; i < count; i++) {
+        pArr[i * 3 + 1] += dt * 0.75;
+        if (pArr[i * 3 + 1] > 2.6) {
+          pArr[i * 3 + 1] = -2.2;
+        }
+      }
+      this.auraMotes.geometry.attributes.position.needsUpdate = true;
+    }
 
     // Garante presença na Spatial Grid de combate à noite para ser focado pela mira e levar golpes
     if (this.npcs?.spatialGrid && !this._inGrid) {
