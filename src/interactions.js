@@ -41,10 +41,25 @@ import {
 import { WorldDecay } from "./decay.js";
 
 const CULTIST_RUMORS = [
+  "«Ouvi dizer de uma seita que destruiu algumas cidades proximas, eles deixaram alguns itens escondidos dentros das casas, talvez eu vá dar uma olhada...»",
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
   "«O padre diz que máscaras de pássaro são contos para assustar crianças.»",
   "«Se os Cátaros quisessem nosso fim, por que não invadem os portões? É tudo invenção.»",
   "«Dizem que eles adoram o Demiurgo e não temem a morte... que Deus nos guarde fora dos muros.»",
+  "«Cavalos selvagens nos ermos sentem teu cheiro a léguas. Se segurares um fardo de feno [G], eles se aproximam mansos e deixam montar [E].»",
+  "«No Modo Construção [C], aperte [E] com uma tocha ou vela em mãos para cravá-la na parede ou no solo. Ela queimará dia e noite para guiar teus passos.»",
+  "«Se a guarda decretar tua cabeça a prêmio, fuja para a paróquia: a absolvição do Padre Anselmo no confessionário anula qualquer nível de Procurado.»",
+  "«Contra guerreiros protegidos por escudos pesados, mantenha o golpe premido: o ataque carregado despedaça a postura de guarda e lança o inimigo ao chão.»",
+  "«Pelos ermos brotam prismas brilhantes de cristais. Se colheres um [E], tua tocha absorve aquela cor na hora e fende a escuridão.»",
+];
+
+export const OBSCURE_TUTORIAL_HINTS = [
+  "«Ouvi dizer de uma seita que destruiu algumas cidades proximas, eles deixaram alguns itens escondidos dentros das casas, talvez eu vá dar uma olhada... Olhe para o céu à noite: halos de névoa arroxeada marcam onde essas ruínas jazem.»",
+  "«Cavalos selvagens nos ermos têm pavor de gente correndo. Segure um fardo de feno [G] na mão e caminhe devagar. O bicho sente o faro da cevada e te deixará montar [E] sem disparar em fuga.»",
+  "«A noite é um breu assassino e o vento apaga tua vela se correr. Mas se entrares no Modo Construção [C] empunhando uma tocha ou vela e apertares [E], podes fincá-la na parede ou no chão! Ela nunca mais se apaga e cria faróis pelo caminho.»",
+  "«Se cometeres deslizes e os guardas caçarem tua cabeça, corre para a Igreja de Caldera. Ajoelhar-se no confessionário com o Padre Anselmo zera o status de Procurado e ainda te concede +2 Carisma perante o povo.»",
+  "«Contra guardas de escudo ou bestas blindadas, golpes rápidos batem na lata. Segure o ataque com martelo, machado ou maça até o fim: o golpe pesado carrega e quebra a defesa de qualquer inimigo, atordoando-o.»",
+  "«Os cristais brilhantes nos ermos guardam essências antigas. Quando recolhes um prisma colorido no solo [E], tua tocha absorve a cor dele na hora (azul, verde, rosa, vermelho, roxo), iluminando a noite com propriedades místicas.»",
 ];
 
 export class InteractionSystem {
@@ -571,6 +586,7 @@ export class InteractionSystem {
         { id: "arrows", label: `Flechas · ${pArrows} moedas`, disabled: this.player.coins < pArrows },
         { id: "bombs", label: `Duas bombas de mão · ${pBombs} moedas`, disabled: this.player.coins < pBombs },
         { id: "train:cha", label: `Cortesia e Retórica (+1 CAR, atual ${PlayerStats.cha}) · ${pTrainCha} moedas`, disabled: this.player.coins < pTrainCha },
+        { id: "rumor:secrets", label: "✦ Segredos dos Viajantes: Mecânicas e boatos dos ermos" },
         { id: "rumor:demiurge_book", label: "✦ Boatos da Taverna: Indagar sobre o Diário dos Demiurgos" },
         { id: "close", label: "Encerrar conversa" },
       ];
@@ -694,12 +710,58 @@ export class InteractionSystem {
         },
         { id: "close", label: "Retirar-se em silêncio nas sombras" },
       ];
+    } else if (npc.name === "Vasco Corvino" || npc.title === "Andarilho") {
+      body =
+        message ||
+        "«Vasco ajeita o capuz de couro, olha de esguelha e sussurra: 'Ouvi dizer de uma seita que destruiu algumas cidades proximas, eles deixaram alguns itens escondidos dentros das casas, talvez eu vá dar uma olhada...'»";
+      actions = [
+        {
+          id: "tutorial:ghost_towns",
+          label: "✦ Segredo das Ruínas: 'O que há escondido nas casas destruídas?'",
+        },
+        {
+          id: "tutorial:tame_horses",
+          label: "✦ Domar Montaria: Como aproximar de cavalos selvagens com Feno [G]",
+        },
+        {
+          id: "tutorial:torch_placing",
+          label: "✦ Fincar Tochas [C + E]: Como iluminar caminhos no breu eterno",
+        },
+        {
+          id: "tutorial:church_absolution",
+          label: "✦ Limpar Crimes: O segredo da Confissão na Igreja com o Padre",
+        },
+        {
+          id: "tutorial:charged_attack",
+          label: "✦ Combate Pesado: Como romper defesas e escudos com ataque carregado",
+        },
+        {
+          id: "tutorial:crystal_torches",
+          label: "✦ Cristais do Solo: As chamas coloridas da tocha nos ermos",
+        },
+        {
+          id: "mission:horse_theft",
+          label: "✦ Missão: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
+        },
+        {
+          id: "rumor:cult",
+          label: "Ouvir boatos sobre as sombras além dos muros",
+        },
+        ...(MissionState.activeId
+          ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+          : []),
+        { id: "close", label: "Encerrar conversa" },
+      ];
     } else {
       body = message || "Psst... Um comprador discreto paga 60 moedas por um Cavalo Puro-Sangue furtado da muralha leste.";
       actions = [
         {
           id: "mission:horse_theft",
           label: "✦ Missão: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
+        },
+        {
+          id: "rumor:secrets",
+          label: "✦ Segredos dos Viajantes: Ouvir dicas e boatos dos ermos",
         },
         {
           id: "rumor:cult",
@@ -779,6 +841,47 @@ export class InteractionSystem {
     if (action === "rumor:cult") {
       const rumor = CULTIST_RUMORS[Math.floor(Math.random() * CULTIST_RUMORS.length)];
       this._showNPCDialogue(rumor);
+      return;
+    }
+    if (action === "rumor:secrets") {
+      const hint = OBSCURE_TUTORIAL_HINTS[Math.floor(Math.random() * OBSCURE_TUTORIAL_HINTS.length)];
+      this._showNPCDialogue(hint);
+      return;
+    }
+    if (action === "tutorial:ghost_towns") {
+      this._showNPCDialogue(
+        "«Vasco aponta para a névoa escura além dos muros: 'A oeste e ao sul há vilarejos destruídos pela seita da máscara de porcelana. À noite, uma névoa espectral azulada paira sobre eles e pode ser vista à distância no breu. Não temas entrar nos casebres em ruínas: os cultistas deixaram baús com ouro, poções e relíquias raras nos cantos escuros das salas que ninguém teve coragem de saquear.'»"
+      );
+      return;
+    }
+    if (action === "tutorial:tame_horses") {
+      this._showNPCDialogue(
+        "«Vasco sorri e revela o truque dos tropeiros: 'Cavalos selvagens nos ermos têm medo de humanos correndo. Se fores atrás deles em desespero, eles fogem até o fim do mundo. O segredo é ter um fardo de feno no alforje. Segure o feno com [G] e ande calmamente até o focinho dele. O bicho sentirá o aroma doce e aceitará tua montaria [E] sem disparar em fuga.'»"
+      );
+      return;
+    }
+    if (action === "tutorial:torch_placing") {
+      this._showNPCDialogue(
+        "«Vasco mostra uma tocha gasta: 'O breu da noite mata mais do que lâminas, e o vento forte apaga tua vela se correres. Mas eis o segredo: entre no Modo Construção [C] segurando uma tocha ou vela e pressione [E]. Tu cravarás a tocha na parede de uma casa ou na terra do ermo! Ela queima eternamente e cria faróis seguros pelo caminho.'»"
+      );
+      return;
+    }
+    if (action === "tutorial:church_absolution") {
+      this._showNPCDialogue(
+        "«Vasco pisca um olho com cumplicidade: 'Se a guarda da capital estiver te caçando por abater animais, arranjar brigas ou furtar, não adianta tentar matar os soldados. Corre para dentro da Igreja de Caldera e fala com o Padre Anselmo. A bênção do confessionário purifica tua culpa: zera o nível de Procurado na hora e ainda te rende +2 de Carisma perante o povo.'»"
+      );
+      return;
+    }
+    if (action === "tutorial:charged_attack") {
+      this._showNPCDialogue(
+        "«'Quando enfrentares um guarda de escudo ou fera blindada, ficar dando toques rápidos só fará tua lâmina resvalar. Com machado, martelo ou maça, segure o ataque com força. Vais sentir o peso acumular: quando desferir o golpe carregado, a postura do guarda quebra e ele tomba no chão indefeso!'»"
+      );
+      return;
+    }
+    if (action === "tutorial:crystal_torches") {
+      this._showNPCDialogue(
+        "«'Pelos descampados brotam prismas brilhantes de cristais antigos. Se colheres um [E], tua tocha absorve aquela cor na hora: azul celeste, verde floresta, carmesim, rosa ou roxo místico. Cada prisma altera o brilho da tua tocha e como a escuridão dos lobos reage a você.'»"
+      );
       return;
     }
     if (action.startsWith("cult_leader:")) {
