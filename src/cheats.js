@@ -1676,7 +1676,7 @@ export function initCheatMenu(env = {}) {
   window.__cheats = window.CheatMenu;
 
   console.log(
-    "%c[PURIS CHEATS] Ativado! Digite 'POTATO' durante o jogo, clique no Pause (Esc) ou use 'window.CheatMenu'",
+    "%c[PURIS CHEATS] Ativado (oculto na interface). Digite 'POTATO' durante o jogo ou utilize 'window.CheatMenu' no console.",
     "color: #bb86fc; font-weight: bold; font-size: 13px;"
   );
 }
