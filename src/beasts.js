@@ -177,11 +177,6 @@ export class Gulur {
       eyeMesh.add(pupil);
     }
 
-    // Pequena luz pontual amarela etérea que emana dos olhos no alto
-    this.eyeLight = new THREE.PointLight(0xffea00, 2.5, 18.0, 1.6);
-    this.eyeLight.position.set(0, 1.2, -1.5);
-    this.neck.add(this.eyeLight);
-
     // 4 Pernas Finas Colossais (16 metros de altura cada) com Esporões Ósseos
     this.legs = [];
     const legOffsets = [
@@ -783,11 +778,6 @@ export class Hexoculus {
       this.eyes.push(eye);
     }
 
-    // Luz mística que emana dos 6 olhos
-    this.eyeLight = new THREE.PointLight(0xffea00, 3.2, 14, 1.6);
-    this.eyeLight.position.set(0, 0.05, 0.2);
-    this.headGroup.add(this.eyeLight);
-
     // Tiras de manto sombrio fantasmagórico pendentes dos ombros
     for (let sh = 0; sh < 4; sh++) {
       const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.85, 0.18), _tornClothMat);
@@ -926,8 +916,6 @@ export class Hexoculus {
 
     // Efeito pulsante e cintilante assíncrono dos 6 olhos
     const now = performance.now();
-    const pulse = 1.0 + Math.sin(now * 0.008) * 0.25;
-    if (this.eyeLight) this.eyeLight.intensity = 2.8 * pulse;
 
     for (let i = 0; i < this.eyes.length; i++) {
       const pScale = 1.0 + Math.sin(now * 0.008 + i * 1.05) * 0.16;

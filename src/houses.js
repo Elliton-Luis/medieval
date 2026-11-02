@@ -11,13 +11,23 @@ import {
 } from "./rpg.js";
 
 export const _activeOccluders = [];
+const _OCCLUDER_POOL = Array.from({ length: 6 }, () => ({
+  x: 0,
+  z: 0,
+  dist: 0,
+  distSq: 0,
+  minAngle: 0,
+  maxAngle: 0,
+}));
 let _activeCameraPos = null;
 
 export function isOccludedByHouses(x, z) {
   if (_activeOccluders.length === 0 || !_activeCameraPos) return false;
   const cx = x - _activeCameraPos.x;
   const cz = z - _activeCameraPos.z;
-  const dist = Math.hypot(cx, cz);
+  const dSq = cx * cx + cz * cz;
+  if (dSq < _activeOccluders[0].distSq) return false;
+  const dist = Math.sqrt(dSq);
   const angle = Math.atan2(cx, cz);
   for (let i = 0; i < _activeOccluders.length; i++) {
     const occ = _activeOccluders[i];
@@ -179,13 +189,14 @@ export class HouseSystem {
           const centerAngle = Math.atan2(cx, cz);
           const radius = Math.max(h.W, h.D) * 0.44;
           const halfAngle = Math.atan2(radius, dist);
-          _activeOccluders.push({
-            x: h.x,
-            z: h.z,
-            dist,
-            minAngle: centerAngle - halfAngle,
-            maxAngle: centerAngle + halfAngle,
-          });
+          const occ = _OCCLUDER_POOL[_activeOccluders.length];
+          occ.x = h.x;
+          occ.z = h.z;
+          occ.dist = dist;
+          occ.distSq = cDistSq;
+          occ.minAngle = centerAngle - halfAngle;
+          occ.maxAngle = centerAngle + halfAngle;
+          _activeOccluders.push(occ);
           if (_activeOccluders.length >= 6) break;
         }
       }

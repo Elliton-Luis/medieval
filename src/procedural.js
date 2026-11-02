@@ -433,9 +433,14 @@ function _spawnRegionalCityNPCs(cityObj, npcSystem) {
   assignNpcAnchors(guard, anchors, "gates");
 }
 
+let _lastRegionX = null;
+let _lastRegionZ = null;
+const _pendingRegions = [];
+
 /**
  * CORREÇÃO: Gerador de Múltiplas Cidades.
  * Verifica regiões de 500x500m. Se a seed regional permitir, gera uma vila/cidade.
+ * Otimizado com fila de espera por frame para não travar a thread ao descobrir novas regiões.
  * @param {THREE.Vector3|{x:number,z:number}} playerPos
  * @param {Map<string, object|null>} activeCities
  * @param {THREE.Material} [houseMaterial]
@@ -447,42 +452,54 @@ export function updateWorldChunks(playerPos, activeCities, houseMaterial = creat
   const regionX = Math.floor(playerPos.x / 500);
   const regionZ = Math.floor(playerPos.z / 500);
 
-  // Checa 9 regiões em volta do jogador
-  for (let x = -1; x <= 1; x++) {
-    for (let z = -1; z <= 1; z++) {
-      const rx = regionX + x;
-      const rz = regionZ + z;
-      const regionId = `${rx}_${rz}`;
+  // Só recalcula os setores vizinhos quando o jogador cruza um quadrante de 500m
+  if (regionX !== _lastRegionX || regionZ !== _lastRegionZ) {
+    _lastRegionX = regionX;
+    _lastRegionZ = regionZ;
 
-      if (!activeCities.has(regionId)) {
-        // Seed baseada nas coordenadas para ser sempre no mesmo lugar
-        const regionSeed = 12345 + rx * 1000 + rz;
-        const random = createSeededRandom(regionSeed);
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        const rx = regionX + x;
+        const rz = regionZ + z;
+        const regionId = `${rx}_${rz}`;
 
-        // 30% de chance de ter uma vila/cidade viva naquela região
-        const roll = random();
-        if (roll < 0.3) {
-          const offsetX = (random() - 0.5) * 200;
-          const offsetZ = (random() - 0.5) * 200;
-          const cityCenter = new THREE.Vector3(rx * 500 + offsetX, 0, rz * 500 + offsetZ);
-
-          activeCities.set(regionId, generateCity(regionSeed, cityCenter, houseMaterial));
-        } else if (roll < 0.55 && (rx !== 0 || rz !== 0)) {
-          // 25% de chance de gerar uma Cidade Fantasma arruinada pela guerra
-          const offsetX = (random() - 0.5) * 220;
-          const offsetZ = (random() - 0.5) * 220;
-          const ghostTownConfig = {
-            name: `Ruínas Devastadas do Setor [${rx}, ${rz}]`,
-            x: rx * 500 + offsetX,
-            z: rz * 500 + offsetZ,
-            seed: regionSeed,
-            radius: 54,
-          };
-          const ghostTown = generateGhostTown(ghostTownConfig, _procEnv.scene, _procEnv.world);
-          activeCities.set(regionId, { ghostTown, center: ghostTown.center });
-        } else {
-          activeCities.set(regionId, null); // Marca como vazio para não checar de novo
+        if (!activeCities.has(regionId) && !_pendingRegions.some((p) => p.regionId === regionId)) {
+          _pendingRegions.push({ rx, rz, regionId });
         }
+      }
+    }
+  }
+
+  // Gera no máximo 1 setor por frame para eliminar stutters
+  if (_pendingRegions.length > 0) {
+    const item = _pendingRegions.shift();
+    const { rx, rz, regionId } = item;
+
+    if (!activeCities.has(regionId)) {
+      const regionSeed = 12345 + rx * 1000 + rz;
+      const random = createSeededRandom(regionSeed);
+
+      const roll = random();
+      if (roll < 0.3) {
+        const offsetX = (random() - 0.5) * 200;
+        const offsetZ = (random() - 0.5) * 200;
+        const cityCenter = new THREE.Vector3(rx * 500 + offsetX, 0, rz * 500 + offsetZ);
+
+        activeCities.set(regionId, generateCity(regionSeed, cityCenter, houseMaterial));
+      } else if (roll < 0.55 && (rx !== 0 || rz !== 0)) {
+        const offsetX = (random() - 0.5) * 220;
+        const offsetZ = (random() - 0.5) * 220;
+        const ghostTownConfig = {
+          name: `Ruínas Devastadas do Setor [${rx}, ${rz}]`,
+          x: rx * 500 + offsetX,
+          z: rz * 500 + offsetZ,
+          seed: regionSeed,
+          radius: 54,
+        };
+        const ghostTown = generateGhostTown(ghostTownConfig, _procEnv.scene, _procEnv.world);
+        activeCities.set(regionId, { ghostTown, center: ghostTown.center });
+      } else {
+        activeCities.set(regionId, null);
       }
     }
   }

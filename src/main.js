@@ -385,6 +385,7 @@ window.addEventListener("contextmenu", (event) => event.preventDefault());
 
 let lastTime = performance.now();
 let hasRendered = false;
+let _lastResourceRespawn = 0;
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -419,7 +420,10 @@ function frame(now) {
     ui.showToast(on ? "Assist. Mira: ATIVADO (ser mais próximo)" : "Assist. Mira: DESATIVADO");
   }
   world.updateAround(player.x, player.z);
-  world.respawnResources(now);
+  if (now - _lastResourceRespawn > 1000) {
+    _lastResourceRespawn = now;
+    world.respawnResources(now);
+  }
   updateWorldChunks(player.root.position, activeCities, sharedHouseMaterial);
   updateGhostTownAtmosphere(player.root.position, ui, dt);
   riding.update(dt, cameraRig.yaw);

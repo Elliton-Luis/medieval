@@ -109,8 +109,8 @@ export class DayNightCycle {
     // Ajuste de atmosfera sombria, neblina corrompida e Eclipse Vermelho
     updateAtmosphereDecay(this, this.scene, renderer);
 
-    // Otimização de Sombras Dinâmicas: desliga a sombra à noite profunda para economizar GPU
-    this.sun.castShadow = this.daylight > 0.12;
+    // Mantém castShadow sempre ativo para evitar recompilação de shaders no WebGL ao anoitecer/amanhecer
+    this.sun.castShadow = true;
 
     // Degraus esparsos de 3m: atualiza a posição da luz ortográfica sem tremores e sem recalculadas milimétricas
     const sx = Math.round(playerX / 3) * 3;

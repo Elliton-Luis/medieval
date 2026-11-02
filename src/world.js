@@ -67,7 +67,44 @@ export class World {
     setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, CONFIG.seed)));
     this._spawnX = CONFIG.player.startX;
     this._spawnZ = CONFIG.player.startZ;
-    this.updateAround(this._spawnX, this._spawnZ);
+    this._pendingChunkQueue = [];
+    this._pendingUnloadQueue = [];
+    this._initInitialChunks(this._spawnX, this._spawnZ);
+  }
+
+  _initInitialChunks(x, z) {
+    const cx = Math.floor(x / this.chunkSize);
+    const cz = Math.floor(z / this.chunkSize);
+    this.centerX = cx;
+    this.centerZ = cz;
+    this.activeChunks.length = 0;
+
+    for (let dz = -this.radius; dz <= this.radius; dz++) {
+      for (let dx = -this.radius; dx <= this.radius; dx++) {
+        if (dx * dx + dz * dz > this.loadRadiusSq) continue;
+        const chunkX = cx + dx;
+        const chunkZ = cz + dz;
+        const key = `${chunkX}:${chunkZ}`;
+        const chunk = this._createChunk(chunkX, chunkZ);
+        this.chunks.set(key, chunk);
+        chunk.group.visible = true;
+        this.activeChunks.push(chunk);
+      }
+    }
+    this._syncEnvironmentMeshes();
+  }
+
+  _syncEnvironmentMeshes() {
+    this.environmentInstancedMeshes.length = 0;
+    for (let i = 0; i < this.activeChunks.length; i++) {
+      const chunk = this.activeChunks[i];
+      for (let m = 0; m < chunk.instancedMeshes.length; m++) {
+        const mesh = chunk.instancedMeshes[m];
+        if (mesh.name === "Trees" || mesh.name === "Rocks" || mesh.name === "Clay") {
+          this.environmentInstancedMeshes.push(mesh);
+        }
+      }
+    }
   }
 
   _proceduralHeightAt(x, z) {
@@ -277,33 +314,77 @@ export class World {
   updateAround(x, z) {
     const cx = Math.floor(x / this.chunkSize);
     const cz = Math.floor(z / this.chunkSize);
+
+    // Quando o jogador cruza a fronteira de um chunk (64m)
     if (cx !== this.centerX || cz !== this.centerZ) {
       this.centerX = cx;
       this.centerZ = cz;
       this.activeChunks.length = 0;
-      for (const chunk of this.chunks.values()) chunk.group.visible = false;
+      this._pendingChunkQueue.length = 0;
+      this._pendingUnloadQueue.length = 0;
 
-      // Carregamento circular com base em distância Euclidiana
+      for (const chunk of this.chunks.values()) {
+        chunk.group.visible = false;
+      }
+
+      // 1. Identifica chunks já construídos no raio e enfileira os que faltam
       for (let dz = -this.radius; dz <= this.radius; dz++) {
         for (let dx = -this.radius; dx <= this.radius; dx++) {
-          if (dx * dx + dz * dz > this.loadRadiusSq) continue;
+          const dSq = dx * dx + dz * dz;
+          if (dSq > this.loadRadiusSq) continue;
           const chunkX = cx + dx;
           const chunkZ = cz + dz;
           const key = `${chunkX}:${chunkZ}`;
-          let chunk = this.chunks.get(key);
-          if (!chunk) {
-            chunk = this._createChunk(chunkX, chunkZ);
-            this.chunks.set(key, chunk);
+          const chunk = this.chunks.get(key);
+          if (chunk) {
+            chunk.group.visible = true;
+            this.activeChunks.push(chunk);
+          } else {
+            this._pendingChunkQueue.push({ x: chunkX, z: chunkZ, distSq: dSq });
           }
-          chunk.group.visible = true;
-          this.activeChunks.push(chunk);
         }
       }
 
-      // Descarregamento com base em distância Euclidiana e liberação de buffers GPU
+      // Prioriza a construção dos chunks mais próximos do jogador
+      this._pendingChunkQueue.sort((a, b) => a.distSq - b.distSq);
+
+      // 2. Enfileira chunks muito distantes para descarregamento suave
       for (const [key, chunk] of this.chunks) {
         const dcx = chunk.x - cx;
         const dcz = chunk.z - cz;
+        if (dcx * dcx + dcz * dcz > this.unloadRadiusSq) {
+          this._pendingUnloadQueue.push(key);
+        }
+      }
+
+      this._syncEnvironmentMeshes();
+    }
+
+    // Processamento orçado por frame: constrói no máximo 1 novo chunk por frame
+    // Isso evita completamente picos de 150-250ms que causavam travamentos ao caminhar ou cavalgar
+    if (this._pendingChunkQueue.length > 0) {
+      const next = this._pendingChunkQueue.shift();
+      const key = `${next.x}:${next.z}`;
+      if (!this.chunks.has(key)) {
+        const dcx = next.x - this.centerX;
+        const dcz = next.z - this.centerZ;
+        if (dcx * dcx + dcz * dcz <= this.loadRadiusSq) {
+          const chunk = this._createChunk(next.x, next.z);
+          this.chunks.set(key, chunk);
+          chunk.group.visible = true;
+          this.activeChunks.push(chunk);
+          this._syncEnvironmentMeshes();
+        }
+      }
+    }
+
+    // Descarregamento orçado por frame: libera no máximo 1 chunk por frame para evitar pausas no driver GPU
+    if (this._pendingUnloadQueue.length > 0) {
+      const unloadKey = this._pendingUnloadQueue.shift();
+      const chunk = this.chunks.get(unloadKey);
+      if (chunk) {
+        const dcx = chunk.x - this.centerX;
+        const dcz = chunk.z - this.centerZ;
         if (dcx * dcx + dcz * dcz > this.unloadRadiusSq) {
           this.scene.remove(chunk.group);
           chunk.terrain.geometry.dispose();
@@ -315,18 +396,7 @@ export class World {
               this.spatialGrid.remove(chunk.colliders[i]);
             }
           }
-          this.chunks.delete(key);
-        }
-      }
-
-      this.environmentInstancedMeshes.length = 0;
-      for (let i = 0; i < this.activeChunks.length; i++) {
-        const chunk = this.activeChunks[i];
-        for (let m = 0; m < chunk.instancedMeshes.length; m++) {
-          const mesh = chunk.instancedMeshes[m];
-          if (mesh.name === "Trees" || mesh.name === "Rocks" || mesh.name === "Clay") {
-            this.environmentInstancedMeshes.push(mesh);
-          }
+          this.chunks.delete(unloadKey);
         }
       }
     }
@@ -885,9 +955,6 @@ export class World {
         chunk.group.visible = true;
         chunk.near.visible = distanceSq < this.lodDistanceSq * 1.5;
         chunk.far.visible = distanceSq >= this.lodDistanceSq * 1.5;
-        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-          chunk.shadowMeshes[s].castShadow = true;
-        }
         continue;
       }
 
@@ -905,9 +972,6 @@ export class World {
         chunk.group.visible = false;
         chunk.near.visible = false;
         chunk.far.visible = false;
-        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-          chunk.shadowMeshes[s].castShadow = false;
-        }
         continue;
       }
 
@@ -924,9 +988,6 @@ export class World {
 
       chunk.near.visible = visible && distanceSq < effectiveLodSq;
       chunk.far.visible = visible && distanceSq >= effectiveLodSq;
-      for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-        chunk.shadowMeshes[s].castShadow = inShadowRange && (dotCam >= -10.0 || distToCamSq <= safeRadiusSq);
-      }
     }
   }
 
