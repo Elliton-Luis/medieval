@@ -33,6 +33,7 @@ import { setMeleeEnv, clearTokens } from "./melee.js";
 import { initDemiurgeDiary, updateDemiurgeDiary } from "./demiurgeBook.js";
 import { BeastManager } from "./beasts.js";
 import { spawnCrystalNodes, applyTorchColor } from "./crystals.js";
+import { telemetry } from "./telemetry.js";
 import {
   PlayerStats,
   PlayerEquipment,
@@ -388,6 +389,7 @@ let hasRendered = false;
 let _lastResourceRespawn = 0;
 
 function frame(now) {
+  telemetry.beginFrame();
   requestAnimationFrame(frame);
   const elapsed = Math.min((now - lastTime) / 1000, 0.25);
   lastTime = now;
@@ -408,6 +410,7 @@ function frame(now) {
     world.updateVisibility(camera, player.x, player.z, true);
     dayNight.update(dt, player.x, player.z);
     renderer.render(scene, camera);
+    telemetry.endFrame(renderer);
     if (!hasRendered) {
       hasRendered = true;
       window.setTimeout(() => ui.hideLoading(), 160);
@@ -419,6 +422,7 @@ function frame(now) {
     const on = aim.toggleAssist();
     ui.showToast(on ? "Assist. Mira: ATIVADO (ser mais próximo)" : "Assist. Mira: DESATIVADO");
   }
+
   world.updateAround(player.x, player.z);
   if (now - _lastResourceRespawn > 1000) {
     _lastResourceRespawn = now;
@@ -426,9 +430,13 @@ function frame(now) {
   }
   updateWorldChunks(player.root.position, activeCities, sharedHouseMaterial);
   updateGhostTownAtmosphere(player.root.position, ui, dt);
+  telemetry.mark("world");
+
   riding.update(dt, cameraRig.yaw);
   player.update(dt, input, world, cameraRig.yaw, aim);
   ui.setStealth(player.crouching);
+  telemetry.mark("physics");
+
   const isPlayerLit = torches.isPlayerLit(player, candle, fire);
   const timeOfDay = (dayNight.progress * 24) % 24;
   if (settlement.cityData) {
@@ -441,6 +449,8 @@ function frame(now) {
   updateMessenger(dt, player, effects, ui, audio, world, input);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay, isCutscene);
   interactions.update(dt);
+  telemetry.mark("ai");
+
   combat.update(dt);
   updateMissionProgress(player.root, dt);
   updateWaypointBillboard(player.root.position, now);
@@ -470,14 +480,21 @@ function frame(now) {
   minimap.update(dt, player, cameraRig.yaw, npcs, npcs.wanted);
   explosions.update(dt);
   effects.update(dt);
+  telemetry.mark("combat");
+
   world.updateVisibility(camera, player.x, player.z, isCutscene);
   renderer.render(scene, camera);
+  telemetry.mark("render");
+
   ui.update(dt, clock, world.activeChunks.length, npcs.nearest, player.x, player.z);
+
+  telemetry.endFrame(renderer);
 
   if (!hasRendered) {
     hasRendered = true;
     window.setTimeout(() => ui.hideLoading(), 160);
   }
+}
 }
 
 requestAnimationFrame(frame);
