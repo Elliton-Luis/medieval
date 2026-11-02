@@ -90,10 +90,6 @@ export function addCityBeacon(scene, x, z, color = 0xffaa40, baseSize = 36, worl
   return sprite;
 }
 
-  _activeBeacons.push(beaconData);
-  return sprite;
-}
-
 /**
  * Atualiza a escala e intensidade dos beacons de cidades de acordo com o ciclo dia/noite.
  * À noite, o halo expande e ganha força para guiar o viajante no breu.
