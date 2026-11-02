@@ -2,6 +2,7 @@ import { saveGame } from "./save.js";
 import { PlayerStats, PlayerInventory } from "./rpg.js";
 import { CultState } from "./cult.js";
 import { getDemiurgeDiarySpotIndex } from "./demiurgeBook.js";
+import { WorldDecay } from "./decay.js";
 
 const CSS = `
 .sleep-layer { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; display: grid; place-content: center; text-align: center; transition: opacity 1.2s ease; }
@@ -84,6 +85,13 @@ export class SleepSystem {
         z: this.player.z,
         candles: this.candle?.count ?? 0,
         demiurgeBookSpotIndex: getDemiurgeDiarySpotIndex(),
+        decay: {
+          daysPassed: WorldDecay.daysPassed,
+          decayLevel: WorldDecay.decayLevel,
+          isEclipse: WorldDecay.isEclipse,
+          eclipsesExperienced: WorldDecay.eclipsesExperienced || 0,
+          eclipseDays: WorldDecay.scheduledEclipseDays || [],
+        },
         stats: {
           str: PlayerStats.str,
           con: PlayerStats.con,

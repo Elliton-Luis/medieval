@@ -358,6 +358,19 @@ Otimização de visibilidade em 3 camadas na GPU e CPU para dispositivos modesto
   - Permanece recolhida por padrão para manter a tela limpa e imersiva. Ao clicar, expande suavemente com os contadores de Madeira, Pedra, Barro e Feno. A preferência do jogador é persistida automaticamente no `localStorage`.
   - Todos os recursos continuam disponíveis para consulta detalhada no menu de artesanato e inventário (`I`).
 
+## Ciclo do Eclipse e Regras do Apocalipse do Demiurgo
+
+- **Regras Estritas para o Fim dos Tempos (Descida do Demiurgo)**:
+  - **Maldade Extrema (> 90%)**: Se a maldade do jogador estiver acima de 90%, o cataclismo pode ser desencadeado a partir do **Dia 7** (`daysPassed >= 7`).
+  - **Maldade Padrão/Baixa (≤ 90%)**: O final do Demiurgo só pode ocorrer estritamente **depois do Dia 15** (`daysPassed > 15`).
+  - **Trava de Eclipse Obrigatória**: O Apocalipse nunca dispara sem que o jogador tenha vivenciado **ao menos 1 Dia de Eclipse** previamente (`eclipsesExperienced >= 1`).
+- **Sorteio e Mecânicas do Dia de Eclipse**:
+  - **Agendamento (> Dia 4)**: O eclipse só pode ocorrer estritamente depois do dia 4 (ou seja, dia 5 em diante). O sistema agenda 1 ou mais dias de eclipse (o primeiro entre o dia 5 e 6 para garantir o presságio antes de um possível apocalipse precoce no dia 7, e dias adicionais posteriores).
+  - **Spawn de Monstros Dobrado**: Durante todo o dia de eclipse, a taxa, limite e velocidade de spawn de lobisomens e feras nos ermos são **estritamente dobrados**.
+  - **Diálogo Profético de Todos os NPCs**: Todo e qualquer habitante abordado para conversa durante o eclipse proclama o aviso de pavor:
+    *« O maligno que habita nesse mundo decidiu nos mostrar a sua face, cuidado jovem, coisas ruins acontecerão. »*
+  - **Persistência Completa**: O número de dias passados, eclipses vivenciados e o calendário agendado são salvos automaticamente no `localStorage` ao dormir na cama e podem ser inspecionados em tempo real na tela de debug `F3`.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

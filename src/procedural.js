@@ -1050,12 +1050,15 @@ export function updateWildernessSpawns(playerPos, cityData, isNight, monstersPoo
     }
   }
 
-  // Rate-limiting do trigger (~1 avaliação por segundo ou gatilho probabilístico do frame)
+  // Rate-limiting do trigger: no dia do eclipse, o ritmo de avaliação é dobrado
   _wildernessTimer += dt;
-  if (_wildernessTimer < 0.85 && Math.random() >= 0.02) return;
+  const evalInterval = WorldDecay.isEclipse ? 0.42 : 0.85;
+  if (_wildernessTimer < evalInterval && Math.random() >= (WorldDecay.isEclipse ? 0.04 : 0.02)) return;
   _wildernessTimer = 0;
 
-  if (Math.random() < CHANCE_WEREWOLF) {
+  // No dia do eclipse, o spawn de monstros é estritamente dobrado (só nesse dia)
+  const spawnChance = WorldDecay.isEclipse ? CHANCE_WEREWOLF * 2.0 : CHANCE_WEREWOLF;
+  if (Math.random() < spawnChance) {
     const werewolf = monstersPool.find((m) => !m.visible);
     if (werewolf) {
       // Spawna na distância cega (45m) ao redor do jogador

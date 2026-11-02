@@ -1439,7 +1439,7 @@ export function initCheatMenu(env = {}) {
 
     triggerApocalypse() {
       import("./decay.js").then(({ triggerDemiurgeCataclysm }) => {
-        triggerDemiurgeCataclysm(window.__game || env);
+        triggerDemiurgeCataclysm(window.__game || env, true);
         env.ui?.showToast?.("☄️ CHEAT: O Mal Final foi invocado! O Demiurgo desce dos céus!");
         console.log("☄️ CHEAT: Descida do Demiurgo iniciada");
       }).catch((err) => {

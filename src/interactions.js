@@ -33,6 +33,7 @@ import {
 } from "./demiurgeBook.js";
 import { checkCrystalNearby, collectCrystalNode, applyTorchColor, CRYSTAL_PALETTE } from "./crystals.js";
 import { checkGhostTownRubbleNearby, searchGhostTownRubble } from "./ghostTowns.js";
+import { WorldDecay } from "./decay.js";
 
 const CULTIST_RUMORS = [
   "«Eu vi fumaça negra além das árvores... deve ser apenas um raio.»",
@@ -368,7 +369,19 @@ export class InteractionSystem {
         ? ` (Carisma ${PlayerStats.cha}: +${Math.abs(discountPct)}% nos preços)`
         : "";
 
-    let body = `${npc.task}.${chaNote}`;
+    let eclipseHeader = "";
+    if (WorldDecay && WorldDecay.isEclipse) {
+      const quotes = [
+        "O maligno que habita nesse mundo decidiu nos mostrar a sua face, cuidado jovem, coisas ruins acontecerão.",
+        "O sol sangrou e o dia virou trevas... O maligno que habita nesse mundo decidiu nos mostrar a sua face! Cuidado jovem, coisas ruins acontecerão.",
+        "Cuidado jovem, coisas ruins acontecerão. O maligno decidiu nos mostrar sua face sob este manto escarlate.",
+        "Os sinos dobram sozinhos e as feras uivam apavoradas... O maligno que habita nesse mundo decidiu nos mostrar sua face neste eclipse!",
+      ];
+      const q = quotes[Math.floor(Math.random() * quotes.length)];
+      eclipseHeader = `🌑 « ${q} »\n\n`;
+    }
+
+    let body = `${eclipseHeader}${npc.task}.${chaNote}`;
     let actions = [{ id: "close", label: "Encerrar conversa" }];
 
     if (npc.root?.userData?.isMissionDebtor) {
@@ -612,11 +625,14 @@ export class InteractionSystem {
         { id: "close", label: "Encerrar conversa" },
       ];
     }
-    this.ui.showDialogue(npc.name, body, actions, {
+    const finalBody = (eclipseHeader && !body.includes(eclipseHeader)) ? (eclipseHeader + body) : body;
+    this.ui.showDialogue(npc.name, finalBody, actions, {
       role: npc.title || "Habitante de Caldera",
       roleKey: npc.roleKey,
       customPortrait: npc.portrait || (npc.roleKey === "cult_leader" ? CULT_LEADER_PORTRAIT : null),
-      eyebrow: npc.roleKey === "cult_leader" ? "GRANDE BASTIÃO DE REX MUNDI · DIÁLOGO HERÉTICO" : "CALDERA · CONVERSA & COMÉRCIO",
+      eyebrow: (WorldDecay && WorldDecay.isEclipse)
+        ? "🌑 DIA DE ECLIPSE · O MALIGNO MOSTRA SUA FACE"
+        : (npc.roleKey === "cult_leader" ? "GRANDE BASTIÃO DE REX MUNDI · DIÁLOGO HERÉTICO" : "CALDERA · CONVERSA & COMÉRCIO"),
       funds: {
         coins: this.player.coins,
         wood: PlayerInventory.wood,

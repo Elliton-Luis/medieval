@@ -208,9 +208,11 @@ export class DebugScreen {
     this._leftLines[4].innerHTML = `Chunk: [<span class="debug-highlight">${chunkX}, ${chunkZ}</span>] · ${activeChunksCount} chunks ativos (raio 2)`;
     this._leftLines[5].innerHTML = `Direção: <span class="debug-highlight">${facing.cardinal}</span> (Yaw: ${facing.deg}° / Pitch: ${(pitch * 180 / Math.PI).toFixed(1)}°)`;
     this._leftLines[6].innerHTML = `Chão Y: ${groundY.toFixed(2)}m (${hasFloor ? '<span class="debug-good">Piso OBB Construído</span>' : 'Terreno Natural'})`;
-    this._leftLines[7].innerHTML = `Tempo: <span class="debug-highlight">${timeStr}</span> (${dayNightState} · Ciclo: ${(progress * 100).toFixed(1)}%)`;
+    const dayStr = `Dia <span class="debug-highlight">${WorldDecay?.daysPassed ?? 1}</span>`;
+    const eclipseTag = WorldDecay?.isEclipse ? ' · <span class="debug-alert">🌑 ECLIPSE ATIVO (Spawn 2x)</span>' : '';
+    this._leftLines[7].innerHTML = `${dayStr} · Tempo: <span class="debug-highlight">${timeStr}</span> (${dayNightState})${eclipseTag}`;
     this._leftLines[8].innerHTML = `Luz Solar: ${daylightPct}% · Jogador Iluminado: ${isPlayerLit ? '<span class="debug-good">Sim</span>' : '<span class="debug-warn">Escuro</span>'}`;
-    this._leftLines[9].innerHTML = `Bioma: <span class="debug-cyan">Reino de Caldera</span> · Decaimento: ${(WorldDecay?.evilLevel ?? 0).toFixed(1)}%`;
+    this._leftLines[9].innerHTML = `Bioma: <span class="debug-cyan">Reino de Caldera</span> · Decaimento: ${((WorldDecay?.decayLevel ?? 0) * 100).toFixed(0)}% · Eclipses: ${WorldDecay?.eclipsesExperienced ?? 0}`;
     this._leftLines[10].innerHTML = `Jogador: HP <span class="debug-good">${hp}/${maxHp}</span> · Stamina: <span class="debug-cyan">${stamina}/100</span> · Ouro: <span class="debug-highlight">${gold}</span>`;
     this._leftLines[11].innerHTML = `Alerta / Procurado: ${wantedLvl > 0 ? `<span class="debug-alert">Nível ${wantedLvl}</span>` : '<span class="debug-good">Tranquilo (0)</span>'}`;
     this._leftLines[12].innerHTML = `Postura: ${player.mounted ? '<span class="debug-highlight">Montado a Cavalo</span>' : player.crouching ? '<span class="debug-purple">Furtivo (Agachado)</span>' : 'A Pé'}`;

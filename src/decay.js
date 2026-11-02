@@ -1,19 +1,75 @@
 import * as THREE from "three";
 import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js";
-import { spawnWaypointMarker } from "./rpg.js";
+import { spawnWaypointMarker, getEvilPercent } from "./rpg.js";
 import { showVictoryEndingModal } from "./gameEndingScreen.js";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
 // ============================================================================
 export const WorldDecay = {
-  daysPassed: 0,
+  daysPassed: 1, // Inicia no Dia 1
   decayLevel: 0.0, // 0.0 (Normal) a 1.0 (Apocalipse)
   isEclipse: false,
   eclipseDayRemaining: 0,
-  lightningTimer: 14.0, // Tempo até o próximo raio apocalíptico
-  pendingLightning: null, // Ponto de aviso prévio de faíscas (1s antes)
+  scheduledEclipseDays: [], // Dias de eclipse sorteados (sempre > Dia 4)
+  eclipsesExperienced: 0,   // Contagem de eclipses já ocorridos
+  lightningTimer: 14.0,     // Tempo até o próximo raio apocalíptico
+  pendingLightning: null,   // Ponto de aviso prévio de faíscas (1s antes)
+
+  /**
+   * Sorteia ao menos 1 dia de eclipse estritamente DEPOIS do dia 4 (dia >= 5).
+   * Pode ser 1 ou mais dias. Como o final com maldade > 90% pode acontecer no dia 7,
+   * o primeiro dia sorteado é estrategicamente agendado no dia 5 ou 6.
+   */
+  initEclipseSchedule() {
+    if (this.scheduledEclipseDays && this.scheduledEclipseDays.length > 0) return;
+    const firstDay = Math.random() < 0.5 ? 5 : 6; // Dia 5 ou 6 (após dia 4)
+    this.scheduledEclipseDays = [firstDay];
+    // Sorteia se haverá mais dias de eclipse (pode ser 1 ou mais)
+    if (Math.random() < 0.65) {
+      const secondDay = 10 + Math.floor(Math.random() * 5); // Dia 10, 11, 12, 13 ou 14
+      this.scheduledEclipseDays.push(secondDay);
+    }
+  },
+
+  restore(saved) {
+    if (!saved) return;
+    if (typeof saved.daysPassed === "number") this.daysPassed = saved.daysPassed;
+    if (typeof saved.decayLevel === "number") this.decayLevel = saved.decayLevel;
+    if (typeof saved.isEclipse === "boolean") this.isEclipse = saved.isEclipse;
+    if (typeof saved.eclipsesExperienced === "number") this.eclipsesExperienced = saved.eclipsesExperienced;
+    if (Array.isArray(saved.eclipseDays) && saved.eclipseDays.length > 0) {
+      this.scheduledEclipseDays = saved.eclipseDays;
+    } else {
+      this.initEclipseSchedule();
+    }
+  },
 };
+
+WorldDecay.initEclipseSchedule();
+
+/**
+ * Validação estrita das regras do Final do Demiurgo:
+ * 1. Deve ter acontecido AO MENOS 1 DIA DE ECLIPSE antes do cataclismo.
+ * 2. Se maldade > 90%: pode acontecer a partir do Dia 7.
+ * 3. Se maldade <= 90%: só pode acontecer estritamente DEPOIS do Dia 15 (Dia 16+).
+ */
+export function canDemiurgeCataclysmTrigger() {
+  if ((WorldDecay.eclipsesExperienced || 0) < 1) {
+    return false; // Obrigatório: ao menos 1 eclipse precisa ter acontecido antes
+  }
+
+  const evil = typeof getEvilPercent === "function" ? getEvilPercent() : 50;
+  const day = WorldDecay.daysPassed;
+
+  // Se maldade acima de 90%, permitido a partir do dia 7
+  if (evil > 90) {
+    return day >= 7;
+  }
+
+  // Caso contrário, só pode acontecer depois do dia 15
+  return day > 15;
+}
 
 const _normalSkyDay = new THREE.Color("#cad4e0");
 const _normalSkyNight = new THREE.Color("#0c121e");
@@ -77,36 +133,42 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
 // ============================================================================
 export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) {
   WorldDecay.daysPassed++;
-  // O mundo atinge o nível máximo de corrupção em ~20 dias
-  WorldDecay.decayLevel = Math.min(1.0, WorldDecay.daysPassed * 0.05);
+  WorldDecay.initEclipseSchedule();
 
-  // Aumenta 5% de chance do Fim dos Tempos a cada dia passado
+  // 1. Finaliza eclipse anterior se estava ativo no dia passado
+  if (WorldDecay.isEclipse) {
+    WorldDecay.isEclipse = false;
+    WorldDecay.eclipseDayRemaining = 0;
+    ui?.showToast?.("✦ O sangue arrefece no horizonte. O Eclipse cessou por ora.");
+  }
+
+  // 2. Verifica se hoje é um dos dias agendados de Eclipse (> Dia 4)
+  const isTodayEclipse = WorldDecay.scheduledEclipseDays.includes(WorldDecay.daysPassed);
+  if (isTodayEclipse) {
+    WorldDecay.isEclipse = true;
+    WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo de 24h
+    WorldDecay.eclipsesExperienced = (WorldDecay.eclipsesExperienced || 0) + 1;
+    ui?.showToast?.("🌑 O Olho do Demiurgo se abre! O Sol sangra no firmamento... O Eclipse começou!");
+    if (effects && world) {
+      effects.play("star", 0, 10, 0, "#ff2211", 3.0);
+    }
+  }
+
+  // 3. Aumenta corrupção progressiva (decaimento do mundo)
+  WorldDecay.decayLevel = Math.min(1.0, WorldDecay.daysPassed * 0.05);
   const currentApocalypseChance = CultState?.addApocalypseProgress?.(5) || 0;
 
-  // Gerenciamento da duração do Eclipse e sorteio do Apocalipse
-  if (WorldDecay.isEclipse) {
-    WorldDecay.eclipseDayRemaining--;
-    if (WorldDecay.eclipseDayRemaining <= 0) {
-      WorldDecay.isEclipse = false;
-      ui?.showToast?.("✦ O sangue arrefece no horizonte. O Eclipse cessou por ora.");
-    }
-  } else {
-    // Sorteio do Apocalipse do Demiurgo conforme a probabilidade acumulada
-    const rollApocalypse = Math.random() * 100 < currentApocalypseChance;
+  // 4. Avaliação estrita do Fim dos Tempos (Descida do Demiurgo):
+  // Regra do Usuário:
+  // - Requisito preliminar: deve ter ocorrido ao menos 1 eclipse antes.
+  // - Se maldade > 90%: pode acontecer a partir do Dia 7.
+  // - Se maldade <= 90%: só pode acontecer estritamente depois do Dia 15.
+  if (canDemiurgeCataclysmTrigger() && !WorldDecay.isEclipse) {
+    const evil = typeof getEvilPercent === "function" ? getEvilPercent() : 50;
+    const triggerChance = evil > 90 ? Math.max(35, currentApocalypseChance) : currentApocalypseChance;
+    const rollApocalypse = Math.random() * 100 < triggerChance;
     if (rollApocalypse && window.__game) {
       triggerDemiurgeCataclysm(window.__game);
-    } else {
-      // O Eclipse só pode surgir a partir do Dia 5 E com corrupção avançada (>= 25%), nunca precocemente no Dia 2
-      const canEclipse = WorldDecay.daysPassed >= 5 && (currentApocalypseChance >= 25 || WorldDecay.daysPassed >= 16);
-      const rollEclipse = canEclipse && (Math.random() * 100 < (currentApocalypseChance * 0.6) || WorldDecay.daysPassed >= 18);
-      if (rollEclipse) {
-        WorldDecay.isEclipse = true;
-        WorldDecay.eclipseDayRemaining = 1; // 1 ciclo completo
-        ui?.showToast?.("🌑 O Olho do Demiurgo se abre! O Sol sangra no firmamento!");
-        if (effects && world) {
-          effects.play("star", 0, 10, 0, "#ff2211", 3.0);
-        }
-      }
     }
   }
 
@@ -1484,9 +1546,12 @@ export const DemiurgeCataclysm = {
 
 /**
  * Inicia o Fim dos Tempos: Descida do Demiurgo à Terra.
+ * @param {object} env
+ * @param {boolean} [force=false] - Se true, bypassa as travas de dia/eclipse (ex: Cheat Menu)
  */
-export function triggerDemiurgeCataclysm(env) {
+export function triggerDemiurgeCataclysm(env, force = false) {
   if (DemiurgeCataclysm.active) return;
+  if (!force && !canDemiurgeCataclysmTrigger()) return;
   DemiurgeCataclysm.active = true;
   DemiurgeCataclysm.timer = 0;
   DemiurgeCataclysm.lastDescentSound = 0;

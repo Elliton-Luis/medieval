@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { spawnLoot, addGood } from "./rpg.js";
+import { WorldDecay } from "./decay.js";
 
 // ============================================================================
 // Materiais Otimizados para as Criaturas Sobrenaturais (Zero-GC)
@@ -1402,16 +1403,21 @@ export class BeastManager {
       this.polyphoniaList[i].update(dt, isNight);
     }
 
-    // À noite, repõe criaturas mortas periodicamente de forma randômica
-    if (isNight) {
+    // À noite ou durante o Eclipse, repõe criaturas mortas periodicamente
+    const isDangerous = isNight || (WorldDecay && WorldDecay.isEclipse);
+    if (isDangerous) {
       this.respawnTimer += dt;
-      if (this.respawnTimer > 28.0) {
+      const isEclipse = Boolean(WorldDecay && WorldDecay.isEclipse);
+      const respawnLimit = isEclipse ? 14.0 : 28.0; // Dobro da taxa de reposição no eclipse
+      if (this.respawnTimer > respawnLimit) {
         this.respawnTimer = 0;
+        const maxBiters = isEclipse ? 8 : 4; // Dobro do limite de feras ativas no eclipse
         const activeBiters = this.biters.filter((b) => b.alive && b.root.visible).length;
-        if (activeBiters < 4) {
+        if (activeBiters < maxBiters) {
           const px = this.player.x ?? 0;
           const pz = this.player.z ?? 0;
-          this.spawnRandomBiters(px, pz, 2);
+          const spawnCount = isEclipse ? 4 : 2; // Dobro da quantidade spawnada por leva
+          this.spawnRandomBiters(px, pz, spawnCount);
         }
       }
     }

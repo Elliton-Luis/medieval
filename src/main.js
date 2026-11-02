@@ -347,6 +347,9 @@ window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, wo
 
 const saved = loadGame();
 if (saved) {
+  if (saved.decay) {
+    WorldDecay.restore(saved.decay);
+  }
   if (saved.stats) {
     PlayerStats.str = saved.stats.str ?? PlayerStats.str;
     PlayerStats.con = saved.stats.con ?? PlayerStats.con;
