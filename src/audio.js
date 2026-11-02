@@ -21,6 +21,9 @@ export class GameAudio {
     this.musicMuted = false;
     this.musicIndoor = 1;
     this.onUnlock = [];
+    this.sfxBuffers = new Map();
+    this.beastStepBuffers = [];
+    this._sfxLoadingStarted = false;
     const unlock = () => this._unlock();
     for (const type of ["pointerdown", "keydown", "mousedown", "click"]) window.addEventListener(type, unlock);
     window.addEventListener("keydown", (event) => {
@@ -46,9 +49,118 @@ export class GameAudio {
       this.noise = this.context.createBuffer(1, length, this.context.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+      this._preloadSfx();
       for (const callback of this.onUnlock) callback();
     }
     if (this.context.state === "suspended") this.context.resume();
+  }
+
+  _preloadSfx() {
+    if (!this.context || this._sfxLoadingStarted) return;
+    this._sfxLoadingStarted = true;
+
+    const load = (name, url) => {
+      fetch(encodeURI(url))
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((buf) => this.context.decodeAudioData(buf))
+        .then((decoded) => {
+          this.sfxBuffers.set(name, decoded);
+        })
+        .catch((err) => {
+          console.warn(`[Audio] Falha ao carregar som ${url}:`, err);
+        });
+    };
+
+    load("sword", "audio/efeitos sonoros/espada.wav");
+    load("knife", "audio/efeitos sonoros/faca.wav");
+    load("grassStep", "audio/efeitos sonoros/passos_grama.flac");
+    load("wolfHowl", "audio/efeitos sonoros/lobo\u2044lobisomen.mp3");
+
+    for (let i = 0; i < 8; i++) {
+      const stepUrl = `audio/efeitos sonoros/passos_lobos\u2044lobisomens/${i}.ogg`;
+      fetch(encodeURI(stepUrl))
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((buf) => this.context.decodeAudioData(buf))
+        .then((decoded) => {
+          this.beastStepBuffers.push(decoded);
+        })
+        .catch((err) => {
+          console.warn(`[Audio] Falha ao carregar passo de fera ${i}:`, err);
+        });
+    }
+  }
+
+  playBuffer(buffer, volume = 1.0, pitchVariation = 0.05) {
+    if (!this.context || !buffer || !this.sfx) return null;
+    const t = this.context.currentTime;
+    const src = this.context.createBufferSource();
+    src.buffer = buffer;
+    if (pitchVariation > 0) {
+      src.playbackRate.value = 1.0 + (Math.random() * 2 - 1) * pitchVariation;
+    }
+    const gain = this.context.createGain();
+    gain.gain.value = Math.max(0, volume);
+    src.connect(gain).connect(this.sfx);
+    src.start(t);
+    return src;
+  }
+
+  playSword(heavy = false) {
+    const buf = this.sfxBuffers.get("sword");
+    if (buf) {
+      this.playBuffer(buf, heavy ? 0.95 : 0.78, 0.08);
+      return true;
+    }
+    return false;
+  }
+
+  playKnife() {
+    const buf = this.sfxBuffers.get("knife");
+    if (buf) {
+      this.playBuffer(buf, 0.8, 0.1);
+      return true;
+    }
+    return false;
+  }
+
+  playGrassStep(run = false, strength = 1.0) {
+    const buf = this.sfxBuffers.get("grassStep");
+    if (buf) {
+      const vol = (run ? 0.75 : 0.48) * strength;
+      this.playBuffer(buf, vol, 0.12);
+      return true;
+    }
+    return false;
+  }
+
+  playWolfHowl(volume = 0.8, distance = 0) {
+    const buf = this.sfxBuffers.get("wolfHowl");
+    if (buf) {
+      const distFactor = Math.max(0, 1 - distance / 95);
+      if (distFactor <= 0.01) return false;
+      this.playBuffer(buf, volume * distFactor, 0.04);
+      return true;
+    }
+    return false;
+  }
+
+  playBeastStep(distance = 0) {
+    if (this.beastStepBuffers.length === 0) return false;
+    const distFactor = Math.max(0, 1 - distance / 70);
+    if (distFactor <= 0.02) return false;
+    const idx = Math.floor(Math.random() * this.beastStepBuffers.length);
+    const buf = this.beastStepBuffers[idx];
+    if (buf) {
+      this.playBuffer(buf, 0.65 * distFactor, 0.08);
+      return true;
+    }
+    return false;
   }
 
   _save() {
@@ -205,8 +317,15 @@ export class GameAudio {
     this._tone("sine", 56, 34, 0.15, 0.38 * strength, 0.2);
   }
 
-  // Passos: um sopro curto e abafado + uma batida grave. Corrida soa mais forte.
+  // Passos: som real de passos na grama/terra (passos_grama.flac) + batida grave de apoio.
   step(run, strength = 1) {
+    if (this.playGrassStep(run, strength)) {
+      if (this.context) {
+        const v = (run ? 0.35 : 0.2) * strength;
+        this._tone("sine", 95 + Math.random() * 20, 45, 0.07, v);
+      }
+      return;
+    }
     if (!this.context) return;
     const v = (run ? 0.8 : 0.55) * strength * (0.8 + Math.random() * 0.4);
     this._burst(0.09, v, "lowpass", 650 + Math.random() * 450, 180);
@@ -275,8 +394,22 @@ export class GameAudio {
     this._burst(heavy ? 0.28 : 0.2, heavy ? 0.28 : 0.2, "bandpass", 700, heavy ? 1800 : 2400);
   }
 
-  // Golpe no ar conforme o tipo da arma.
-  weaponSwing(kind = "slash", heavy = false) {
+  // Golpe no ar conforme o tipo da arma (suporta samples reais de espada.wav e faca.wav).
+  weaponSwing(kind = "slash", heavy = false, weaponId = null) {
+    if (weaponId === "knife" || weaponId === "dagger" || weaponId === "knives" || kind === "knife") {
+      if (this.playKnife()) return;
+    }
+    if (
+      weaponId === "shortsword" ||
+      weaponId === "longsword" ||
+      weaponId === "greatsword" ||
+      weaponId === "halberd" ||
+      kind === "slash" ||
+      kind === "blade"
+    ) {
+      if (this.playSword(heavy)) return;
+    }
+
     const v = heavy ? 1.3 : 1;
     switch (kind) {
       case "punch": this._burst(0.12, 0.2 * v, "lowpass", 900, 250); break;

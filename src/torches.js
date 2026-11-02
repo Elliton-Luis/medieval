@@ -40,8 +40,8 @@ export function setupAtmosphere(scene, renderer) {
  * @param {THREE.PointLight} light
  */
 export function configureDistantLight(light) {
-  light.distance = 45.0; // Visível a longa distância
-  light.decay = 1.8;     // Decaimento suave
+  light.distance = 75.0; // Visível a longa distância
+  light.decay = 1.38;     // Decaimento suave e envolvente
   light.castShadow = false; // Obrigatório: evita cálculo de shadow map em luzes secundárias
 }
 
@@ -165,28 +165,30 @@ export function updateGuardTracking(guard, playerPos, isPlayerLit, isNight, delt
   return _driftDir;
 }
 
-export function makeGlowTexture(inner = "255,200,120") {
+export function makeGlowTexture(inner = "255,225,160") {
   const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 64;
+  canvas.width = 128;
+  canvas.height = 128;
   const ctx = canvas.getContext("2d");
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
   g.addColorStop(0, `rgba(${inner},1)`);
-  g.addColorStop(0.35, `rgba(255,140,50,0.55)`);
-  g.addColorStop(1, "rgba(255,90,20,0)");
+  g.addColorStop(0.2, "rgba(255,185,85,0.85)");
+  g.addColorStop(0.5, "rgba(255,120,40,0.42)");
+  g.addColorStop(0.8, "rgba(255,75,15,0.14)");
+  g.addColorStop(1, "rgba(255,50,10,0)");
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillRect(0, 0, 128, 128);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 
-const MAX_LIGHTS = 8;
+const MAX_LIGHTS = 24;
 const EMBERS = 90;
 const _sortByDist = (a, b) => a.d - b.d;
 
 // Tochas fixas, lareiras e pool de tochas dos guardas:
-// só as mais próximas usam PointLight real (Zero-GC); as demais usam emissivo + sprite de brilho.
+// agora com pool expandido para 24 PointLights ativas para iluminar completamente as cidades à noite.
 export class TorchSystem {
   constructor(scene, world, dayNight) {
     this.scene = scene;
@@ -199,7 +201,7 @@ export class TorchSystem {
     this.glow = makeGlowTexture();
     this.lights = [];
     for (let i = 0; i < MAX_LIGHTS; i++) {
-      const light = new THREE.PointLight("#ffb060", 0, 90.0, 1.8);
+      const light = new THREE.PointLight("#ffaa50", 0, 75.0, 1.38);
       configureDistantLight(light);
       light.userData.source = null;
       scene.add(light);
@@ -209,7 +211,7 @@ export class TorchSystem {
     // Pool fixo de 8 PointLights para as tochas dos guardas (nunca aloca no loop)
     this.guardTorchPool = [];
     for (let i = 0; i < GUARD_TORCH_POOL_SIZE; i++) {
-      const guardLight = new THREE.PointLight(0xff8833, 4.4, 48.0, 2.0);
+      const guardLight = new THREE.PointLight(0xff9944, 8.5, 56.0, 1.6);
       guardLight.castShadow = false;
       guardLight.visible = false;
       this.guardTorchPool.push(guardLight);
@@ -220,7 +222,7 @@ export class TorchSystem {
     this.headGeometry = new THREE.CylinderGeometry(0.075, 0.05, 0.2, 6);
     this.stickMaterial = new THREE.MeshStandardMaterial({ color: "#4a3626", roughness: 1, flatShading: true });
     this.headMaterial = new THREE.MeshStandardMaterial({ color: "#2c2218", emissive: "#ff7a22", emissiveIntensity: 0, roughness: 1, flatShading: true });
-    this.guardHeadMaterial = new THREE.MeshStandardMaterial({ color: "#2c2218", emissive: "#ff8833", emissiveIntensity: 1.8, roughness: 1, flatShading: true });
+    this.guardHeadMaterial = new THREE.MeshStandardMaterial({ color: "#2c2218", emissive: "#ff8833", emissiveIntensity: 4.5, roughness: 1, flatShading: true });
     this.poleMaterial = new THREE.MeshStandardMaterial({ color: "#503b2a", roughness: 1, flatShading: true });
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -300,7 +302,7 @@ export class TorchSystem {
     const customHeadMaterial = new THREE.MeshStandardMaterial({
       color: "#2c2218",
       emissive: pal.flameHex,
-      emissiveIntensity: isAlwaysLit ? 2.5 : (this.lit ? 1.8 : 0.05),
+      emissiveIntensity: isAlwaysLit ? 5.8 : (this.lit ? 4.8 : 0.05),
       roughness: 1,
       flatShading: true,
     });
@@ -320,7 +322,7 @@ export class TorchSystem {
       group.position.set(x, y, z);
     }
     this.group.add(group);
-    const spriteScale = isPlayerPlaced ? 1.4 : 0.9;
+    const spriteScale = isPlayerPlaced ? 2.2 : (post ? 2.0 : 1.7);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: this.glow,
       color: pal.flameHex,
@@ -328,16 +330,16 @@ export class TorchSystem {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     }));
-    sprite.scale.set(spriteScale, spriteScale * 1.25, 1);
+    sprite.scale.set(spriteScale, spriteScale * 1.35, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
     sprite.visible = isAlwaysLit;
     this.scene.add(sprite);
 
     // Tochas fixadas pelo jogador recebem iluminação direta dedicada forte (PointLight)
-    // que banha paredes e chão intensamente sem depender do limite de 8 luzes das vilas
+    // que banha paredes e chão intensamente sem depender do limite de luzes das vilas
     let torchLight = null;
     if (isPlayerPlaced || alwaysOn) {
-      torchLight = new THREE.PointLight(pal.flameHex, 18.0, 32.0, 1.8);
+      torchLight = new THREE.PointLight(pal.flameHex, 36.0, 52.0, 1.4);
       torchLight.castShadow = false;
       torchLight.position.set(x + nx * 0.27, y + 0.6, z + nz * 0.27);
       this.scene.add(torchLight);
@@ -351,13 +353,14 @@ export class TorchSystem {
       phase: Math.random() * 6.28,
       kind: "torch",
       alwaysOn: isAlwaysLit,
-      light: !torchLight, // Se tiver PointLight dedicada, não compete no pool genérico de 8
+      light: !torchLight,
       group,
       lightColor: pal.flameHex,
       colorKey,
       headMaterial: customHeadMaterial,
       pointLight: torchLight,
       isPlayerPlaced: Boolean(isPlayerPlaced),
+      isPost: Boolean(post),
     };
     this.sources.push(source);
     return source;
@@ -422,11 +425,11 @@ export class TorchSystem {
     const daylight = this.dayNight.daylight;
     if (!this.lit && daylight < 0.42) this.lit = true;
     else if (this.lit && daylight > 0.55) this.lit = false;
-    this.headMaterial.emissiveIntensity = this.lit ? 1.8 : 0.05;
+    this.headMaterial.emissiveIntensity = this.lit ? 4.8 : 0.05;
     for (let s = 0; s < this.sources.length; s++) {
       const src = this.sources[s];
       if (src.headMaterial) {
-        src.headMaterial.emissiveIntensity = (src.alwaysOn || this.lit) ? 2.5 : 0.05;
+        src.headMaterial.emissiveIntensity = (src.alwaysOn || this.lit) ? 5.8 : 0.05;
       }
     }
 
@@ -439,12 +442,12 @@ export class TorchSystem {
       const dz = source.z - pz;
       const d = dx * dx + dz * dz;
       const on = this._isOn(source);
-      const near = d < 95 * 95;
-      const flicker = 0.85 + 0.15 * Math.sin(this.time * 11 + source.phase) + 0.08 * Math.sin(this.time * 23 + source.phase * 2);
+      const near = d < 160 * 160;
+      const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
       if (source.pointLight) {
         source.pointLight.visible = on && near;
         if (on && near) {
-          source.pointLight.intensity = 18.0 * flicker;
+          source.pointLight.intensity = 36.0 * flicker;
         } else {
           source.pointLight.intensity = 0;
         }
@@ -452,12 +455,13 @@ export class TorchSystem {
       if (source.sprite) {
         source.sprite.visible = on && near;
         if (on && near) {
-          const s = (source.kind === "hearth" ? 1.15 : 0.95) * flicker;
-          source.sprite.scale.set(s, s * 1.25, 1);
-          source.sprite.material.opacity = 0.78 + 0.22 * flicker;
+          const baseScale = source.kind === "hearth" ? 2.4 : (source.isPost ? 2.1 : 1.7);
+          const s = baseScale * flicker;
+          source.sprite.scale.set(s, s * 1.35, 1);
+          source.sprite.material.opacity = 0.88 + 0.12 * flicker;
         }
       }
-      if (!on || d > 65 * 65 || !source.light) continue;
+      if (!on || d > 115 * 115 || !source.light) continue;
       // lareiras só iluminam de noite ou quando o jogador está dentro da casa
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
       source.d = d;
@@ -498,14 +502,14 @@ export class TorchSystem {
       const light = this.lights[i];
       const source = light.userData.source;
       const flicker = source ? 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase) : 1;
-      const target = source ? (source.kind === "hearth" ? 56 : 90) * flicker : 0;
+      const target = source ? (source.kind === "hearth" ? 220 : 340) * flicker : 0;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
       if (source) {
-        light.position.set(source.x, source.y + 0.2, source.z);
+        light.position.set(source.x, source.y + 0.25, source.z);
         if (source.lightColor !== undefined) {
           light.color.setHex(source.lightColor);
         } else {
-          light.color.setHex(0xffb060);
+          light.color.setHex(0xffaa50);
         }
       }
     }

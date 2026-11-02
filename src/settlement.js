@@ -518,11 +518,19 @@ export function createSettlement(scene, world) {
   for (const house of houses) {
     for (const spot of house.torchSpots) torchSpots.push({ ...spot, post: false });
   }
-  // postes na estrada principal e em volta dos poços
+  // postes na estrada principal, pontos centrais de Caldera e em volta dos poços das vilas
   for (const z of [-14, -28, -42]) {
     post(-3.8, z);
     post(3.8, z);
   }
+  post(-4.2, -56); // Portão norte de Caldera
+  post(4.2, -56);
+  post(-12.0, -21.0); // Praça do Mercado de Caldera
+  post(-7.5, -21.0);
+  post(-9.0, -4.5);  // Pátio da Igreja de Caldera
+  post(-14.0, -4.5);
+  post(17.0, -4.0);  // Área externa do Ferreiro
+  post(23.0, -4.0);
   for (const place of villages) {
     for (const [dx, dz] of [[3.6, 3.6], [-3.6, 3.6], [3.6, -3.6], [-3.6, -3.6]]) post(place.village.x + dx, place.village.z + dz);
   }

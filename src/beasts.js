@@ -376,13 +376,14 @@ export { Gulur as TallWalker };
 // 2. Necron: O Humanoide Cego (Sem topo da cabeça, dentes expostos, fica esperando)
 // ============================================================================
 export class Necron {
-  constructor(scene, world, effects, combat, player, npcs, x, z) {
+  constructor(scene, world, effects, combat, player, npcs, x, z, audio = null) {
     this.scene = scene;
     this.world = world;
     this.effects = effects;
     this.combat = combat;
     this.player = player;
     this.npcs = npcs;
+    this.audio = audio;
     this.x = x;
     this.z = z;
     this.speed = 0;
@@ -396,6 +397,8 @@ export class Necron {
     this.roleKey = "necron";
     this.name = "Necron";
     this.deadTime = 0;
+    this._stepTimer = 0;
+    this._howlCooldown = 0;
 
     this.root = new THREE.Group();
     this.root.name = "Necron";
@@ -584,6 +587,7 @@ export class Necron {
     }
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    if (this._howlCooldown > 0) this._howlCooldown -= dt;
 
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
@@ -594,6 +598,10 @@ export class Necron {
 
     // O Necron fica esperando; SÓ ATACA QUANDO O PLAYER ESTÁ MUITO PERTO (<= 7.5m, distSq <= 56.25)
     if (distSq <= 56.25) {
+      if (this.state !== "charging" && this._howlCooldown <= 0) {
+        this._howlCooldown = 5.0;
+        this.audio?.playWolfHowl?.(0.85, Math.sqrt(distSq));
+      }
       this.state = "charging";
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 8.0);
@@ -613,6 +621,7 @@ export class Necron {
         this.speed = 1.8; // Desacelera para infligir a mordida sem atravessar o corpo
         if (this.attackCooldown <= 0) {
           this.attackCooldown = 0.95;
+          this.audio?.playWolfHowl?.(0.65, Math.sqrt(distSq));
           if (this.combat?.hurtPlayer) {
             this.combat.hurtPlayer(2.0, this.x, this.z, { weapon: "teeth_bite", knock: 3.2 });
           }
@@ -652,6 +661,12 @@ export class Necron {
       const legCycle = performance.now() * 0.022;
       this.legs[0].rotation.x = Math.sin(legCycle) * 0.7;
       this.legs[1].rotation.x = -Math.sin(legCycle) * 0.7;
+
+      this._stepTimer = (this._stepTimer || 0) + dt;
+      if (this._stepTimer >= 0.22) {
+        this._stepTimer = 0;
+        this.audio?.playBeastStep?.(Math.sqrt(distSq));
+      }
     } else {
       this.legs[0].rotation.x = 0;
       this.legs[1].rotation.x = 0;
@@ -1373,7 +1388,8 @@ export class BeastManager {
         this.player,
         this.npcs,
         bx,
-        bz
+        bz,
+        this.audio
       );
       this.biters.push(necron);
       if (this.npcs?.npcs && !this.npcs.npcs.includes(necron)) {
@@ -1406,6 +1422,12 @@ export class BeastManager {
     // À noite ou durante o Eclipse, repõe criaturas mortas periodicamente
     const isDangerous = isNight || (WorldDecay && WorldDecay.isEclipse);
     if (isDangerous) {
+      this.ambientHowlTimer = (this.ambientHowlTimer || (25 + Math.random() * 25)) - dt;
+      if (this.ambientHowlTimer <= 0) {
+        this.ambientHowlTimer = 45 + Math.random() * 45;
+        this.audio?.playWolfHowl?.(0.5, 55 + Math.random() * 30);
+      }
+
       this.respawnTimer += dt;
       const isEclipse = Boolean(WorldDecay && WorldDecay.isEclipse);
       const respawnLimit = isEclipse ? 14.0 : 28.0; // Dobro da taxa de reposição no eclipse

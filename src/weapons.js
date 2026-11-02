@@ -1757,7 +1757,7 @@ export class WeaponSystem {
     else if (weapon.type === "crossbow") this.effects.play("star", startX, startY, startZ, "#d5d0a7", 0.45);
     if (weapon.type === "bow") this.audio.shot("bow");
     else if (weapon.type === "crossbow") this.audio.shot("crossbow");
-    else this.audio.weaponSwing("stab", false);
+    else this.audio.weaponSwing("stab", false, weapon.id);
     this.aim.kick(weapon.kick);
     if (weapon.recoil) this.cameraRig.kick(weapon.recoil);
     if (weapon.id === "heavycrossbow") this.cameraRig.addShake(0.1);

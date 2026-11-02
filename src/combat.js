@@ -89,7 +89,7 @@ export class CombatSystem {
     this.player.startAttack(def.anim[step % def.anim.length], length);
     this.player.faceYaw = cameraYaw + Math.PI;
     this.player.faceTimer = 0.5;
-    this.audio.weaponSwing(def.sound, def.hands === 2 || finisher);
+    this.audio.weaponSwing(def.sound, def.hands === 2 || finisher, def.id);
 
     const forwardX = -Math.sin(cameraYaw);
     const forwardZ = -Math.cos(cameraYaw);

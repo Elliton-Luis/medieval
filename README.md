@@ -440,6 +440,38 @@ A geração procedural de vilas e o gerenciamento de mundo foram reformulados pa
 - Se o jogador purificar altares heréticos (`-12%`), curar doentes da peste (`-8%`), consertar e badalar o sino da igreja (`-15%` / `-2%`), apagar incêndios (`-5%`) e colher com sua foice (`-1.5%`), a corrupção recua continuamente.
 - O jogador pode conter o fim dos tempos indefinidamente, vivendo como um fazendeiro e sobrevivente em um mundo dinâmico e sem fim.
 
+## Iluminação Radiante e Ampliação de Tochas nas Cidades
+
+Anteriormente, as cidades e vilas à noite ficavam excessivamente escuras porque o sistema de iluminação estava restrito a apenas 8 fontes de luz pontuais (`MAX_LIGHTS = 8`) fracas (intensidade ~90 com decaimento 1.8), o que fazia com que uma vila inteira tivesse a maioria de suas tochas apagadas e sem projeção de luz no solo e nas paredes. A iluminação noturna foi completamente reformulada:
+
+- **Pool Expandido para 24 PointLights Ativas (`MAX_LIGHTS = 24`)**:
+  - Capacidade triplicada para permitir que avenidas inteiras, pátios de igrejas e praças de mercado fiquem simultaneamente iluminados.
+  - Mantém a arquitetura Zero-GC reaproveitando instâncias pré-alocadas de `THREE.PointLight` sem sombras secundárias (`castShadow = false`), rodando a 60 FPS lisos.
+- **Intensidade e Alcance Fortalecidos**:
+  - Alcance ampliado para **75 metros** (`distance = 75.0`) com decaimento suave de **1.38** (`decay = 1.38`).
+  - Intensidade das tochas aumentada para **340** (e **220** para lareiras), cortando a neblina densa e banhando o chão de paralelepípedos e as fachadas de madeira e pedra com um caloroso tom dourado âmbar (`#ffaa50`).
+- **Halo e Sprite de Fogo Volumétrico**:
+  - Textura de brilho gerada proceduralmente em alta resolução (`128x128`) com 5 gradientes quentes de emissão.
+  - Escala dos sprites de fogo dobrada (1.7x a 2.4x) com cintilação suave motivada pela física do ar.
+  - Material emissivo da ponta da tocha quadruplicado (`emissiveIntensity: 4.8 a 5.8`), mantendo os archotes visíveis a mais de 150m através da névoa.
+- **Novos Postes Estratégicos em Caldera**:
+  - Adicionados postes iluminados no Grande Portão Norte, na Praça do Mercado, no Pátio da Igreja e na Forja do Ferreiro, transformando Caldera em um verdadeiro refúgio vivo e radiante contra a escuridão dos ermos.
+
+## Novo Sistema de Áudio Imersivo e Efeitos Sonoros Reais
+
+Incorporados novos arquivos de áudio de alta fidelidade gravados para combate, movimentação e criaturas (`audio/efeitos sonoros/`), pré-carregados e decodificados em `AudioBuffer`s de baixa latência pelo `GameAudio` (`src/audio.js`):
+
+- **Passos Reais na Relva e Terra (`passos_grama.flac`)**:
+  - Movimentação do jogador agora reproduz passos nítidos de calçados sobre o solo e vegetação, com pitch aleatório dinâmico (`0.94 - 1.06`) e volume sincronizado com a passada anatômica e velocidade de corrida.
+- **Golpes de Espadas e Lâminas (`espada.wav`)**:
+  - Ataques com Espada Curta, Espada Longa, Montante e Alabarda tocam som encorpado de corte afiado no ar, distinguindo golpes normais e golpes pesados carregados.
+- **Cortes Ágeis de Facas e Adagas (`faca.wav`)**:
+  - Ataques rápidos com Faca, Adaga e Facas de Arremesso disparam áudio cortante e metálico de alta agilidade.
+- **Uivos e Rosnados de Feras (`lobo⁄lobisomen.mp3`)**:
+  - Criaturas predadoras dos ermos (como o Necron e Lobisomens) soltam rosnados e uivos ao avistarem o jogador e engajarem em investida feroz, além de uivos atmosféricos distantes ecoando periodicamente na neblina durante noites e eclipses.
+- **Passadas Pesadas de Predadores (`passos_lobos⁄lobisomens/{0..7}.ogg`)**:
+  - Banco de 8 variações dinâmicas de passos de garras e patas pesadas reproduzidos cadenciadamente durante as perseguições em alta velocidade das criaturas nos ermos.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.
