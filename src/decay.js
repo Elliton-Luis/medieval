@@ -1635,6 +1635,7 @@ export function triggerDemiurgeCataclysm(env, force = false) {
   }
 
   ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! OS ANJOS MALIGNOS DESCEM!");
+  audio?.playBigMonster?.(1.0);
   audio?.demiurgeDescent?.();
   audio?.deathBell?.();
 

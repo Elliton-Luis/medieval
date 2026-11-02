@@ -1428,6 +1428,13 @@ export class BeastManager {
         this.audio?.playWolfHowl?.(0.5, 55 + Math.random() * 30);
       }
 
+      // Eco misterioso do Big Monster na escuridão da noite (quando isolado na natureza)
+      this.ambientBigMonsterTimer = (this.ambientBigMonsterTimer || (20 + Math.random() * 25)) - dt;
+      if (this.ambientBigMonsterTimer <= 0) {
+        this.ambientBigMonsterTimer = 50 + Math.random() * 40;
+        this.audio?.playBigMonster?.(0.78, 55 + Math.random() * 45);
+      }
+
       this.respawnTimer += dt;
       const isEclipse = Boolean(WorldDecay && WorldDecay.isEclipse);
       const respawnLimit = isEclipse ? 14.0 : 28.0; // Dobro da taxa de reposição no eclipse

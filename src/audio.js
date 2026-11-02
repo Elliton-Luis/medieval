@@ -107,6 +107,9 @@ export class GameAudio {
     load("knife", "audio/sfx/knife.wav");
     load("grassStep", "audio/sfx/footsteps_grass.flac");
     load("wolfHowl", "audio/sfx/wolf_howl.mp3");
+    load("cutsceneMonster", "audio/sfx/cutscene monster.mp3");
+    load("cutsceneMonsterOverlap", "audio/sfx/custecene_monster_overlap.mp3");
+    load("bigMonster", "audio/sfx/big_monster.ogg");
 
     // Passos de feras
     for (let i = 0; i < 8; i++) {
@@ -317,6 +320,106 @@ export class GameAudio {
       this.playBuffer(buf, 0.65 * distFactor, 0.08);
       return true;
     }
+    return false;
+  }
+
+  /**
+   * Monstro da Cutscene com sobreposição polifônica:
+   * Camada 1: cutscene monster
+   * Camada 2: custecene_monster_overlap
+   * Camada 3: custecene_monster_overlap atrasada (+0.20s) e pitch mais grave
+   */
+  playCutsceneMonster(volume = 1.0) {
+    const buf1 = this.sfxBuffers.get("cutsceneMonster");
+    const buf2 = this.sfxBuffers.get("cutsceneMonsterOverlap");
+
+    if (this.context && this.sfx) {
+      const now = this.context.currentTime;
+      // Camada 1: som principal do monstro da cutscene
+      if (buf1) {
+        const src1 = this.context.createBufferSource();
+        src1.buffer = buf1;
+        const g1 = this.context.createGain();
+        g1.gain.value = 0.95 * volume * this.settings.sfx;
+        src1.connect(g1).connect(this.sfx);
+        src1.start(now);
+      } else {
+        try {
+          const a = new Audio("audio/sfx/cutscene monster.mp3");
+          a.volume = Math.min(1, 0.95 * volume * this.settings.sfx);
+          a.play().catch(() => {});
+        } catch (_) {}
+      }
+
+      // Camada 2: Overlap direto
+      if (buf2) {
+        const src2 = this.context.createBufferSource();
+        src2.buffer = buf2;
+        src2.playbackRate.value = 1.02;
+        const g2 = this.context.createGain();
+        g2.gain.value = 0.9 * volume * this.settings.sfx;
+        src2.connect(g2).connect(this.sfx);
+        src2.start(now);
+
+        // Camada 3: Overlap com leve atraso (+0.20s) e tom mais cavernoso/grave
+        const src3 = this.context.createBufferSource();
+        src3.buffer = buf2;
+        src3.playbackRate.value = 0.91; // pitch mais profundo/estranho
+        const g3 = this.context.createGain();
+        g3.gain.value = 0.72 * volume * this.settings.sfx;
+        src3.connect(g3).connect(this.sfx);
+        src3.start(now + 0.20);
+      } else {
+        try {
+          const a2 = new Audio("audio/sfx/custecene_monster_overlap.mp3");
+          a2.volume = Math.min(1, 0.9 * volume * this.settings.sfx);
+          a2.play().catch(() => {});
+          setTimeout(() => {
+            const a3 = new Audio("audio/sfx/custecene_monster_overlap.mp3");
+            a3.volume = Math.min(1, 0.72 * volume * this.settings.sfx);
+            a3.playbackRate = 0.91;
+            a3.play().catch(() => {});
+          }, 200);
+        } catch (_) {}
+      }
+      return true;
+    } else {
+      // Fallback sem AudioContext ativo
+      try {
+        const a1 = new Audio("audio/sfx/cutscene monster.mp3");
+        const a2 = new Audio("audio/sfx/custecene_monster_overlap.mp3");
+        a1.play().catch(() => {});
+        a2.play().catch(() => {});
+        setTimeout(() => {
+          const a3 = new Audio("audio/sfx/custecene_monster_overlap.mp3");
+          a3.playbackRate = 0.91;
+          a3.play().catch(() => {});
+        }, 200);
+        return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  /**
+   * Rugido do Big Monster: usado na escuridão da noite (quando isolado na natureza)
+   * e também na manifestação cataclísmica do Demiurgo.
+   */
+  playBigMonster(volume = 0.85, distance = 0) {
+    const buf = this.sfxBuffers.get("bigMonster");
+    const distFactor = distance > 0 ? Math.max(0, 1 - distance / 160) : 1.0;
+    if (distFactor <= 0.01) return false;
+
+    if (buf && this.context) {
+      this.playBuffer(buf, volume * distFactor, 0.04);
+      return true;
+    }
+    try {
+      const a = new Audio("audio/sfx/big_monster.ogg");
+      a.volume = Math.min(1, volume * distFactor * (this.settings?.sfx ?? 0.85));
+      a.play().catch(() => {});
+      return true;
+    } catch (_) {}
     return false;
   }
 
@@ -830,6 +933,7 @@ export class GameAudio {
 
   // Som contínuo de rugido e vento abissal da descida do Olho do Demiurgo
   demiurgeDescent() {
+    this.playBigMonster(0.95);
     if (!this.context) return;
     // Rugido descendente de baixa frequência
     this._tone("sawtooth", 140, 28, 2.2, 0.65);

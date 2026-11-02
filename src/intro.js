@@ -567,6 +567,7 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
 
       if (t >= 10.6 && GameState.introPhase < 2) {
         GameState.introPhase = 2;
+        if (audio?.playCutsceneMonster) audio.playCutsceneMonster(1.0);
         if (audio?.supernaturalScare) audio.supernaturalScare();
       }
 
