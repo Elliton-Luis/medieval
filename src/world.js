@@ -70,6 +70,7 @@ function createIsoscelesTriangleGeometry(baseWidth, height, yBottom = 0) {
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
   geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1));
   return geo;
 }
 
@@ -102,8 +103,12 @@ function createFarTreeImpostorGeometry() {
   shadow.translate(0, 0.04, 0);
   geos.push(shadow);
 
-  const merged = mergeGeometries(geos, false);
+  const nonIndexed = geos.map((g) => (g.index ? g.toNonIndexed() : g));
+  const merged = mergeGeometries(nonIndexed, false);
   for (const g of geos) g.dispose();
+  for (const g of nonIndexed) {
+    if (g !== merged) g.dispose();
+  }
   return merged;
 }
 
@@ -124,8 +129,12 @@ function createFarRockImpostorGeometry() {
   shadow.translate(0, 0.03, 0);
   geos.push(shadow);
 
-  const merged = mergeGeometries(geos, false);
+  const nonIndexed = geos.map((g) => (g.index ? g.toNonIndexed() : g));
+  const merged = mergeGeometries(nonIndexed, false);
   for (const g of geos) g.dispose();
+  for (const g of nonIndexed) {
+    if (g !== merged) g.dispose();
+  }
   return merged;
 }
 
@@ -1469,9 +1478,10 @@ export class World {
   }
 
   _makeInstances(geometry, material, data, setTransform, castShadow) {
+    if (!geometry) return null;
     const count = data.length;
     if (count === 0) return null;
-    if (geometry && !geometry.boundingSphere) {
+    if (!geometry.boundingSphere) {
       if (!geometry.boundingBox) geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
     }
