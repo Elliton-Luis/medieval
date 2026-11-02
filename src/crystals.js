@@ -215,7 +215,6 @@ export function updateCrystalLight(playerPos) {
     _sharedCrystalLight.position.set(0, -9999, 0);
   }
 }
-}
 
 // ============================================================================
 // Interação e Coleta de Cristais no Solo
