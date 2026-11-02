@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js";
 import { spawnWaypointMarker, getEvilPercent } from "./rpg.js";
 import { showVictoryEndingModal } from "./gameEndingScreen.js";
+import { EventBus, GAME_EVENTS } from "./EventBus.js";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
@@ -15,6 +16,18 @@ export const WorldDecay = {
   eclipsesExperienced: 0,   // Contagem de eclipses já ocorridos
   lightningTimer: 14.0,     // Tempo até o próximo raio apocalíptico
   pendingLightning: null,   // Ponto de aviso prévio de faíscas (1s antes)
+
+  reduceDecay(amount, reason = "") {
+    const prev = this.decayLevel;
+    this.decayLevel = Math.max(0, this.decayLevel - amount);
+    EventBus.emit(GAME_EVENTS.CORRUPTION_CHANGED, { level: this.decayLevel, delta: this.decayLevel - prev, reason });
+  },
+
+  addDecay(amount, reason = "") {
+    const prev = this.decayLevel;
+    this.decayLevel = Math.min(1.0, this.decayLevel + amount);
+    EventBus.emit(GAME_EVENTS.CORRUPTION_CHANGED, { level: this.decayLevel, delta: this.decayLevel - prev, reason });
+  },
 
   /**
    * Sorteia ao menos 1 dia de eclipse estritamente DEPOIS do dia 4 (dia >= 5).
@@ -57,6 +70,11 @@ WorldDecay.initEclipseSchedule();
 export function canDemiurgeCataclysmTrigger() {
   if ((WorldDecay.eclipsesExperienced || 0) < 1) {
     return false; // Obrigatório: ao menos 1 eclipse precisa ter acontecido antes
+  }
+
+  // Trava de Endless Survival: O apocalipse SÓ ocorre se a Barra Global de Corrupção atingir o limite (100% / 1.0)
+  if (WorldDecay.decayLevel < 0.99) {
+    return false;
   }
 
   const evil = typeof getEvilPercent === "function" ? getEvilPercent() : 50;
@@ -154,13 +172,17 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
     }
   }
 
-  // 3. Aumenta corrupção progressiva (decaimento do mundo)
-  WorldDecay.decayLevel = Math.min(1.0, WorldDecay.daysPassed * 0.05);
+  // 3. Aumenta corrupção progressiva diária (apenas +0.045 por dia, permitindo sobrevivência infinita via ações do jogador)
+  WorldDecay.addDecay(0.045, "DAILY_TICK");
   const currentApocalypseChance = CultState?.addApocalypseProgress?.(5) || 0;
 
-  // 4. Avaliação estrita do Fim dos Tempos (Descida do Demiurgo):
+  // 4. Eventos Orgânicos de Suspense por Âncoras (sem calendário fixo)
+  triggerOrganicVillageEvents(ui, effects);
+
+  // 5. Avaliação estrita do Fim dos Tempos (Descida do Demiurgo):
   // Regra do Usuário:
   // - Requisito preliminar: deve ter ocorrido ao menos 1 eclipse antes.
+  // - Trava de Endless Survival: Barra Global de Corrupção no limite (100%).
   // - Se maldade > 90%: pode acontecer a partir do Dia 7.
   // - Se maldade <= 90%: só pode acontecer estritamente depois do Dia 15.
   if (canDemiurgeCataclysmTrigger() && !WorldDecay.isEclipse) {
@@ -174,6 +196,43 @@ export function triggerDailyDecayCycle(world, npcs, horses, ui, scene, effects) 
 
   // Degradação silenciosa de flora e fauna (Zero-GC)
   applyFloraAndFaunaDecay(world, npcs, horses);
+}
+
+/**
+ * Dispara eventos orgânicos de suspense na virada da noite (baseados em testes de probabilidade PRNG).
+ */
+export function triggerOrganicVillageEvents(ui, effects) {
+  // 1. O Sacrifício: Animais têm chance procedural de amanhecerem mortos em seus currais com sangue
+  if (Math.random() < 0.28 && window.__game?.farmAnimals) {
+    const victim = window.__game.farmAnimals.triggerSacrificeEvent();
+    if (victim) {
+      ui?.showToast?.("🩸 O Sacrifício: Um animal amanheceu massacrado no curral! O terror toma a vila.");
+      WorldDecay.addDecay(0.025, "ANIMAL_SACRIFICED");
+      EventBus.emit(GAME_EVENTS.ANIMAL_SACRIFICED, { victim });
+    }
+  }
+
+  // 2. A Peste: NPCs têm chance procedural de amanhecerem doentes (sick = true)
+  if (Math.random() < 0.22 && window.__game?.npcs?.npcs) {
+    const villagers = window.__game.npcs.npcs.filter((n) => n.alive && !n.isDead && !n.sick && n.type === "villager");
+    if (villagers.length > 0) {
+      const sickNpc = villagers[Math.floor(Math.random() * villagers.length)];
+      sickNpc.sick = true;
+      sickNpc.task = "Acometido pela Peste Negra! (Ofereça uma Poção [E])";
+      ui?.showToast?.(`☣ A Peste: ${sickNpc.name || "Um aldeão"} adoeceu gravemente! Ajude-o com uma poção.`);
+      WorldDecay.addDecay(0.03, "NPC_SICK");
+      EventBus.emit(GAME_EVENTS.NPC_SICK, { npc: sickNpc });
+    }
+  }
+
+  // 3. O Colapso do Sino de Bronze da Igreja: Se a corrupção estiver alta (> 35%), chance de desabar da torre
+  if (WorldDecay.decayLevel > 0.35 && Math.random() < 0.2 && window.__game?.villageGenerator?.bells) {
+    const intactBells = window.__game.villageGenerator.bells.filter((b) => b.state === "intact");
+    if (intactBells.length > 0) {
+      const bell = intactBells[Math.floor(Math.random() * intactBells.length)];
+      bell.collapse();
+    }
+  }
 }
 
 function applyFloraAndFaunaDecay(world, npcs, horses) {

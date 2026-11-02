@@ -1503,6 +1503,29 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
     _env.ui?.showToast?.(`+${gainedStone} Pedra${bonusText} (Pedras: ${PlayerInventory.stone})`);
     syncPlayerStatsToPlayer();
     return true;
+  } else if ((toolType === "SCYTHE" || !toolType) && (hit.object.name === "Hay" || hit.object.name === "Crops" || hit.object.name === "Clutter_HayMounds" || hit.object.name === "Farm_Crops")) {
+    const gainedHay = Math.floor(Math.random() * 3) + 2;
+    PlayerInventory.hay = (PlayerInventory.hay || 0) + gainedHay;
+
+    _registerHarvestedInstance(hit.object, hit.instanceId);
+
+    hit.object.getMatrixAt(hit.instanceId, _dummyMatrix);
+    _dummyMatrix.scale(_zeroScale);
+    hit.object.setMatrixAt(hit.instanceId, _dummyMatrix);
+    hit.object.instanceMatrix.needsUpdate = true;
+
+    // Ação virtuosa de sobrevivente: recua a corrupção do mundo
+    if (typeof WorldDecay !== "undefined" && WorldDecay.decayLevel) {
+      WorldDecay.decayLevel = Math.max(0, WorldDecay.decayLevel - 0.015);
+    }
+
+    const pt = hit.point || hit.object.userData?.items?.[hit.instanceId];
+    if (pt && _env.effects) {
+      _env.effects.play("dust", pt.x, (pt.y ?? 0) + 0.4, pt.z, "#e3c26a", 1.4);
+    }
+    _env.ui?.showToast?.(`🌾 Colheita com a Foice! +${gainedHay} Feno (Feno: ${PlayerInventory.hay}) · A terra floresce (-1.5% Corrupção)`);
+    syncPlayerStatsToPlayer();
+    return true;
   } else if ((toolType === "PICKAXE" || toolType === "AXE" || !toolType) && hit.object.name === "Clay") {
     const gainedClay = Math.floor(Math.random() * 3) + 2;
     PlayerInventory.clay = (PlayerInventory.clay || 0) + gainedClay;

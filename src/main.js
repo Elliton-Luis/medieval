@@ -126,6 +126,9 @@ import {
   endIntroSequence,
   createTallFigure,
 } from "./intro.js";
+import { ClutterManager } from "./clutter.js";
+import { FarmAnimalManager } from "./farmAnimals.js";
+import { VillageGenerator, PROFESSIONS, HOUSE_TIERS } from "./villageGenerator.js";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -247,6 +250,46 @@ houses.riding = riding;
 interactions.horses = horses;
 interactions.hayBales = settlement.hay;
 interactions.dayNight = dayNight;
+
+// 1. ClutterManager: Instanciação massiva de adereços (1 Draw Call por tipo)
+const clutter = new ClutterManager(scene, world, 160);
+
+// 2. FarmAnimalManager: Fauna dinâmica (Galinhas e Porcos no ObjectPool e SpatialGrid)
+const farmAnimals = new FarmAnimalManager({ scene, world, drops });
+
+// 3. VillageGenerator: Profissões visuais nas casas, Tiers e Sinos de Bronze
+const villageGenerator = new VillageGenerator({ scene, world, clutter, farmAnimals, audio, ui });
+interactions.villageGenerator = villageGenerator;
+
+// Decora casas e vilas com profissões e currais
+if (settlement.houses && settlement.houses.length > 0) {
+  const profs = [PROFESSIONS.FARMER, PROFESSIONS.MERCHANT, PROFESSIONS.VILLAGER];
+  settlement.houses.forEach((h, idx) => {
+    const prof = idx === 0 ? PROFESSIONS.FARMER : profs[idx % profs.length];
+    villageGenerator.decorateProfessionHouse(h, prof);
+  });
+}
+if (settlement.churches && settlement.churches.length > 0) {
+  settlement.churches.forEach((c) => {
+    villageGenerator.createChurchBell(c.x || 0, c.floorY || c.y || 0, c.z || 0);
+  });
+}
+// Adereços de clutter nas estradas e margens
+clutter.addWoodPile(12, -22);
+clutter.addStonePile(14, -24);
+clutter.addAbandonedCart(6, -38, 0.2);
+clutter.addAbandonedCart(-6, -52, -0.3);
+clutter.build();
+
+// Registra os InstancedMeshes de clutter no world para suporte a corte/mineração
+world.environmentInstancedMeshes.push(
+  clutter.scarecrowsMesh,
+  clutter.hayMoundsMesh,
+  clutter.woodPilesMesh,
+  clutter.stonePilesMesh,
+  clutter.cartsMesh
+);
+
 initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs, dayNight, houses });
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
@@ -351,7 +394,7 @@ const debugScreen = new DebugScreen({
   WorldDecay,
 });
 
-window.__game = { debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+window.__game = { clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
 const saved = loadGame();
@@ -509,6 +552,8 @@ function frame(now) {
   houses.update(dt, camera, isCutscene);
   fire.update(dt);
   horses.update(dt);
+  farmAnimals.update(dt);
+  villageGenerator.update(dt);
   const isNightStrict = Boolean(dayNight.isNight && dayNight.daylight < 0.45);
   beasts.update(dt, isNightStrict);
   music.update(elapsed);

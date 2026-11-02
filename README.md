@@ -90,23 +90,23 @@ A trilha sonora do Puris é gerenciada pelo `MusicDirector` com carregamento sob
 
 | Contexto / Cenário | Faixa de Áudio | Comportamento e Gatilho |
 | --- | --- | --- |
-| **Exploração Aberta (Dia)** | `audio/exploração.mp3` | Exploração ativa a pé ou a cavalo pelos caminhos do reino |
-| **Pradarias & Planícies** | `audio/ambiente_calmo_dia.mp3` / `ambiente_calmo_dia_2.ogg` | Planícies abertas distantes de vilas e cidades |
-| **Cidades, Vilas e Mercados** | `audio/cidade_calma_dia.mp3` (alt: `cidade_dia_calmo.mp3`) | Proximidade de vilarejos, feiras, muralhas e centros urbanos |
-| **Florestas e Bosques** | `audio/ambiente_dia_floresta.mp3` | Regiões com aglomerados de árvores e bosques diurnos |
-| **Ermos Profundos e Matas Fechadas** | `audio/ambiente_dia_muito_denso.mp3` | Matas densas (> 18 árvores por perto) e montanhas ermas |
-| **Noite (Anoitecer até Meia-Noite)** | `audio/ambiente_denso_noite_2.ogg` | Início da noite e crepúsculo pelos ermos e estradas |
-| **Madrugada Sombria (00h às 05h)** | `audio/ambiente_denso_madrugada.ogg` | As horas mais escuras e silenciosas da madrugada |
-| **Tavernas e Estalagens** | `audio/generica_calma.ogg` | Interiores acolhedores de tavernas, estalagens e pousadas |
-| **Igrejas e Catedrais** | `audio/generica_calma.ogg` | Serenidade sacra ao sentar nos bancos da igreja ou entrar no templo |
-| **Tensão e Ameaça Iminente** | `audio/tensa_escalando.OGG` | Presença de wendigos, lobisomens, feras ou cultistas a menos de 35m |
-| **Combate Leve (Procurado 1-2)** | `audio/batalha_menos_seria.mp3` | Conflito com camponeses ou perseguição inicial da guarda |
-| **Combate Médio (Procurado 3)** | `audio/batalha_animada.mp3` | Confronto armado intenso com reforços de besteiros e arqueiros |
-| **Perseguição Severa (Procurado 4-5)** | `audio/batalha_séria.mp3` | Caça implacável do reino por cavaleiros montados e canhoneiros |
-| **Vila Fantasma & Acampamentos** | `audio/vila_fantasma_e_acampamento_demiurgo.mp3` | Cidades fantasmas em ruínas e acampamentos noturnos do Demiurgo |
-| **Eclipse Solar & Cataclismo** | `audio/o_fim_maligno.mp3` | Durante o Dia do Eclipse e a descida apocalíptica do Demiurgo |
-| **Descobertas & Missões** | `audio/descoberta.mp3` | Abertura de baús com tesouro e conclusão de missões |
-| **Tela de Morte ("PERECESTE")** | `audio/Derrota_2.ogg` (fallback: `Derrota.wav`) | Pausa a música ambiente e ecoa a melodia fúnebre de derrota |
+| **Exploração Aberta (Dia)** | `audio/musicas/exploração.mp3` | Exploração ativa a pé ou a cavalo pelos caminhos do reino |
+| **Pradarias & Planícies** | `audio/musicas/ambiente_calmo_dia.mp3` / `ambiente_calmo_dia_2.ogg` | Planícies abertas distantes de vilas e cidades |
+| **Cidades, Vilas e Mercados** | `audio/musicas/cidade_calma_dia.mp3` (alt: `cidade_dia_calmo.mp3`) | Proximidade de vilarejos, feiras, muralhas e centros urbanos |
+| **Florestas e Bosques** | `audio/musicas/ambiente_dia_floresta.mp3` | Regiões com aglomerados de árvores e bosques diurnos |
+| **Ermos Profundos e Matas Fechadas** | `audio/musicas/ambiente_dia_muito_denso.mp3` | Matas densas (> 18 árvores por perto) e montanhas ermas |
+| **Noite (Anoitecer até Meia-Noite)** | `audio/musicas/ambiente_denso_noite_2.ogg` | Início da noite e crepúsculo pelos ermos e estradas |
+| **Madrugada Sombria (00h às 05h)** | `audio/musicas/ambiente_denso_madrugada.ogg` | As horas mais escuras e silenciosas da madrugada |
+| **Tavernas e Estalagens** | `audio/musicas/generica_calma.ogg` | Interiores acolhedores de tavernas, estalagens e pousadas |
+| **Igrejas e Catedrais** | `audio/musicas/generica_calma.ogg` | Serenidade sacra ao sentar nos bancos da igreja ou entrar no templo |
+| **Tensão e Ameaça Iminente** | `audio/musicas/tensa_escalando.OGG` | Presença de wendigos, lobisomens, feras ou cultistas a menos de 35m |
+| **Combate Leve (Procurado 1-2)** | `audio/musicas/batalha_menos_seria.mp3` | Conflito com camponeses ou perseguição inicial da guarda |
+| **Combate Médio (Procurado 3)** | `audio/musicas/batalha_animada.mp3` | Confronto armado intenso com reforços de besteiros e arqueiros |
+| **Perseguição Severa (Procurado 4-5)** | `audio/musicas/batalha_séria.mp3` | Caça implacável do reino por cavaleiros montados e canhoneiros |
+| **Vila Fantasma & Acampamentos** | `audio/musicas/vila_fantasma_e_acampamento_demiurgo.mp3` | Cidades fantasmas em ruínas e acampamentos noturnos do Demiurgo |
+| **Eclipse Solar & Cataclismo** | `audio/musicas/o_fim_maligno.mp3` | Durante o Dia do Eclipse e a descida apocalíptica do Demiurgo |
+| **Descobertas & Missões** | `audio/musicas/descoberta.mp3` | Abertura de baús com tesouro e conclusão de missões |
+| **Tela de Morte ("PERECESTE")** | `audio/musicas/Derrota_2.ogg` (fallback: `Derrota.wav`) | Pausa a música ambiente e ecoa a melodia fúnebre de derrota |
 
 - **Abafamento em Interiores**: Dentro de qualquer residência ou cômodo fechado, o volume da música ambiente é reduzido automaticamente (filtro acústico suave).
 - **Atalho de Mudo**: Tecla `M` silencia e desilencia a música instantaneamente. Volume independente na tela de pausa (`Esc`).
@@ -393,6 +393,52 @@ Otimização de visibilidade em 3 camadas na GPU e CPU para dispositivos modesto
   - **Diálogo Profético de Todos os NPCs**: Todo e qualquer habitante abordado para conversa durante o eclipse proclama o aviso de pavor:
     *« O maligno que habita nesse mundo decidiu nos mostrar a sua face, cuidado jovem, coisas ruins acontecerão. »*
   - **Persistência Completa**: O número de dias passados, eclipses vivenciados e o calendário agendado são salvos automaticamente no `localStorage` ao dormir na cama e podem ser inspecionados em tempo real na tela de debug `F3`.
+
+## Geração Procedural: Cidades Vivas, Profissões e Sobrevivência Dinâmica
+
+A geração procedural de vilas e o gerenciamento de mundo foram reformulados para criar um ecossistema medieval orgânico, visualmente inconfundível e com suporte a *Endless Survival*:
+
+### 1. Variedade Arquitetônica e Identidade Visual de Profissões
+- **Casas Modulares e Tiers de Loot**:
+  - **Pobre / Cabana**: Dimensões compactas com palha rústica; baús contendo moedas escassas e provisões básicas.
+  - **Médio / Casa Padrão**: Enxaimel com reboco claro e telhas; baús com moedas equilibradas e poções.
+  - **Rico / Mansão**: Estrutura imponente com alvenaria de pedra aparelhada; baús fartos em ouro e gemas.
+- **Identidade Visual por Âncora de Profissão**:
+  - **Ferreiro (`blacksmith`)**: Casa acoplada a uma forja externa com brasa emissiva ardente (`#ff7b1c`), bigorna de ferro forjado e ferramentas.
+  - **Fazendeiro (`farmer`)**: Casa com curral cercado de mourões e tábuas onde habitam animais domésticos, espantalho e montes de feno.
+  - **Mercador (`merchant`)**: Fachada com toldo de tecido comercial, caixas de mantimentos e carroças estacionadas.
+- **A Igreja e o Sino de Bronze (Âncora de Sanidade)**:
+  - Construção mais alta e solene da vila, coroada por uma torre campanário destacada.
+  - **Sino de Bronze (`BronzeBell`) Manipulável**: O sino é uma entidade física articulada. Ao badalar (`E`), abençoa a vila e recua a corrupção do mundo em `-2%`. Em noites de alta corrupção, pode desabar no solo, aumentando o medo; o jogador pode reerguê-lo com 2 Madeiras e 2 Pedras, aliviando a corrupção em `-15%`.
+
+### 2. Fauna Dinâmica e Otimizada (`Chicken` e `Pig`)
+- **Galinhas (`Chicken`) e Porcos (`Pig`)**:
+  - Gerenciados via `ObjectPool` (Zero-GC) e cadastrados na grade de colisão `SpatialGrid`.
+  - Habitam os currais dos fazendeiros com IA de perambulação, ciscadas e farejos orgânicos.
+  - Podem ser abatidos para obtenção de penas, carne suína e alimento.
+
+### 3. Preenchimento de Mundo (Clutter Otimizado em InstancedMesh)
+- Renderização de 100% dos adereços decorativos com **exatamente 1 Draw Call por tipo** no mundo todo (`src/clutter.js`):
+  - **Espantalhos (`Scarecrows`)**: Postes com cruzeta e chapéu nos limites das plantações.
+  - **Montes de Feno (`HayMounds`)**: Medas cônicas douradas nas fazendas e hortas.
+  - **Pilhas de Toras (`WoodPiles`)**: Feixes de madeira empilhados próximos às casas de lenhadores.
+  - **Montes de Pedra (`StonePiles`)**: Pilhas de cantaria lavrada junto a forjas e pedreiras.
+  - **Carroças Abandonadas (`AbandonedCarts`)**: Carroças estáticas de madeira nas margens das estradas e praças de mercado.
+
+### 4. A Foice de Colheita (`Scythe`) e Extrativismo Agrícola
+- Adicionada a **Foice de Colheita** no slot 3 de ferramentas (alternando ciclicamente com a Picareta).
+- Modelo 3D com haste longa de madeira e lâmina em meia-lua de aço polido, com ícone desenhado na hotbar.
+- Permite ceifar rapidamente feno, plantações e montes de feno instanciados, rebaixando a matriz da instância na hora (Zero-GC), dropando feno e pão no solo, e recuando a corrupção do mundo (`-1.5%`).
+
+### 5. Eventos Orgânicos de Suspense por Âncoras (Sem Calendário Fixo)
+- Desacoplados de dias pré-determinados via testes probabilísticos independentes (PRNG) gerenciados pelo `EventBus` na virada de cada dia:
+  - **O Sacrifício**: Chance de um animal de curral amanhecer massacrado com poça de sangue carmesim no chão.
+  - **A Peste Negra**: Chance de um aldeão amanhecer enfermo (`sick = true`), tossindo e pedindo socorro. O jogador pode curá-lo entregando uma poção (`E`), recebendo +3 de Carisma e recuando a corrupção em `-8%`.
+
+### 6. A Mecânica do Apocalipse Adiável (Endless Survival)
+- O Apocalipse do Demiurgo **SÓ pode ocorrer se a Barra Global de Corrupção (`WorldDecay.decayLevel`) atingir 100% (1.0)**!
+- Se o jogador purificar altares heréticos (`-12%`), curar doentes da peste (`-8%`), consertar e badalar o sino da igreja (`-15%` / `-2%`), apagar incêndios (`-5%`) e colher com sua foice (`-1.5%`), a corrupção recua continuamente.
+- O jogador pode conter o fim dos tempos indefinidamente, vivendo como um fazendeiro e sobrevivente em um mundo dinâmico e sem fim.
 
 ## Fase 1
 

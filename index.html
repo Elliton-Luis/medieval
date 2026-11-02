@@ -80,6 +80,20 @@
         </aside>
       </div>
 
+      <div class="charge" id="charge-bar" hidden><i id="charge-fill"></i></div>
+      <div class="stealth-tag" id="stealth-tag" hidden>◐ FURTIVO · cavalos não fogem</div>
+      <div class="stamina" id="stamina-bar" hidden><span>FÔLEGO DO CAVALO</span><div><i id="stamina-fill"></i></div></div>
+
+      <section class="hotbar" id="hotbar" aria-label="Armas">
+        <div class="weapon-title"><strong id="weapon-name">ESPADA</strong><small id="weapon-ammo">CORPO A CORPO</small></div>
+        <div class="slots" id="slots"></div>
+      </section>
+
+      <section id="nearby-card" class="nearby-card" aria-live="polite" hidden>
+        <span id="nearby-portrait" class="nearby-portrait" aria-hidden="true"></span>
+        <div><span class="eyebrow" id="nearby-task">RESIDENTE</span><strong id="nearby-name">—</strong><small id="nearby-role">—</small><div id="nearby-health" class="npc-health" hidden><span id="nearby-health-fill"></span></div></div>
+      </section>
+
       <section class="radar" aria-label="Mapa">
         <div class="radar-frame"><canvas id="minimap" width="224" height="224"></canvas><span class="radar-n">N</span></div>
         <div class="wanted-block" id="wanted-block"><span class="eyebrow">PROCURADO</span><strong id="wanted">—</strong></div>

@@ -10,8 +10,8 @@ import { CULT_CAMP_GROUPS } from "./cult.js";
 export const TRACK_CATALOG = {
   // Exploração Geral (Dia)
   explore: {
-    mp3: "audio/exploração.mp3",
-    ogg: "audio/ambiente_calmo_dia_2.ogg",
+    mp3: "audio/musicas/exploração.mp3",
+    ogg: "audio/musicas/ambiente_calmo_dia_2.ogg",
     title: "Exploração Geral",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -19,8 +19,8 @@ export const TRACK_CATALOG = {
   },
   // Planícies e Pradarias Abertas
   grass: {
-    mp3: "audio/ambiente_calmo_dia.mp3",
-    ogg: "audio/ambiente_calmo_dia_2.ogg",
+    mp3: "audio/musicas/ambiente_calmo_dia.mp3",
+    ogg: "audio/musicas/ambiente_calmo_dia_2.ogg",
     title: "Ambiente Calmo (Dia)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -28,8 +28,8 @@ export const TRACK_CATALOG = {
   },
   // Cidades e Vilarejos
   town: {
-    mp3: "audio/cidade_calma_dia.mp3",
-    altMp3: "audio/cidade_dia_calmo.mp3",
+    mp3: "audio/musicas/cidade_calma_dia.mp3",
+    altMp3: "audio/musicas/cidade_dia_calmo.mp3",
     title: "Cidade Calma (Dia)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -37,7 +37,7 @@ export const TRACK_CATALOG = {
   },
   // Florestas e Bosques
   forest: {
-    mp3: "audio/ambiente_dia_floresta.mp3",
+    mp3: "audio/musicas/ambiente_dia_floresta.mp3",
     title: "Ambiente Dia (Floresta)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -45,7 +45,7 @@ export const TRACK_CATALOG = {
   },
   // Ermos Profundos e Matas Muito Densas
   deep_forest: {
-    mp3: "audio/ambiente_dia_muito_denso.mp3",
+    mp3: "audio/musicas/ambiente_dia_muito_denso.mp3",
     title: "Ambiente Dia Muito Denso",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -53,8 +53,8 @@ export const TRACK_CATALOG = {
   },
   // Exploração Noturna (Anoitecer até a Meia-Noite)
   night: {
-    ogg: "audio/ambiente_denso_noite_2.ogg",
-    mp3: "audio/ambiente_denso_noite_2.ogg",
+    ogg: "audio/musicas/ambiente_denso_noite_2.ogg",
+    mp3: "audio/musicas/ambiente_denso_noite_2.ogg",
     title: "Ambiente Denso (Noite)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -62,8 +62,8 @@ export const TRACK_CATALOG = {
   },
   // Madrugada Sombria (00h às 05h)
   late_night: {
-    ogg: "audio/ambiente_denso_madrugada.ogg",
-    mp3: "audio/ambiente_denso_madrugada.ogg",
+    ogg: "audio/musicas/ambiente_denso_madrugada.ogg",
+    mp3: "audio/musicas/ambiente_denso_madrugada.ogg",
     title: "Ambiente Denso (Madrugada)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -71,8 +71,8 @@ export const TRACK_CATALOG = {
   },
   // Tavernas e Estalagens
   tavern: {
-    ogg: "audio/generica_calma.ogg",
-    mp3: "audio/generica_calma.ogg",
+    ogg: "audio/musicas/generica_calma.ogg",
+    mp3: "audio/musicas/generica_calma.ogg",
     title: "Genérica Calma (Tavernas & Estalagens)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -80,8 +80,8 @@ export const TRACK_CATALOG = {
   },
   // Igrejas e Catedrais Sagradas
   church: {
-    ogg: "audio/generica_calma.ogg",
-    mp3: "audio/generica_calma.ogg",
+    ogg: "audio/musicas/generica_calma.ogg",
+    mp3: "audio/musicas/generica_calma.ogg",
     title: "Genérica Calma (Serenidade Sacra)",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -89,8 +89,8 @@ export const TRACK_CATALOG = {
   },
   // Tensão / Monstros e Predadores à Espreita
   tension: {
-    ogg: "audio/tensa_escalando.OGG",
-    mp3: "audio/tensa_escalando.OGG",
+    ogg: "audio/musicas/tensa_escalando.OGG",
+    mp3: "audio/musicas/tensa_escalando.OGG",
     title: "Tensa Escalando",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -98,8 +98,8 @@ export const TRACK_CATALOG = {
   },
   // Alias de compatibilidade para intro.js
   tense: {
-    ogg: "audio/tensa_escalando.OGG",
-    mp3: "audio/tensa_escalando.OGG",
+    ogg: "audio/musicas/tensa_escalando.OGG",
+    mp3: "audio/musicas/tensa_escalando.OGG",
     title: "Tensa Escalando",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -107,7 +107,7 @@ export const TRACK_CATALOG = {
   },
   // Combate Leve (Procurado Nível 1 e 2)
   wanted_low: {
-    mp3: "audio/batalha_menos_seria.mp3",
+    mp3: "audio/musicas/batalha_menos_seria.mp3",
     title: "Batalha Menos Séria",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -115,7 +115,7 @@ export const TRACK_CATALOG = {
   },
   // Combate Médio (Procurado Nível 3)
   wanted_mid: {
-    mp3: "audio/batalha_animada.mp3",
+    mp3: "audio/musicas/batalha_animada.mp3",
     title: "Batalha Animada",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -123,7 +123,7 @@ export const TRACK_CATALOG = {
   },
   // Combate Geral (compatibilidade retroativa)
   wanted: {
-    mp3: "audio/batalha_animada.mp3",
+    mp3: "audio/musicas/batalha_animada.mp3",
     title: "Batalha Animada",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -131,7 +131,7 @@ export const TRACK_CATALOG = {
   },
   // Perseguição Máxima (Procurado Nível 4 e 5)
   chase: {
-    mp3: "audio/batalha_séria.mp3",
+    mp3: "audio/musicas/batalha_séria.mp3",
     title: "Batalha Séria",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -139,7 +139,7 @@ export const TRACK_CATALOG = {
   },
   // Vilas Fantasmas e Acampamentos do Demiurgo
   cult_camp: {
-    mp3: "audio/vila_fantasma_e_acampamento_demiurgo.mp3",
+    mp3: "audio/musicas/vila_fantasma_e_acampamento_demiurgo.mp3",
     title: "Vila Fantasma & Acampamento do Demiurgo",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -147,7 +147,7 @@ export const TRACK_CATALOG = {
   },
   // Dia de Eclipse e Cataclismo do Demiurgo
   eclipse: {
-    mp3: "audio/o_fim_maligno.mp3",
+    mp3: "audio/musicas/o_fim_maligno.mp3",
     title: "O Fim Maligno",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -155,7 +155,7 @@ export const TRACK_CATALOG = {
   },
   // Descobertas e Segredos
   discovery: {
-    mp3: "audio/descoberta.mp3",
+    mp3: "audio/musicas/descoberta.mp3",
     title: "Descoberta",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -163,8 +163,8 @@ export const TRACK_CATALOG = {
   },
   // Tela de Perecimento / Derrota
   defeat: {
-    ogg: "audio/Derrota_2.ogg",
-    wav: "audio/Derrota.wav",
+    ogg: "audio/musicas/Derrota_2.ogg",
+    wav: "audio/musicas/Derrota.wav",
     title: "Trilha de Derrota",
     artist: "Trilha Puris",
     license: "Uso Livre / Domínio Público",
@@ -177,22 +177,22 @@ export const TRACK_CATALOG = {
  */
 export function getMusicCredits() {
   return [
-    { track: "Exploração Geral", file: "audio/exploração.mp3", role: "Exploração Ativa pelo Mundo Aberto", license: "Uso Livre" },
-    { track: "Ambiente Calmo (Dia)", file: "audio/ambiente_calmo_dia.mp3 & ambiente_calmo_dia_2.ogg", role: "Pradarias e Planícies Abertas", license: "Uso Livre" },
-    { track: "Cidade Calma (Dia)", file: "audio/cidade_calma_dia.mp3 & cidade_dia_calmo.mp3", role: "Cidades, Vilarejos e Mercados", license: "Uso Livre" },
-    { track: "Ambiente Dia Floresta", file: "audio/ambiente_dia_floresta.mp3", role: "Florestas e Bosques", license: "Uso Livre" },
-    { track: "Ambiente Dia Muito Denso", file: "audio/ambiente_dia_muito_denso.mp3", role: "Ermos Profundos e Montanhas", license: "Uso Livre" },
-    { track: "Ambiente Denso Noite", file: "audio/ambiente_denso_noite_2.ogg", role: "Exploração Noturna", license: "Uso Livre" },
-    { track: "Ambiente Denso Madrugada", file: "audio/ambiente_denso_madrugada.ogg", role: "Madrugada Sombria (00h às 05h)", license: "Uso Livre" },
-    { track: "Genérica Calma", file: "audio/generica_calma.ogg", role: "Tavernas, Estalagens e Serenidade Sacra nas Igrejas", license: "Uso Livre" },
-    { track: "Tensa Escalando", file: "audio/tensa_escalando.OGG", role: "Ameaça Iminente e Monstros Próximos (< 35m)", license: "Uso Livre" },
-    { track: "Batalha Menos Séria", file: "audio/batalha_menos_seria.mp3", role: "Combate Leve (Procurado 1-2)", license: "Uso Livre" },
-    { track: "Batalha Animada", file: "audio/batalha_animada.mp3", role: "Combate Intenso (Procurado 3)", license: "Uso Livre" },
-    { track: "Batalha Séria", file: "audio/batalha_séria.mp3", role: "Perseguição Máxima (Procurado 4-5)", license: "Uso Livre" },
-    { track: "Vila Fantasma & Acampamento do Demiurgo", file: "audio/vila_fantasma_e_acampamento_demiurgo.mp3", role: "Cidades Fantasmas e Acampamentos Cultistas", license: "Uso Livre" },
-    { track: "O Fim Maligno", file: "audio/o_fim_maligno.mp3", role: "Dia do Eclipse e Cataclismo do Demiurgo", license: "Uso Livre" },
-    { track: "Descoberta", file: "audio/descoberta.mp3", role: "Conclusão de Missões e Tesouros Encontrados", license: "Uso Livre" },
-    { track: "Trilha de Derrota", file: "audio/Derrota_2.ogg & Derrota.wav", role: "Tela de Perecimento e Morte", license: "Uso Livre" },
+    { track: "Exploração Geral", file: "audio/musicas/exploração.mp3", role: "Exploração Ativa pelo Mundo Aberto", license: "Uso Livre" },
+    { track: "Ambiente Calmo (Dia)", file: "audio/musicas/ambiente_calmo_dia.mp3 & ambiente_calmo_dia_2.ogg", role: "Pradarias e Planícies Abertas", license: "Uso Livre" },
+    { track: "Cidade Calma (Dia)", file: "audio/musicas/cidade_calma_dia.mp3 & cidade_dia_calmo.mp3", role: "Cidades, Vilarejos e Mercados", license: "Uso Livre" },
+    { track: "Ambiente Dia Floresta", file: "audio/musicas/ambiente_dia_floresta.mp3", role: "Florestas e Bosques", license: "Uso Livre" },
+    { track: "Ambiente Dia Muito Denso", file: "audio/musicas/ambiente_dia_muito_denso.mp3", role: "Ermos Profundos e Montanhas", license: "Uso Livre" },
+    { track: "Ambiente Denso Noite", file: "audio/musicas/ambiente_denso_noite_2.ogg", role: "Exploração Noturna", license: "Uso Livre" },
+    { track: "Ambiente Denso Madrugada", file: "audio/musicas/ambiente_denso_madrugada.ogg", role: "Madrugada Sombria (00h às 05h)", license: "Uso Livre" },
+    { track: "Genérica Calma", file: "audio/musicas/generica_calma.ogg", role: "Tavernas, Estalagens e Serenidade Sacra nas Igrejas", license: "Uso Livre" },
+    { track: "Tensa Escalando", file: "audio/musicas/tensa_escalando.OGG", role: "Ameaça Iminente e Monstros Próximos (< 35m)", license: "Uso Livre" },
+    { track: "Batalha Menos Séria", file: "audio/musicas/batalha_menos_seria.mp3", role: "Combate Leve (Procurado 1-2)", license: "Uso Livre" },
+    { track: "Batalha Animada", file: "audio/musicas/batalha_animada.mp3", role: "Combate Intenso (Procurado 3)", license: "Uso Livre" },
+    { track: "Batalha Séria", file: "audio/musicas/batalha_séria.mp3", role: "Perseguição Máxima (Procurado 4-5)", license: "Uso Livre" },
+    { track: "Vila Fantasma & Acampamento do Demiurgo", file: "audio/musicas/vila_fantasma_e_acampamento_demiurgo.mp3", role: "Cidades Fantasmas e Acampamentos Cultistas", license: "Uso Livre" },
+    { track: "O Fim Maligno", file: "audio/musicas/o_fim_maligno.mp3", role: "Dia do Eclipse e Cataclismo do Demiurgo", license: "Uso Livre" },
+    { track: "Descoberta", file: "audio/musicas/descoberta.mp3", role: "Conclusão de Missões e Tesouros Encontrados", license: "Uso Livre" },
+    { track: "Trilha de Derrota", file: "audio/musicas/Derrota_2.ogg & Derrota.wav", role: "Tela de Perecimento e Morte", license: "Uso Livre" },
   ];
 }
 
@@ -354,7 +354,7 @@ export class MusicDirector {
 
   playDiscovery() {
     try {
-      const audio = new Audio("audio/descoberta.mp3");
+      const audio = new Audio("audio/musicas/descoberta.mp3");
       audio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
       audio.play().catch(() => {});
     } catch (_) {}

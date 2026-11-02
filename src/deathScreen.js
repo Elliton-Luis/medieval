@@ -177,7 +177,7 @@ export class DeathScreen {
     try {
       if (!this._defeatAudio) {
         const canVorbis = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
-        this._defeatAudio = new Audio(canVorbis ? "audio/Derrota_2.ogg" : "audio/Derrota.wav");
+        this._defeatAudio = new Audio(canVorbis ? "audio/musicas/Derrota_2.ogg" : "audio/musicas/Derrota.wav");
         this._defeatAudio.preload = "auto";
       }
       this._defeatAudio.currentTime = 0;

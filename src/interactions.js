@@ -122,7 +122,8 @@ export class InteractionSystem {
         !this._tryCollectCrystal() &&
         !this._tryInteractDemiurgeDiary() &&
         !this._tryInteractAltar() &&
-        !this._trySearchGhostTown()
+        !this._trySearchGhostTown() &&
+        !this._tryInteractBell()
       ) {
         this._interactNearby();
       }
@@ -131,6 +132,7 @@ export class InteractionSystem {
     this._checkDemiurgeDiaryNearby();
     this._checkCrystalNearby();
     this._checkGhostTownNearby();
+    this._checkBellNearby();
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
@@ -329,6 +331,47 @@ export class InteractionSystem {
     return false;
   }
 
+  _checkBellNearby() {
+    const bells = this.villageGenerator?.bells || window.__game?.villageGenerator?.bells;
+    if (!bells || bells.length === 0) return;
+    const px = this.player.x;
+    const pz = this.player.z;
+    for (let i = 0; i < bells.length; i++) {
+      const bell = bells[i];
+      const dx = bell.x - px;
+      const dz = bell.z - pz;
+      if (dx * dx + dz * dz < 4.2 * 4.2) {
+        if (bell.state === "fallen") {
+          this.ui.setPrompt?.("✦ SINO CAÍDO DA IGREJA [E] Reerguer Sino (2 Madeiras + 2 Pedras)");
+        } else {
+          this.ui.setPrompt?.("✦ SINO DA IGREJA [E] Badalar Sino Sagrado (-2% Corrupção)");
+        }
+        return;
+      }
+    }
+  }
+
+  _tryInteractBell() {
+    const bells = this.villageGenerator?.bells || window.__game?.villageGenerator?.bells;
+    if (!bells || bells.length === 0) return false;
+    const px = this.player.x;
+    const pz = this.player.z;
+    for (let i = 0; i < bells.length; i++) {
+      const bell = bells[i];
+      const dx = bell.x - px;
+      const dz = bell.z - pz;
+      if (dx * dx + dz * dz < 4.2 * 4.2) {
+        if (bell.state === "fallen") {
+          return bell.repair();
+        } else {
+          bell.ring();
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   _interactNearby() {
     let target = null;
     let best = 3.8 * 3.8;
@@ -383,6 +426,32 @@ export class InteractionSystem {
 
     let body = `${eclipseHeader}${npc.task}.${chaNote}`;
     let actions = [{ id: "close", label: "Encerrar conversa" }];
+
+    if (npc.sick) {
+      body =
+        message ||
+        "« Coff... coff... A peste negra queima minhas entranhas e o ar me falta... Por piedade, viajante, tens uma poção de cura para salvar minha vida? »";
+      actions = [
+        {
+          id: "cure_plague",
+          label: `💊 Entregar Poção e Curar a Peste Negra (-1 Poção · tens ${this.player.potions})`,
+          disabled: this.player.potions <= 0,
+        },
+        { id: "close", label: "Afastar-se do enfermo" },
+      ];
+      this.ui.showDialogue(npc.name, body, actions, {
+        role: "Enfermo da Peste",
+        roleKey: npc.roleKey,
+        funds: {
+          coins: this.player.coins,
+          wood: PlayerInventory.wood,
+          stone: PlayerInventory.stone,
+          clay: PlayerInventory.clay || 0,
+          hay: PlayerInventory.hay,
+        },
+      });
+      return;
+    }
 
     if (npc.root?.userData?.isMissionDebtor) {
       body =
@@ -905,6 +974,19 @@ export class InteractionSystem {
         this.ui.showToast("Colar da Bênção consagrado com a graça celestial! (15% redução de dano)");
         this._showNPCDialogue("«A graça de Deus é dom gratuito». Que este colar abençoado guarde o teu peito.");
       }
+    } else if (action === "cure_plague" && this.player.potions > 0 && this.activeNPC?.sick) {
+      this.player.potions -= 1;
+      this.activeNPC.sick = false;
+      this.activeNPC.task = "Curado da peste negra!";
+      PlayerStats.cha = Math.min(20, PlayerStats.cha + 3);
+      addGood(12, "Curou aldeão da peste negra");
+      WorldDecay.reduceDecay(0.08, "CURED_PLAGUE_NPC");
+      this.audio.coin?.();
+      syncPlayerStatsToPlayer(this.player, this.ui);
+      this.ui.showToast("✦ Curaste o aldeão da peste negra! O mal recua perante tua virtude (-8% Corrupção) · +3 CAR");
+      this._showNPCDialogue("« Louvado sejais! O ar voltou aos meus pulmões e a febre cessou! Que Deus vos guarde! »");
+      EventBus.emit(GAME_EVENTS.NPC_CURED, { npc: this.activeNPC });
+      return;
     } else if (action === "priest:heal") {
       this.player.health = this.player.maxHealth;
       syncPlayerStatsToPlayer(this.player, this.ui);

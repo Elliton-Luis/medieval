@@ -17,6 +17,7 @@ export const WEAPON_LIST = [
   { id: "dagger", name: "Adaga", slot: 2, type: "melee", grip: "blade", hands: 1, damage: 1, reach: 2.1, arc: 0.5, cooldown: 0.26, length: 0.24, hitDelay: 0.08, weight: 1.0, knock: 1.6, combo: true, anim: [4, 4, 0], lunge: 3.2, sound: "stab", price: 25 },
   { id: "knife", name: "Faca", slot: 2, type: "melee", grip: "blade", hands: 1, damage: 1, reach: 1.9, arc: 0.5, cooldown: 0.22, length: 0.22, hitDelay: 0.07, weight: 1.0, knock: 1.4, combo: true, anim: [4, 0, 4], lunge: 3, sound: "stab", price: 12 },
   { id: "pickaxe", name: "Picareta", slot: 3, type: "melee", toolType: "PICKAXE", grip: "blade", hands: 1, damage: 2, reach: 2.8, arc: 0.45, cooldown: 0.58, length: 0.44, hitDelay: 0.15, weight: 0.92, knock: 4.4, combo: true, anim: [2, 1, 0], lunge: 0, sound: "smash", price: 0 },
+  { id: "scythe", name: "Foice de Colheita", slot: 3, type: "melee", toolType: "SCYTHE", grip: "blade", hands: 2, damage: 2, reach: 3.2, arc: 0.6, cooldown: 0.52, length: 0.5, hitDelay: 0.12, weight: 0.94, knock: 3.8, combo: true, anim: [0, 1, 2], lunge: 1.5, sound: "slash", price: 0 },
   { id: "shortsword", name: "Espada curta", slot: 4, type: "melee", grip: "blade", hands: 1, damage: 2, reach: 3.0, arc: 0.45, cooldown: 0.4, length: 0.34, hitDelay: 0.1, weight: 1.0, knock: 3.4, combo: true, anim: [0, 1, 2], lunge: 3.4, sound: "slash", price: 20 },
   { id: "longsword", name: "Espada longa", slot: 4, type: "melee", grip: "blade", hands: 1, damage: 3, reach: 3.5, arc: 0.4, cooldown: 0.58, length: 0.42, hitDelay: 0.13, weight: 0.95, knock: 4.4, combo: true, anim: [0, 1, 2], lunge: 3.6, sound: "slash", price: 60 },
   { id: "mace", name: "Maça", slot: 4, type: "melee", grip: "blade", hands: 1, damage: 2, reach: 2.7, arc: 0.45, cooldown: 0.66, length: 0.5, hitDelay: 0.17, weight: 0.92, knock: 5.6, combo: true, anim: [0, 1, 2], lunge: 3, sound: "smash", price: 40 },
@@ -37,7 +38,7 @@ export const WEAPON_LIST = [
 
 export const WEAPONS_BY_ID = Object.fromEntries(WEAPON_LIST.map((w) => [w.id, w]));
 export const SLOTS = Array.from({ length: 9 }, (_, i) => WEAPON_LIST.filter((w) => w.slot === i + 1).map((w) => w.id));
-export const STARTER_WEAPONS = ["fists", "axe", "pickaxe"];
+export const STARTER_WEAPONS = ["fists", "axe", "pickaxe", "scythe"];
 export const AMMO_LABELS = { bolts: "VIROTES", arrows: "FLECHAS", bombs: "BOMBAS", knives: "FACAS", oil: "POTES" };
 // munição vendida no ferreiro: [tipo, quantidade, preço]
 export const AMMO_SHOP = [["bolts", 4, 8], ["knives", 5, 15], ["oil", 2, 14]];
@@ -135,6 +136,12 @@ const builders = {
     const tipL = mesh(g, new THREE.ConeGeometry(0.04, 0.28, 4), M.steel, -0.16, 0.69, 0);
     tipL.rotation.z = Math.PI / 2 + 0.15;
   },
+  scythe(g, M) {
+    handle(g, M, -0.2, 0.95, 0.035);
+    mesh(g, new THREE.BoxGeometry(0.06, 0.18, 0.06), M.wood, 0.08, 0.55, 0);
+    const blade = mesh(g, new THREE.BoxGeometry(0.38, 0.08, 0.04), M.steel, 0.18, 0.92, 0);
+    blade.rotation.z = -0.35;
+  },
   mace(g, M) {
     handle(g, M, -0.18, 0.62, 0.035);
     mesh(g, new THREE.IcosahedronGeometry(0.16, 0), M.iron, 0, 0.74, 0);
@@ -231,6 +238,7 @@ const icons = {
   longsword(c) { line(c, 10, 46, 42, 6); line(c, 42, 6, 46, 10); line(c, 16, 28, 28, 40); line(c, 6, 48, 12, 42); },
   axe(c) { line(c, 12, 46, 36, 10); c.beginPath(); c.moveTo(30, 8); c.quadraticCurveTo(48, 12, 44, 30); c.lineTo(34, 20); c.closePath(); c.stroke(); },
   pickaxe(c) { line(c, 14, 48, 34, 14); c.beginPath(); c.arc(28, 22, 16, 3.6, 5.9, false); c.stroke(); },
+  scythe(c) { line(c, 10, 48, 38, 12); c.beginPath(); c.arc(32, 16, 14, 4.2, 6.28); c.stroke(); },
   mace(c) { line(c, 12, 46, 32, 20); c.beginPath(); c.arc(36, 15, 9, 0, 6.28); c.stroke(); for (const [a, b] of [[36, 3], [48, 15], [44, 7], [26, 8]]) line(c, 36, 15, a, b); },
   flail(c) { line(c, 10, 46, 24, 28); c.setLineDash([3, 3]); line(c, 24, 28, 38, 14); c.setLineDash([]); c.beginPath(); c.arc(42, 10, 7, 0, 6.28); c.stroke(); },
   warhammer(c) { line(c, 14, 48, 34, 14); c.strokeRect(24, 6, 22, 12); line(c, 46, 12, 52, 12); },
