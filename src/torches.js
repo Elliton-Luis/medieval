@@ -218,6 +218,9 @@ export class TorchSystem {
     }
 
     this.pending = [];
+    this._lastSortX = -9999;
+    this._lastSortZ = -9999;
+    this._sortTimer = 0;
     this.stickGeometry = new THREE.CylinderGeometry(0.035, 0.05, 0.62, 6);
     this.headGeometry = new THREE.CylinderGeometry(0.075, 0.05, 0.2, 6);
     this.stickMaterial = new THREE.MeshStandardMaterial({ color: "#4a3626", roughness: 1, flatShading: true });
@@ -536,7 +539,18 @@ export class TorchSystem {
       candidates.push(source);
     }
 
-    candidates.sort(_sortByDist);
+    // Ordenação sob demanda: evita sort() a cada quadro se o jogador estiver parado ou houver poucas fontes
+    if (candidates.length > MAX_LIGHTS) {
+      const movedDx = px - this._lastSortX;
+      const movedDz = pz - this._lastSortZ;
+      this._sortTimer -= dt;
+      if (movedDx * movedDx + movedDz * movedDz > 0.64 || this._sortTimer <= 0) {
+        this._lastSortX = px;
+        this._lastSortZ = pz;
+        this._sortTimer = 0.2;
+        candidates.sort(_sortByDist);
+      }
+    }
     const chosenCount = Math.min(candidates.length, MAX_LIGHTS);
 
     // Mantém as PointLights presas às mesmas fontes para evitar oscilação visual

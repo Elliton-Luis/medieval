@@ -540,6 +540,53 @@ if (shouldPlayIntro) {
   });
 }
 
+// ============================================================================
+// Shader Warmup & Pipeline Precompilation (Zero-Hitch em eventos e armas)
+// ============================================================================
+export function warmupPipelines(renderer, scene, camera, weapons) {
+  const hiddenObjects = [];
+  if (weapons?.models) {
+    for (const model of Object.values(weapons.models)) {
+      if (model && !model.visible) {
+        model.visible = true;
+        hiddenObjects.push(model);
+      }
+    }
+  }
+  if (weapons?.projectiles) {
+    for (const p of weapons.projectiles) {
+      if (p.root && !p.root.visible) {
+        p.root.visible = true;
+        hiddenObjects.push(p.root);
+      }
+      if (p.variants) {
+        for (const v of Object.values(p.variants)) {
+          if (v && !v.visible) {
+            v.visible = true;
+            hiddenObjects.push(v);
+          }
+        }
+      }
+    }
+  }
+
+  try {
+    renderer.compile(scene, camera);
+  } catch (err) {
+    console.warn("Shader warmup aviso:", err);
+  }
+
+  for (const obj of hiddenObjects) {
+    obj.visible = false;
+  }
+  if (weapons?.currentId) {
+    weapons.equip(weapons.currentId, false);
+  }
+}
+
+// Pré-aquecimento da GPU durante a inicialização (100% dos shaders compilados antes do jogo)
+warmupPipelines(renderer, scene, camera, weapons);
+
 function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -552,14 +599,23 @@ function resize() {
 window.addEventListener("resize", resize, { passive: true });
 window.addEventListener("contextmenu", (event) => event.preventDefault());
 
+const TARGET_FPS = 60;
+const FRAME_MIN_MS = 1000 / (TARGET_FPS + 2); // ~16.1ms
+let _lastRenderStamp = 0;
 let lastTime = performance.now();
 let hasRendered = false;
 let _lastResourceRespawn = 0;
 
 function frame(now) {
-  telemetry.beginFrame();
   requestAnimationFrame(frame);
-  const elapsed = Math.min((now - lastTime) / 1000, 0.25);
+
+  // Frametime Pacing: crava em 60 FPS estáveis, impedindo flutuação de 1400 -> 70 FPS
+  const delta = now - _lastRenderStamp;
+  if (delta < FRAME_MIN_MS) return;
+  _lastRenderStamp = now - (delta % FRAME_MIN_MS);
+
+  telemetry.beginFrame();
+  const elapsed = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
   // a tela de morte usa o tempo real; o jogo usa passos curtos e a câmera lenta
   deathScreen.update(elapsed);

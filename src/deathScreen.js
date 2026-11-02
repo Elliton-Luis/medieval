@@ -81,8 +81,16 @@ export class DeathScreen {
     this.scale = 1;
     this.grainTimer = 0;
     this._shown = {};
-    this._defeatAudio = null;
     this._onKey = (event) => this._wake(event);
+
+    // Pré-carrega o áudio de derrota no construtor para eliminar congelamentos síncronos na morte
+    try {
+      const canVorbis = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
+      this._defeatAudio = new Audio(canVorbis ? "audio/music/defeat_2.ogg" : "audio/music/defeat.wav");
+      this._defeatAudio.preload = "auto";
+    } catch (_) {
+      this._defeatAudio = null;
+    }
 
     this._injectAssets();
     this._build();
@@ -193,16 +201,13 @@ export class DeathScreen {
     this.music?.pauseForDefeat?.();
     this.audio.deathBell();
     this.audio.fadeWorld(1.6);
-    try {
-      if (!this._defeatAudio) {
-        const canVorbis = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
-        this._defeatAudio = new Audio(canVorbis ? "audio/music/defeat_2.ogg" : "audio/music/defeat.wav");
-        this._defeatAudio.preload = "auto";
-      }
-      this._defeatAudio.currentTime = 0;
-      this._defeatAudio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.05);
-      this._defeatAudio.play().catch(() => {});
-    } catch (_) {}
+    if (this._defeatAudio) {
+      try {
+        this._defeatAudio.currentTime = 0;
+        this._defeatAudio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.05);
+        this._defeatAudio.play().catch(() => {});
+      } catch (_) {}
+    }
   }
 
   _reveal(name, element, at) {

@@ -247,6 +247,14 @@ export class MusicDirector {
     this.override = null;
     this.pausedForDefeat = false;
 
+    // Pré-carrega o som de descoberta no construtor para evitar I/O no frame
+    try {
+      this._discoveryAudio = new Audio("audio/music/discovery.mp3");
+      this._discoveryAudio.preload = "auto";
+    } catch (_) {
+      this._discoveryAudio = null;
+    }
+
     audio.onUnlock.push(() => this.start());
     if (audio.context) this.start();
   }
@@ -353,10 +361,11 @@ export class MusicDirector {
   }
 
   playDiscovery() {
+    if (!this._discoveryAudio) return;
     try {
-      const audio = new Audio("audio/music/discovery.mp3");
-      audio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
-      audio.play().catch(() => {});
+      this._discoveryAudio.currentTime = 0;
+      this._discoveryAudio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
+      this._discoveryAudio.play().catch(() => {});
     } catch (_) {}
   }
 

@@ -83,6 +83,10 @@ export class WeaponSystem {
     this._createThrownSpear(scene);
     this._createMusketTracer(scene);
     this._nearbyNPCs = [];
+    this._hotbarEntriesCache = [];
+    for (let i = 0; i < 9; i++) {
+      this._hotbarEntriesCache.push({ id: null, name: "", count: 0, ammo: "", empty: true });
+    }
     this.equip("fists", false);
   }
 
@@ -1609,19 +1613,34 @@ export class WeaponSystem {
                   ? "SEM ARMA"
                   : "CORPO A CORPO";
     this.ui.setWeapon(def.name.toLocaleUpperCase("pt-BR"), ammoText);
-    const entries = SLOTS.map((ids, index) => {
-      const owned = ids.filter((id) => this.owned.has(id));
-      const shown = owned.includes(this.lastInSlot[index]) ? this.lastInSlot[index] : owned[0] || null;
+
+    // Reutiliza cache estático para Zero-GC ao trocar armas
+    for (let index = 0; index < 9; index++) {
+      const ids = SLOTS[index];
+      let ownedCount = 0;
+      let firstOwned = null;
+      let hasPreferred = false;
+      const pref = this.lastInSlot[index];
+
+      for (let j = 0; j < ids.length; j++) {
+        const id = ids[j];
+        if (this.owned.has(id)) {
+          ownedCount++;
+          if (!firstOwned) firstOwned = id;
+          if (id === pref) hasPreferred = true;
+        }
+      }
+
+      const shown = hasPreferred ? pref : firstOwned;
       const shownDef = shown ? WEAPONS_BY_ID[shown] : null;
-      return {
-        id: shown,
-        name: shownDef ? shownDef.name : "",
-        count: owned.length,
-        ammo: shownDef ? (shownDef.ammo ? String(this.ammo[shownDef.ammo]) : "∞") : "",
-        empty: shownDef ? Boolean(shownDef.ammo) && this.ammo[shownDef.ammo] <= 0 : true,
-      };
-    });
-    this.ui.setHotbar(this.slot, entries);
+      const entry = this._hotbarEntriesCache[index];
+      entry.id = shown;
+      entry.name = shownDef ? shownDef.name : "";
+      entry.count = ownedCount;
+      entry.ammo = shownDef ? (shownDef.ammo ? String(this.ammo[shownDef.ammo]) : "∞") : "";
+      entry.empty = shownDef ? Boolean(shownDef.ammo) && this.ammo[shownDef.ammo] <= 0 : true;
+    }
+    this.ui.setHotbar(this.slot, this._hotbarEntriesCache);
   }
 
   buyAmmo(type, amount) {
