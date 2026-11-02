@@ -173,6 +173,7 @@ export class World {
   heightAt(x, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
+      if (f.active === false) continue;
       if (f.rot) {
         const relX = x - f.cx;
         const relZ = z - f.cz;
@@ -190,6 +191,7 @@ export class World {
   chunkGroundHeight(cx, cz, heights, x, z) {
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
+      if (f.active === false) continue;
       if (f.rot) {
         const relX = x - f.cx;
         const relZ = z - f.cz;
@@ -237,6 +239,7 @@ export class World {
     let bestY = -Infinity;
     for (let i = 0; i < this.floors.length; i++) {
       const f = this.floors[i];
+      if (f.active === false) continue;
       if (f.rot) {
         const relX = x - f.cx;
         const relZ = z - f.cz;

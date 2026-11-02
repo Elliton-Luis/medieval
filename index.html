@@ -127,14 +127,31 @@
             <button type="button" class="build-tab active" data-tab="all">TODAS AS OBRAS (10)</button>
             <button type="button" class="build-tab" data-tab="vila">HABITAÇÃO & VILA</button>
             <button type="button" class="build-tab" data-tab="defesa">DEFESA & TRABALHO</button>
+            <button type="button" class="build-tab build-tab-destroy" data-tab="destroy" style="color: #ff8585; border-color: #aa3333;">🔨 DEMOLIÇÃO</button>
           </nav>
 
           <div id="build-grid" class="build-grid"></div>
 
           <footer class="build-footer">
             <span class="build-hint">💡 Dica: Ao escolher uma obra, mova o holograma verde pelo terreno e clique com <strong>Botão Esquerdo</strong> ou <strong>E</strong> para erguer.</span>
-            <button id="build-place-item-btn" class="build-place-item-btn" type="button">📌 Fixar Tocha ou Arma na Parede / Chão</button>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button id="build-destroy-btn" class="build-destroy-btn" type="button">🔨 Destruir / Demolir Construção</button>
+              <button id="build-place-item-btn" class="build-place-item-btn" type="button">📌 Fixar Tocha ou Arma</button>
+            </div>
           </footer>
+        </div>
+      </section>
+
+      <!-- HUD do Modo Demolição de Construções -->
+      <section id="demolish-hud" class="demolish-hud" hidden>
+        <div class="demolish-hud-card">
+          <span class="demolish-hud-badge">MODO DEMOLIÇÃO [C para sair]</span>
+          <h4 id="demolish-target-name" class="demolish-target-name">Nenhuma construção sob a mira</h4>
+          <p id="demolish-target-hint" class="demolish-target-hint">Aponte para sua construção e clique com o botão esquerdo ou aperte [E] para SELECIONAR.</p>
+          <div class="demolish-actions">
+            <button id="demolish-confirm-btn" class="demolish-confirm-btn" type="button" disabled>💥 DELETAR CONSTRUÇÃO</button>
+            <button id="demolish-cancel-btn" class="demolish-cancel-btn" type="button">✕ Cancelar Seleção</button>
+          </div>
         </div>
       </section>
 

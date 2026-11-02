@@ -76,6 +76,12 @@ export class GameUI {
     this.buildClose = document.getElementById("build-close");
     this.buildTabs = document.getElementById("build-tabs");
     this.buildPlaceItemBtn = document.getElementById("build-place-item-btn");
+    this.buildDestroyBtn = document.getElementById("build-destroy-btn");
+    this.demolishHud = document.getElementById("demolish-hud");
+    this.demolishTargetName = document.getElementById("demolish-target-name");
+    this.demolishTargetHint = document.getElementById("demolish-target-hint");
+    this.demolishConfirmBtn = document.getElementById("demolish-confirm-btn");
+    this.demolishCancelBtn = document.getElementById("demolish-cancel-btn");
     this._buildActiveTab = "all";
     this.onBuildClose = null;
 
@@ -149,6 +155,12 @@ export class GameUI {
           this.closeBuildHub();
         }
       });
+    }
+
+    if (this.demolishHud) {
+      this.demolishHud.addEventListener("mousedown", (e) => e.stopPropagation());
+      this.demolishHud.addEventListener("mouseup", (e) => e.stopPropagation());
+      this.demolishHud.addEventListener("click", (e) => e.stopPropagation());
     }
   }
 
@@ -343,7 +355,7 @@ export class GameUI {
     }
   }
 
-  showBuildHub(catalog, playerInventory, onSelectCallback, onPlaceItemCallback) {
+  showBuildHub(catalog, playerInventory, onSelectCallback, onPlaceItemCallback, onDestroyCallback) {
     if (!this.buildPanel) return;
 
     this._buildActiveTab = "all";
@@ -356,9 +368,15 @@ export class GameUI {
       const tabs = this.buildTabs.querySelectorAll(".build-tab");
       tabs.forEach((tab) => {
         tab.onclick = () => {
+          const targetTab = tab.getAttribute("data-tab") || "all";
+          if (targetTab === "destroy") {
+            this.closeBuildHub();
+            onDestroyCallback?.();
+            return;
+          }
           tabs.forEach((t) => t.classList.remove("active"));
           tab.classList.add("active");
-          this._buildActiveTab = tab.getAttribute("data-tab") || "all";
+          this._buildActiveTab = targetTab;
           this._renderBuildGrid(catalog, playerInventory, this._buildActiveTab, onSelectCallback);
         };
       });
@@ -368,6 +386,13 @@ export class GameUI {
       this.buildPlaceItemBtn.onclick = () => {
         this.closeBuildHub();
         onPlaceItemCallback?.();
+      };
+    }
+
+    if (this.buildDestroyBtn) {
+      this.buildDestroyBtn.onclick = () => {
+        this.closeBuildHub();
+        onDestroyCallback?.();
       };
     }
 
@@ -384,6 +409,30 @@ export class GameUI {
     if (!this.buildPanel || this.buildPanel.hidden) return;
     this.buildPanel.hidden = true;
     this.onBuildClose?.();
+  }
+
+  setDemolishHud(visible, targetName = "", isSelected = false, onConfirm = null, onCancel = null) {
+    if (!this.demolishHud) return;
+    if (!visible) {
+      this.demolishHud.hidden = true;
+      return;
+    }
+    this.demolishHud.hidden = false;
+    if (this.demolishTargetName) {
+      this.demolishTargetName.textContent = targetName || "Nenhuma construção sob a mira";
+    }
+    if (this.demolishTargetHint) {
+      this.demolishTargetHint.textContent = isSelected
+        ? "Clique no botão DELETAR ou aperte [E / Espaço / Delete] para destruir."
+        : "Aponte para sua construção e clique com botão esquerdo ou aperte [E] para SELECIONAR.";
+    }
+    if (this.demolishConfirmBtn) {
+      this.demolishConfirmBtn.disabled = !isSelected;
+      if (onConfirm) this.demolishConfirmBtn.onclick = onConfirm;
+    }
+    if (this.demolishCancelBtn) {
+      if (onCancel) this.demolishCancelBtn.onclick = onCancel;
+    }
   }
 
   _renderBuildGrid(catalog, playerInventory, tab = "all", onSelectCallback) {

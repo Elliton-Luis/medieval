@@ -6,6 +6,8 @@ import {
   PlayerEquipment,
   PlayerInventory,
   BUILD_COSTS,
+  BUILDING_BOUNDS,
+  destroyBuilding,
   createFirePool,
   igniteTarget,
   updateFirePool,
@@ -67,11 +69,14 @@ export class WeaponSystem {
     this._buildTurnAccum = 0;
     this._keyRotCooldown = 0;
     this.selectedBuildType = "HOUSE";
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
     this.ammo = { bolts: 8, arrows: 12, bombs: 3, knives: 0, oil: 0 };
     this.projectiles = [];
     this._cursor = 0;
     this.firePool = createFirePool(scene);
     this.playerBuildingsPool = createPlayerBuildingsPool(scene, world);
+    this._demolishHighlightGroup = this._createDemolishHighlight(scene);
     this._createWeaponModels();
     this._createProjectilePool(24);
     this._createTrajectoryDots(scene);
@@ -311,34 +316,39 @@ export class WeaponSystem {
 
     const wheel = this.input.consumeWheelStep();
     if (this.buildMode) {
-      // No modo de construção, a câmera permanece travada e o jogador gira a construção em passos de 15°
-      if (this.cameraRig) this.cameraRig.frozen = true;
-      const STEP_15 = Math.PI / 12;
+      if (this.selectedBuildType === "DESTROY") {
+        // No modo demolição a câmera é livre para permitir olhar em 360° e mirar nas construções
+        if (this.cameraRig) this.cameraRig.frozen = false;
+      } else {
+        // No modo de construção, a câmera permanece travada e o jogador gira a construção em passos de 15°
+        if (this.cameraRig) this.cameraRig.frozen = true;
+        const STEP_15 = Math.PI / 12;
 
-      // Scroll da roda do mouse roda a construção em 15°
-      if (wheel !== 0) {
-        this.buildAngle += (wheel > 0 ? 1 : -1) * STEP_15;
-      }
-
-      // Teclas Q e E (ou setas Esquerda/Direita) giram a construção em 15°
-      if (this._keyRotCooldown > 0) this._keyRotCooldown -= dt;
-      if (this._keyRotCooldown <= 0) {
-        if (this.input.isKeyPressed?.("KeyQ") || this.input.isKeyPressed?.("ArrowLeft")) {
-          this.buildAngle -= STEP_15;
-          this._keyRotCooldown = 0.16;
-        } else if (this.input.isKeyPressed?.("KeyE") || this.input.isKeyPressed?.("ArrowRight")) {
-          this.buildAngle += STEP_15;
-          this._keyRotCooldown = 0.16;
+        // Scroll da roda do mouse roda a construção em 15°
+        if (wheel !== 0) {
+          this.buildAngle += (wheel > 0 ? 1 : -1) * STEP_15;
         }
-      }
 
-      // Movimento do mouse enquanto a câmera está travada
-      const lookX = this.cameraRig?._smoothLookX || 0;
-      if (Math.abs(lookX) > 0.12) {
-        this._buildTurnAccum += lookX;
-        if (Math.abs(this._buildTurnAccum) > 0.75) {
-          this.buildAngle -= Math.sign(this._buildTurnAccum) * STEP_15;
-          this._buildTurnAccum = 0;
+        // Teclas Q e E (ou setas Esquerda/Direita) giram a construção em 15°
+        if (this._keyRotCooldown > 0) this._keyRotCooldown -= dt;
+        if (this._keyRotCooldown <= 0) {
+          if (this.input.isKeyPressed?.("KeyQ") || this.input.isKeyPressed?.("ArrowLeft")) {
+            this.buildAngle -= STEP_15;
+            this._keyRotCooldown = 0.16;
+          } else if (this.input.isKeyPressed?.("KeyE") || this.input.isKeyPressed?.("ArrowRight")) {
+            this.buildAngle += STEP_15;
+            this._keyRotCooldown = 0.16;
+          }
+        }
+
+        // Movimento do mouse enquanto a câmera está travada
+        const lookX = this.cameraRig?._smoothLookX || 0;
+        if (Math.abs(lookX) > 0.12) {
+          this._buildTurnAccum += lookX;
+          if (Math.abs(this._buildTurnAccum) > 0.75) {
+            this.buildAngle -= Math.sign(this._buildTurnAccum) * STEP_15;
+            this._buildTurnAccum = 0;
+          }
         }
       }
     } else {
@@ -387,6 +397,19 @@ export class WeaponSystem {
 
     if (this.buildMode) {
       this._cancelCharge();
+      if (this.selectedBuildType === "DESTROY") {
+        updateBuildPreview(this.player.root.position, 0, false);
+        this._updateDemolishMode(dt, cameraYaw);
+        this._updateTrajectory(def);
+        this._updateProjectiles(dt);
+        return;
+      }
+      if (this.ui?.demolishHud && !this.ui.demolishHud.hidden) {
+        this.ui.setDemolishHud(false);
+      }
+      if (this._demolishHighlightGroup) {
+        this._demolishHighlightGroup.visible = false;
+      }
       updateBuildPreview(
         this.player.root.position,
         this.player.model?.rotation?.y ?? 0,
@@ -406,6 +429,12 @@ export class WeaponSystem {
       return;
     } else {
       updateBuildPreview(this.player.root.position, 0, false);
+      if (this.ui?.demolishHud && !this.ui.demolishHud.hidden) {
+        this.ui.setDemolishHud(false);
+      }
+      if (this._demolishHighlightGroup) {
+        this._demolishHighlightGroup.visible = false;
+      }
     }
 
     if (def.id === "spear" && this.models.spear?.userData?.isThrown) {
@@ -477,6 +506,10 @@ export class WeaponSystem {
   openBuildHub() {
     this.buildHubOpen = true;
     this.buildMode = false;
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
+    if (this._demolishHighlightGroup) this._demolishHighlightGroup.visible = false;
+    this.ui?.setDemolishHud?.(false);
     updateBuildPreview(this.player.root.position, 0, false);
     this.input.setModalOpen(true);
 
@@ -493,12 +526,19 @@ export class WeaponSystem {
       () => {
         this.startBuildMode("PLACE_ITEM");
       },
+      () => {
+        this.startBuildMode("DESTROY");
+      },
     );
   }
 
   closeBuildHub() {
     this.buildHubOpen = false;
     this.buildMode = false;
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
+    if (this._demolishHighlightGroup) this._demolishHighlightGroup.visible = false;
+    this.ui?.setDemolishHud?.(false);
     if (this.cameraRig) this.cameraRig.frozen = false;
     this.ui.closeBuildHub();
     this.input.setModalOpen(false);
@@ -512,6 +552,10 @@ export class WeaponSystem {
   exitBuildMode() {
     this.buildMode = false;
     this.buildHubOpen = false;
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
+    if (this._demolishHighlightGroup) this._demolishHighlightGroup.visible = false;
+    this.ui?.setDemolishHud?.(false);
     if (this.cameraRig) this.cameraRig.frozen = false;
     this.input.setModalOpen(false);
     updateBuildPreview(this.player.root.position, 0, false);
@@ -523,8 +567,12 @@ export class WeaponSystem {
     this.buildHubOpen = false;
     this.buildMode = true;
     this.selectedBuildType = type;
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
     this.buildAngle = Math.round((this.player.model?.rotation?.y ?? 0) / (Math.PI / 12)) * (Math.PI / 12);
-    if (this.cameraRig) this.cameraRig.frozen = true;
+    if (this.cameraRig) {
+      this.cameraRig.frozen = type !== "DESTROY";
+    }
     this.input.setModalOpen(false);
     this._announceBuildMode();
     try {
@@ -534,6 +582,11 @@ export class WeaponSystem {
 
   _announceBuildMode() {
     const type = this.selectedBuildType || "HOUSE";
+    if (type === "DESTROY") {
+      this.ui.setWeapon("MODO CONSTRUÇÃO (C)", "🔨 MODO DEMOLIÇÃO");
+      this.ui.showToast("Modo Demolição ativado! Aponte para sua construção e clique com botão esquerdo ou aperte [E] para SELECIONAR.");
+      return;
+    }
     if (type === "PLACE_ITEM") {
       const label = `FIXAR ${this.currentWeapon.name.toLocaleUpperCase("pt-BR")} NA PAREDE/CHÃO [E]`;
       this.ui.setWeapon("MODO CONSTRUÇÃO (C)", label);
@@ -781,6 +834,238 @@ export class WeaponSystem {
       if (cost.hay) parts.push(`${cost.hay} Feno (tens ${PlayerInventory.hay})`);
       this.ui.showToast(`Recursos insuficientes! Precisas de: ${parts.join(" · ")}`);
     }
+  }
+
+  _createDemolishHighlight(scene) {
+    if (!scene) return null;
+    const group = new THREE.Group();
+    group.name = "DemolishHighlight";
+
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xff3333,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const lineBox = new THREE.LineSegments(edgesGeo, lineMat);
+    group.add(lineBox);
+
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: 0xff1111,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const fillBox = new THREE.Mesh(boxGeo, fillMat);
+    group.add(fillBox);
+
+    group.visible = false;
+    scene.add(group);
+    return group;
+  }
+
+  _updateDemolishHighlight(target, isSelected) {
+    if (!this._demolishHighlightGroup) return;
+    if (!target) {
+      this._demolishHighlightGroup.visible = false;
+      return;
+    }
+
+    const type = target.userData?.type || "DEFAULT";
+    const bounds = BUILDING_BOUNDS[type] || { w: 2.2, d: 2.2, h: 2.0, y: 1.0 };
+    const now = performance.now();
+
+    const bx = target.position ? target.position.x : target.x;
+    const by = (target.position ? target.position.y : target.y) + bounds.y;
+    const bz = target.position ? target.position.z : target.z;
+    const ry = target.rotation ? target.rotation.y : (this._yaw || 0);
+
+    this._demolishHighlightGroup.position.set(bx, by, bz);
+    this._demolishHighlightGroup.rotation.y = ry;
+    this._demolishHighlightGroup.scale.set(bounds.w * 1.05, bounds.h * 1.05, bounds.d * 1.05);
+
+    const lineBox = this._demolishHighlightGroup.children[0];
+    const fillBox = this._demolishHighlightGroup.children[1];
+
+    if (isSelected) {
+      const pulse = 0.72 + 0.28 * Math.sin(now * 0.016);
+      if (lineBox) {
+        lineBox.material.color.setHex(0xff1818);
+        lineBox.material.opacity = pulse;
+      }
+      if (fillBox) {
+        fillBox.material.color.setHex(0xff2222);
+        fillBox.material.opacity = 0.22 * pulse;
+      }
+    } else {
+      const pulse = 0.65 + 0.35 * Math.sin(now * 0.008);
+      if (lineBox) {
+        lineBox.material.color.setHex(0xffa834);
+        lineBox.material.opacity = pulse;
+      }
+      if (fillBox) {
+        fillBox.material.color.setHex(0xff8811);
+        fillBox.material.opacity = 0.12 * pulse;
+      }
+    }
+
+    this._demolishHighlightGroup.visible = true;
+  }
+
+  _updateDemolishMode(dt, cameraYaw) {
+    if (this.cameraRig) this.cameraRig.frozen = false;
+
+    // Se o alvo selecionado não estiver mais visível, reseta a seleção
+    if (this.selectedDemolishTarget && !this.selectedDemolishTarget.visible && !this.selectedDemolishTarget.model) {
+      this.selectedDemolishTarget = null;
+    }
+
+    const px = this.player.x;
+    const pz = this.player.z;
+    const forwardX = -Math.sin(cameraYaw);
+    const forwardZ = -Math.cos(cameraYaw);
+
+    const buildings = (this.playerBuildingsPool || []).filter((b) => b.visible);
+    let bestCandidate = null;
+    let bestScore = Infinity;
+
+    for (let i = 0; i < buildings.length; i++) {
+      const b = buildings[i];
+      const dx = b.position.x - px;
+      const dz = b.position.z - pz;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 32) continue;
+
+      const dot = (dx * forwardX + dz * forwardZ) / Math.max(0.001, dist);
+      if (dot < 0.55) continue;
+
+      const score = dist * (2.0 - dot);
+      if (score < bestScore) {
+        bestScore = score;
+        bestCandidate = b;
+      }
+    }
+
+    if (this.placedItems && this.placedItems.length > 0) {
+      for (let i = 0; i < this.placedItems.length; i++) {
+        const item = this.placedItems[i];
+        const dx = item.x - px;
+        const dz = item.z - pz;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 10) continue;
+        const dot = (dx * forwardX + dz * forwardZ) / Math.max(0.001, dist);
+        if (dot < 0.65) continue;
+        const score = dist * (2.0 - dot);
+        if (score < bestScore) {
+          bestScore = score;
+          bestCandidate = item;
+        }
+      }
+    }
+
+    this.hoveredDemolishTarget = bestCandidate;
+    const activeTarget = this.selectedDemolishTarget || this.hoveredDemolishTarget;
+    const isSelected = Boolean(this.selectedDemolishTarget);
+
+    this._updateDemolishHighlight(activeTarget, isSelected);
+
+    // Texto descritivo para a interface
+    let targetText = "Nenhuma construção sob a mira";
+    if (this.selectedDemolishTarget) {
+      const type = this.selectedDemolishTarget.userData?.type;
+      const cost = BUILD_COSTS[type];
+      const name = cost?.label || this.selectedDemolishTarget.name || type || "Construção";
+      targetText = `[SELECIONADO] ${name}`;
+    } else if (this.hoveredDemolishTarget) {
+      const type = this.hoveredDemolishTarget.userData?.type;
+      const cost = BUILD_COSTS[type];
+      const name = cost?.label || this.hoveredDemolishTarget.name || type || "Construção";
+      targetText = `Mirando em: ${name}`;
+    }
+
+    this.ui.setDemolishHud(
+      true,
+      targetText,
+      isSelected,
+      () => this._demolishSelectedTarget(),
+      () => this._clearDemolishSelection(),
+    );
+
+    // Entrada do teclado/mouse para selecionar e destruir
+    const attackPressed = this.input.consumeAttackPressed?.();
+    const interactPressed = this.input.consumeInteractPressed?.();
+    const spacePressed = this.input.isKeyPressed?.("Space");
+    const deletePressed = this.input.isKeyPressed?.("Delete") || this.input.isKeyPressed?.("Backspace");
+    const cancelPressed = this.input.isKeyPressed?.("Escape") || this.input.consumeBlockPressed?.();
+
+    if (cancelPressed) {
+      this._clearDemolishSelection();
+      return;
+    }
+
+    if (deletePressed && this.selectedDemolishTarget) {
+      this._demolishSelectedTarget();
+      return;
+    }
+
+    if (attackPressed || interactPressed || spacePressed) {
+      if (this.selectedDemolishTarget) {
+        if (!this.hoveredDemolishTarget || this.hoveredDemolishTarget === this.selectedDemolishTarget) {
+          this._demolishSelectedTarget();
+        } else {
+          this.selectedDemolishTarget = this.hoveredDemolishTarget;
+          this.audio?.weaponSwing?.("chop", false);
+        }
+      } else if (this.hoveredDemolishTarget) {
+        this.selectedDemolishTarget = this.hoveredDemolishTarget;
+        this.audio?.weaponSwing?.("chop", false);
+        const type = this.selectedDemolishTarget.userData?.type;
+        const cost = BUILD_COSTS[type];
+        const name = cost?.label || this.selectedDemolishTarget.name || type || "Construção";
+        this.ui.showToast(`✦ ${name} selecionada! Clique no botão DELETAR ou aperte [E / Delete / Espaço] para destruir.`);
+      }
+    }
+  }
+
+  _clearDemolishSelection() {
+    if (this.selectedDemolishTarget) {
+      this.selectedDemolishTarget = null;
+      this.ui.showToast("Seleção cancelada.");
+    }
+    if (this._demolishHighlightGroup) this._demolishHighlightGroup.visible = false;
+  }
+
+  _demolishSelectedTarget() {
+    const target = this.selectedDemolishTarget;
+    if (!target) return;
+
+    if (target.model || target.torchSource || target.id) {
+      const idx = this.placedItems ? this.placedItems.indexOf(target) : -1;
+      if (idx !== -1) this.placedItems.splice(idx, 1);
+
+      if (target.torchSource?.group) target.torchSource.group.parent?.remove(target.torchSource.group);
+      if (target.torchSource?.sprite) target.torchSource.sprite.parent?.remove(target.torchSource.sprite);
+      if (target.model) target.model.parent?.remove(target.model);
+
+      this.effects?.play("dust", target.x, target.y + 0.3, target.z, "#cdbb97", 1.2);
+      this.effects?.play("smoke", target.x, target.y + 0.3, target.z, "#8c8273", 1.0);
+      this.audio?.weaponSwing?.("chop", false);
+      this.ui.showToast(`✦ ${target.name || "Item fixado"} deletado com sucesso!`);
+    } else {
+      const type = target.userData?.type;
+      const cost = BUILD_COSTS[type];
+      const name = cost?.label || type || "Construção";
+      destroyBuilding(target, this.world, this.scene, this.effects);
+      this.ui.showToast(`💥 ${name} foi demolida e removida do reino!`);
+    }
+
+    this.selectedDemolishTarget = null;
+    this.hoveredDemolishTarget = null;
+    if (this._demolishHighlightGroup) this._demolishHighlightGroup.visible = false;
+    this.ui.setDemolishHud(true, "Construção demolida com sucesso!", false);
   }
 
   setWeaponDurability(id, amount) {

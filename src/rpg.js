@@ -2829,6 +2829,23 @@ export function createPlayerBuildingsPool(scene = _env.scene, world = _env.world
   return _playerBuildingsPool;
 }
 
+export const BUILDING_BOUNDS = {
+  CABIN: { w: 3.6, d: 3.0, h: 2.8, y: 1.4 },
+  HOUSE: { w: 5.0, d: 4.4, h: 3.8, y: 1.9 },
+  CORRAL: { w: 5.2, d: 5.2, h: 1.5, y: 0.75 },
+  BARN: { w: 6.0, d: 4.8, h: 4.5, y: 2.25 },
+  WATCHTOWER: { w: 3.2, d: 3.2, h: 6.8, y: 3.4 },
+  WALL_GATE: { w: 5.2, d: 1.2, h: 3.4, y: 1.7 },
+  BLACKSMITH_SHED: { w: 4.2, d: 3.4, h: 3.0, y: 1.5 },
+  WELL: { w: 2.4, d: 2.4, h: 2.4, y: 1.2 },
+  TORCH_POST: { w: 0.9, d: 0.9, h: 3.4, y: 1.7 },
+  CAMPFIRE: { w: 1.8, d: 1.8, h: 0.9, y: 0.45 },
+  STONE_WALL_SMALL: { w: 3.8, d: 0.9, h: 2.3, y: 1.15 },
+  CLAY_WALL_SMALL: { w: 3.8, d: 0.9, h: 2.3, y: 1.15 },
+  STONE_WALL_LARGE: { w: 6.0, d: 1.8, h: 6.8, y: 3.4 },
+  CLAY_WALL_LARGE: { w: 6.0, d: 1.8, h: 6.8, y: 3.4 },
+};
+
 function _registerBuildingColliders(building, world = _env.world) {
   if (!building || !world) return;
   const bx = building.position.x;
@@ -2842,6 +2859,25 @@ function _registerBuildingColliders(building, world = _env.world) {
     z: bz - lx * sin + lz * cos,
   });
 
+  building.userData.registeredBoxes = building.userData.registeredBoxes || [];
+  building.userData.registeredFloors = building.userData.registeredFloors || [];
+  const addBox = (cx, cz, width, depth, ry, bottom, top, flags = {}) => {
+    const box = world.addOrientedBox(cx, cz, width, depth, ry, bottom, top, flags);
+    if (box) {
+      box.buildingRef = building;
+      building.userData.registeredBoxes.push(box);
+    }
+    return box;
+  };
+  const addFloor = (cx, cz, width, depth, ry, y) => {
+    const floor = world.addOrientedFloor?.(cx, cz, width, depth, ry, y);
+    if (floor) {
+      floor.buildingRef = building;
+      building.userData.registeredFloors.push(floor);
+    }
+    return floor;
+  };
+
   const type = building.userData.type;
 
   if (type === "HOUSE") {
@@ -2854,16 +2890,16 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pFrontR = toW(1.85, 2.0);
 
     // Registra piso interno e degrau frontal no world.floors para caminhar suavemente
-    world.addOrientedFloor?.(bx, bz, 4.8, 4.0, ry, by + 0.08);
+    addFloor(bx, bz, 4.8, 4.0, ry, by + 0.08);
     const pStep = toW(0, 2.45);
-    world.addOrientedFloor?.(pStep.x, pStep.z, 2.2, 0.9, ry, by + 0.08);
+    addFloor(pStep.x, pStep.z, 2.2, 0.9, ry, by + 0.08);
 
-    world.addOrientedBox(pBack.x, pBack.z, 5.0, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pRight.x, pRight.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pBack.x, pBack.z, 5.0, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pLeft.x, pLeft.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pRight.x, pRight.z, 0.34, 4.2, ry, bottom, top, { move: true, shot: true, cam: false });
     // Paredes frontais com vão de porta amplo (2.4m) livre de colisão
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontL.x, pFrontL.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontR.x, pFrontR.z, 1.25, 0.34, ry, bottom, top, { move: true, shot: true, cam: false });
 
     // Registra cama para repouso
     const bedPos = toW(-1.6, 0.9);
@@ -2880,13 +2916,13 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pFrontL = toW(-1.7, 2.5);
     const pFrontR = toW(1.7, 2.5);
 
-    world.addOrientedFloor?.(bx, bz, 5.0, 5.0, ry, by + 0.04);
+    addFloor(bx, bz, 5.0, 5.0, ry, by + 0.04);
 
-    world.addOrientedBox(pBack.x, pBack.z, 5.2, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
-    world.addOrientedBox(pRight.x, pRight.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pBack.x, pBack.z, 5.2, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pLeft.x, pLeft.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pRight.x, pRight.z, 0.28, 5.2, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pFrontL.x, pFrontL.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pFrontR.x, pFrontR.z, 1.65, 0.28, ry, bottom, top, { move: true, shot: false, cam: false });
   } else if (type === "CABIN") {
     const top = by + 2.8;
     const bottom = by - 1.0;
@@ -2896,15 +2932,15 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pFrontL = toW(-1.35, 1.35);
     const pFrontR = toW(1.35, 1.35);
 
-    world.addOrientedFloor?.(bx, bz, 3.5, 2.9, ry, by + 0.25);
+    addFloor(bx, bz, 3.5, 2.9, ry, by + 0.25);
     const pStep = toW(0, 1.5);
-    world.addOrientedFloor?.(pStep.x, pStep.z, 1.8, 0.7, ry, by + 0.15);
+    addFloor(pStep.x, pStep.z, 1.8, 0.7, ry, by + 0.15);
 
-    world.addOrientedBox(pBack.x, pBack.z, 3.6, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pRight.x, pRight.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pBack.x, pBack.z, 3.6, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pLeft.x, pLeft.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pRight.x, pRight.z, 0.3, 2.9, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontL.x, pFrontL.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontR.x, pFrontR.z, 0.9, 0.3, ry, bottom, top, { move: true, shot: true, cam: false });
 
     // Registra cama de campanha para repouso
     const bedPos = toW(-1.0, -0.4);
@@ -2921,13 +2957,13 @@ function _registerBuildingColliders(building, world = _env.world) {
     const pFrontL = toW(-2.1, 2.3);
     const pFrontR = toW(2.1, 2.3);
 
-    world.addOrientedFloor?.(bx, bz, 5.8, 4.6, ry, by + 0.1);
+    addFloor(bx, bz, 5.8, 4.6, ry, by + 0.1);
 
-    world.addOrientedBox(pBack.x, pBack.z, 6.0, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pLeft.x, pLeft.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pRight.x, pRight.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pFrontL.x, pFrontL.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedBox(pFrontR.x, pFrontR.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pBack.x, pBack.z, 6.0, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pLeft.x, pLeft.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pRight.x, pRight.z, 0.35, 4.8, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontL.x, pFrontL.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(pFrontR.x, pFrontR.z, 1.5, 0.35, ry, bottom, top, { move: true, shot: true, cam: false });
   } else if (type === "WATCHTOWER") {
     const top = by + 6.8;
     const bottom = by - 1.0;
@@ -2935,7 +2971,7 @@ function _registerBuildingColliders(building, world = _env.world) {
     for (const px of [-1.3, 1.3]) {
       for (const pz of [-1.3, 1.3]) {
         const p = toW(px, pz);
-        world.addOrientedBox(p.x, p.z, 0.6, 0.6, ry, bottom, top, { move: true, shot: false, cam: false });
+        addBox(p.x, p.z, 0.6, 0.6, ry, bottom, top, { move: true, shot: false, cam: false });
       }
     }
   } else if (type === "WALL_GATE") {
@@ -2943,40 +2979,122 @@ function _registerBuildingColliders(building, world = _env.world) {
     const bottom = by - 1.0;
     const pLeft = toW(-2.3, 0);
     const pRight = toW(2.3, 0);
-    world.addOrientedBox(pLeft.x, pLeft.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pRight.x, pRight.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
+    addBox(pLeft.x, pLeft.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
+    addBox(pRight.x, pRight.z, 2.4, 0.38, ry, bottom, top, { move: true, shot: true, cam: true });
   } else if (type === "BLACKSMITH_SHED") {
     const top = by + 3.0;
     const bottom = by - 1.0;
     const pForge = toW(1.1, -1.0);
     const pBench = toW(-1.1, -1.1);
     const pAnvil = toW(-0.6, 0.2);
-    world.addOrientedBox(pForge.x, pForge.z, 1.5, 1.3, ry, bottom, top, { move: true, shot: true, cam: true });
-    world.addOrientedBox(pBench.x, pBench.z, 1.7, 0.8, ry, bottom, top, { move: true, shot: false, cam: false });
-    world.addOrientedBox(pAnvil.x, pAnvil.z, 0.7, 0.7, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pForge.x, pForge.z, 1.5, 1.3, ry, bottom, top, { move: true, shot: true, cam: true });
+    addBox(pBench.x, pBench.z, 1.7, 0.8, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(pAnvil.x, pAnvil.z, 0.7, 0.7, ry, bottom, top, { move: true, shot: false, cam: false });
   } else if (type === "WELL") {
     const top = by + 2.4;
     const bottom = by - 1.0;
-    world.addOrientedBox(bx, bz, 2.3, 2.3, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(bx, bz, 2.3, 2.3, ry, bottom, top, { move: true, shot: false, cam: false });
   } else if (type === "TORCH_POST") {
     const top = by + 3.4;
     const bottom = by - 1.0;
-    world.addOrientedBox(bx, bz, 0.55, 0.55, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(bx, bz, 0.55, 0.55, ry, bottom, top, { move: true, shot: false, cam: false });
   } else if (type === "CAMPFIRE") {
     const top = by + 0.9;
     const bottom = by - 0.5;
-    world.addOrientedBox(bx, bz, 1.6, 1.6, ry, bottom, top, { move: true, shot: false, cam: false });
+    addBox(bx, bz, 1.6, 1.6, ry, bottom, top, { move: true, shot: false, cam: false });
   } else if (type === "STONE_WALL_SMALL" || type === "CLAY_WALL_SMALL") {
     const top = by + 2.3;
     const bottom = by - 1.0;
-    world.addOrientedBox(bx, bz, 3.8, 0.85, ry, bottom, top, { move: true, shot: true, cam: false });
+    addBox(bx, bz, 3.8, 0.85, ry, bottom, top, { move: true, shot: true, cam: false });
   } else if (type === "STONE_WALL_LARGE" || type === "CLAY_WALL_LARGE") {
     const top = by + 6.8;
     const bottom = by - 1.5;
-    world.addOrientedBox(bx, bz, 6.0, 1.85, ry, bottom, top, { move: true, shot: true, cam: false });
-    world.addOrientedFloor?.(bx, bz, 6.0, 1.8, ry, by + 5.25);
+    addBox(bx, bz, 6.0, 1.85, ry, bottom, top, { move: true, shot: true, cam: false });
+    addFloor(bx, bz, 6.0, 1.8, ry, by + 5.25);
   }
   building.userData.collidersRegistered = true;
+}
+
+export function destroyBuilding(building, world = _env.world, scene = _env.scene, effects = _env.effects) {
+  if (!building) return false;
+
+  // 1. Desativa todos os colisores orientados (OBBs) registrados para esta construção
+  if (building.userData.registeredBoxes && building.userData.registeredBoxes.length > 0) {
+    for (let i = 0; i < building.userData.registeredBoxes.length; i++) {
+      const b = building.userData.registeredBoxes[i];
+      if (b) {
+        b.active = false;
+        b.move = false;
+        b.shot = false;
+        b.cam = false;
+      }
+    }
+  }
+
+  // Desativa qualquer colisor residual associado a esta construção
+  if (world?.boxColliders) {
+    for (let i = 0; i < world.boxColliders.length; i++) {
+      const b = world.boxColliders[i];
+      if (b && b.buildingRef === building) {
+        b.active = false;
+        b.move = false;
+        b.shot = false;
+        b.cam = false;
+      }
+    }
+  }
+
+  // 2. Remove e desativa pisos registrados
+  if (building.userData.registeredFloors && building.userData.registeredFloors.length > 0) {
+    for (let i = 0; i < building.userData.registeredFloors.length; i++) {
+      const f = building.userData.registeredFloors[i];
+      if (f) {
+        f.active = false;
+        if (world?.floors) {
+          const idx = world.floors.indexOf(f);
+          if (idx !== -1) world.floors.splice(idx, 1);
+        }
+      }
+    }
+  }
+  if (world?.floors) {
+    for (let i = world.floors.length - 1; i >= 0; i--) {
+      const f = world.floors[i];
+      if (f && f.buildingRef === building) {
+        f.active = false;
+        world.floors.splice(i, 1);
+      }
+    }
+  }
+
+  // 3. Efeitos de demolição (explosão de poeira e som de quebra)
+  const bx = building.position.x;
+  const by = building.position.y;
+  const bz = building.position.z;
+  const fx = effects || _env.effects;
+  if (fx?.play) {
+    fx.play("dust", bx, by + 1.2, bz, "#cdbb97", 2.2);
+    fx.play("smoke", bx, by + 0.8, bz, "#8c8273", 1.8);
+    fx.play("dust", bx - 1.2, by + 0.5, bz + 1.2, "#a67d4b", 1.5);
+    fx.play("dust", bx + 1.2, by + 0.5, bz - 1.2, "#a67d4b", 1.5);
+  }
+  playWoodChopSound();
+
+  // 4. Apaga quaisquer luzes internas e oculta
+  building.traverse((child) => {
+    if (child.isLight) {
+      child.intensity = 0;
+      child.visible = false;
+    }
+  });
+
+  building.visible = false;
+  building.userData.collidersRegistered = false;
+  if (building.userData.registeredBoxes) building.userData.registeredBoxes.length = 0;
+  if (building.userData.registeredFloors) building.userData.registeredFloors.length = 0;
+  if (building.userData.bed) delete building.userData.bed;
+
+  return true;
 }
 
 /**
