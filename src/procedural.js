@@ -951,13 +951,16 @@ export class Werewolf extends NPC {
     this.root.position.set(this.x, ground, this.z);
 
     const isMoving = mLen > 0.001 && moveSpeed > 0.1;
-    const stride = isMoving ? Math.sin(this.walkPhase) * 0.92 : 0;
+    if (!this._stride) this._stride = 0;
+    const targetStride = isMoving ? Math.sin(this.walkPhase) * 0.78 : 0;
+    this._stride += (targetStride - this._stride) * (1 - Math.exp(-18 * dt));
+    const stride = this._stride;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
     bendJoints(this, stride, stride);
-    this.model.rotation.x = 0.32; // Postura predadora curvada para a frente
-    this.leftArm.rotation.x = -0.75 - stride * 0.55;
-    this.rightArm.rotation.x = -0.75 + stride * 0.55;
+    this.model.rotation.x = 0.28; // Postura predadora curvada para a frente
+    this.leftArm.rotation.x = -0.65 - stride * 0.45;
+    this.rightArm.rotation.x = -0.65 + stride * 0.45;
 
     if (this.meleeWind > 0) {
       this.rightArm.rotation.x = -2.1 * this.meleeWind;
@@ -965,7 +968,10 @@ export class Werewolf extends NPC {
     }
     if (this.swingTimer > 0) {
       this.swingTimer = Math.max(0, this.swingTimer - dt);
-      const slash = Math.sin((1 - this.swingTimer / 0.3) * Math.PI);
+      const strikeNorm = 1 - this.swingTimer / 0.3;
+      const slash = strikeNorm < 0.25
+        ? Math.pow(strikeNorm / 0.25, 2.0)
+        : 1 - Math.pow((strikeNorm - 0.25) / 0.75, 1.4);
       this.rightArm.rotation.x = -2.2 + slash * 2.6;
       this.leftArm.rotation.x = -2.0 + slash * 2.4;
     }

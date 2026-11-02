@@ -394,13 +394,14 @@ export class NPC {
       this._groundY = this.world.heightAt(this.x, this.z);
     }
     this.root.position.set(this.x, this._groundY, this.z);
-    const stride = this.moving ? Math.sin(this.walkPhase) * 0.56 : 0;
+    this._stride = THREE.MathUtils.lerp(this._stride || 0, this.moving ? Math.sin(this.walkPhase) * 0.45 : 0, 1 - Math.exp(-18 * dt));
+    const stride = this._stride;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
-    bendJoints(this, stride, stride);
-    this.leftArm.rotation.x = -stride * 0.82;
-    this.rightArm.rotation.x = stride * 0.82;
-    this.model.position.y = this.moving ? Math.abs(Math.sin(this.walkPhase * 2)) * 0.03 : 0;
+    bendJoints(this, stride, stride, 0, false);
+    this.leftArm.rotation.x = -stride * 0.75;
+    this.rightArm.rotation.x = stride * 0.75;
+    this.model.position.y = this.moving ? Math.abs(Math.sin(this.walkPhase * 2)) * 0.024 : 0;
 
     if (this.roleKey === "smith") {
       const working = !this.moving;
@@ -937,21 +938,25 @@ export class NPC {
       this._groundY = this.world.heightAt(this.x, this.z);
     }
     this.root.position.set(this.x, this._groundY, this.z);
-    const stride = this.moving ? Math.sin(this.walkPhase) * 0.9 : 0;
+    this._alertStride = THREE.MathUtils.lerp(this._alertStride || 0, this.moving ? Math.sin(this.walkPhase) * 0.62 : 0, 1 - Math.exp(-20 * dt));
+    const stride = this._alertStride;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
-    bendJoints(this, stride, stride);
+    bendJoints(this, stride, stride, 0, this.mode === "hunt");
     if (this.mode === "hunt") {
-      this.leftArm.rotation.x = -stride * 0.8;
-      this.rightArm.rotation.x = stride * 0.8 - 0.4;
+      this.leftArm.rotation.x = -stride * 0.75;
+      this.rightArm.rotation.x = stride * 0.75 - 0.35;
       if (this.meleeWind > 0) {
-        // preparação do golpe: o braço da arma sobe devagar
-        this.rightArm.rotation.x = -0.4 - 1.9 * this.meleeWind;
+        // Preparação do golpe: o braço da arma sobe acumulando força
+        this.rightArm.rotation.x = -0.4 - 1.8 * this.meleeWind;
         this.rightForearm.rotation.x = -0.3 - 0.6 * this.meleeWind;
       }
       if (this.swingTimer > 0) {
         this.swingTimer = Math.max(0, this.swingTimer - dt);
-        this.rightArm.rotation.x = -2.1 * Math.sin((1 - this.swingTimer / 0.3) * Math.PI);
+        const p = 1 - this.swingTimer / 0.3;
+        const slash = p < 0.35 ? Math.sin((p / 0.35) * Math.PI * 0.5) : Math.cos(((p - 0.35) / 0.65) * Math.PI * 0.5);
+        this.rightArm.rotation.x = -1.9 * slash - 0.2;
+        this.rightForearm.rotation.x = -0.75 + 0.65 * slash;
       }
     } else {
       // braços para o alto, em pânico

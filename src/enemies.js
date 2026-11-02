@@ -266,8 +266,11 @@ export class Soldier extends NPC {
     this.leftForearm.rotation.x = -0.6;
     if (this.swingTimer > 0) {
       this.swingTimer = Math.max(0, this.swingTimer - dt);
-      const k = Math.sin((1 - this.swingTimer / 0.35) * Math.PI);
-      this.rightArm.rotation.set(-1.15 - 0.45 * k, 0, 0);
+      const strikeNorm = 1 - this.swingTimer / 0.35;
+      const k = strikeNorm < 0.28
+        ? Math.pow(strikeNorm / 0.28, 1.8)
+        : 1 - Math.pow((strikeNorm - 0.28) / 0.72, 1.4);
+      this.rightArm.rotation.set(-1.15 - 0.55 * k, 0, 0);
     } else {
       // preparação: a lança sobe antes da investida
       this.rightArm.rotation.set(-1.15 - 0.8 * this.meleeWind, 0, 0);
@@ -419,12 +422,17 @@ export class Soldier extends NPC {
     this.root.position.set(this.x, this.world.heightAt(this.x, this.z), this.z);
 
     if (moving) this.walkPhase += dt * (6 + speed * 1.7);
-    const stride = moving ? Math.sin(this.walkPhase) * 0.7 : 0;
+    if (!this._stride) this._stride = 0;
+    const targetStride = moving ? Math.sin(this.walkPhase) * 0.58 : 0;
+    this._stride += (targetStride - this._stride) * (1 - Math.exp(-20 * dt));
+    const stride = this._stride;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
     bendJoints(this, stride, stride);
-    this.model.position.y = moving ? Math.abs(Math.sin(this.walkPhase * 2)) * 0.04 : 0;
-    this.model.rotation.x = moving ? 0.12 : 0;
+    const targetBob = moving ? Math.abs(Math.sin(this.walkPhase * 2)) * 0.035 : 0;
+    this.model.position.y += (targetBob - this.model.position.y) * (1 - Math.exp(-18 * dt));
+    const targetPitch = moving ? 0.09 : 0;
+    this.model.rotation.x += (targetPitch - this.model.rotation.x) * (1 - Math.exp(-14 * dt));
 
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * (1 - Math.exp(-14 * dt));
     const ab = this.aimBlend;
@@ -441,8 +449,13 @@ export class Soldier extends NPC {
     }
     if (this.swingTimer > 0) {
       this.swingTimer = Math.max(0, this.swingTimer - dt);
-      this.rightArm.rotation.x = -2.1 * Math.sin((1 - this.swingTimer / 0.3) * Math.PI);
-      this.rightForearm.rotation.x = -0.2;
+      const strikeNorm = 1 - this.swingTimer / 0.3;
+      const strikeArc = strikeNorm < 0.28
+        ? Math.pow(strikeNorm / 0.28, 1.8)
+        : 1 - Math.pow((strikeNorm - 0.28) / 0.72, 1.4);
+      this.rightArm.rotation.x = -0.3 - 1.9 * strikeArc;
+      this.rightArm.rotation.z = -0.2 * strikeArc;
+      this.rightForearm.rotation.x = -0.25 - 0.3 * strikeArc;
       weaponFree = true;
     }
     if (this.behavior === "archer" || this.behavior === "crossbow") {

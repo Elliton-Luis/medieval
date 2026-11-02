@@ -89,11 +89,21 @@ export function buildHumanoid(model, m) {
   return body;
 }
 
-// Dobra joelhos e cotovelos a partir do balanço de passo.
-export function bendJoints(body, stride, armSwing, extra = 0) {
-  body.leftKnee.rotation.x = Math.max(0, stride) * 1.15 + 0.04 + extra;
-  body.rightKnee.rotation.x = Math.max(0, -stride) * 1.15 + 0.04 + extra;
-  const elbow = Math.abs(armSwing) * 0.45;
-  body.leftForearm.rotation.x = -0.12 - elbow;
-  body.rightForearm.rotation.x = -0.12 - elbow;
+// Dobra joelhos e cotovelos a partir do balanço anatômico natural de passo.
+// A perna de impulso (traseira) flexiona o joelho para erguer a canela e permitir o avanço suave.
+// A perna de contato (dianteira) estende amortecendo o impacto no solo.
+export function bendJoints(body, stride, armSwing, extra = 0, isRunning = false) {
+  const kneeMult = isRunning ? 1.45 : 1.1;
+  const backLeft = Math.max(0, -stride);
+  const backRight = Math.max(0, stride);
+  const frontLeft = Math.max(0, stride);
+  const frontRight = Math.max(0, -stride);
+
+  body.leftKnee.rotation.x = backLeft * kneeMult + frontLeft * 0.12 + 0.04 + extra;
+  body.rightKnee.rotation.x = backRight * kneeMult + frontRight * 0.12 + 0.04 + extra;
+
+  const elbowBase = isRunning ? -0.45 : -0.18;
+  const elbowSwing = Math.abs(armSwing) * (isRunning ? 0.55 : 0.35);
+  body.leftForearm.rotation.x = elbowBase - elbowSwing;
+  body.rightForearm.rotation.x = elbowBase - elbowSwing;
 }

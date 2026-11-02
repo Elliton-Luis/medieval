@@ -559,13 +559,13 @@ export class Player {
       if (aiming || this.blocking || this.faceTimer > 0) {
         const difference = Math.atan2(Math.sin(this.faceYaw - before), Math.cos(this.faceYaw - before));
         this.model.rotation.y += difference * (1 - Math.exp(-24 * dt));
-        this.walkPhase += dt * 9 * this.speedRatio;
+        this.walkPhase += dt * 7.2 * Math.min(1.0, this.speedRatio * 1.35);
       } else if (horizontalSpeed > 0.12) {
-        // giro suave em direção ao movimento, em vez de estalar
+        // Giro suave e firme na direção exata do vetor de movimento
         const target = Math.atan2(this.vx, this.vz);
         const difference = Math.atan2(Math.sin(target - before), Math.cos(target - before));
         this.model.rotation.y += difference * (1 - Math.exp(-20 * dt));
-        this.walkPhase += dt * (running ? 14 : 9) * this.speedRatio;
+        this.walkPhase += dt * (running ? 9.8 : 6.8) * Math.min(1.0, this.speedRatio * 1.35);
       }
       turnRate = Math.atan2(Math.sin(this.model.rotation.y - before), Math.cos(this.model.rotation.y - before)) / Math.max(dt, 0.001);
     }
@@ -594,52 +594,61 @@ export class Player {
     const air = !this.grounded;
     this.crouchPose += ((this.crouching ? 1 : 0) - this.crouchPose) * (1 - Math.exp(-12 * dt));
     const cp = this.crouchPose;
-    const stride = Math.sin(this.walkPhase) * s * (running ? 1.22 : 0.62);
-    const armSwing = Math.sin(this.walkPhase) * s * (running ? 1.15 : 0.62);
+
+    // Amplitude de passada anatômica e proporcional: elimina o efeito espacate
+    const targetStride = Math.sin(this.walkPhase) * s * (running ? 0.68 : 0.42);
+    const targetArmSwing = Math.sin(this.walkPhase) * s * (running ? 0.62 : 0.35);
     const idle = 1 - Math.min(1, s * 4);
     const breath = Math.sin(this.idleTime * 1.9);
     const sway = Math.sin(this.idleTime * 0.7);
 
-    // Reseta explicitamente Y e Z das pernas a cada frame fora da montaria para nunca travar na pose RIDING
-    this.leftLeg.rotation.set(stride, 0, 0);
-    this.rightLeg.rotation.set(-stride, 0, 0);
+    // Suavização das pernas: rotação X com interpolação contínua e leve roll em Z
+    const legBlend = 1 - Math.exp(-24 * dt);
+    this.leftLeg.rotation.x = THREE.MathUtils.lerp(this.leftLeg.rotation.x, targetStride, legBlend);
+    this.rightLeg.rotation.x = THREE.MathUtils.lerp(this.rightLeg.rotation.x, -targetStride, legBlend);
+    this.leftLeg.rotation.z = THREE.MathUtils.lerp(this.leftLeg.rotation.z, Math.sin(this.walkPhase) * 0.025 * s, legBlend);
+    this.rightLeg.rotation.z = THREE.MathUtils.lerp(this.rightLeg.rotation.z, -Math.sin(this.walkPhase) * 0.025 * s, legBlend);
 
-    // Braços e antebraços com bombeamento atlético e cotovelos flexionados na corrida
+    // Braços e antebraços com balanço natural e sincronizado
     if (running && s > 0.25) {
-      this.leftArm.rotation.set(-armSwing * 0.95 + 0.32, 0, -0.12);
-      this.rightArm.rotation.set(armSwing * 0.95 - 0.22, 0, 0.12);
-      this.leftForearm.rotation.x = -0.9 - Math.max(0, -armSwing) * 0.42;
-      this.rightForearm.rotation.x = -0.9 - Math.max(0, armSwing) * 0.42;
+      this.leftArm.rotation.set(-targetArmSwing * 0.85 + 0.22, 0, -0.12);
+      this.rightArm.rotation.set(targetArmSwing * 0.85 - 0.18, 0, 0.12);
+      this.leftForearm.rotation.x = -0.75 - Math.max(0, -targetArmSwing) * 0.35;
+      this.rightForearm.rotation.x = -0.75 - Math.max(0, targetArmSwing) * 0.35;
     } else {
-      this.leftArm.rotation.set(-stride * 0.75, 0, -0.03 * breath * idle);
-      this.rightArm.rotation.set(stride * 0.75, 0, 0.03 * breath * idle);
+      this.leftArm.rotation.set(-targetStride * 0.7, 0, -0.04 * idle + Math.sin(this.walkPhase) * 0.02 * s);
+      this.rightArm.rotation.set(targetStride * 0.7, 0, 0.04 * idle - Math.sin(this.walkPhase) * 0.02 * s);
+      this.leftForearm.rotation.x = -0.18 - Math.abs(targetStride) * 0.22;
+      this.rightForearm.rotation.x = -0.18 - Math.abs(targetStride) * 0.22;
     }
 
-    // Postura: inclinação atlética para a frente na corrida (~19 graus / 0.33 rad) e balanço nas curvas.
-    let lean = s * (running ? 0.33 : 0.1);
-    let bank = Math.max(-0.2, Math.min(0.2, -turnRate * 0.016 * s));
+    // Postura corporal: inclinação elegante para a frente e transferência de peso lateral
+    let lean = s * (running ? 0.24 : 0.08);
+    let bank = Math.max(-0.18, Math.min(0.18, -turnRate * 0.014 * s));
     let squash = 1;
     let drop = -0.22 * cp;
     lean += 0.3 * cp;
+
     if (air) {
       const rising = this.verticalSpeed > 0;
-      this.leftLeg.rotation.x = rising ? -0.7 : -0.25;
-      this.rightLeg.rotation.x = rising ? 0.3 : 0.45;
-      this.leftArm.rotation.z = -0.55;
-      this.rightArm.rotation.z = 0.55;
-      this.leftArm.rotation.x = -0.4;
-      this.rightArm.rotation.x = -0.4;
-      lean = rising ? 0.1 : 0.04;
-      squash = rising ? 1.05 : 1.02;
+      this.leftLeg.rotation.x = rising ? -0.55 : -0.22;
+      this.rightLeg.rotation.x = rising ? 0.25 : 0.38;
+      this.leftArm.rotation.z = -0.45;
+      this.rightArm.rotation.z = 0.45;
+      this.leftArm.rotation.x = -0.35;
+      this.rightArm.rotation.x = -0.35;
+      lean = rising ? 0.08 : 0.04;
+      squash = rising ? 1.04 : 1.02;
     } else if (this.landTimer > 0) {
       const k = Math.sin((this.landTimer / LAND_TIME) * Math.PI);
       squash = 1 - 0.1 * k;
       drop = -0.1 * k;
-      this.leftLeg.rotation.x = -0.45 * k;
-      this.rightLeg.rotation.x = 0.45 * k;
-      lean += 0.14 * k;
+      this.leftLeg.rotation.x = -0.35 * k;
+      this.rightLeg.rotation.x = 0.35 * k;
+      lean += 0.12 * k;
     }
-    // Guarda: escudo erguido à frente do peito.
+
+    // Guarda: postura firme com o escudo protegendo o tronco
     this.blockPose += ((this.blocking ? 1 : 0) - this.blockPose) * (1 - Math.exp(-18 * dt));
     if (this.blockPose > 0.015) {
       const bp = this.blockPose;
@@ -647,13 +656,14 @@ export class Player {
       this.leftArm.rotation.z += (0.62 - this.leftArm.rotation.z) * bp;
       lean += 0.06 * bp;
     }
-    // Respiração e troca de apoio quando parado.
-    this.head.position.y = 1.66 + breath * 0.012 * idle + Math.abs(Math.sin(this.walkPhase * 2)) * 0.02 * s;
-    this.head.rotation.x = -lean * 0.6;
-    bank += sway * 0.018 * idle;
 
-    this.cape.rotation.x = -0.08 - s * 0.38 - (air ? 0.25 : 0) - Math.sin(this.idleTime * 7.5) * 0.05 * s;
-    this.cape.rotation.z = Math.sin(this.idleTime * 4.5) * 0.04 * s + bank * 0.5;
+    // Respiração e troca suave de apoio quando parado
+    this.head.position.y = 1.66 + breath * 0.012 * idle + Math.abs(Math.sin(this.walkPhase * 2)) * 0.018 * s;
+    this.head.rotation.x = -lean * 0.6;
+    bank += sway * 0.016 * idle;
+
+    this.cape.rotation.x = -0.08 - s * 0.32 - (air ? 0.22 : 0) - Math.sin(this.idleTime * 7.5) * 0.04 * s;
+    this.cape.rotation.z = Math.sin(this.idleTime * 4.5) * 0.035 * s + bank * 0.5;
 
     const poseTarget = aiming || this.firePoseTimer > 0 ? 1 : 0;
     this.aimPose += (poseTarget - this.aimPose) * (1 - Math.exp(-16 * dt));
@@ -677,24 +687,23 @@ export class Player {
 
     const melee = this.aimStyle === "melee";
     const carrying = !posing && this.attackTimer <= 0 && !air;
-    bendJoints(this, stride, armSwing, air ? 0.35 : 0);
-    if (running && s > 0.25 && !air) {
-      // Flexão acentuada do joelho traseiro para kickback atlético na corrida real
-      this.leftKnee.rotation.x = Math.max(0.08, Math.max(0, -stride) * 1.55 + Math.max(0, stride) * 0.35);
-      this.rightKnee.rotation.x = Math.max(0.08, Math.max(0, stride) * 1.55 + Math.max(0, -stride) * 0.35);
-    }
+
+    // Dobras anatômicas corretas dos joelhos e cotovelos
+    bendJoints(this, this.leftLeg.rotation.x, targetArmSwing, air ? 0.35 : 0, running);
+
     if (cp > 0.015) {
-      // agachado: coxas para a frente e joelhos dobrados
-      this.leftLeg.rotation.x -= 0.85 * cp;
-      this.rightLeg.rotation.x -= 0.85 * cp;
-      this.leftKnee.rotation.x += 1.5 * cp;
-      this.rightKnee.rotation.x += 1.5 * cp;
+      // Agachado com flexão proporcional e alinhada
+      this.leftLeg.rotation.x -= 0.65 * cp;
+      this.rightLeg.rotation.x -= 0.65 * cp;
+      this.leftKnee.rotation.x += 1.25 * cp;
+      this.rightKnee.rotation.x += 1.25 * cp;
     }
-    // Postura de descanso: braço adiantado e cotovelo dobrado, arma à frente do corpo.
+
+    // Postura de descanso: arma descansando elegantemente em prontidão à frente do tronco
     if (carrying) {
-      this.rightArm.rotation.x += melee ? -0.55 : -0.5;
-      this.rightArm.rotation.z += 0.08;
-      this.rightForearm.rotation.x += melee ? -0.7 : -0.5;
+      this.rightArm.rotation.x += melee ? -0.48 : -0.42;
+      this.rightArm.rotation.z += 0.06;
+      this.rightForearm.rotation.x += melee ? -0.55 : -0.42;
     } else if (posing && this.aimStyle === "long") {
       this.rightForearm.rotation.x *= 1 - this.aimPose;
       this.leftForearm.rotation.x *= 1 - this.aimPose;
@@ -708,7 +717,7 @@ export class Player {
       lean -= this.recoil * 0.07;
     }
 
-    // ataque carregado: a arma pesada sobe sobre a cabeça enquanto o botão é segurado
+    // Ataque carregado de armas pesadas
     if (this.chargePose > 0.01 && this.attackTimer <= 0) {
       const cp2 = this.chargePose;
       this.rightArm.rotation.x += (-0.6 - 2.0 * cp2 - this.rightArm.rotation.x) * Math.min(1, cp2 * 2);
@@ -716,69 +725,141 @@ export class Player {
       this.rightForearm.rotation.x = -0.4 * cp2;
       lean -= 0.14 * cp2;
     }
-    // braço de apoio nas armas de duas mãos
+
+    // Braço de apoio nas armas de duas mãos
     if (this.twoHanded && this.blockPose < 0.015 && !(posing && this.aimStyle === "long")) {
       if (this.weaponGrip === "pole") {
-        this.leftArm.rotation.x = -0.95;
-        this.leftArm.rotation.z = 0.5;
-        this.leftForearm.rotation.x = -0.6;
+        this.leftArm.rotation.x = -0.85;
+        this.leftArm.rotation.z = 0.45;
+        this.leftForearm.rotation.x = -0.55;
       } else if (this.weaponGrip === "heavy") {
         this.leftArm.rotation.x += (this.rightArm.rotation.x * 0.85 - this.leftArm.rotation.x) * 0.8;
-        this.leftArm.rotation.z = 0.45;
+        this.leftArm.rotation.z = 0.42;
         this.leftForearm.rotation.x = this.rightForearm.rotation.x;
       }
     }
-    // punhos: guarda de boxeador
+
+    // Punhos: guarda clássica de combate corporal
     if (this.weaponGrip === "none" && carrying) {
-      this.rightArm.rotation.x = -0.75 + stride * 0.2;
-      this.rightForearm.rotation.x = -1.35;
-      this.leftArm.rotation.x = -0.85;
-      this.leftArm.rotation.z = 0.2;
-      this.leftForearm.rotation.x = -1.4;
+      this.rightArm.rotation.x = -0.65 + targetStride * 0.15;
+      this.rightForearm.rotation.x = -1.25;
+      this.leftArm.rotation.x = -0.75;
+      this.leftArm.rotation.z = 0.18;
+      this.leftForearm.rotation.x = -1.3;
     }
 
+    // =========================================================================
+    // Sistema Cinematográfico de Golpes (Combate Suave com Wind-up, Corte e Follow-through)
+    // =========================================================================
+    let attackTorsoYaw = 0;
     if (this.attackTimer > 0) {
       const phase = 1 - this.attackTimer / this.attackLen;
-      const swing = Math.sin(phase * Math.PI);
-      this.rightForearm.rotation.x = -0.2;
-      if (this.attackKind === 1) {
-        this.rightArm.rotation.x = -1.25 * swing;
-        this.rightArm.rotation.z = 0.2 + swing * 0.9;
-        bank += 0.12 * swing;
+
+      if (this.attackKind === 0) {
+        // --- GOLPE 1: Corte Diagonal Direito -> Esquerdo (Slash A) ---
+        if (phase < 0.22) {
+          const t = phase / 0.22;
+          const w = Math.sin(t * Math.PI * 0.5);
+          this.rightArm.rotation.set(-0.4 - 1.05 * w, 0.42 * w, -0.32 * w);
+          this.rightForearm.rotation.x = -0.5 - 0.65 * w;
+          this.leftArm.rotation.set(-0.35 + 0.25 * w, 0, 0.22);
+          lean -= 0.05 * w;
+          bank += 0.08 * w;
+          attackTorsoYaw = 0.26 * w;
+        } else {
+          const t = (phase - 0.22) / 0.78;
+          const slash = t < 0.32 ? Math.sin((t / 0.32) * Math.PI * 0.5) : Math.cos(((t - 0.32) / 0.68) * Math.PI * 0.5);
+          this.rightArm.rotation.set(-1.45 + 0.82 * slash, 0.42 - 0.88 * slash, -0.32 + 1.15 * slash);
+          this.rightForearm.rotation.x = -1.15 + 1.05 * slash;
+          this.leftArm.rotation.set(-0.35 - 0.22 * slash, 0, 0.32);
+          lean += 0.22 * slash;
+          bank -= 0.14 * slash;
+          attackTorsoYaw = 0.26 - 0.58 * slash;
+        }
+      } else if (this.attackKind === 1) {
+        // --- GOLPE 2: Contragolpe Inverso Esquerdo -> Direito (Slash B) ---
+        if (phase < 0.2) {
+          const t = phase / 0.2;
+          const w = Math.sin(t * Math.PI * 0.5);
+          this.rightArm.rotation.set(-1.05 - 0.48 * w, -0.38 * w, 0.65 * w);
+          this.rightForearm.rotation.x = -0.4 - 0.55 * w;
+          attackTorsoYaw = -0.24 * w;
+        } else {
+          const t = (phase - 0.2) / 0.8;
+          const slash = t < 0.3 ? Math.sin((t / 0.3) * Math.PI * 0.5) : Math.cos(((t - 0.3) / 0.7) * Math.PI * 0.5);
+          this.rightArm.rotation.set(-1.55 + 0.9 * slash, -0.38 + 0.82 * slash, 0.65 - 1.15 * slash);
+          this.rightForearm.rotation.x = -0.95 + 0.88 * slash;
+          lean += 0.18 * slash;
+          bank += 0.15 * slash;
+          attackTorsoYaw = -0.24 + 0.52 * slash;
+        }
       } else if (this.attackKind === 2) {
-        this.rightArm.rotation.x = -2.9 * swing;
-        this.rightArm.rotation.z = -0.1;
-        lean += 0.32 * swing;
-      } else if (this.attackKind === 3) {
-        // arremesso por cima: o braço sobe e desce rápido
-        this.rightArm.rotation.x = -2.5 + 2.2 * phase;
-        this.rightArm.rotation.z = -0.15;
-        lean += 0.16 * swing;
+        // --- GOLPE 3: Golpe Demolidor Vertical Descendente (Overhead Cleave) ---
+        if (phase < 0.26) {
+          const t = phase / 0.26;
+          const w = Math.sin(t * Math.PI * 0.5);
+          this.rightArm.rotation.set(-0.6 - 2.1 * w, 0, -0.12 * w);
+          this.rightForearm.rotation.x = -0.4 - 0.55 * w;
+          this.leftArm.rotation.set(-0.4 - 1.6 * w, 0, 0.25);
+          this.leftForearm.rotation.x = -0.4 - 0.5 * w;
+          lean -= 0.12 * w;
+        } else {
+          const t = (phase - 0.26) / 0.74;
+          const cleave = t < 0.28 ? Math.sin((t / 0.28) * Math.PI * 0.5) : Math.cos(((t - 0.28) / 0.72) * Math.PI * 0.5);
+          this.rightArm.rotation.set(-2.7 + 2.2 * cleave, 0, -0.05);
+          this.rightForearm.rotation.x = -0.95 + 0.85 * cleave;
+          this.leftArm.rotation.set(-2.0 + 1.5 * cleave, 0, 0.22);
+          this.leftForearm.rotation.x = -0.9 + 0.75 * cleave;
+          lean += 0.34 * cleave;
+          this.leftKnee.rotation.x += 0.22 * cleave;
+          this.rightKnee.rotation.x += 0.22 * cleave;
+        }
       } else if (this.attackKind === 4) {
-        // estocada: o braço dispara para a frente
-        this.rightArm.rotation.x = -0.55 - 0.95 * swing;
-        this.rightArm.rotation.z = 0.05;
-        this.rightForearm.rotation.x = -0.1;
-        lean += 0.24 * swing;
+        // --- GOLPE 4: Estocada Rápida e Penetrante (Thrust - Lança / Adaga) ---
+        if (phase < 0.18) {
+          const t = phase / 0.18;
+          const w = Math.sin(t * Math.PI * 0.5);
+          this.rightArm.rotation.set(-0.25 + 0.12 * w, 0, 0.08);
+          this.rightForearm.rotation.x = -0.55 - 0.75 * w;
+          attackTorsoYaw = 0.18 * w;
+        } else {
+          const t = (phase - 0.18) / 0.82;
+          const thrust = t < 0.28 ? Math.sin((t / 0.28) * Math.PI * 0.5) : Math.cos(((t - 0.28) / 0.72) * Math.PI * 0.5);
+          this.rightArm.rotation.set(-0.15 - 1.45 * thrust, 0, 0.04);
+          this.rightForearm.rotation.x = -1.3 + 1.25 * thrust;
+          lean += 0.26 * thrust;
+          attackTorsoYaw = 0.18 - 0.36 * thrust;
+        }
       } else if (this.attackKind === 5) {
-        // soco direto com a mão da arma
-        this.rightArm.rotation.x = -1.65 * swing;
-        this.rightForearm.rotation.x = -0.05;
-        this.leftArm.rotation.x = -0.6 + 0.4 * swing;
-        lean += 0.16 * swing;
-        bank -= 0.1 * swing;
+        // --- GOLPE 5: Soco Direto Direito (Jab) ---
+        const t = phase < 0.3 ? Math.sin((phase / 0.3) * Math.PI * 0.5) : Math.cos(((phase - 0.3) / 0.7) * Math.PI * 0.5);
+        this.rightArm.rotation.set(-0.5 - 1.15 * t, 0, 0.05);
+        this.rightForearm.rotation.x = -1.35 + 1.25 * t;
+        this.leftArm.rotation.set(-0.85, 0, 0.2);
+        this.leftForearm.rotation.x = -1.4;
+        lean += 0.16 * t;
+        attackTorsoYaw = -0.22 * t;
       } else if (this.attackKind === 6) {
-        // soco com a mão livre
-        this.leftArm.rotation.x = -1.65 * swing;
-        this.leftForearm.rotation.x = -0.05;
-        this.rightArm.rotation.x = -0.75;
-        lean += 0.14 * swing;
-        bank += 0.1 * swing;
-      } else {
-        this.rightArm.rotation.x = -1.55 * swing;
-        this.rightArm.rotation.z = -0.25 - swing * 0.8;
-        bank -= 0.1 * swing;
+        // --- GOLPE 6: Cruzado / Direto Esquerdo (Cross) ---
+        const t = phase < 0.3 ? Math.sin((phase / 0.3) * Math.PI * 0.5) : Math.cos(((phase - 0.3) / 0.7) * Math.PI * 0.5);
+        this.leftArm.rotation.set(-0.5 - 1.15 * t, 0, -0.05);
+        this.leftForearm.rotation.x = -1.4 + 1.3 * t;
+        this.rightArm.rotation.set(-0.75, 0, -0.15);
+        this.rightForearm.rotation.x = -1.35;
+        lean += 0.16 * t;
+        attackTorsoYaw = 0.22 * t;
+      } else if (this.attackKind === 3) {
+        // --- GOLPE 3: Arremesso (Throw) ---
+        const t = phase < 0.35 ? Math.sin((phase / 0.35) * Math.PI * 0.5) : Math.cos(((phase - 0.35) / 0.65) * Math.PI * 0.5);
+        this.rightArm.rotation.set(-2.4 + 1.9 * t, 0, -0.12);
+        this.rightForearm.rotation.x = -0.8 + 0.75 * t;
+        lean += 0.22 * t;
       }
+
+      // Olhar da cabeça focado no alvo mesmo durante a rotação violenta do tronco
+      this.head.rotation.y = THREE.MathUtils.lerp(this.head.rotation.y, -attackTorsoYaw * 0.75, 1 - Math.exp(-22 * dt));
+    } else {
+      this.head.rotation.y = THREE.MathUtils.lerp(this.head.rotation.y, 0, 1 - Math.exp(-14 * dt));
     }
 
     if (this.blockPose > 0.015) {
@@ -786,31 +867,39 @@ export class Player {
     }
     this.shield.rotation.x = -(this.leftArm.rotation.x + this.leftForearm.rotation.x);
 
-    // Orientação da arma na mão: a espada acompanha o braço; as demais ficam
-    // apontadas para a frente (ou para a mira), sempre para fora do corpo.
-    let socket;
+    // Orientação suave da arma na mão (sem quebras angulares abruptas)
+    let targetSocket;
     const elbowTotal = this.rightArm.rotation.x + this.rightForearm.rotation.x;
     const elevation = aim ? aim.elevation : 0;
     const grip = this.weaponGrip;
     if (grip === "blade") {
-      socket = this.attackTimer > 0 ? 1.2 : 0.85 - elbowTotal;
+      if (this.attackTimer > 0) {
+        const p = 1 - this.attackTimer / this.attackLen;
+        targetSocket = 1.05 + Math.sin(p * Math.PI) * 0.38;
+      } else {
+        targetSocket = 0.85 - elbowTotal;
+      }
     } else if (grip === "pole") {
-      socket = this.attackTimer > 0 ? Math.PI / 2 - 0.12 - elbowTotal : 0.78 - elbowTotal;
+      targetSocket = this.attackTimer > 0 ? Math.PI / 2 - 0.12 - elbowTotal : 0.78 - elbowTotal;
     } else if (grip === "heavy") {
-      socket = this.attackTimer > 0 ? 1.05 : this.chargePose > 0.01 ? 0.15 - elbowTotal : 0.35 - elbowTotal;
+      targetSocket = this.attackTimer > 0 ? 1.05 : this.chargePose > 0.01 ? 0.15 - elbowTotal : 0.35 - elbowTotal;
     } else if (grip === "bow") {
-      socket = 0.05 - elevation * 0.4 * this.aimPose - elbowTotal;
+      targetSocket = 0.05 - elevation * 0.4 * this.aimPose - elbowTotal;
     } else if (grip === "throw") {
-      socket = 0.6 - elbowTotal;
+      targetSocket = 0.6 - elbowTotal;
     } else {
       const ready = Math.PI / 2 + 0.4;
-      socket = ready + (Math.PI / 2 - elevation - ready) * this.aimPose - elbowTotal;
+      targetSocket = ready + (Math.PI / 2 - elevation - ready) * this.aimPose - elbowTotal;
     }
-    this.handSocket.rotation.x += (socket - this.handSocket.rotation.x) * (1 - Math.exp(-22 * dt));
+    this.handSocket.rotation.x += (targetSocket - this.handSocket.rotation.x) * (1 - Math.exp(-24 * dt));
 
-    const runBob = running ? Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.075 : Math.abs(Math.sin(this.walkPhase * 2)) * s * 0.035;
+    // Bobbing vertical e balanço dinâmico natural do corpo
+    const runBob = (running ? 0.042 : 0.022) * Math.abs(Math.sin(this.walkPhase)) * s;
+    const bodySway = Math.sin(this.walkPhase) * (running ? 0.026 : 0.015) * s;
+
     this.model.rotation.x = lean;
-    this.model.rotation.z = bank + (running ? Math.sin(this.walkPhase) * s * 0.035 : 0);
+    this.model.rotation.z = bank + bodySway;
+    this.model.rotation.y += attackTorsoYaw;
     this.model.scale.y = squash;
     this.model.position.set(0, (this.grounded ? runBob : 0) + drop, 0);
 
