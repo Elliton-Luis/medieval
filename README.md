@@ -365,6 +365,10 @@ Otimização de visibilidade em 3 camadas na GPU e CPU para dispositivos modesto
    - **Culling de Interiores**: O interior de cada residência e igreja (`interior.visible`) permanece desligado por padrão, sendo ativado somente se o jogador estiver dentro do cômodo ou a menos de 5 metros de uma porta aberta (`houses.js`).
    - **Oclusão Angular por Estruturas**: Casas e construções bloqueadas no cone de visão por edifícios maiores mais próximos são ocultadas dinamicamente (`group.visible = false`), economizando chamadas de desenho e vértices.
 
+4. **União Estática de Geometrias e Compatibilidade de Shaders**:
+   - O utilitário [`src/mergeUtils.js`](file:///home/chocotonilitz/Programacao/projetos/puris/src/mergeUtils.js) fornece união segura e otimizada (`mergeGeometries` e `mergeBufferGeometries`), combinando automaticamente peças procedurais de adereços decorativos (`clutter.js`), casas e vegetação em geometrias únicas de altíssimo desempenho com suporte à extensão oficial do Three.js e fallback de buffers Float32Array.
+   - O mapa de sombras foi atualizado para `THREE.PCFShadowMap` nativo em [`src/main.js`](file:///home/chocotonilitz/Programacao/projetos/puris/src/main.js#L154-L156), eliminando alertas de depreciação e garantindo console 100% limpo no navegador.
+
 ## Iluminação Forte e Independente para Tochas Colocadas
 
 - **Luz Dedicada e Forte (PointLight)**: Ao fixar uma tocha no chão ou na parede (`src/weapons.js`), a tocha agora recebe sua própria fonte de luz pontual forte (`THREE.PointLight`, intensidade 18.0, alcance de 32 metros, decaimento suave de 1.8 e `alwaysOn: true`). Ela ilumina efetivamente o solo, as paredes e os arredores mesmo durante o dia ou à noite, sem disputar ou perder iluminação para o pool genérico de 8 luzes das vilas.

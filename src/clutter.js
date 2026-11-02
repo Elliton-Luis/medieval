@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { mergeGeometries } from "./mergeUtils.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 // ============================================================================
 // clutter.js — Preenchimento Massivo de Mundo Otimizado (ClutterManager)

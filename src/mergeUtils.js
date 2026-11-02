@@ -1,8 +1,21 @@
 import * as THREE from "three";
+import { mergeGeometries as threeMergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 // ============================================================================
 // Utilitário de Condensação Estática de Geometrias (Redução para 1 Draw Call)
 // ============================================================================
+export function mergeGeometries(geometries, useGroups = false) {
+  if (typeof threeMergeGeometries === "function") {
+    try {
+      const res = threeMergeGeometries(geometries, useGroups);
+      if (res) return res;
+    } catch {
+      // Fallback para merge interno
+    }
+  }
+  return mergeBufferGeometries(geometries);
+}
+
 export function mergeBufferGeometries(geometries) {
   if (!geometries || geometries.length === 0) return null;
 

@@ -151,8 +151,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(INITIAL_FOG_COLOR);
 setupAtmosphere(scene, renderer);
 renderer.shadowMap.enabled = true;
-// PCFSoft com mapa de sombra 512x512 para altíssimo desempenho em GPUs integradas
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// PCFShadowMap para sombras suaves e altíssimo desempenho em GPUs integradas
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.domElement.id = "world-canvas";
 renderer.domElement.tabIndex = 0;
 renderer.domElement.setAttribute("aria-label", "Clique para capturar o mouse e controlar a câmera");
