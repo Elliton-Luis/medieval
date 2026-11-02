@@ -24,226 +24,162 @@ let _wolfGrowlPlayed = false;
 let _wolfStepsTimer = 0;
 
 // ============================================================================
-// 2. A Entidade do Vazio Abissal: VULGUS (Silhueta Toda Preta, Olhos e Dentes-Zíper)
+// 2. A Entidade do Vazio Abissal: VULGUS (Silhueta Espectral com Capa e Capuz Profundo)
 // ============================================================================
 export function createTallFigure() {
   const group = new THREE.Group();
   group.name = "Vulgus";
 
-  // O corpo do Vulgus é feito de escuridão pura e impenetrável (preto absoluto 0x000000).
-  // Na escuridão, apenas seus olhos e os píxeis brancos da boca vertical em zíper são visíveis.
-  const pitchBlackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff1800 });
+  // Materiais sóbrios e discretos: tecido pesado de manto ébano e vazio abissal
+  const pitchBlackMat = new THREE.MeshBasicMaterial({ color: 0x020203 });
+  const cloakMat = new THREE.MeshLambertMaterial({ color: 0x09090c });
+  const cloakFoldMat = new THREE.MeshLambertMaterial({ color: 0x050507 });
+  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff1600 });
   const eyeWhitePixelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const zipperTeethMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const zipperTeethMat = new THREE.MeshBasicMaterial({ color: 0xe0e0e0 });
 
   // --------------------------------------------------------------------------
-  // 1. Pernas Longas, Esqueléticas e Finas (Totalmente Pretas)
+  // 1. O Manto e Túnica Longa (Cobre totalmente pernas e corpo, sem exposição)
+  // --------------------------------------------------------------------------
+  // Manto principal cônico que desce dos ombros até quase o solo
+  const robeGeo = new THREE.CylinderGeometry(0.46, 1.05, 4.3, 12, 1, true);
+  const robe = new THREE.Mesh(robeGeo, cloakMat);
+  robe.position.set(0, 2.15, -0.04);
+  robe.rotation.y = Math.PI / 12;
+  group.add(robe);
+
+  // Interior preto absoluto do manto
+  const robeInnerGeo = new THREE.CylinderGeometry(0.40, 0.98, 4.25, 8);
+  const robeInner = new THREE.Mesh(robeInnerGeo, pitchBlackMat);
+  robeInner.position.set(0, 2.15, -0.04);
+  group.add(robeInner);
+
+  // Capa externa traseira pesada que escorre das costas ao chão
+  const backCapeGeo = new THREE.CylinderGeometry(0.55, 1.25, 4.4, 8, 1, true, -Math.PI * 0.45, Math.PI * 0.9);
+  const backCape = new THREE.Mesh(backCapeGeo, cloakFoldMat);
+  backCape.position.set(0, 2.2, -0.12);
+  backCape.scale.set(1.0, 1.0, 1.15);
+  group.add(backCape);
+
+  // Dobras frontais da capa que caem dos ombros sobre o peito e laterais
+  for (const side of [-1, 1]) {
+    const foldGeo = new THREE.BoxGeometry(0.38, 3.85, 0.24);
+    const fold = new THREE.Mesh(foldGeo, cloakFoldMat);
+    fold.position.set(side * 0.32, 2.1, 0.12);
+    fold.rotation.y = side * 0.22;
+    fold.rotation.z = side * 0.04;
+    group.add(fold);
+  }
+
+  // --------------------------------------------------------------------------
+  // 2. Gola Alta e Ombros Largos Imponentes (Mantle / Cowl)
+  // --------------------------------------------------------------------------
+  // Ombreiras largas e imponentes da capa
+  const mantleGeo = new THREE.BoxGeometry(1.35, 0.48, 0.65);
+  const mantle = new THREE.Mesh(mantleGeo, cloakMat);
+  mantle.position.set(0, 4.25, 0.05);
+  group.add(mantle);
+
+  // Gola envolvente na base do pescoço
+  const cowlGeo = new THREE.CylinderGeometry(0.42, 0.58, 0.55, 8);
+  const cowl = new THREE.Mesh(cowlGeo, cloakFoldMat);
+  cowl.position.set(0, 4.55, 0.12);
+  cowl.rotation.x = 0.14;
+  group.add(cowl);
+
+  // --------------------------------------------------------------------------
+  // 3. Mangas Longas da Capa e Garras Discretas
   // --------------------------------------------------------------------------
   for (const side of [-1, 1]) {
-    // Coxa fina de sombra
-    const thighGeo = new THREE.CylinderGeometry(0.045, 0.035, 1.45, 5);
-    const thigh = new THREE.Mesh(thighGeo, pitchBlackMat);
-    thigh.position.set(side * 0.16, 1.95, -0.05);
-    thigh.rotation.x = -0.18;
-    group.add(thigh);
+    // Manga larga cônica drapeada
+    const sleeveGeo = new THREE.CylinderGeometry(0.18, 0.32, 2.4, 7);
+    const sleeve = new THREE.Mesh(sleeveGeo, cloakMat);
+    sleeve.position.set(side * 0.62, 3.15, 0.08);
+    sleeve.rotation.z = side * -0.16;
+    sleeve.rotation.x = 0.12;
+    group.add(sleeve);
 
-    // Joelho nodoso
-    const kneeGeo = new THREE.DodecahedronGeometry(0.065, 0);
-    const knee = new THREE.Mesh(kneeGeo, pitchBlackMat);
-    knee.position.set(side * 0.16, 1.32, 0.08);
-    group.add(knee);
+    // Foz escura da manga de onde as garras emergem
+    const sleeveCuffGeo = new THREE.CylinderGeometry(0.12, 0.34, 0.45, 6);
+    const sleeveCuff = new THREE.Mesh(sleeveCuffGeo, cloakFoldMat);
+    sleeveCuff.position.set(side * 0.78, 2.05, 0.22);
+    sleeveCuff.rotation.z = side * -0.22;
+    group.add(sleeveCuff);
 
-    // Canela longa inclinada
-    const shinGeo = new THREE.CylinderGeometry(0.035, 0.026, 1.55, 5);
-    const shin = new THREE.Mesh(shinGeo, pitchBlackMat);
-    shin.position.set(side * 0.16, 0.65, -0.02);
-    shin.rotation.x = 0.16;
-    group.add(shin);
-
-    // Pé comprido
-    const footGeo = new THREE.BoxGeometry(0.08, 0.035, 0.42);
-    const foot = new THREE.Mesh(footGeo, pitchBlackMat);
-    foot.position.set(side * 0.16, 0.025, 0.14);
-    group.add(foot);
-
-    // Garras finas dos pés
-    for (const fx of [-0.028, 0, 0.028]) {
-      const toeClaw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.14, 4), pitchBlackMat);
-      toeClaw.position.set(side * 0.16 + fx, 0.025, 0.35);
-      toeClaw.rotation.x = Math.PI * 0.5;
-      group.add(toeClaw);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // 2. Pelve Estreita e Coluna Vertebral Curva (Totalmente Pretas)
-  // --------------------------------------------------------------------------
-  const pelvisGeo = new THREE.BoxGeometry(0.28, 0.16, 0.18);
-  const pelvis = new THREE.Mesh(pelvisGeo, pitchBlackMat);
-  pelvis.position.set(0, 2.58, 0);
-  group.add(pelvis);
-
-  // Coluna vertebral inclinada para frente
-  const spineGeo = new THREE.CylinderGeometry(0.045, 0.055, 1.35, 6);
-  const spine = new THREE.Mesh(spineGeo, pitchBlackMat);
-  spine.position.set(0, 3.25, -0.04);
-  spine.rotation.x = 0.15;
-  group.add(spine);
-
-  // Vértebras pontiagudas dorsais
-  for (let v = 0; v < 6; v++) {
-    const vertGeo = new THREE.ConeGeometry(0.03, 0.2, 4);
-    const vert = new THREE.Mesh(vertGeo, pitchBlackMat);
-    vert.position.set(0, 2.75 + v * 0.22, -0.12 - (v * 0.02));
-    vert.rotation.x = -Math.PI * 0.42;
-    group.add(vert);
-  }
-
-  // --------------------------------------------------------------------------
-  // 3. Tórax Magro e Emaciado (Totalmente Preto - Sem boca no peito)
-  // --------------------------------------------------------------------------
-  const sternum = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.18), pitchBlackMat);
-  sternum.position.set(0, 3.48, 0.03);
-  sternum.rotation.x = 0.15;
-  group.add(sternum);
-
-  // Costelas finas emaciadas
-  for (let r = 0; r < 5; r++) {
-    const ry = 3.05 + r * 0.19;
-    const rScale = 0.85 + (r === 2 ? 0.25 : r * 0.08);
-    for (const side of [-1, 1]) {
-      const ribGeo = new THREE.BoxGeometry(0.13 * rScale, 0.028, 0.22 * rScale);
-      const rib = new THREE.Mesh(ribGeo, pitchBlackMat);
-      rib.position.set(side * (0.13 * rScale), ry, 0.02);
-      rib.rotation.z = side * -0.25;
-      rib.rotation.y = side * 0.18;
-      group.add(rib);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // 4. Clavículas e Braços Desproporcionais (Totalmente Pretos)
-  // --------------------------------------------------------------------------
-  const clavicleGeo = new THREE.BoxGeometry(0.64, 0.05, 0.08);
-  const clavicle = new THREE.Mesh(clavicleGeo, pitchBlackMat);
-  clavicle.position.set(0, 4.02, 0.06);
-  group.add(clavicle);
-
-  for (const side of [-1, 1]) {
-    const scapulaGeo = new THREE.ConeGeometry(0.08, 0.38, 4);
-    const scapula = new THREE.Mesh(scapulaGeo, pitchBlackMat);
-    scapula.position.set(side * 0.32, 4.16, -0.06);
-    scapula.rotation.z = side * -0.45;
-    scapula.rotation.x = -0.25;
-    group.add(scapula);
-
-    const upperArmGeo = new THREE.CylinderGeometry(0.038, 0.03, 1.5, 5);
-    const upperArm = new THREE.Mesh(upperArmGeo, pitchBlackMat);
-    upperArm.position.set(side * 0.4, 3.28, 0.02);
-    upperArm.rotation.z = side * -0.12;
-    upperArm.rotation.x = 0.12;
-    group.add(upperArm);
-
-    const elbowGeo = new THREE.DodecahedronGeometry(0.048, 0);
-    const elbow = new THREE.Mesh(elbowGeo, pitchBlackMat);
-    elbow.position.set(side * 0.46, 2.52, 0.12);
-    group.add(elbow);
-
-    const forearmGeo = new THREE.CylinderGeometry(0.032, 0.024, 1.6, 5);
-    const forearm = new THREE.Mesh(forearmGeo, pitchBlackMat);
-    forearm.position.set(side * 0.5, 1.72, 0.08);
-    forearm.rotation.z = side * -0.06;
-    group.add(forearm);
-
-    // Garras longas pontiagudas
+    // Garras pontiagudas pretas saindo discretamente sob a manga
     for (let c = -1; c <= 2; c++) {
-      const clawGeo = new THREE.ConeGeometry(0.016, 0.45, 4);
+      const clawGeo = new THREE.ConeGeometry(0.018, 0.42, 4);
       const claw = new THREE.Mesh(clawGeo, pitchBlackMat);
-      claw.position.set(side * 0.5 + c * 0.032, 0.78, 0.06 + Math.abs(c) * 0.02);
-      claw.rotation.x = 0.28 + c * 0.05;
-      claw.rotation.z = side * (0.08 + c * 0.06);
+      claw.position.set(side * 0.78 + c * 0.038, 1.62, 0.26 + Math.abs(c) * 0.03);
+      claw.rotation.x = 0.32 + c * 0.06;
+      claw.rotation.z = side * (0.12 + c * 0.08);
       group.add(claw);
     }
   }
 
   // --------------------------------------------------------------------------
-  // 5. Pescoço e Cabeça do Vulgus (Totalmente Pretos)
+  // 4. O Capuz Profundo (Deep Hood) e Vazio Abissal da Face
   // --------------------------------------------------------------------------
-  const neckGeo = new THREE.CylinderGeometry(0.075, 0.095, 0.88, 6);
-  const neck = new THREE.Mesh(neckGeo, pitchBlackMat);
-  neck.position.set(0, 4.42, 0.14);
-  neck.rotation.x = 0.24;
-  group.add(neck);
+  // Cúpula superior do capuz (alongada e sutilmente pontuda atrás)
+  const hoodDomeGeo = new THREE.SphereGeometry(0.38, 10, 8);
+  const hoodDome = new THREE.Mesh(hoodDomeGeo, cloakMat);
+  hoodDome.position.set(0, 5.35, 0.2);
+  hoodDome.scale.set(1.05, 1.25, 1.2);
+  group.add(hoodDome);
 
-  // Caixa craniana escura
-  const skullCraniumGeo = new THREE.BoxGeometry(0.28, 0.42, 0.36);
-  const skullCranium = new THREE.Mesh(skullCraniumGeo, pitchBlackMat);
-  skullCranium.position.set(0, 5.25, 0.26);
-  skullCranium.rotation.x = 0.12;
-  group.add(skullCranium);
+  // Paredes laterais e traseira do capuz que descem até a gola
+  const hoodBackGeo = new THREE.BoxGeometry(0.68, 0.95, 0.55);
+  const hoodBack = new THREE.Mesh(hoodBackGeo, cloakMat);
+  hoodBack.position.set(0, 5.05, 0.12);
+  hoodBack.rotation.x = 0.12;
+  group.add(hoodBack);
 
-  // Topo do crânio
-  const skullDomeGeo = new THREE.SphereGeometry(0.19, 8, 8);
-  const skullDome = new THREE.Mesh(skullDomeGeo, pitchBlackMat);
-  skullDome.position.set(0, 5.44, 0.22);
-  skullDome.scale.set(1.0, 0.7, 1.1);
-  group.add(skullDome);
+  // Aba frontal proeminente do capuz (cria sombra profunda sobre o rosto)
+  const hoodBrimGeo = new THREE.CylinderGeometry(0.36, 0.42, 0.52, 7, 1, true, -Math.PI * 0.5, Math.PI);
+  const hoodBrim = new THREE.Mesh(hoodBrimGeo, cloakFoldMat);
+  hoodBrim.position.set(0, 5.25, 0.35);
+  hoodBrim.rotation.x = Math.PI * 0.5;
+  hoodBrim.scale.set(1.0, 1.2, 0.85);
+  group.add(hoodBrim);
 
-  // Mandíbula alongada e afunilada
-  const jawGeo = new THREE.BoxGeometry(0.22, 0.28, 0.26);
-  const jaw = new THREE.Mesh(jawGeo, pitchBlackMat);
-  jaw.position.set(0, 4.75, 0.32);
-  group.add(jaw);
-
-  // Fenda profunda no meio da face para abrigar a boca vertical
-  const verticalSlitGeo = new THREE.BoxGeometry(0.035, 0.84, 0.12);
-  const verticalSlit = new THREE.Mesh(verticalSlitGeo, pitchBlackMat);
-  verticalSlit.position.set(0, 5.08, 0.43);
-  group.add(verticalSlit);
+  // Vazio interno da face (preto absoluto, abissal, sob a sombra do capuz)
+  const faceVoidGeo = new THREE.BoxGeometry(0.42, 0.65, 0.32);
+  const faceVoid = new THREE.Mesh(faceVoidGeo, pitchBlackMat);
+  faceVoid.position.set(0, 5.15, 0.28);
+  group.add(faceVoid);
 
   // --------------------------------------------------------------------------
-  // 6. OLHOS DO VULGUS (Únicos elementos visíveis além dos dentes!)
+  // 5. Olhos Carmesins Incandescentes e Dentes Zíper Discretos
   // --------------------------------------------------------------------------
-  // Olhos penetrantes situados nas laterais da cabeça, à esquerda e à direita
   const eyesConfig = [
-    { x: -0.125, y: 5.16, z: 0.42, radius: 0.040 },
-    { x:  0.125, y: 5.16, z: 0.42, radius: 0.040 },
-    // Par secundário ligeiramente mais alto nas têmporas
-    { x: -0.155, y: 5.34, z: 0.36, radius: 0.030 },
-    { x:  0.155, y: 5.34, z: 0.36, radius: 0.030 },
+    { x: -0.12, y: 5.18, z: 0.38, radius: 0.042 },
+    { x:  0.12, y: 5.18, z: 0.38, radius: 0.042 },
+    { x: -0.15, y: 5.35, z: 0.32, radius: 0.030 },
+    { x:  0.15, y: 5.35, z: 0.32, radius: 0.030 },
   ];
 
   eyesConfig.forEach((eyeCfg) => {
-    // Esfera luminosa carmesim/vermelha
     const iris = new THREE.Mesh(new THREE.SphereGeometry(eyeCfg.radius, 6, 6), eyeGlowMat);
     iris.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z);
     group.add(iris);
 
-    // Píxel branco puro no centro do olho
-    const pupilPixel = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.024), eyeWhitePixelMat);
-    pupilPixel.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z + eyeCfg.radius * 0.72);
+    const pupilPixel = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.022), eyeWhitePixelMat);
+    pupilPixel.position.set(eyeCfg.x, eyeCfg.y, eyeCfg.z + eyeCfg.radius * 0.75);
     group.add(pupilPixel);
   });
 
-  // --------------------------------------------------------------------------
-  // 7. BOCA VERTICAL ENTRE OS OLHOS COM PÍXEIS BRANCOS DE DENTES (ESTILO ZÍPER IRREGULAR)
-  // --------------------------------------------------------------------------
-  // Dentes finos, quadrados, separados e irregulares dispostos na vertical entre os olhos
+  // Dentes-zíper verticais discretos entre os olhos
   const zipperTeethData = [
-    { side: -1, y: 4.70, xOffset: 0.018, z: 0.435, rotZ:  0.08, w: 0.016, h: 0.014, d: 0.022 },
-    { side:  1, y: 4.76, xOffset: 0.016, z: 0.442, rotZ: -0.14, w: 0.015, h: 0.016, d: 0.024 },
-    { side: -1, y: 4.83, xOffset: 0.020, z: 0.447, rotZ: -0.06, w: 0.017, h: 0.014, d: 0.021 },
-    { side:  1, y: 4.90, xOffset: 0.017, z: 0.450, rotZ:  0.12, w: 0.016, h: 0.017, d: 0.025 },
-    { side: -1, y: 4.97, xOffset: 0.019, z: 0.453, rotZ: -0.11, w: 0.015, h: 0.015, d: 0.023 },
-    { side:  1, y: 5.04, xOffset: 0.022, z: 0.452, rotZ:  0.07, w: 0.018, h: 0.016, d: 0.026 },
-    // Altura central (exatamente no eixo dos olhos principais y ~ 5.14)
-    { side: -1, y: 5.12, xOffset: 0.020, z: 0.449, rotZ:  0.16, w: 0.017, h: 0.017, d: 0.026 },
-    { side:  1, y: 5.19, xOffset: 0.018, z: 0.445, rotZ: -0.13, w: 0.016, h: 0.015, d: 0.024 },
-    { side: -1, y: 5.26, xOffset: 0.021, z: 0.439, rotZ:  0.09, w: 0.017, h: 0.016, d: 0.023 },
-    { side:  1, y: 5.33, xOffset: 0.017, z: 0.431, rotZ: -0.08, w: 0.015, h: 0.014, d: 0.021 },
-    { side: -1, y: 5.40, xOffset: 0.020, z: 0.420, rotZ:  0.14, w: 0.016, h: 0.015, d: 0.020 },
-    { side:  1, y: 5.46, xOffset: 0.022, z: 0.408, rotZ: -0.10, w: 0.014, h: 0.013, d: 0.018 },
+    { side: -1, y: 4.80, xOffset: 0.016, z: 0.395, rotZ:  0.08, w: 0.014, h: 0.013, d: 0.020 },
+    { side:  1, y: 4.86, xOffset: 0.015, z: 0.402, rotZ: -0.14, w: 0.013, h: 0.015, d: 0.022 },
+    { side: -1, y: 4.93, xOffset: 0.018, z: 0.408, rotZ: -0.06, w: 0.015, h: 0.013, d: 0.020 },
+    { side:  1, y: 5.00, xOffset: 0.016, z: 0.410, rotZ:  0.12, w: 0.014, h: 0.016, d: 0.024 },
+    { side: -1, y: 5.07, xOffset: 0.018, z: 0.412, rotZ: -0.11, w: 0.014, h: 0.014, d: 0.022 },
+    { side:  1, y: 5.14, xOffset: 0.020, z: 0.410, rotZ:  0.07, w: 0.016, h: 0.015, d: 0.025 },
+    { side: -1, y: 5.22, xOffset: 0.019, z: 0.406, rotZ:  0.16, w: 0.015, h: 0.016, d: 0.025 },
+    { side:  1, y: 5.29, xOffset: 0.017, z: 0.402, rotZ: -0.13, w: 0.015, h: 0.014, d: 0.023 },
+    { side: -1, y: 5.36, xOffset: 0.019, z: 0.396, rotZ:  0.09, w: 0.015, h: 0.015, d: 0.022 },
+    { side:  1, y: 5.43, xOffset: 0.016, z: 0.388, rotZ: -0.08, w: 0.013, h: 0.013, d: 0.020 },
   ];
 
   zipperTeethData.forEach((t) => {
@@ -253,6 +189,16 @@ export function createTallFigure() {
     toothMesh.rotation.z = t.rotZ;
     group.add(toothMesh);
   });
+
+  // Bainha da capa com pontas rasgadas / fiapos escuros na base
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const hemSpike = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 4), cloakFoldMat);
+    hemSpike.position.set(Math.cos(angle) * 0.95, 0.2, Math.sin(angle) * 0.95 - 0.05);
+    hemSpike.rotation.x = Math.PI;
+    hemSpike.rotation.y = angle;
+    group.add(hemSpike);
+  }
 
   group.visible = false;
   return group;
@@ -484,8 +430,27 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
   const groundY = world ? world.heightAt(player.x, player.z) : 0;
   player.root.position.set(player.x, groundY, player.z);
 
-  if (runSpeed > 0 && player.animTime !== undefined) {
-    player.animTime += dt * 16;
+  // Animação realista e biomecânica de corrida: pernas, braços e passada sincronizada
+  const isRunning = runSpeed > 0.15;
+  player.grounded = true;
+  player.crouching = false;
+  player.rolling = false;
+  player.blocking = false;
+  player.vx = 0;
+  player.vz = runSpeed;
+  player.speedRatio = isRunning ? 1.0 : 0;
+
+  if (isRunning) {
+    player.walkPhase = (player.walkPhase || 0) + dt * 14.5;
+    const stepIndex = Math.floor(player.walkPhase / Math.PI);
+    if (stepIndex !== player._introStepIndex) {
+      player._introStepIndex = stepIndex;
+      audio?.step?.(true, 1);
+    }
+  }
+
+  if (typeof player._animate === "function") {
+    player._animate(dt, null, false, isRunning, 0);
   }
 
   // 2. Os Bichos de 3 Olhos Vermelhos correm atrás a 5.9 m/s
@@ -650,7 +615,14 @@ export function endIntroSequence(isSkipped = false) {
       player.x = safeSpawnX;
       player.z = safeSpawnZ;
       player.root.position.set(safeSpawnX, safeGroundY, safeSpawnZ);
+      player.vx = 0;
+      player.vz = 0;
+      player.speedRatio = 0;
+      player.walkPhase = 0;
       if (player.model) player.model.rotation.y = 0; // Olhando para o portão da cidade
+      if (typeof player._animate === "function") {
+        player._animate(0.016, null, false, false, 0);
+      }
 
       // TRANSIÇÃO PARA AMANHECER SUAVE (6h da manhã, névoa limpa)
       if (dayNight) {
