@@ -454,6 +454,7 @@ export class World {
 
     // Processamento orçado por frame: constrói no máximo 1 novo chunk por frame
     // Isso evita completamente picos de 150-250ms que causavam travamentos ao caminhar ou cavalgar
+    let createdChunk = false;
     if (this._pendingChunkQueue.length > 0) {
       const next = this._pendingChunkQueue.shift();
       const key = `${next.x}:${next.z}`;
@@ -466,12 +467,14 @@ export class World {
           chunk.group.visible = true;
           this.activeChunks.push(chunk);
           this._syncEnvironmentMeshes();
+          createdChunk = true;
         }
       }
     }
 
-    // Descarregamento orçado por frame: libera no máximo 1 chunk por frame para evitar pausas no driver GPU
-    if (this._pendingUnloadQueue.length > 0) {
+    // Descarregamento orçado por frame: libera no máximo 1 chunk por frame APENAS quando nenhum chunk foi construído no frame atual,
+    // eliminando conflitos de desalocação e alocação simultânea no driver WebGL
+    if (!createdChunk && this._pendingUnloadQueue.length > 0) {
       const unloadKey = this._pendingUnloadQueue.shift();
       const chunk = this.chunks.get(unloadKey);
       if (chunk) {

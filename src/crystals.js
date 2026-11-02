@@ -154,11 +154,6 @@ export function spawnCrystalNodes({ scene, world, cityCenter }) {
     baseRock.scale.set(1.2, 0.45, 1.1);
     group.add(baseRock);
 
-    // Luz pontual brilhante suave da cor do cristal
-    const light = new THREE.PointLight(info.lightHex, 1.8, 8.0, 1.5);
-    light.position.set(0, 0.6, 0);
-    group.add(light);
-
     scene.add(group);
 
     ACTIVE_CRYSTAL_NODES.push({
@@ -171,10 +166,55 @@ export function spawnCrystalNodes({ scene, world, cityCenter }) {
       y,
       z: def.z,
       group,
-      light,
       collected: false,
     });
   }
+
+  // Cria uma única PointLight compartilhada para todos os cristais do mundo,
+  // mantendo visible=true estático e apenas reposicionando quando o jogador se aproxima (<10m).
+  if (!_sharedCrystalLight && scene) {
+    _sharedCrystalLight = new THREE.PointLight(0x00ffff, 0, 10.0, 1.8);
+    _sharedCrystalLight.visible = true;
+    _sharedCrystalLight.position.set(0, -9999, 0);
+    scene.add(_sharedCrystalLight);
+  }
+}
+
+let _sharedCrystalLight = null;
+
+/**
+ * Atualiza a luz compartilhada dos cristais. Se o jogador estiver perto (<10m), ilumina; senão intensidade = 0.
+ * Zero recompilação de shader.
+ */
+export function updateCrystalLight(playerPos) {
+  if (!_sharedCrystalLight || !playerPos) return;
+  const px = playerPos.x ?? playerPos.position?.x ?? 0;
+  const pz = playerPos.z ?? playerPos.position?.z ?? 0;
+
+  let nearest = null;
+  let nearestDistSq = 100.0; // raio de 10m
+
+  for (let i = 0; i < ACTIVE_CRYSTAL_NODES.length; i++) {
+    const node = ACTIVE_CRYSTAL_NODES[i];
+    if (node.collected || !node.group.visible) continue;
+    const dx = node.x - px;
+    const dz = node.z - pz;
+    const dSq = dx * dx + dz * dz;
+    if (dSq < nearestDistSq) {
+      nearestDistSq = dSq;
+      nearest = node;
+    }
+  }
+
+  if (nearest) {
+    _sharedCrystalLight.position.set(nearest.x, nearest.y + 0.6, nearest.z);
+    _sharedCrystalLight.color.setHex(nearest.info.lightHex);
+    _sharedCrystalLight.intensity = 1.8;
+  } else {
+    _sharedCrystalLight.intensity = 0;
+    _sharedCrystalLight.position.set(0, -9999, 0);
+  }
+}
 }
 
 // ============================================================================

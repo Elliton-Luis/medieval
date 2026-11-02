@@ -20,6 +20,7 @@ import { Minimap } from "./minimap.js";
 import { EnemyDirector } from "./enemies.js";
 import { DeathScreen } from "./deathScreen.js";
 import { TorchSystem, Candle, setupAtmosphere } from "./torches.js";
+import { updateCityBeacons } from "./beacons.js";
 import { FireSystem } from "./fire.js";
 import { HouseSystem } from "./houses.js";
 import { SleepSystem } from "./sleep.js";
@@ -32,7 +33,7 @@ import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
 import { initDemiurgeDiary, updateDemiurgeDiary } from "./demiurgeBook.js";
 import { BeastManager } from "./beasts.js";
-import { spawnCrystalNodes, applyTorchColor } from "./crystals.js";
+import { spawnCrystalNodes, applyTorchColor, updateCrystalLight } from "./crystals.js";
 import { telemetry } from "./telemetry.js";
 import {
   PlayerStats,
@@ -688,6 +689,8 @@ function frame(now) {
   weapons.update(dt, cameraRig.yaw);
   director.update(dt, player);
   torches.update(dt, player);
+  updateCityBeacons(dayNight.daylight);
+  updateCrystalLight(player);
   candle.update(dt, player.mounted ? player.mounted.speed : 0);
   houses.update(dt, camera, isCutscene);
   fire.update(dt);

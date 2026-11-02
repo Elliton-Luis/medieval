@@ -187,6 +187,13 @@ export class WeaponSystem {
     if (this.models.torch) {
       this.models.torch.add(this.torchLight);
     }
+
+    // Luz compartilhada única e estática para velas colocadas no chão (Zero Shader Recompilation)
+    this.sharedPlacedCandleLight = new THREE.PointLight(0xffb866, 0, 16.0, 1.8);
+    this.sharedPlacedCandleLight.castShadow = false;
+    this.sharedPlacedCandleLight.visible = true;
+    this.sharedPlacedCandleLight.position.set(0, -9999, 0);
+    this.scene.add(this.sharedPlacedCandleLight);
   }
 
   _createThrownSpear(scene) {
@@ -470,6 +477,37 @@ export class WeaponSystem {
 
     this._updateTrajectory(def);
     this._updateProjectiles(dt);
+
+    // Atualização da PointLight única e fixa para velas no solo (Zero Shader Recompilation)
+    if (this.sharedPlacedCandleLight) {
+      const px = this.player.x;
+      const pz = this.player.z;
+      let nearestCandle = null;
+      let minCandleDistSq = 144; // 12m
+
+      if (this.placedItems && this.placedItems.length > 0) {
+        for (let i = 0; i < this.placedItems.length; i++) {
+          const item = this.placedItems[i];
+          if (item.id !== "candle") continue;
+          const dx = item.x - px;
+          const dz = item.z - pz;
+          const dSq = dx * dx + dz * dz;
+          if (dSq < minCandleDistSq) {
+            minCandleDistSq = dSq;
+            nearestCandle = item;
+          }
+        }
+      }
+
+      if (nearestCandle) {
+        const flicker = 0.88 + 0.12 * Math.sin(now * 0.012);
+        this.sharedPlacedCandleLight.position.set(nearestCandle.x, nearestCandle.y + 0.35, nearestCandle.z);
+        this.sharedPlacedCandleLight.intensity = 2.4 * flicker;
+      } else {
+        this.sharedPlacedCandleLight.intensity = 0;
+        this.sharedPlacedCandleLight.position.set(0, -9999, 0);
+      }
+    }
   }
 
   // Corpo a corpo: toque = golpe (combo nas leves); segurar = ataque carregado nas pesadas.
@@ -667,15 +705,13 @@ export class WeaponSystem {
           transparent: true,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
+          fog: false, // Perfora a neblina escura noturna
         })
       );
       flameSprite.scale.set(0.38, 0.52, 1);
       flameSprite.position.y = 0.32;
 
-      const candleLight = new THREE.PointLight(0xffb866, 2.8, 16, 1.8);
-      candleLight.position.set(0, 0.35, 0);
-
-      candleGroup.add(wax, wick, flameSprite, candleLight);
+      candleGroup.add(wax, wick, flameSprite);
       candleGroup.position.set(targetX, placeY, targetZ);
       this.scene.add(candleGroup);
 

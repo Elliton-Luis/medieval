@@ -4,6 +4,7 @@ import { makeRandom } from "./utils.js";
 import { createHouse, createChurchBuilding } from "./house.js";
 import { createHay } from "./fire.js";
 import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js";
+import { addCityBeacon } from "./beacons.js";
 
 const sharedHouseMat = createSharedHouseMaterial();
 const wallMat = sharedHouseMat;
@@ -500,6 +501,14 @@ export function createSettlement(scene, world) {
 
   createKingdomRoads(scene, world);
   const villages = VILLAGES.map((village) => createVillage(scene, world, village, houses));
+
+  // Beacon de Caldera (centro da capital) e de cada vila para orientação noturna a longa distância
+  addCityBeacon(scene, 0, -20, 0xffa834, 70, world);
+  for (let i = 0; i < VILLAGES.length; i++) {
+    const v = VILLAGES[i];
+    addCityBeacon(scene, v.x, v.z, 0xffaa40, 55, world);
+  }
+
   const hay = [];
   const torchSpots = [];
   const post = (x, z) => {

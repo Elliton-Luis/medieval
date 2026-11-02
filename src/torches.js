@@ -69,41 +69,19 @@ export function setupGuardTorch(guard, isNight, torchPool) {
     if (guard.userData.torchProp) {
       guard.userData.torchProp.visible = true;
     }
-
-    // Reaproveita PointLight do pool fixo sem alocação dinâmica
-    if (Array.isArray(torchPool)) {
-      const torch = torchPool.find((l) => !l.visible);
-      if (torch) {
-        torch.visible = true;
-        torch.color.setHex(0xff9944);
-        torch.intensity = 9.6;
-        torch.distance = 64.0;
-        torch.decay = 1.6;
-        torch.castShadow = false; // Preserva GPU integrada
-
-        guard.add(torch);
-        torch.position.set(0.25, 1.1, 0.35);
-        guard.userData.torchLight = torch;
-      }
-    }
   }
 }
 
 /**
- * Devolve a PointLight do guarda para o pool fixo sem desalocar memória.
+ * Libera a tocha do guarda sem mexer em luzes dinâmicas.
  * @param {THREE.Object3D} guard
  */
 export function releaseGuardTorch(guard) {
   if (!guard || !guard.userData) return;
-  const torch = guard.userData.torchLight;
-  if (torch) {
-    if (torch.parent) torch.parent.remove(torch);
-    torch.visible = false;
-    guard.userData.torchLight = null;
-  }
   if (guard.userData.torchProp) {
     guard.userData.torchProp.visible = false;
   }
+  guard.userData.torchLight = null;
   guard.userData.hasTorch = false;
 }
 
@@ -183,12 +161,13 @@ export function makeGlowTexture(inner = "255,225,160") {
   return texture;
 }
 
-const MAX_LIGHTS = 24;
+const MAX_LIGHTS = 6;
 const EMBERS = 90;
 const _sortByDist = (a, b) => a.d - b.d;
 
-// Tochas fixas, lareiras e pool de tochas dos guardas:
-// agora com pool expandido para 24 PointLights ativas para iluminar completamente as cidades à noite.
+// Tochas fixas, lareiras e iluminação noturna:
+// Pool estrito e imutável de 6 PointLights ativas mantidas permanentemente na cena (visible=true),
+// eliminando 100% das recompilações de shaders que causavam micro-travamentos violentos.
 export class TorchSystem {
   constructor(scene, world, dayNight) {
     this.scene = scene;
@@ -201,21 +180,17 @@ export class TorchSystem {
     this.glow = makeGlowTexture();
     this.lights = [];
     for (let i = 0; i < MAX_LIGHTS; i++) {
-      const light = new THREE.PointLight("#ffaa50", 0, 75.0, 1.38);
+      const light = new THREE.PointLight("#ffaa50", 0, 28.0, 1.4);
       configureDistantLight(light);
+      light.visible = true; // CRÍTICO: NUNCA alternar visible em runtime para evitar recompilação de shader
+      light.position.set(0, -9999, 0);
       light.userData.source = null;
       scene.add(light);
       this.lights.push(light);
     }
 
-    // Pool fixo de 8 PointLights para as tochas dos guardas (nunca aloca no loop)
+    // Pool de guardas esvaziado: guardas utilizam halos aditivos e materiais emissivos (Zero PointLights reais)
     this.guardTorchPool = [];
-    for (let i = 0; i < GUARD_TORCH_POOL_SIZE; i++) {
-      const guardLight = new THREE.PointLight(0xff9944, 8.5, 56.0, 1.6);
-      guardLight.castShadow = false;
-      guardLight.visible = false;
-      this.guardTorchPool.push(guardLight);
-    }
 
     this.pending = [];
     this._lastSortX = -9999;
@@ -378,7 +353,7 @@ export class TorchSystem {
       group.position.set(x, y, z);
     }
     this.group.add(group);
-    const spriteScale = isPlayerPlaced ? 2.2 : (post ? 2.0 : 1.7);
+    const spriteScale = isPlayerPlaced ? 2.4 : (post ? 2.2 : 1.9);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: this.glow,
       color: pal.flameHex,
@@ -392,16 +367,6 @@ export class TorchSystem {
     sprite.visible = isAlwaysLit;
     this.scene.add(sprite);
 
-    // Tochas fixadas pelo jogador recebem iluminação direta dedicada forte (PointLight)
-    // que banha paredes e chão intensamente sem depender do limite de luzes das vilas
-    let torchLight = null;
-    if (isPlayerPlaced || alwaysOn) {
-      torchLight = new THREE.PointLight(pal.flameHex, 48.0, 58.0, 1.25);
-      torchLight.castShadow = false;
-      torchLight.position.set(x + nx * 0.27, y + 0.6, z + nz * 0.27);
-      this.scene.add(torchLight);
-    }
-
     const source = {
       x: x + nx * 0.27,
       y: y + 0.5,
@@ -410,12 +375,12 @@ export class TorchSystem {
       phase: Math.random() * 6.28,
       kind: "torch",
       alwaysOn: isAlwaysLit,
-      light: !torchLight,
+      light: true,
       group,
       lightColor: pal.flameHex,
       colorKey,
       headMaterial: customHeadMaterial,
-      pointLight: torchLight,
+      pointLight: null,
       isPlayerPlaced: Boolean(isPlayerPlaced),
       isPost: Boolean(post),
     };
@@ -495,9 +460,10 @@ export class TorchSystem {
     const candidates = this.pending;
     candidates.length = 0;
 
-    // Regra: PointLights reais iluminam em um raio generoso de 55m do jogador (ilumina toda a vila e arredores)
-    const POINTLIGHT_ACTIVATION_DIST = 55.0;
-    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 3025 m²
+    // Regra: PointLights reais iluminam em um raio curto de até 25m do jogador.
+    // Acima disso, halos e billboards aditivos perfuram o breu sem custo de sombreamento ou recompilação.
+    const POINTLIGHT_ACTIVATION_DIST = 25.0;
+    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 625 m²
 
     for (let i = 0; i < this.sources.length; i++) {
       const source = this.sources[i];
@@ -508,30 +474,20 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
-      // 1. PointLight dedicada (tochas fixadas pelo jogador)
-      if (source.pointLight) {
-        source.pointLight.visible = nearPointLight;
-        if (nearPointLight) {
-          source.pointLight.intensity = 48.0 * flicker;
-          source.pointLight.distance = 58.0;
-        } else {
-          source.pointLight.intensity = 0;
-        }
-      }
-
-      // 2. Halo / Chama do Sprite: sempre visível no breu (fog=false), visível mesmo de muito longe
+      // 1. Halo / Chama do Sprite: compensa a distância e perfura a neblina escura (fog=false)
       if (source.sprite) {
         source.sprite.visible = on;
         if (on) {
           const baseScale = source.kind === "hearth" ? 3.4 : (source.isPost ? 2.4 : 1.9);
           const dist = Math.sqrt(d);
-          const distScaleBoost = dist > 25.0 ? Math.min(2.8, 1.0 + (dist - 25.0) * 0.009) : 1.0;
+          // Escala cresce com a distância para manter legibilidade visual clara de 100m a 200m
+          const distScaleBoost = Math.min(8.0, Math.max(1.0, 1.0 + dist * 0.035));
           const s = baseScale * flicker * distScaleBoost;
           source.sprite.scale.set(s, s * 1.35, 1);
         }
       }
 
-      // 3. Seleção de fontes para o pool de PointLights reais gerais:
+      // 2. Seleção de fontes para o pool de PointLights reais de curta distância:
       if (!nearPointLight || !source.light) continue;
       // Lareiras de dia só iluminam quem está dentro da casa
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
@@ -554,6 +510,7 @@ export class TorchSystem {
     const chosenCount = Math.min(candidates.length, MAX_LIGHTS);
 
     // Mantém as PointLights presas às mesmas fontes para evitar oscilação visual
+    // CRÍTICO: NUNCA alterar light.visible (manter sempre true para zero recompilação de shader)
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const light = this.lights[i];
       const src = light.userData.source;
@@ -565,7 +522,7 @@ export class TorchSystem {
       if (!stillChosen) {
         light.userData.source = null;
         light.intensity = 0;
-        light.visible = false;
+        light.position.set(0, -9999, 0);
       }
     }
     for (let j = 0; j < chosenCount; j++) {
@@ -586,7 +543,6 @@ export class TorchSystem {
       }
       if (free) {
         free.userData.source = source;
-        free.visible = true;
       }
     }
     for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -594,15 +550,14 @@ export class TorchSystem {
       const source = light.userData.source;
       if (!source) {
         light.intensity = 0;
-        light.visible = false;
+        light.position.set(0, -9999, 0);
         continue;
       }
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase);
-      const target = (source.kind === "hearth" ? 380 : 540) * flicker;
-      light.visible = true;
-      light.distance = 55.0;
-      light.decay = 1.22;
-      light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
+      const target = (source.kind === "hearth" ? 28 : 38) * flicker;
+      light.distance = 28.0;
+      light.decay = 1.4;
+      light.intensity += (target - light.intensity) * (1 - Math.exp(-8 * dt));
       light.position.set(source.x, source.y + 0.25, source.z);
       if (source.lightColor !== undefined) {
         light.color.setHex(source.lightColor);

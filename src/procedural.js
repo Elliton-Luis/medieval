@@ -7,6 +7,7 @@ import { meleeThink, releaseToken } from "./melee.js";
 import { WorldDecay } from "./decay.js";
 import { mergeBufferGeometries } from "./mergeUtils.js";
 import { generateGhostTown } from "./ghostTowns.js";
+import { addCityBeacon } from "./beacons.js";
 
 // ============================================================================
 // 1. Sistema de Seed (PRNG Mulberry32) e Texturas Procedurais de Baixo Custo
@@ -393,6 +394,11 @@ export function generateCity(
 
   const cityObj = { radius: cityRadius, center: _cityCenter.clone(), anchors, material: houseMaterial, assignNpcAnchors };
 
+  // Beacon de cidade visível a longa distância cortando o breu noturno
+  if (scene) {
+    addCityBeacon(scene, _cityCenter.x, _cityCenter.z, 0xffaa40, 60, world);
+  }
+
   // Se for uma cidade regional gerada dinamicamente fora de (0,0) e o sistema de NPCs estiver ativo, popula com moradores e comerciantes
   if (!settlement && _procEnv.npcs && (Math.abs(cx) > 50 || Math.abs(cz) > 50)) {
     _spawnRegionalCityNPCs(cityObj, _procEnv.npcs);
@@ -438,11 +444,12 @@ function _spawnRegionalCityNPCs(cityObj, npcSystem) {
 let _lastRegionX = null;
 let _lastRegionZ = null;
 const _pendingRegions = [];
+let _cityGenCooldown = 0;
 
 /**
  * CORREÇÃO: Gerador de Múltiplas Cidades.
  * Verifica regiões de 500x500m. Se a seed regional permitir, gera uma vila/cidade.
- * Otimizado com fila de espera por frame para não travar a thread ao descobrir novas regiões.
+ * Otimizado com fila orçada e espaçada por frames para eliminar stutters ao descobrir novas regiões.
  * @param {THREE.Vector3|{x:number,z:number}} playerPos
  * @param {Map<string, object|null>} activeCities
  * @param {THREE.Material} [houseMaterial]
@@ -472,7 +479,13 @@ export function updateWorldChunks(playerPos, activeCities, houseMaterial = creat
     }
   }
 
-  // Gera no máximo 1 setor por frame para eliminar stutters
+  // Resfriamento orçado: se uma cidade pesada acabou de ser construída, espera alguns frames
+  if (_cityGenCooldown > 0) {
+    _cityGenCooldown--;
+    return;
+  }
+
+  // Gera no máximo 1 setor por ciclo orçado para eliminar completamente stutters
   if (_pendingRegions.length > 0) {
     const item = _pendingRegions.shift();
     const { rx, rz, regionId } = item;
@@ -488,6 +501,7 @@ export function updateWorldChunks(playerPos, activeCities, houseMaterial = creat
         const cityCenter = new THREE.Vector3(rx * 500 + offsetX, 0, rz * 500 + offsetZ);
 
         activeCities.set(regionId, generateCity(regionSeed, cityCenter, houseMaterial));
+        _cityGenCooldown = 4; // Espaça o próximo setor para manter 60 FPS liso
       } else if (roll < 0.55 && (rx !== 0 || rz !== 0)) {
         const offsetX = (random() - 0.5) * 220;
         const offsetZ = (random() - 0.5) * 220;
@@ -500,6 +514,7 @@ export function updateWorldChunks(playerPos, activeCities, houseMaterial = creat
         };
         const ghostTown = generateGhostTown(ghostTownConfig, _procEnv.scene, _procEnv.world);
         activeCities.set(regionId, { ghostTown, center: ghostTown.center });
+        _cityGenCooldown = 4; // Espaça o próximo setor para manter 60 FPS liso
       } else {
         activeCities.set(regionId, null);
       }

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { PlayerInventory, PlayerStats } from "./rpg.js";
 import { createIrregularBloodGeometry } from "./farmAnimals.js";
+import { addCityBeacon } from "./beacons.js";
 
 // ============================================================================
 // Cidades Fantasma Procedurais: Ruínas de Guerra, Escombros e Sangue Seco
@@ -734,6 +735,11 @@ export function generateGhostTown(townConfig, scene, world) {
     root: townRoot,
     visited: false,
   };
+
+  // Beacon espectral da cidade fantasma visível de longe cortando o breu noturno
+  if (scene) {
+    addCityBeacon(scene, cx, cz, 0x9988bb, 48, world);
+  }
 
   ActiveGhostTowns.push(townData);
   return townData;
