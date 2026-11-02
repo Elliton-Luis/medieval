@@ -175,12 +175,12 @@ export class TorchSystem {
     this.dayNight = dayNight;
     this.sources = [];
     this.time = 0;
-    this.lit = false;
+    this.lit = Boolean(this.dayNight && (this.dayNight.isNight || this.dayNight.daylight < 0.48));
     this.rain = 0;
     this.glow = makeGlowTexture();
     this.lights = [];
     for (let i = 0; i < MAX_LIGHTS; i++) {
-      const light = new THREE.PointLight("#ffaa50", 0, 28.0, 1.4);
+      const light = new THREE.PointLight("#ffaa50", 0, 48.0, 1.25);
       configureDistantLight(light);
       light.visible = true; // CRÍTICO: NUNCA alternar visible em runtime para evitar recompilação de shader
       light.position.set(0, -9999, 0);
@@ -377,7 +377,7 @@ export class TorchSystem {
     }));
     sprite.scale.set(spriteScale, spriteScale * 1.35, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
-    sprite.visible = false; // Renderizado via InstancedMesh (impostorMesh) para zero draw calls
+    sprite.visible = Boolean(isAlwaysLit || this.lit);
     this.scene.add(sprite);
 
     const source = {
@@ -388,7 +388,7 @@ export class TorchSystem {
       phase: Math.random() * 6.28,
       kind: "torch",
       alwaysOn: isAlwaysLit,
-      isLit: Boolean(isAlwaysLit),
+      isLit: Boolean(isAlwaysLit || this.lit),
       light: true,
       group,
       lightColor: pal.flameHex,
@@ -461,52 +461,20 @@ export class TorchSystem {
     const px = player.x;
     const pz = player.z;
 
-    // Regra: Tochas acendem e apagam UMA A UMA, da mais próxima à mais distante, sem paralelismo
     const daylight = this.dayNight.daylight;
-    const wantsLit = daylight < 0.42;
-    const wantsUnlit = daylight > 0.55;
+    const isNightNow = Boolean(this.dayNight.isNight || daylight < 0.48);
 
-    this._lightStepTimer += dt;
-    if (this._lightStepTimer >= 0.05) {
-      this._lightStepTimer = 0;
-
-      if (wantsLit) {
-        // Encontra a tocha desligada MAIS PRÓXIMA do jogador para acender primeiro
-        let bestSrc = null;
-        let bestDistSq = Infinity;
-        for (let s = 0; s < this.sources.length; s++) {
-          const src = this.sources[s];
-          if (src.alwaysOn || src.isLit) continue;
-          const dx = src.x - px;
-          const dz = src.z - pz;
-          const d = dx * dx + dz * dz;
-          if (d < bestDistSq) {
-            bestDistSq = d;
-            bestSrc = src;
+    // Atualiza estado de todas as tochas da cidade ao transitar entre dia e noite
+    if (this.lit !== isNightNow) {
+      this.lit = isNightNow;
+      this.headMaterial.emissiveIntensity = isNightNow ? 5.2 : 0.05;
+      for (let s = 0; s < this.sources.length; s++) {
+        const src = this.sources[s];
+        if (!src.alwaysOn) {
+          src.isLit = isNightNow;
+          if (src.headMaterial) {
+            src.headMaterial.emissiveIntensity = isNightNow ? 5.2 : 0.05;
           }
-        }
-        if (bestSrc) {
-          bestSrc.isLit = true;
-          if (bestSrc.headMaterial) bestSrc.headMaterial.emissiveIntensity = 5.8;
-        }
-      } else if (wantsUnlit) {
-        // Encontra a tocha ligada MAIS DISTANTE do jogador para apagar primeiro ao amanhecer
-        let bestSrc = null;
-        let maxDistSq = -1;
-        for (let s = 0; s < this.sources.length; s++) {
-          const src = this.sources[s];
-          if (src.alwaysOn || !src.isLit) continue;
-          const dx = src.x - px;
-          const dz = src.z - pz;
-          const d = dx * dx + dz * dz;
-          if (d > maxDistSq) {
-            maxDistSq = d;
-            bestSrc = src;
-          }
-        }
-        if (bestSrc) {
-          bestSrc.isLit = false;
-          if (bestSrc.headMaterial) bestSrc.headMaterial.emissiveIntensity = 0.05;
         }
       }
     }
@@ -514,10 +482,9 @@ export class TorchSystem {
     const candidates = this.pending;
     candidates.length = 0;
 
-    // Regra: PointLights reais iluminam em um raio curto de até 25m do jogador.
-    // Acima disso, o InstancedMesh (impostorMesh) perfura o breu sem custo de sombreamento ou recompilação.
-    const POINTLIGHT_ACTIVATION_DIST = 25.0;
-    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 625 m²
+    // Regra: PointLights reais iluminam em um raio de até 45m do jogador (praças, ruas e arredores de Caldera e vilas)
+    const POINTLIGHT_ACTIVATION_DIST = 45.0;
+    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 2025 m²
 
     let activeImpostorCount = 0;
 
@@ -530,12 +497,20 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
-      // 1. Light Impostors (quanto mais longe, menor; brilho sutil e pontual na escuridão):
-      if (on && activeImpostorCount < this.maxImpostors) {
+      // 1. Halo / Chama do Sprite nativo: sempre visível de perto com fidelidade
+      if (source.sprite) {
+        source.sprite.visible = on;
+        if (on) {
+          const baseScale = source.kind === "hearth" ? 2.4 : (source.isPost ? 1.8 : 1.5);
+          source.sprite.scale.set(baseScale * flicker, baseScale * flicker * 1.25, 1);
+        }
+      }
+
+      // Impostores InstancedMesh para tochas de média/longa distância (> 16m)
+      if (on && activeImpostorCount < this.maxImpostors && d > 256) {
         const dist = Math.sqrt(d);
         const baseScale = source.kind === "hearth" ? 1.5 : (source.isPost ? 1.2 : 0.95);
-        // Quanto mais longe, menor: reduz o halo com a distância para evitar efeito de queimada
-        const distReduction = Math.max(0.28, 1.0 - (dist / 200.0) * 0.65);
+        const distReduction = Math.max(0.35, 1.0 - (dist / 220.0) * 0.55);
         const s = baseScale * flicker * distReduction;
 
         this._impostorPos.set(source.x, source.y + 0.35, source.z);
@@ -552,7 +527,7 @@ export class TorchSystem {
         activeImpostorCount++;
       }
 
-      // 2. Seleção de fontes para o pool de PointLights reais de curta distância:
+      // 2. Seleção de fontes para o pool de PointLights reais de curta/média distância:
       if (!nearPointLight || !source.light) continue;
       // Lareiras de dia só iluminam quem está dentro da casa
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
@@ -575,18 +550,8 @@ export class TorchSystem {
       this.impostorMesh.instanceColor.needsUpdate = true;
     }
 
-    // Ordenação sob demanda: evita sort() a cada quadro se o jogador estiver parado ou houver poucas fontes
-    if (candidates.length > MAX_LIGHTS) {
-      const movedDx = px - this._lastSortX;
-      const movedDz = pz - this._lastSortZ;
-      this._sortTimer -= dt;
-      if (movedDx * movedDx + movedDz * movedDz > 0.64 || this._sortTimer <= 0) {
-        this._lastSortX = px;
-        this._lastSortZ = pz;
-        this._sortTimer = 0.2;
-        candidates.sort(_sortByDist);
-      }
-    }
+    // Ordena sempre candidatos por distância para priorizar as 6 tochas mais próximas do jogador
+    candidates.sort(_sortByDist);
     const chosenCount = Math.min(candidates.length, MAX_LIGHTS);
 
     // Mantém as PointLights presas às mesmas fontes para evitar oscilação visual
@@ -634,11 +599,11 @@ export class TorchSystem {
         continue;
       }
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase);
-      const target = (source.kind === "hearth" ? 28 : 38) * flicker;
-      light.distance = 28.0;
-      light.decay = 1.4;
+      const target = (source.kind === "hearth" ? 320 : 440) * flicker;
+      light.distance = 48.0;
+      light.decay = 1.25;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-8 * dt));
-      light.position.set(source.x, source.y + 0.25, source.z);
+      light.position.set(source.x, source.y + 0.3, source.z);
       if (source.lightColor !== undefined) {
         light.color.setHex(source.lightColor);
       } else {
