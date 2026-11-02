@@ -54,13 +54,13 @@ export class DebugScreen {
     // Pré-aloca linhas DOM reutilizáveis para evitar criação de elementos no loop
     this._leftLines = [];
     this._rightLines = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 15; i++) {
       const line = document.createElement("div");
       line.className = "debug-line";
       colL.appendChild(line);
       this._leftLines.push(line);
     }
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 15; i++) {
       const line = document.createElement("div");
       line.className = "debug-line";
       colR.appendChild(line);
@@ -147,6 +147,8 @@ export class DebugScreen {
       cultistsPool,
       weapons,
       WorldDecay,
+      music,
+      audio,
     } = this.ctx;
 
     if (!player) return;
@@ -216,7 +218,16 @@ export class DebugScreen {
     this._leftLines[10].innerHTML = `Jogador: HP <span class="debug-good">${hp}/${maxHp}</span> · Stamina: <span class="debug-cyan">${stamina}/100</span> · Ouro: <span class="debug-highlight">${gold}</span>`;
     this._leftLines[11].innerHTML = `Alerta / Procurado: ${wantedLvl > 0 ? `<span class="debug-alert">Nível ${wantedLvl}</span>` : '<span class="debug-good">Tranquilo (0)</span>'}`;
     this._leftLines[12].innerHTML = `Postura: ${player.mounted ? '<span class="debug-highlight">Montado a Cavalo</span>' : player.crouching ? '<span class="debug-purple">Furtivo (Agachado)</span>' : 'A Pé'}`;
-    this._leftLines[13].innerHTML = `<small style="color:#aaa;">[F3] Alternar Debug · [F8] Exportar Log de Telemetria</small>`;
+
+    // 7.1 Trilha Sonora Atual
+    const trackInfo = music?.getCurrentTrackInfo ? music.getCurrentTrackInfo() : null;
+    const trackTitle = trackInfo ? trackInfo.title : "Nenhuma";
+    const trackFile = trackInfo?.fileName ? ` (${trackInfo.fileName})` : "";
+    const trackVol = trackInfo ? `${trackInfo.volumePct}%` : "0%";
+    const trackPlay = trackInfo?.isPlaying ? '<span class="debug-good">Tocando</span>' : '<span class="debug-warn">Pausa/Fade</span>';
+    const trackMuted = audio?.musicMuted ? ' · <span class="debug-alert">[MUDO - M]</span>' : '';
+    this._leftLines[13].innerHTML = `Música Atual: <span class="debug-purple">${trackTitle}${trackFile}</span> · Vol: ${trackVol} (${trackPlay})${trackMuted}`;
+    this._leftLines[14].innerHTML = `<small style="color:#aaa;">[F3] Alternar Debug · [F8] Exportar Telemetria · [M] Mute</small>`;
 
     // 8. Estatísticas de Renderização da GPU
     const info = renderer?.info;

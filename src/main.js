@@ -129,6 +129,7 @@ import {
 import { ClutterManager } from "./clutter.js";
 import { FarmAnimalManager } from "./farmAnimals.js";
 import { VillageGenerator, PROFESSIONS, HOUSE_TIERS } from "./villageGenerator.js";
+import { LoadingScreen } from "./loadingScreen.js";
 
 const gameRoot = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -210,6 +211,7 @@ const deathScreen = new DeathScreen({
   onRespawn: () => combat.respawnAtChurch(),
 });
 combat.deathScreen = deathScreen;
+const loadingScreen = new LoadingScreen(gameRoot);
 const torches = new TorchSystem(scene, world, dayNight);
 npcs.torches = torches;
 for (const t of settlement.torchSpots) torches.addTorch(t.x, t.y, t.z, t.nx, t.nz, t.post);
@@ -294,7 +296,7 @@ initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs, dayNight, houses });
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
 pause.onPlayIntro = () => {
-  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music });
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music, loadingScreen, renderer, camera });
 };
 const damageFx = new DamageFx({ container: gameRoot, audio, player });
 combat.damageFx = damageFx;
@@ -392,9 +394,11 @@ const debugScreen = new DebugScreen({
   input,
   ui,
   WorldDecay,
+  music,
+  audio,
 });
 
-window.__game = { clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+window.__game = { loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
 const saved = loadGame();
@@ -453,7 +457,22 @@ initDemiurgeDiary({
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {
-  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music });
+  startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music, loadingScreen, renderer, camera });
+} else {
+  // Transição inicial fluida fora da tela ao restaurar save existente
+  loadingScreen.transition({
+    title: "PURIS · REINO DE CALDERA",
+    message: "Restaurando o estado do reino...",
+    action: () => {
+      if (cameraRig) cameraRig.snap?.(player);
+    },
+    world,
+    scene,
+    camera,
+    renderer,
+    player,
+    minDuration: 400,
+  });
 }
 
 function resize() {

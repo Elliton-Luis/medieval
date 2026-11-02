@@ -74,13 +74,13 @@ export class GameAudio {
         });
     };
 
-    load("sword", "audio/efeitos sonoros/espada.wav");
-    load("knife", "audio/efeitos sonoros/faca.wav");
-    load("grassStep", "audio/efeitos sonoros/passos_grama.flac");
-    load("wolfHowl", "audio/efeitos sonoros/lobo\u2044lobisomen.mp3");
+    load("sword", "audio/sfx/sword.wav");
+    load("knife", "audio/sfx/knife.wav");
+    load("grassStep", "audio/sfx/footsteps_grass.flac");
+    load("wolfHowl", "audio/sfx/wolf_howl.mp3");
 
     for (let i = 0; i < 8; i++) {
-      const stepUrl = `audio/efeitos sonoros/passos_lobos\u2044lobisomens/${i}.ogg`;
+      const stepUrl = `audio/sfx/beast_steps/${i}.ogg`;
       fetch(encodeURI(stepUrl))
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);

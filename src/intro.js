@@ -19,6 +19,9 @@ let _skipPrompt = null;
 let _introWolves = [];
 let _tallFigure = null;
 let _entitySpawnedZ = 0;
+let _wolfHowl1Played = false;
+let _wolfGrowlPlayed = false;
+let _wolfStepsTimer = 0;
 
 // ============================================================================
 // 2. A Entidade do Vazio Abissal: VULGUS (Silhueta Toda Preta, Olhos e Dentes-Zíper)
@@ -344,10 +347,10 @@ function _attachSkipListener() {
   window.addEventListener(
     "keydown",
     (event) => {
-      if (GameState.isIntroPlaying && (event.code === "Space" || event.code === "Escape")) {
+      if (GameState.isIntroPlaying && (event.code === "Space" || event.code === "Escape" || event.code === "Enter")) {
         event.preventDefault();
         event.stopPropagation();
-        endIntroSequence();
+        endIntroSequence(true); // Pulo imediato com tela de loading
       }
     },
     true
@@ -355,11 +358,15 @@ function _attachSkipListener() {
 }
 
 // ============================================================================
-// 5. Inicialização da Cutscene Noturna com Trilha Tensa
+// 5. Inicialização da Cutscene Noturna com Trilha Tensa e Efeitos de Feras
 // ============================================================================
 export function startIntroSequence(env) {
   _introEnv = env;
-  const { scene, world, player, cameraRig, input, dayNight, music } = env;
+  const { scene, world, player, cameraRig, input, dayNight, music, audio } = env;
+
+  _wolfHowl1Played = false;
+  _wolfGrowlPlayed = false;
+  _wolfStepsTimer = 0;
 
   _ensureUIElements();
   _attachSkipListener();
@@ -377,10 +384,19 @@ export function startIntroSequence(env) {
     }
   }
 
-  // TOCA MÚSICA TENSA (audio/tense.mp3)
+  // TOCA MÚSICA TENSA (tense_escalating.ogg)
   if (music?.setOverride) {
     music.setOverride("tense");
   }
+  // Destravamento de áudio garantido na primeira interação
+  const unlockCutsceneAudio = () => {
+    if (audio?._unlock) audio._unlock();
+    if (music?.current?.element?.paused) {
+      music.current.element.play().catch(() => {});
+    }
+  };
+  window.addEventListener("pointerdown", unlockCutsceneAudio, { once: true });
+  window.addEventListener("keydown", unlockCutsceneAudio, { once: true });
 
   // FORÇA NOITE PROFUNDA E MUITA NEBLINA
   if (dayNight) {
@@ -434,6 +450,20 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
 
   GameState.introTimer += dt;
   const t = GameState.introTimer;
+
+  // EFEITOS SONOROS DE LOBOS E FERAS NA CUTSCENE
+  if (t >= 0.5 && !_wolfHowl1Played) {
+    _wolfHowl1Played = true;
+    audio?.playWolfHowl?.(0.9, 18);
+  }
+
+  if (t < 9.6) {
+    _wolfStepsTimer += dt;
+    if (_wolfStepsTimer >= 0.3) {
+      _wolfStepsTimer = 0;
+      audio?.playBeastStep?.(10);
+    }
+  }
 
   // Tremores orgânicos de câmera
   const shakeLightX = Math.sin(t * 11) * 0.025 + Math.cos(t * 17) * 0.015;
@@ -505,6 +535,11 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
     _camTarget.set(bPos.x + shakeHeavyX * 0.8, bPos.y + 1.18 + shakeHeavyY * 0.8, bPos.z + 1.55);
     camera.position.copy(_camTarget);
     camera.lookAt(bPos.x, bPos.y + 1.05, bPos.z);
+
+    if (!_wolfGrowlPlayed && t >= 5.2) {
+      _wolfGrowlPlayed = true;
+      audio?.playWolfHowl?.(1.0, 4);
+    }
 
     if (t > 5.25 && t < 5.35 && audio?.pain) {
       audio.pain();
@@ -582,7 +617,7 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
 // ============================================================================
 // 7. Encerramento: Despertar na Estrada Principal (Saída 100% Desobstruída)
 // ============================================================================
-export function endIntroSequence() {
+export function endIntroSequence(isSkipped = false) {
   if (!GameState.isIntroPlaying && GameState.introPhase === 3) return;
 
   GameState.isIntroPlaying = false;
@@ -599,43 +634,65 @@ export function endIntroSequence() {
   if (_skipPrompt) _skipPrompt.style.opacity = "0";
 
   if (_introEnv) {
-    const { player, world, cameraRig, input, ui, dayNight, scene, music } = _introEnv;
+    const { player, world, cameraRig, input, ui, dayNight, scene, music, loadingScreen, renderer, camera } = _introEnv;
 
-    // RESTAURA MÚSICA NORMAL (libera o override de tense.mp3)
-    if (music?.setOverride) {
-      music.setOverride(null);
+    const performWakeup = () => {
+      // RESTAURA MÚSICA NORMAL (libera o override de tense)
+      if (music?.setOverride) {
+        music.setOverride(null);
+      }
+
+      // SPAWN NA ESTRADA PRINCIPAL DO LADO DE FORA DO PORTÃO (Saída 100% garantida)
+      const safeSpawnX = 0;
+      const safeSpawnZ = -62;
+      const safeGroundY = world ? world.heightAt(safeSpawnX, safeSpawnZ) : 0;
+
+      player.x = safeSpawnX;
+      player.z = safeSpawnZ;
+      player.root.position.set(safeSpawnX, safeGroundY, safeSpawnZ);
+      if (player.model) player.model.rotation.y = 0; // Olhando para o portão da cidade
+
+      // TRANSIÇÃO PARA AMANHECER SUAVE (6h da manhã, névoa limpa)
+      if (dayNight) {
+        dayNight.progress = 0.25; // 6:00 AM (Amanhecer claro)
+      }
+      if (scene && scene.fog) {
+        scene.fog.density = CONFIG.fogDensity || 0.0165;
+        scene.fog.color.set("#aebfae");
+        scene.background.set("#aebfae");
+      }
+
+      if (cameraRig) {
+        cameraRig.frozen = false;
+        cameraRig.snap?.(player);
+      }
+
+      if (input) {
+        input.setModalOpen(false);
+      }
+
+      ui?.showToast?.("✦ Despertas na estrada diante dos portões. A névoa da noite se dissipa.");
+    };
+
+    if (loadingScreen) {
+      loadingScreen.transition({
+        title: "PURIS · REINO DE CALDERA",
+        message: isSkipped ? "Avançando para os portões da cidade..." : "Despertando diante dos portões...",
+        action: performWakeup,
+        world,
+        scene,
+        camera: cameraRig?.camera || camera,
+        renderer,
+        player,
+        minDuration: isSkipped ? 650 : 450,
+        onComplete: () => {
+          if (_fadeOverlay) _fadeOverlay.style.opacity = "0";
+        },
+      });
+      return;
     }
 
-    // SPAWN NA ESTRADA PRINCIPAL DO LADO DE FORA DO PORTÃO (Saída 100% garantida)
-    const safeSpawnX = 0;
-    const safeSpawnZ = -62;
-    const safeGroundY = world ? world.heightAt(safeSpawnX, safeSpawnZ) : 0;
-
-    player.x = safeSpawnX;
-    player.z = safeSpawnZ;
-    player.root.position.set(safeSpawnX, safeGroundY, safeSpawnZ);
-    if (player.model) player.model.rotation.y = 0; // Olhando para o portão da cidade
-
-    // TRANSIÇÃO PARA AMANHECER SUAVE (6h da manhã, névoa limpa)
-    if (dayNight) {
-      dayNight.progress = 0.25; // 6:00 AM (Amanhecer claro)
-    }
-    if (scene && scene.fog) {
-      scene.fog.density = CONFIG.fogDensity || 0.0165;
-      scene.fog.color.set("#aebfae");
-      scene.background.set("#aebfae");
-    }
-
-    if (cameraRig) {
-      cameraRig.frozen = false;
-      cameraRig.snap?.(player);
-    }
-
-    if (input) {
-      input.setModalOpen(false);
-    }
-
-    ui?.showToast?.("✦ Despertas na estrada diante dos portões. A névoa da noite se dissipa.");
+    performWakeup();
   }
 
   // Remove fade preto suavemente

@@ -90,23 +90,23 @@ A trilha sonora do Puris é gerenciada pelo `MusicDirector` com carregamento sob
 
 | Contexto / Cenário | Faixa de Áudio | Comportamento e Gatilho |
 | --- | --- | --- |
-| **Exploração Aberta (Dia)** | `audio/musicas/exploração.mp3` | Exploração ativa a pé ou a cavalo pelos caminhos do reino |
-| **Pradarias & Planícies** | `audio/musicas/ambiente_calmo_dia.mp3` / `ambiente_calmo_dia_2.ogg` | Planícies abertas distantes de vilas e cidades |
-| **Cidades, Vilas e Mercados** | `audio/musicas/cidade_calma_dia.mp3` (alt: `cidade_dia_calmo.mp3`) | Proximidade de vilarejos, feiras, muralhas e centros urbanos |
-| **Florestas e Bosques** | `audio/musicas/ambiente_dia_floresta.mp3` | Regiões com aglomerados de árvores e bosques diurnos |
-| **Ermos Profundos e Matas Fechadas** | `audio/musicas/ambiente_dia_muito_denso.mp3` | Matas densas (> 18 árvores por perto) e montanhas ermas |
-| **Noite (Anoitecer até Meia-Noite)** | `audio/musicas/ambiente_denso_noite_2.ogg` | Início da noite e crepúsculo pelos ermos e estradas |
-| **Madrugada Sombria (00h às 05h)** | `audio/musicas/ambiente_denso_madrugada.ogg` | As horas mais escuras e silenciosas da madrugada |
-| **Tavernas e Estalagens** | `audio/musicas/generica_calma.ogg` | Interiores acolhedores de tavernas, estalagens e pousadas |
-| **Igrejas e Catedrais** | `audio/musicas/generica_calma.ogg` | Serenidade sacra ao sentar nos bancos da igreja ou entrar no templo |
-| **Tensão e Ameaça Iminente** | `audio/musicas/tensa_escalando.OGG` | Presença de wendigos, lobisomens, feras ou cultistas a menos de 35m |
-| **Combate Leve (Procurado 1-2)** | `audio/musicas/batalha_menos_seria.mp3` | Conflito com camponeses ou perseguição inicial da guarda |
-| **Combate Médio (Procurado 3)** | `audio/musicas/batalha_animada.mp3` | Confronto armado intenso com reforços de besteiros e arqueiros |
-| **Perseguição Severa (Procurado 4-5)** | `audio/musicas/batalha_séria.mp3` | Caça implacável do reino por cavaleiros montados e canhoneiros |
-| **Vila Fantasma & Acampamentos** | `audio/musicas/vila_fantasma_e_acampamento_demiurgo.mp3` | Cidades fantasmas em ruínas e acampamentos noturnos do Demiurgo |
-| **Eclipse Solar & Cataclismo** | `audio/musicas/o_fim_maligno.mp3` | Durante o Dia do Eclipse e a descida apocalíptica do Demiurgo |
-| **Descobertas & Missões** | `audio/musicas/descoberta.mp3` | Abertura de baús com tesouro e conclusão de missões |
-| **Tela de Morte ("PERECESTE")** | `audio/musicas/Derrota_2.ogg` (fallback: `Derrota.wav`) | Pausa a música ambiente e ecoa a melodia fúnebre de derrota |
+| **Exploração Aberta (Dia)** | `audio/music/exploration.mp3` | Exploração ativa a pé ou a cavalo pelos caminhos do reino |
+| **Pradarias & Planícies** | `audio/music/ambient_calm_day.mp3` / `ambient_calm_day_2.ogg` | Planícies abertas distantes de vilas e cidades |
+| **Cidades, Vilas e Mercados** | `audio/music/town_calm_day.mp3` (alt: `town_day_calm.mp3`) | Proximidade de vilarejos, feiras, muralhas e centros urbanos |
+| **Florestas e Bosques** | `audio/music/ambient_day_forest.mp3` | Regiões com aglomerados de árvores e bosques diurnos |
+| **Ermos Profundos e Matas Fechadas** | `audio/music/ambient_day_dense.mp3` | Matas densas (> 18 árvores por perto) e montanhas ermas |
+| **Noite (Anoitecer até Meia-Noite)** | `audio/music/ambient_dense_night.ogg` | Início da noite e crepúsculo pelos ermos e estradas |
+| **Madrugada Sombria (00h às 05h)** | `audio/music/ambient_dense_dawn.ogg` | As horas mais escuras e silenciosas da madrugada |
+| **Tavernas e Estalagens** | `audio/music/generic_calm.ogg` | Interiores acolhedores de tavernas, estalagens e pousadas |
+| **Igrejas e Catedrais** | `audio/music/generic_calm.ogg` | Serenidade sacra ao sentar nos bancos da igreja ou entrar no templo |
+| **Tensão e Ameaça Iminente** | `audio/music/tense_escalating.ogg` | Presença de wendigos, lobisomens, feras ou cultistas a menos de 35m |
+| **Combate Leve (Procurado 1-2)** | `audio/music/battle_light.mp3` | Conflito com camponeses ou perseguição inicial da guarda |
+| **Combate Médio (Procurado 3)** | `audio/music/battle_fast.mp3` | Confronto armado intenso com reforços de besteiros e arqueiros |
+| **Perseguição Severa (Procurado 4-5)** | `audio/music/battle_serious.mp3` | Caça implacável do reino por cavaleiros montados e canhoneiros |
+| **Vila Fantasma & Acampamentos** | `audio/music/ghost_town_demiurge_camp.mp3` | Cidades fantasmas em ruínas e acampamentos noturnos do Demiurgo |
+| **Eclipse Solar & Cataclismo** | `audio/music/evil_end.mp3` | Durante o Dia do Eclipse e a descida apocalíptica do Demiurgo |
+| **Descobertas & Missões** | `audio/music/discovery.mp3` | Abertura de baús com tesouro e conclusão de missões |
+| **Tela de Morte ("PERECESTE")** | `audio/music/defeat_2.ogg` (fallback: `defeat.wav`) | Pausa a música ambiente e ecoa a melodia fúnebre de derrota |
 
 - **Abafamento em Interiores**: Dentro de qualquer residência ou cômodo fechado, o volume da música ambiente é reduzido automaticamente (filtro acústico suave).
 - **Atalho de Mudo**: Tecla `M` silencia e desilencia a música instantaneamente. Volume independente na tela de pausa (`Esc`).
@@ -463,18 +463,60 @@ Anteriormente, as cidades e vilas à noite ficavam excessivamente escuras porque
 
 ## Novo Sistema de Áudio Imersivo e Efeitos Sonoros Reais
 
-Incorporados novos arquivos de áudio de alta fidelidade gravados para combate, movimentação e criaturas (`audio/efeitos sonoros/`), pré-carregados e decodificados em `AudioBuffer`s de baixa latência pelo `GameAudio` (`src/audio.js`):
+Incorporados novos arquivos de áudio de alta fidelidade gravados para combate, movimentação e criaturas (`audio/sfx/`), pré-carregados e decodificados em `AudioBuffer`s de baixa latência pelo `GameAudio` (`src/audio.js`):
 
-- **Passos Reais na Relva e Terra (`passos_grama.flac`)**:
+- **Passos Reais na Relva e Terra (`audio/sfx/footsteps_grass.flac`)**:
   - Movimentação do jogador agora reproduz passos nítidos de calçados sobre o solo e vegetação, com pitch aleatório dinâmico (`0.94 - 1.06`) e volume sincronizado com a passada anatômica e velocidade de corrida.
-- **Golpes de Espadas e Lâminas (`espada.wav`)**:
+- **Golpes de Espadas e Lâminas (`audio/sfx/sword.wav`)**:
   - Ataques com Espada Curta, Espada Longa, Montante e Alabarda tocam som encorpado de corte afiado no ar, distinguindo golpes normais e golpes pesados carregados.
-- **Cortes Ágeis de Facas e Adagas (`faca.wav`)**:
+- **Cortes Ágeis de Facas e Adagas (`audio/sfx/knife.wav`)**:
   - Ataques rápidos com Faca, Adaga e Facas de Arremesso disparam áudio cortante e metálico de alta agilidade.
-- **Uivos e Rosnados de Feras (`lobo⁄lobisomen.mp3`)**:
+- **Uivos e Rosnados de Feras (`audio/sfx/wolf_howl.mp3`)**:
   - Criaturas predadoras dos ermos (como o Necron e Lobisomens) soltam rosnados e uivos ao avistarem o jogador e engajarem em investida feroz, além de uivos atmosféricos distantes ecoando periodicamente na neblina durante noites e eclipses.
-- **Passadas Pesadas de Predadores (`passos_lobos⁄lobisomens/{0..7}.ogg`)**:
+- **Passadas Pesadas de Predadores (`audio/sfx/beast_steps/{0..7}.ogg`)**:
   - Banco de 8 variações dinâmicas de passos de garras e patas pesadas reproduzidos cadenciadamente durante as perseguições em alta velocidade das criaturas nos ermos.
+
+## Telas de Carregamento Assíncronas (Zero-Stutter Offscreen Shader Compilation)
+
+Ao iniciar uma nova aventura, restaurar um savegame ou pular a cutscene cinemática, o carregamento de dezenas de chunks procedurais e a compilação síncrona de dezenas de shaders GLSL pelo WebGL geravam engasgos perceptíveis na taxa de quadros (micro-stutters / spikes de frame time). O novo módulo `LoadingScreen` (`src/loadingScreen.js`) resolve essa latência através de uma arquitetura em estágios fora da tela:
+
+- **Overlay Visual Imersivo**:
+  - Brasão rúnico de Caldera pulsante, moldura dourada e barra de progresso suave em gradiente dourado (`0% a 100%`).
+  - Dicas dinâmicas de lore e sobrevivência sorteadas em tempo real.
+- **Pipelines de Transição Divididos em Frames**:
+  1. *Exibição Imediata*: Bloqueia a renderização defasada e foca o usuário na atmosfera do jogo.
+  2. *Streaming de Terreno e Posicionamento*: Desloca o jogador, atualiza chunks de terreno e reposiciona âncoras fora da visão da câmera.
+  3. *Pré-aquecimento de GPU (`renderer.compile`)*: Compila todos os programas de iluminação e materiais na GPU antes que a tela seja revelada, eliminando totalmente o congelamento do primeiro frame.
+  4. *Fade-Out Suave*: Desvanece suavemente a tela revelando o cenário a 60 FPS estáveis.
+
+## Cutscene Cinemática Aprimorada (Trilha Tensa e Áudio de Predadores)
+
+A sequência de abertura na floresta escura (`src/intro.js`) recebeu tratamento sonoro completo:
+- **Trilha Tensa em Escalação (`audio/music/tense_escalating.ogg`)**:
+  - Inicia imediatamente com o suspense da fuga, silenciando suavemente faixas calmas e criando a ambientação opressiva da perseguição na mata.
+- **Efeitos Sonoros de Feras e Uivos Sincronizados**:
+  - Uivos aterradores ecoam na mata logo nos primeiros segundos (`audio.playWolfHowl`).
+  - Passadas pesadas e cadenciadas de patas e garras no solo perseguem o jogador de perto (`audio.playBeastStep`).
+- **Pulo Fluido para a Tela de Carregamento**:
+  - Pressionar `Espaço`, `Esc` ou `Enter` ativa imediatamente a `LoadingScreen`, teletransportando o jogador para os portões seguros de Caldera e realizando a compilação offscreen sem congelar a interface.
+
+## Padronização Global dos Áudios em Inglês Limpo
+
+Todos os diretórios e arquivos de áudio do projeto foram padronizados para convenções POSIX em inglês limpo, sem caracteres especiais (como barras diagonais `⁄`, acentos gráficos ou espaços), garantindo compatibilidade cruzada universal em servidores Linux, Windows e CDNs:
+- `audio/music/` (anteriormente `audio/musicas/`):
+  - `ambient_calm_day.mp3`, `ambient_calm_day_2.ogg`, `ambient_day_dense.mp3`, `ambient_day_forest.mp3`, `ambient_dense_dawn.ogg`, `ambient_dense_night.ogg`, `town_calm_day.mp3`, `town_day_calm.mp3`, `exploration.mp3`, `battle_light.mp3`, `battle_fast.mp3`, `battle_serious.mp3`, `ghost_town_demiurge_camp.mp3`, `tense_escalating.ogg`, `evil_end.mp3`, `discovery.mp3`, `defeat.wav`, `defeat_2.ogg`, `generic_calm.ogg`.
+- `audio/sfx/` (anteriormente `audio/efeitos sonoros/`):
+  - `sword.wav`, `knife.wav`, `footsteps_grass.flac`, `wolf_howl.mp3`, `beast_steps/{0..7}.ogg`.
+- Symlinks de retrocompatibilidade mantidos na raiz de `audio/` para preservar dependências legadas.
+
+## Telemetria da Trilha Atual no Painel Debug [F3]
+
+O painel de depuração em tempo real (`src/debugScreen.js`), ativado via tecla **`[F3]`**, agora conta com monitoramento sonoro em tempo real:
+- **Linha de Áudio / Trilha Sonora**:
+  - Exibe o título catalogado em português da trilha em reprodução (ex.: `Exploração Aberta (Dia)` ou `Tensão e Ameaça Iminente`).
+  - Nome exato do arquivo físico carregado (`exploration.mp3`, `tense_escalating.ogg`, etc.).
+  - Percentual dinâmico de volume com cálculo de abafamento e ducking (ex.: `Vol: 85%`).
+  - Status em tempo real (`TOCANDO` ou `MUTADO`).
 
 ## Fase 1
 
