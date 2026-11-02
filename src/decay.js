@@ -124,7 +124,7 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
     scene.background.copy(eclipseBg);
     if (scene.fog) {
       scene.fog.color.copy(_eclipseFogColor);
-      scene.fog.density = 0.018 + decay * 0.012;
+      scene.fog.density = 0.012 + decay * 0.008;
     }
     if (dayNight.sun) {
       dayNight.sun.color.copy(_eclipseSunColor);
@@ -139,10 +139,10 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
 
     if (scene.fog) {
       if (isNight) {
-        // Preserva o breu noturno aos 40m para o sistema de Light Impostors
-        scene.fog.density = THREE.MathUtils.lerp(0.048, 0.056, decay);
+        // Alcance da neblina noturna expandido em 50%
+        scene.fog.density = THREE.MathUtils.lerp(0.032, 0.037, decay);
       } else {
-        scene.fog.density = 0.018 + decay * 0.016;
+        scene.fog.density = 0.012 + decay * 0.011;
       }
     }
     if (dayNight.sun && decay > 0.3) {

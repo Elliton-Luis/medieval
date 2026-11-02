@@ -590,9 +590,12 @@ Para eliminar travamentos (*stutters* de 1400 FPS para 70 FPS), evitar buracos/l
 - **Tela de Morte e Eventos sem Congelamento**:
   - Substituição da manipulação de `canvas.style.filter` CSS por uma camada overlay dedicada (`.wasted-sepia`), preservando a aceleração de hardware do contexto WebGL sem re-rasterizações pesadas.
   - Otimização do ruído de granulação (`_animateGrain`) através de quadros estáticos pré-computados, reduzindo a zero o custo de CPU na transição.
-- **Tochas e Fogueiras que Furam a Escuridão Noturna**:
+- **Tochas e Fogueiras que Furam a Escuridão Noturna e Neblina Expandida (+50%)**:
   - Billboards aditivos de alta intensidade com `fog: false` nas chamas e halos das tochas, permitindo que a luz corte a neblina preta e sirva como farol no horizonte a longas distâncias.
+  - Alcance da neblina noturna expandido em **50%** (densidade ajustada de 0.052 para 0.0345), permitindo visão límpida até ~60 metros e contornos visíveis até 85-90 metros.
   - Alcance e intensidade das `PointLights` expandidos (55m de raio de ativação nas vilas e ruas) para banhar praças, fachadas e vias medievais com luz quente e acolhedora.
+- **Resiliência de Contexto WebGL (createSafeRenderer)**:
+  - Inicialização com fallback automático (`failIfMajorPerformanceCaveat: false`, contextos WebGL2/WebGL1 alternativos) e tratamento amigável de perda/restauração de contexto (`webglcontextlost`/`webglcontextrestored`).
 - **Zoneamento Rigoroso de Fazendas e Clutter (Proteção de Igrejas e Centros Urbanos)**:
   - Adicionado raio de isolamento mínimo de **38 metros** em torno de todas as Igrejas e templos e **32 metros** do centro urbano de Caldera, impedindo que plantações, espantalhos, cercados ou currais de animais nasçam dentro ou adjacentes a edifícios sagrados ou urbanos. Casas no miolo urbano atuam estritamente como comerciantes e civis.
 

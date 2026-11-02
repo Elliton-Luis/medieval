@@ -139,13 +139,61 @@ scene.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, CONFIG.fogDensity);
 
 // Câmera ampla (far = 200m) permitindo que Light Impostors perfurem a escuridão no horizonte
 const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance || 200);
-const renderer = new THREE.WebGLRenderer({
-  antialias: false,
-  alpha: false,
-  powerPreference: "high-performance",
-  stencil: false,
-  depth: true,
-});
+
+function createSafeRenderer() {
+  const options = {
+    antialias: false,
+    alpha: false,
+    powerPreference: "default",
+    failIfMajorPerformanceCaveat: false, // Permite fallback de renderização sem travar
+    stencil: false,
+    depth: true,
+  };
+
+  try {
+    return new THREE.WebGLRenderer(options);
+  } catch (err) {
+    console.warn("Tentando criar contexto WebGL de contingência...", err);
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl2", options) ||
+                 canvas.getContext("webgl", options) ||
+                 canvas.getContext("experimental-webgl", options);
+      if (gl) {
+        return new THREE.WebGLRenderer({ ...options, canvas, context: gl });
+      }
+    } catch (_) {}
+
+    // Exibe diagnóstico claro se o navegador estiver com aceleração gráfica desabilitada
+    const notice = document.createElement("div");
+    notice.style.cssText = "position:fixed;inset:0;background:#0d1117;color:#f0f6fc;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:system-ui,sans-serif;z-index:99999;";
+    notice.innerHTML = `
+      <h2 style="color:#f85149;margin-bottom:12px;">⚔️ Aceleração WebGL Desativada no Navegador</h2>
+      <p style="max-width:560px;line-height:1.6;color:#c9d1d9;margin-bottom:18px;">
+        O navegador não pôde inicializar a placa gráfica 3D (motivo: <em>WebGL is currently disabled</em>).
+      </p>
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:16px;text-align:left;max-width:520px;font-size:13px;line-height:1.7;">
+        <strong>Como habilitar:</strong><br>
+        1. <strong>Chrome / Brave / Edge</strong>: vá em <code>Configurações &rarr; Sistema</code> e ative <em>"Usar aceleração de hardware / gráfica"</em>.<br>
+        2. <strong>Firefox</strong>: acesse <code>about:config</code>, pesquise <code>webgl.disabled</code> e defina como <code>false</code>.<br>
+        3. Caso tenha muitas abas 3D abertas, feche-as e reinicie o navegador.
+      </div>
+      <button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;background:#238636;color:#fff;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:14px;">Recarregar Página</button>
+    `;
+    document.body.append(notice);
+    throw err;
+  }
+}
+
+const renderer = createSafeRenderer();
+renderer.domElement.addEventListener("webglcontextlost", (event) => {
+  event.preventDefault();
+  console.warn("Contexto WebGL perdido. Aguardando recuperação...");
+}, false);
+renderer.domElement.addEventListener("webglcontextrestored", () => {
+  console.info("Contexto WebGL recuperado!");
+  window.location.reload();
+}, false);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;

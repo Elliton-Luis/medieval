@@ -96,16 +96,16 @@ export class DayNightCycle {
     if (renderer) renderer.setClearColor(this.currentColor);
     if (this.scene.fog) {
       if (night > 0.55) {
-        // Noite escura absoluta: neblina preta pura (0x000000) bloqueando a visão das malhas normais aos 40m
+        // Noite escura com alcance expandido em 50% (visibilidade clara até ~60m e contornos até 80-90m)
         const nightT = (night - 0.55) / 0.45;
         this.currentColor.lerp(new THREE.Color(0x000000), nightT * 0.98);
         this.scene.background.copy(this.currentColor);
         if (renderer) renderer.setClearColor(this.currentColor);
         this.scene.fog.color.copy(this.currentColor);
-        this.scene.fog.density = THREE.MathUtils.lerp(0.032, 0.052, nightT);
+        this.scene.fog.density = THREE.MathUtils.lerp(0.021, 0.0345, nightT);
       } else {
         this.scene.fog.color.copy(this.currentColor);
-        this.scene.fog.density = 0.0315 + 0.0055 * (night * night);
+        this.scene.fog.density = 0.021 + 0.0035 * (night * night);
       }
     }
 

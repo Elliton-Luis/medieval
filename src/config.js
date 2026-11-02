@@ -7,7 +7,7 @@ export const CONFIG = Object.freeze({
   renderDistance: 200,
   viewDistance: 200,
   lodDistance: 54,
-  fogDensity: 0.032,
+  fogDensity: 0.021,
   maxDelta: 0.05,
   player: {
     walkSpeed: 4.1,
