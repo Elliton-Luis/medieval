@@ -10,10 +10,9 @@ function makeBeaconTexture() {
   canvas.height = 128;
   const ctx = canvas.getContext("2d");
   const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gradient.addColorStop(0.0, "rgba(255, 240, 200, 1.0)");
-  gradient.addColorStop(0.2, "rgba(255, 175, 70, 0.85)");
-  gradient.addColorStop(0.5, "rgba(220, 110, 30, 0.4)");
-  gradient.addColorStop(0.8, "rgba(160, 60, 10, 0.12)");
+  gradient.addColorStop(0.0, "rgba(255, 230, 180, 0.65)");
+  gradient.addColorStop(0.25, "rgba(220, 140, 50, 0.32)");
+  gradient.addColorStop(0.55, "rgba(160, 80, 20, 0.08)");
   gradient.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 128, 128);
@@ -36,15 +35,16 @@ const _activeBeacons = [];
 
 /**
  * Adiciona um Beacon visível de longe para sinalizar uma cidade, vila ou ruína no breu da noite.
+ * Suavizado para não ofuscar nem parecer queimada.
  * @param {THREE.Scene} scene
  * @param {number} x
  * @param {number} z
  * @param {number|string} [color=0xffaa40]
- * @param {number} [baseSize=60]
+ * @param {number} [baseSize=36]
  * @param {object} [world=null]
  * @returns {THREE.Sprite}
  */
-export function addCityBeacon(scene, x, z, color = 0xffaa40, baseSize = 60, world = null) {
+export function addCityBeacon(scene, x, z, color = 0xffaa40, baseSize = 36, world = null) {
   if (!scene) return null;
 
   // Evita duplicatas se já houver um beacon na mesma posição exata
@@ -62,16 +62,16 @@ export function addCityBeacon(scene, x, z, color = 0xffaa40, baseSize = 60, worl
     map: texture,
     color: color,
     transparent: true,
-    opacity: 0.52,
+    opacity: 0.28,
     depthWrite: false,
     depthTest: true,
     blending: THREE.AdditiveBlending,
-    fog: false, // CRÍTICO: ignora a neblina preta noturna para ser visível de longe
+    fog: false,
   });
 
   const sprite = new THREE.Sprite(mat);
   const groundY = world && typeof world.heightAt === "function" ? world.heightAt(x, z) : 0;
-  const posY = groundY + 30; // Posiciona entre 25 e 40m de altura sobre a cidade
+  const posY = groundY + 26; // Posiciona suavemente sobre a cidade
 
   sprite.position.set(x, posY, z);
   sprite.scale.set(baseSize, baseSize * 0.9, 1);
@@ -83,8 +83,12 @@ export function addCityBeacon(scene, x, z, color = 0xffaa40, baseSize = 60, worl
     z,
     baseY: posY,
     baseSize,
-    baseOpacity: 0.52,
+    baseOpacity: 0.28,
   };
+
+  _activeBeacons.push(beaconData);
+  return sprite;
+}
 
   _activeBeacons.push(beaconData);
   return sprite;

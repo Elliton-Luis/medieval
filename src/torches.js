@@ -214,10 +214,10 @@ export class TorchSystem {
       map: this.glow,
       color: 0xffffff,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.42, // Suave e translúcido para evitar aspecto de queimada ou fumaça pesada
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      fog: false, // CRÍTICO: ignora a neblina preta noturna para perfurar o breu
+      fog: false, // Ignora a neblina escura noturna sem estourar o brilho
     });
 
     // Injeta rotação para a câmera (Billboard) diretamente no vertex shader da GPU com suporte a InstancedMesh
@@ -530,16 +530,16 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
-      // 1. Light Impostors (InstancedMesh na GPU com 1 draw call para todas as tochas do mundo):
+      // 1. Light Impostors (quanto mais longe, menor; brilho sutil e pontual na escuridão):
       if (on && activeImpostorCount < this.maxImpostors) {
         const dist = Math.sqrt(d);
-        const baseScale = source.kind === "hearth" ? 2.8 : (source.isPost ? 2.2 : 1.7);
-        // Escala cresce com a distância para manter leitura clara a 100m–200m
-        const distScaleBoost = Math.min(8.0, Math.max(1.0, 1.0 + dist * 0.035));
-        const s = baseScale * flicker * distScaleBoost;
+        const baseScale = source.kind === "hearth" ? 1.5 : (source.isPost ? 1.2 : 0.95);
+        // Quanto mais longe, menor: reduz o halo com a distância para evitar efeito de queimada
+        const distReduction = Math.max(0.28, 1.0 - (dist / 200.0) * 0.65);
+        const s = baseScale * flicker * distReduction;
 
         this._impostorPos.set(source.x, source.y + 0.35, source.z);
-        this._impostorScale.set(s, s * 1.35, 1);
+        this._impostorScale.set(s, s * 1.15, 1);
         this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
         this.impostorMesh.setMatrixAt(activeImpostorCount, this._impostorMatrix);
 

@@ -23,22 +23,81 @@ const _hitPoint = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
 
 /**
- * Impostor 2D Cruzado de Árvore Distante (Horizonte):
- * Silhueta chapada e sombra no solo em uma única BufferGeometry estática ultra-leve (Zero-GC).
+ * Cria uma BufferGeometry de Triângulo Isósceles 2D com faces frontal e traseira.
+ * Vértice pontiagudo no topo e base horizontal larga em baixo.
+ * Substitui os antigos retângulos chapados que se confundiam com casas e vilas distantes.
+ * @param {number} baseWidth - Largura da base do triângulo
+ * @param {number} height - Altura do triângulo isósceles
+ * @param {number} [yBottom=0] - Altura da base no eixo Y
+ */
+function createIsoscelesTriangleGeometry(baseWidth, height, yBottom = 0) {
+  const hw = baseWidth / 2;
+  const yTop = yBottom + height;
+
+  const positions = new Float32Array([
+    // Face Frontal
+    -hw, yBottom, 0,
+     hw, yBottom, 0,
+      0, yTop,    0,
+
+    // Face Traseira
+     hw, yBottom, 0,
+    -hw, yBottom, 0,
+      0, yTop,    0,
+  ]);
+
+  const normals = new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+
+    0, 0, -1,
+    0, 0, -1,
+    0, 0, -1,
+  ]);
+
+  const uvs = new Float32Array([
+    0, 0,
+    1, 0,
+    0.5, 1,
+
+    1, 0,
+    0, 0,
+    0.5, 1,
+  ]);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  return geo;
+}
+
+/**
+ * Impostor 2D de Árvore Distante em Triângulos Isósceles Cruzados (Pinheiro / Copa Natural):
+ * Silhueta cônica pontuda e sombra no solo, eliminando qualquer formato retangular.
  */
 function createFarTreeImpostorGeometry() {
   const geos = [];
-  const p1 = new THREE.PlaneGeometry(3.2, 7.2);
-  p1.translate(0, 3.6, 0);
-  geos.push(p1);
+  const t1 = createIsoscelesTriangleGeometry(3.0, 7.2, 0.45);
+  geos.push(t1);
 
-  const p2 = new THREE.PlaneGeometry(3.2, 7.2);
-  p2.rotateY(Math.PI / 2);
-  p2.translate(0, 3.6, 0);
-  geos.push(p2);
+  const t2 = createIsoscelesTriangleGeometry(3.0, 7.2, 0.45);
+  t2.rotateY(Math.PI / 2);
+  geos.push(t2);
+
+  // Tronco fino na base
+  const trunk1 = new THREE.PlaneGeometry(0.36, 0.9);
+  trunk1.translate(0, 0.45, 0);
+  geos.push(trunk1);
+
+  const trunk2 = new THREE.PlaneGeometry(0.36, 0.9);
+  trunk2.rotateY(Math.PI / 2);
+  trunk2.translate(0, 0.45, 0);
+  geos.push(trunk2);
 
   // Sombra chapada escura no solo
-  const shadow = new THREE.CircleGeometry(1.65, 8);
+  const shadow = new THREE.CircleGeometry(1.5, 8);
   shadow.rotateX(-Math.PI / 2);
   shadow.translate(0, 0.04, 0);
   geos.push(shadow);
@@ -49,18 +108,16 @@ function createFarTreeImpostorGeometry() {
 }
 
 /**
- * Impostor 2D de Rocha Distante com sombra chapada no solo.
+ * Impostor 2D de Rocha Distante em formato triangular baixo e achatado.
  */
 function createFarRockImpostorGeometry() {
   const geos = [];
-  const p1 = new THREE.PlaneGeometry(1.4, 0.85);
-  p1.translate(0, 0.42, 0);
-  geos.push(p1);
+  const t1 = createIsoscelesTriangleGeometry(1.5, 0.85, 0.02);
+  geos.push(t1);
 
-  const p2 = new THREE.PlaneGeometry(1.4, 0.85);
-  p2.rotateY(Math.PI / 2);
-  p2.translate(0, 0.42, 0);
-  geos.push(p2);
+  const t2 = createIsoscelesTriangleGeometry(1.5, 0.85, 0.02);
+  t2.rotateY(Math.PI / 2);
+  geos.push(t2);
 
   const shadow = new THREE.CircleGeometry(0.85, 8);
   shadow.rotateX(-Math.PI / 2);
