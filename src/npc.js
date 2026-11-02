@@ -390,8 +390,10 @@ export class NPC {
       }
     }
 
-    const ground = this.world.heightAt(this.x, this.z);
-    this.root.position.set(this.x, ground, this.z);
+    if (this._groundY === undefined || this.moving || this._hitStun > 0) {
+      this._groundY = this.world.heightAt(this.x, this.z);
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
     const stride = this.moving ? Math.sin(this.walkPhase) * 0.56 : 0;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
@@ -931,8 +933,10 @@ export class NPC {
       const difference = Math.atan2(Math.sin(target - this.model.rotation.y), Math.cos(target - this.model.rotation.y));
       this.model.rotation.y += difference * (1 - Math.exp(-14 * dt));
     }
-    const ground = this.world.heightAt(this.x, this.z);
-    this.root.position.set(this.x, ground, this.z);
+    if (this._groundY === undefined || this.moving || this._hitStun > 0) {
+      this._groundY = this.world.heightAt(this.x, this.z);
+    }
+    this.root.position.set(this.x, this._groundY, this.z);
     const stride = this.moving ? Math.sin(this.walkPhase) * 0.9 : 0;
     this.leftLeg.rotation.x = stride;
     this.rightLeg.rotation.x = -stride;
@@ -1473,6 +1477,16 @@ export class NPCSystem {
         continue;
       }
 
+      // 3. Culling de Distância para IA de Trabalho:
+      if (distanceSq > 55 * 55 && npc.mode === "work") {
+        if (npc.alive) {
+          npc.root.visible = false;
+        } else {
+          npc.update(clampedDt, playerX, playerZ);
+        }
+        continue;
+      }
+
       if (npc.alive && npc.mode === "report" && (npc.targetCheck -= clampedDt) <= 0) {
         npc.targetCheck = 1;
         if (!npc.reportTarget || !npc.reportTarget.alive) npc.reportTarget = this._nearestGuard(npc);
@@ -1500,15 +1514,6 @@ export class NPCSystem {
             }
           }
         }
-      }
-      if (distanceSq > 55 * 55 && npc.mode === "work") {
-        // Longe do jogador: não anima nem desenha, mas o respawn continua contando.
-        if (npc.alive) {
-          npc.root.visible = false;
-        } else {
-          npc.update(clampedDt, playerX, playerZ);
-        }
-        continue;
       }
       if (npc.alive && !npc.root.userData.isSleeping) npc.root.visible = true;
       npc.update(clampedDt, playerX, playerZ);

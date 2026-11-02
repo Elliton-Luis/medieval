@@ -477,8 +477,10 @@ export class TorchSystem {
       this.emberVelocity[k * 3 + 2] = (Math.random() - 0.5) * 0.4;
       this.emberLife[k] = 0.9 + Math.random() * 0.9;
     }
+    let anyEmberActive = false;
     for (let i = 0; i < EMBERS; i++) {
       if (this.emberLife[i] <= 0) continue;
+      anyEmberActive = true;
       this.emberLife[i] -= dt;
       if (this.emberLife[i] <= 0) {
         this.emberPositions[i * 3 + 1] = -500;
@@ -488,7 +490,9 @@ export class TorchSystem {
       this.emberPositions[i * 3 + 1] += this.emberVelocity[i * 3 + 1] * dt;
       this.emberPositions[i * 3 + 2] += this.emberVelocity[i * 3 + 2] * dt;
     }
-    this.embers.geometry.attributes.position.needsUpdate = true;
+    if (anyEmberActive || chosenCount > 0) {
+      this.embers.geometry.attributes.position.needsUpdate = true;
+    }
   }
 }
 
