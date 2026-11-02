@@ -24,7 +24,7 @@ import { updateCityBeacons } from "./beacons.js";
 import { FireSystem } from "./fire.js";
 import { HouseSystem } from "./houses.js";
 import { SleepSystem } from "./sleep.js";
-import { loadGame } from "./save.js";
+import { loadGame, AutoSaveManager, saveGame } from "./save.js";
 import { HorseManager } from "./horses.js";
 import { RidingSystem, dismountHorse } from "./riding.js";
 import { MusicDirector, TRACK_CATALOG, getMusicCredits } from "./music.js";
@@ -269,6 +269,7 @@ for (const house of settlement.houses) torches.addFireSource(house.hearth.x, hou
 const candle = new Candle(scene, player, torches, input, ui, audio);
 for (const stand of settlement.stands) candle.addStand(stand.x, stand.z, 4);
 const sleep = new SleepSystem({ container: gameRoot, input, player, npcs, dayNight, ui, audio, weapons, candle });
+const autoSave = new AutoSaveManager({ interval: 60.0 });
 const houses = new HouseSystem({
   houses: settlement.houses,
   wells: settlement.wells,
@@ -464,7 +465,7 @@ const debugScreen = new DebugScreen({
   audio,
 });
 
-window.__game = { loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+window.__game = { autoSave, loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
 const saved = loadGame();
@@ -703,6 +704,7 @@ function frame(now) {
   damageFx.update(dt);
   world.updateWind(dt);
   sleep.update(elapsed);
+  autoSave.update(dt, { player, weapons, dayNight, candle, ui, world }, isCutscene, isPaused);
   drops.update(dt);
   updateDemiurgeDiary(dt, now);
   minimap.churches = settlement.churches;

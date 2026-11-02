@@ -112,6 +112,9 @@ export class SleepSystem {
           crystals: PlayerInventory.crystals || {},
         },
       });
+      if (typeof window !== "undefined" && window.__game?.autoSave) {
+        window.__game.autoSave.timer = 0;
+      }
       this.state = "hold";
       this.time = 0;
     } else if (this.state === "hold" && this.time > 2.2) {
