@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { igniteTarget, spawnLoot, PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
+import { VILLAGES } from "./kingdom.js";
 
 // ============================================================================
 // 1. Materiais e Geometrias Otimizadas do Culto dos Cátaros (Zero-GC)
@@ -460,90 +461,91 @@ export function createCultistCluesMeshes(scene) {
 
 /**
  * Configuração dos Acampamentos dos Servos do Demiurgo em 3 Níveis (Pequeno, Médio, Enorme).
+ * Localizados estritamente nos ermos profundos, desfiladeiros e montanhas distantes, NUNCA dentro de vilas ou da capital.
  */
 export const CULT_CAMPS_PRESETS = [
   // 1. Grande Bastião de Rex Mundi (ENORME - Morada do Líder Cátaro)
   {
     tier: "huge",
     name: "Grande Bastião Cátaro de Rex Mundi",
-    dx: 175,
-    dz: 165,
+    dx: 270,
+    dz: 230,
     radius: 14.0,
     cultistsCount: 6,
     hasLeader: true,
-    lorePrompt: "A fortaleza herética de Rex Mundi ergue-se com braseiros de chama púrpura e estacas afiadas. O Grão-Mestre Morvath aguarda perante o altar.",
+    lorePrompt: "A fortaleza herética de Rex Mundi ergue-se nas montanhas do sudeste profundo com braseiros de chama púrpura e estacas afiadas. O Grão-Mestre Morvath aguarda perante o altar.",
   },
-  // 2. Acampamentos Médios (3 unidades com paliçadas leves e altares rituais)
+  // 2. Acampamentos Médios (3 unidades com paliçadas leves e altares rituais em vales remotos)
   {
     tier: "medium",
     name: "Santuário Oculto dos Montes Leste",
-    dx: 180,
-    dz: -85,
+    dx: 290,
+    dz: -70,
     radius: 9.0,
     cultistsCount: 4,
     hasLeader: false,
-    lorePrompt: "Paliçada de estacas pontiagudas e tochas cerimoniais que cercam o altar da cinza nos montes.",
+    lorePrompt: "Paliçada de estacas pontiagudas e tochas cerimoniais que cercam o altar da cinza nos montes do leste distante.",
   },
   {
     tier: "medium",
     name: "Círculo dos Sacramentos do Sul",
-    dx: -95,
-    dz: 185,
+    dx: -40,
+    dz: 290,
     radius: 9.0,
     cultistsCount: 4,
     hasLeader: false,
-    lorePrompt: "Quatro sentinelas com tochas rubras vigiam a encruzilhada do sul em torno da fogueira do vazio.",
+    lorePrompt: "Quatro sentinelas com tochas rubras vigiam a encruzilhada rochosa do sul em torno da fogueira do vazio.",
   },
   {
     tier: "medium",
     name: "Acampamento das Sombras do Vale Oeste",
-    dx: -190,
-    dz: -75,
+    dx: -290,
+    dz: -50,
     radius: 9.0,
     cultistsCount: 4,
     hasLeader: false,
-    lorePrompt: "Altar ritual cercado por ossadas e símbolos do Deus Cego talhados em troncos queimados.",
+    lorePrompt: "Altar ritual cercado por ossadas e símbolos do Deus Cego talhados em troncos queimados no desfiladeiro oeste.",
   },
-  // 3. Acampamentos Pequenos (4 unidades em anéis mais próximos da muralha: 85m a 135m)
+  // 3. Acampamentos Pequenos (4 unidades em anéis nos ermos distantes)
   {
     tier: "small",
     name: "Vigília Cátara do Ermo Norte",
-    dx: 30,
-    dz: -105,
+    dx: 20,
+    dz: -280,
     radius: 6.5,
     cultistsCount: 2,
     hasLeader: false,
-    lorePrompt: "Duas sentinelas heréticas encapuzadas aquecem suas adagas na chama roxa.",
+    lorePrompt: "Duas sentinelas heréticas encapuzadas aquecem suas adagas na chama roxa no vale gelado ao norte.",
   },
   {
     tier: "small",
     name: "Posto Avançado da Clareira Noroeste",
-    dx: -110,
-    dz: -65,
+    dx: -240,
+    dz: -240,
     radius: 6.5,
     cultistsCount: 2,
     hasLeader: false,
-    lorePrompt: "Pequeno acampamento de servos que observam os viajantes na calada da noite.",
+    lorePrompt: "Pequeno acampamento de servos que observam as estradas desertas na calada da noite no platô noroeste.",
   },
   {
     tier: "small",
     name: "Refúgio da Cinza Sudoeste",
-    dx: -115,
-    dz: 95,
+    dx: -250,
+    dz: 200,
     radius: 6.5,
     cultistsCount: 2,
     hasLeader: false,
-    lorePrompt: "Fogueira mística oculta entre arbustos ressequidos nos limites do vale.",
+    lorePrompt: "Fogueira mística oculta entre arbustos ressequidos nos limites dos bosques do sudoeste.",
   },
   {
     tier: "small",
     name: "Acampamento da Trilha Sudeste",
-    dx: 95,
-    dz: 85,
+    dx: 210,
+    dz: 270,
     radius: 6.5,
     cultistsCount: 2,
     hasLeader: false,
-    lorePrompt: "Tochas avermelhadas ardem nos galhos secos onde os cultistas vigiam.",
+    lorePrompt: "Tochas avermelhadas ardem nos galhos secos onde os cultistas vigiam a ravina do sudeste.",
   },
 ];
 
@@ -562,8 +564,29 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
 
   for (let c = 0; c < CULT_CAMPS_PRESETS.length; c++) {
     const preset = CULT_CAMPS_PRESETS[c];
-    const ax = cx + preset.dx;
-    const az = cz + preset.dz;
+    let ax = cx + preset.dx;
+    let az = cz + preset.dz;
+
+    // Salvaguarda matemática: garante que NUNCA colida com a Capital nem com qualquer Vila
+    const distToCenter = Math.hypot(ax - cx, az - cz);
+    if (distToCenter < 220) {
+      const scale = 260 / Math.max(1, distToCenter);
+      ax = cx + (ax - cx) * scale;
+      az = cz + (az - cz) * scale;
+    }
+    if (Array.isArray(VILLAGES)) {
+      for (let vIdx = 0; vIdx < VILLAGES.length; vIdx++) {
+        const v = VILLAGES[vIdx];
+        const vd = Math.hypot(ax - v.x, az - v.z);
+        if (vd < 140) {
+          const vPush = 150 - vd;
+          const ang = Math.atan2(az - v.z, ax - v.x);
+          ax += Math.cos(ang) * vPush;
+          az += Math.sin(ang) * vPush;
+        }
+      }
+    }
+
     const ay = world ? world.heightAt(ax, az) : 0;
 
     const outpostData = {
@@ -595,7 +618,6 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         const stakeCount = isHuge ? 20 : 10;
         const stakeRadius = isHuge ? 8.5 : 4.8;
         for (let s = 0; s < stakeCount; s++) {
-          // Deixa passagem frontal aberta
           if (s === 0 || s === 1) continue;
           const sang = (s / stakeCount) * Math.PI * 2;
           const stake = new THREE.Mesh(new THREE.ConeGeometry(0.12, 2.4, 5), _robeMat);
@@ -604,7 +626,6 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
           stake.rotation.z = (random() - 0.5) * 0.15;
           campGroup.add(stake);
 
-          // Alguns troncos com crânios fincados
           if (s % 3 === 0) {
             const stakeSkull = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 1), _boneMat);
             stakeSkull.position.set(Math.cos(sang) * stakeRadius, 2.2, Math.sin(sang) * stakeRadius);
@@ -636,11 +657,15 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       purpleFlame.position.set(0, flameH * 0.5, 0);
       campGroup.add(purpleFlame);
 
-      const campfireLight = new THREE.PointLight(0xaa33ff, isHuge ? 7.5 : 5.5, isHuge ? 50 : 36, 1.5);
+      // Única luz pontual por acampamento (otimização radical de shaders e draw calls)
+      const campfireLight = new THREE.PointLight(0xaa33ff, 0, isHuge ? 32 : isMedium ? 24 : 16, 1.8);
       campfireLight.position.set(0, 1.1, 0);
+      campfireLight.visible = false;
       campGroup.add(campfireLight);
+      campGroup.userData.mainLight = campfireLight;
+      campGroup.userData.isHuge = isHuge;
 
-      // 3. Tochas Rubras Cerimoniais
+      // 3. Tochas Rubras Cerimoniais (usando material emissivo de alta performance)
       const torchCount = isHuge ? 6 : isMedium ? 4 : 2;
       const torchDist = isHuge ? 4.5 : isMedium ? 2.8 : 1.6;
       for (let t = 0; t < torchCount; t++) {
@@ -655,13 +680,9 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 5), _redTorchMat);
         flame.position.set(tx, 2.15, tz);
         campGroup.add(flame);
-
-        const tLight = new THREE.PointLight(0xff1100, 4.5, 26, 1.8);
-        tLight.position.set(tx, 2.25, tz);
-        campGroup.add(tLight);
       }
 
-      // 4. Braseiros Monumentais de Fogo Roxo no Acampamento Enorme
+      // 4. Braseiros e Altar no Acampamento Enorme
       if (isHuge) {
         for (const bx of [-3.8, 3.8]) {
           const brazierPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 1.2, 6), _altarStoneMat);
@@ -675,10 +696,6 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
           const brazierFlame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.95, 6), _purpleFireMat);
           brazierFlame.position.set(bx, 1.85, -1.8);
           campGroup.add(brazierFlame);
-
-          const bLight = new THREE.PointLight(0xaa22ff, 5.0, 30, 1.6);
-          bLight.position.set(bx, 2.0, -1.8);
-          campGroup.add(bLight);
         }
 
         // Altar Monumental de Pedra Esculpida ao fundo
@@ -698,10 +715,6 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
         const snakeHead = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.45), _altarStoneMat);
         snakeHead.position.set(0, 2.15, 3.25);
         campGroup.add(snakeHead);
-
-        const totemLight = new THREE.PointLight(0xaa22ff, 3.5, 14, 1.8);
-        totemLight.position.set(0, 2.3, 3.3);
-        campGroup.add(totemLight);
       }
 
       // Crânios de aviso decorativos
@@ -886,10 +899,6 @@ export function buildCultistMesh() {
   torchFlame.position.set(0, 0.28, 0);
   torchGroup.add(torchFlame);
 
-  const torchLight = new THREE.PointLight(0xff2211, 2.8, 18, 1.8);
-  torchLight.position.set(0, 0.32, 0);
-  torchGroup.add(torchLight);
-
   model.add(torchGroup);
 
   // Adaga ritual cerimonial na mão direita (obsidiana com guarda e pomo de ouro)
@@ -916,7 +925,7 @@ export function buildCultistMesh() {
   model.add(daggerGroup);
 
   root.visible = false;
-  return { root, model, robe, armL, armR, torchGroup, torchLight };
+  return { root, model, robe, armL, armR, torchGroup, torchLight: null };
 }
 
 // ============================================================================
@@ -1357,10 +1366,6 @@ export function buildCultLeaderMesh() {
     maskGroup.add(eyeFlame);
   }
 
-  const eyeLight = new THREE.PointLight(0xff2244, 2.0, 6.0, 2.0);
-  eyeLight.position.set(0, 0.05, 0.1);
-  maskGroup.add(eyeLight);
-
   model.add(maskGroup);
 
   // Braços
@@ -1418,7 +1423,7 @@ export function buildCultLeaderMesh() {
   model.add(daggerGroup);
 
   root.visible = false;
-  return { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight };
+  return { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight: null };
 }
 
 export class CultLeader {
@@ -1628,11 +1633,30 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 
   const isNightBool = Boolean(isNight);
 
+  const px = player.x ?? player.position?.x ?? 0;
+  const pz = player.z ?? player.position?.z ?? 0;
+
   // 1. Visibilidade dos Acampamentos dos Servos dos Demiurgos: SÓ APARECEM À NOITE, NUNCA DE DIA!
+  // Otimização Zero-GC: Apenas o acampamento onde o jogador está por perto (< 45m) acende a luz suave.
   for (let c = 0; c < CULT_CAMP_GROUPS.length; c++) {
     const camp = CULT_CAMP_GROUPS[c];
-    if (camp && camp.visible !== isNightBool) {
+    if (!camp) continue;
+    if (camp.visible !== isNightBool) {
       camp.visible = isNightBool;
+    }
+    const light = camp.userData.mainLight;
+    if (light) {
+      if (!isNightBool) {
+        if (light.visible) light.visible = false;
+      } else {
+        const cdx = camp.position.x - px;
+        const cdz = camp.position.z - pz;
+        const isNear = cdx * cdx + cdz * cdz < 45 * 45;
+        if (light.visible !== isNear) {
+          light.visible = isNear;
+          light.intensity = isNear ? (camp.userData.isHuge ? 6.5 : 4.5) : 0;
+        }
+      }
     }
   }
 
@@ -1679,13 +1703,10 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 
   const time = performance.now();
 
-  // Avalia acampamentos fora das muralhas a cada 1.0 segundo
+  // Avalia acampamentos fora das muralhas a cada 1.0 segundo (Zero-GC: contagem sem .filter)
   _cultistCheckTimer += dt;
   if (_cultistCheckTimer > 1.0) {
     _cultistCheckTimer = 0;
-
-    const px = player.x ?? player.position?.x ?? 0;
-    const pz = player.z ?? player.position?.z ?? 0;
 
     for (let a = 0; a < CULT_ALTARS.length; a++) {
       const altar = CULT_ALTARS[a];
@@ -1695,15 +1716,21 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 
       // Ativa o acampamento herético apenas se o jogador estiver nos ermos a <= 55m do local
       if (aDistSq <= 3025) {
-        const activeHere = cultistsPool.filter(
-          (c) => c.root.visible && c.userData.anchor && c.userData.anchor.distanceToSquared(altar) < 36
-        );
-        const maxCultists = altar.cultistsCount || (altar.tier === "huge" ? 6 : altar.tier === "medium" ? 4 : 2);
-        if (activeHere.length < maxCultists) {
-          const available = cultistsPool.find((c) => !c.root.visible);
-          if (available) {
-            available.spawnAtCamp(altar, activeHere.length, maxCultists);
+        let activeCount = 0;
+        let available = null;
+        for (let i = 0; i < cultistsPool.length; i++) {
+          const c = cultistsPool[i];
+          if (c.root.visible) {
+            if (c.userData.anchor && c.userData.anchor.distanceToSquared(altar) < 36) {
+              activeCount++;
+            }
+          } else if (!available) {
+            available = c;
           }
+        }
+        const maxCultists = altar.cultistsCount || (altar.tier === "huge" ? 6 : altar.tier === "medium" ? 4 : 2);
+        if (activeCount < maxCultists && available) {
+          available.spawnAtCamp(altar, activeCount, maxCultists);
         }
       }
     }

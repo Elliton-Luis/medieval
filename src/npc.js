@@ -1445,7 +1445,16 @@ export class NPCSystem {
     let nearestDistanceSq = 16 * 16;
     for (let i = 0; i < this.npcs.length; i++) {
       const npc = this.npcs[i];
-      if (npc.roleKey === "blind_biter" || npc.roleKey === "tall_walker" || npc.roleKey === "gulur" || npc.roleKey === "necron") continue;
+      if (
+        npc.roleKey === "blind_biter" ||
+        npc.roleKey === "tall_walker" ||
+        npc.roleKey === "gulur" ||
+        npc.roleKey === "necron" ||
+        npc.roleKey === "hexoculus" ||
+        npc.roleKey === "polyphonia" ||
+        npc.roleKey === "cult_leader" ||
+        npc.roleKey === "cultist"
+      ) continue;
       const dx = playerX - npc.x;
       const dz = playerZ - npc.z;
       const distanceSq = dx * dx + dz * dz;

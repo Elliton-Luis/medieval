@@ -29,6 +29,9 @@ const _tempVec = new THREE.Vector3();
 const _spawnVec = new THREE.Vector3();
 const _dummyMatrix = new THREE.Matrix4();
 const _zeroScale = new THREE.Vector3(0, 0, 0);
+const _tempSkyDay = new THREE.Color();
+const _tempSkyNight = new THREE.Color();
+const _sunDecayColor = new THREE.Color("#c8c0b4");
 
 // ============================================================================
 // 2. Atmosfera Dinâmica, Eclipse e Neblina Corrompida (Zero-GC no loop)
@@ -55,16 +58,16 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
     }
     if (renderer) renderer.setClearColor(_eclipseFogColor);
   } else if (decay > 0.01) {
-    // Decadência progressiva ao longo dos dias (0.0 a 1.0)
-    const baseDay = _normalSkyDay.clone().lerp(_decaySkyDay, decay);
-    const baseNight = _normalSkyNight.clone().lerp(_decaySkyNight, decay);
-    const currentSky = daylight > 0.5 ? baseDay : baseNight;
+    // Decadência progressiva ao longo dos dias (0.0 a 1.0) - Zero-GC
+    _tempSkyDay.copy(_normalSkyDay).lerp(_decaySkyDay, decay);
+    _tempSkyNight.copy(_normalSkyNight).lerp(_decaySkyNight, decay);
+    const currentSky = daylight > 0.5 ? _tempSkyDay : _tempSkyNight;
 
     if (scene.fog) {
       scene.fog.density = 0.008 + decay * 0.016;
     }
     if (dayNight.sun && decay > 0.3) {
-      dayNight.sun.color.lerp(new THREE.Color("#c8c0b4"), decay * 0.5);
+      dayNight.sun.color.lerp(_sunDecayColor, decay * 0.5);
     }
   }
 }
