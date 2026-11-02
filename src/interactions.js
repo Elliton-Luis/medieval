@@ -32,7 +32,12 @@ import {
   isDemiurgeDiaryReaderOpen,
 } from "./demiurgeBook.js";
 import { checkCrystalNearby, collectCrystalNode, applyTorchColor, CRYSTAL_PALETTE } from "./crystals.js";
-import { checkGhostTownRubbleNearby, searchGhostTownRubble } from "./ghostTowns.js";
+import {
+  checkGhostTownRubbleNearby,
+  searchGhostTownRubble,
+  checkGhostTownHouseNearby,
+  lootGhostTownHouse,
+} from "./ghostTowns.js";
 import { WorldDecay } from "./decay.js";
 
 const CULTIST_RUMORS = [
@@ -317,6 +322,18 @@ export class InteractionSystem {
   }
 
   _checkGhostTownNearby() {
+    // 1. Checa se está no interior de uma casa abandonada com baú de despojos
+    const house = checkGhostTownHouseNearby(this.player.root.position);
+    if (house && !this.ui.dialoguePanel.hidden) {
+      this.ui.setPrompt?.(
+        house.hasBloodEye
+          ? "✦ CASA SOB O OLHO DE SANGUE [E] Saquear Despojos do Demiurgo"
+          : "✦ CASA ARRUINADA [E] Saquear Baú & Fragmentos Perdidos",
+      );
+      return;
+    }
+
+    // 2. Checa se está na praça central das ruínas
     const town = checkGhostTownRubbleNearby(this.player.root.position);
     if (town && !this.ui.dialoguePanel.hidden) {
       this.ui.setPrompt?.(`✦ ${town.name.toUpperCase()} [E] Vasculhar Escombros & Códices`);
@@ -324,6 +341,10 @@ export class InteractionSystem {
   }
 
   _trySearchGhostTown() {
+    const house = checkGhostTownHouseNearby(this.player.root.position);
+    if (house) {
+      return lootGhostTownHouse(house, this.ui, this.audio, this.weapons);
+    }
     const town = checkGhostTownRubbleNearby(this.player.root.position);
     if (town) {
       return searchGhostTownRubble(town, this.ui, this.audio);

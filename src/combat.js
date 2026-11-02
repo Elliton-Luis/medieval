@@ -40,6 +40,8 @@ export class CombatSystem {
     this.armorCooldown = 0;
     this.knockoutTimer = 0;
     this._candidateNPCs = [];
+    this.farmAnimals = null;
+    this._nearbyAnimalsScratch = [];
   }
 
   update(dt) {
@@ -163,6 +165,27 @@ export class CombatSystem {
       hitCount++;
     }
     if (this.houses?.hitAt(player.x + forwardX * 1.5, player.root.position.y + 1.0, player.z + forwardZ * 1.5, 1.0, def.damage)) hitCount++;
+
+    // Impacto contra Animais de Fazenda (Galinhas e Porcos) e gatilho de Agro System
+    if (this.farmAnimals) {
+      const animals = this.farmAnimals.getNearbyAnimals(player.x, player.z, reach + 1.2, this._nearbyAnimalsScratch);
+      for (let i = 0; i < animals.length; i++) {
+        const animal = animals[i];
+        if (!animal.active || animal.state === "dead") continue;
+        const dx = animal.x - player.x;
+        const dz = animal.z - player.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > reach + (animal.hitRadius ?? 0.4) || distance < 0.0001) continue;
+        const directionX = dx / distance;
+        const directionZ = dz / distance;
+        if (directionX * forwardX + directionZ * forwardZ < minFacing) continue;
+        const killed = animal.takeDamage(damage, player);
+        this.effects.play("star", animal.x, animal.y + 0.35, animal.z, "#ff4444", 0.95);
+        this.audio.hit(killed);
+        hitCount++;
+      }
+    }
+
     if (hitCount > 0) {
       this.cameraRig.addShake(big ? 0.22 + charge * 0.12 : 0.1);
       if (isSpear && moveSpeed > 4.5) {

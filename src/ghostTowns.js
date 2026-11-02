@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { PlayerInventory, PlayerStats } from "./rpg.js";
+import { createIrregularBloodGeometry } from "./farmAnimals.js";
 
 // ============================================================================
 // Cidades Fantasma Procedurais: Ruínas de Guerra, Escombros e Sangue Seco
@@ -30,6 +31,7 @@ export const FIXED_GHOST_TOWNS = [
 ];
 
 export const ActiveGhostTowns = [];
+export const ActiveGhostHouses = [];
 
 let _ghostMaterials = null;
 function getGhostTownMaterials() {
@@ -233,16 +235,70 @@ function buildStuckArrowsGroup(mats, count = 3, random) {
 }
 
 /**
- * Constrói decalque de poça de sangue seco ou respingo na parede.
+ * Constrói decalque de poça de sangue seco orgânico irregular ou respingo na parede.
  */
 function buildBloodStainMesh(mats, width = 1.4, length = 1.6, isWall = false) {
-  const geom = new THREE.PlaneGeometry(width, length);
-  const mesh = new THREE.Mesh(geom, mats.bloodSplatter);
-  if (!isWall) {
-    mesh.rotation.x = -Math.PI / 2;
+  let geom;
+  if (isWall) {
+    geom = new THREE.PlaneGeometry(width, length);
+  } else {
+    // Poça orgânica irregular no solo (sem círculos nem planos perfeitos)
+    const baseRadius = (width + length) * 0.28;
+    geom = createIrregularBloodGeometry(baseRadius, Math.random() * 200);
   }
+  const mesh = new THREE.Mesh(geom, mats.bloodSplatter);
   mesh.receiveShadow = false;
   return mesh;
+}
+
+/**
+ * Desenha a Marca Herética do Demiurgo (Olho Minimalista em Sangue na Parede).
+ */
+function buildHereticBloodEyeMesh(mats, size = 1.35) {
+  const group = new THREE.Group();
+  group.name = "HereticBloodEye";
+  const eyeMat = mats.bloodDried;
+
+  // 1. Arco superior da amêndoa do olho
+  const arcTopGeo = new THREE.CylinderGeometry(0.04, 0.04, size * 0.75, 4);
+  arcTopGeo.rotateZ(Math.PI / 4.5);
+  const arcTopLeft = new THREE.Mesh(arcTopGeo, eyeMat);
+  arcTopLeft.position.set(-size * 0.24, size * 0.16, 0);
+  group.add(arcTopLeft);
+
+  const arcTopRight = new THREE.Mesh(arcTopGeo.clone(), eyeMat);
+  arcTopRight.rotation.z = -Math.PI / 4.5;
+  arcTopRight.position.set(size * 0.24, size * 0.16, 0);
+  group.add(arcTopRight);
+
+  // 2. Arco inferior da amêndoa do olho
+  const arcBotGeo = new THREE.CylinderGeometry(0.04, 0.04, size * 0.75, 4);
+  arcBotGeo.rotateZ(-Math.PI / 4.5);
+  const arcBotLeft = new THREE.Mesh(arcBotGeo, eyeMat);
+  arcBotLeft.position.set(-size * 0.24, -size * 0.16, 0);
+  group.add(arcBotLeft);
+
+  const arcBotRight = new THREE.Mesh(arcBotGeo.clone(), eyeMat);
+  arcBotRight.rotation.z = Math.PI / 4.5;
+  arcBotRight.position.set(size * 0.24, -size * 0.16, 0);
+  group.add(arcBotRight);
+
+  // 3. Fenda / pupila vertical mística central
+  const pupilGeo = new THREE.BoxGeometry(0.07, size * 0.58, 0.04);
+  const pupil = new THREE.Mesh(pupilGeo, eyeMat);
+  pupil.position.set(0, 0, 0.02);
+  group.add(pupil);
+
+  // 4. Filetes e gotas de sangue escorrendo da pálpebra inferior
+  const drip1 = new THREE.Mesh(new THREE.BoxGeometry(0.035, size * 0.7, 0.03), eyeMat);
+  drip1.position.set(0, -size * 0.52, 0.015);
+  group.add(drip1);
+
+  const drip2 = new THREE.Mesh(new THREE.BoxGeometry(0.025, size * 0.38, 0.03), eyeMat);
+  drip2.position.set(size * 0.2, -size * 0.36, 0.015);
+  group.add(drip2);
+
+  return group;
 }
 
 // ----------------------------------------------------------------------------
@@ -253,7 +309,7 @@ function buildBloodStainMesh(mats, width = 1.4, length = 1.6, isWall = false) {
  * Constrói uma casa medieval arruinada: vazia, sem tochas, com telhado partido,
  * vigas queimadas expostas, flechas cravadas e marcas de sangue.
  */
-function buildRuinedHouseMesh(mats, random, isDestroyed = false) {
+function buildRuinedHouseMesh(mats, random, isDestroyed = false, hasBloodEye = false) {
   const group = new THREE.Group();
   group.name = isDestroyed ? "DestroyedHouseRuin" : "AbandonedHouse";
 
@@ -350,17 +406,23 @@ function buildRuinedHouseMesh(mats, random, isDestroyed = false) {
   }
 
   // 5. Marcas de Sangue e Flechas na Fachada Frontal e Paredes
-  // Mancha de sangue na parede
-  const bloodWall = buildBloodStainMesh(mats, 1.1, 1.4, true);
-  bloodWall.position.set(-w * 0.34, 1.8, d * 0.5 + 0.14);
-  group.add(bloodWall);
+  // Mancha de sangue na parede ou Olho Minimalista do Demiurgo
+  if (hasBloodEye) {
+    const hereticEye = buildHereticBloodEyeMesh(mats, 1.4);
+    hereticEye.position.set(-w * 0.34, 1.85, d * 0.5 + 0.15);
+    group.add(hereticEye);
+  } else {
+    const bloodWall = buildBloodStainMesh(mats, 1.1, 1.4, true);
+    bloodWall.position.set(-w * 0.34, 1.8, d * 0.5 + 0.14);
+    group.add(bloodWall);
+  }
 
   // Flechas cravadas na fachada da casa
   const stuckWallArrows = buildStuckArrowsGroup(mats, 2 + Math.floor(random() * 3), random);
   stuckWallArrows.position.set(w * 0.32, 1.7, d * 0.5 + 0.12);
   group.add(stuckWallArrows);
 
-  // Sangue no chão da entrada
+  // Sangue orgânico irregular no chão da entrada
   const bloodFloor = buildBloodStainMesh(mats, 1.5, 1.8, false);
   bloodFloor.position.set(0, 0.52, d * 0.5 + 0.7);
   group.add(bloodFloor);
@@ -380,9 +442,26 @@ function buildRuinedHouseMesh(mats, random, isDestroyed = false) {
     group.add(brokenSword);
   }
 
+  // 6. Baú de Despojos no interior da casa abandonada (explorável)
+  const chestGroup = new THREE.Group();
+  chestGroup.name = "AbandonedHouseChest";
+  const chestBase = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.44, 0.55), mats.timberBurned);
+  chestBase.position.y = 0.22;
+  chestBase.castShadow = true;
+  chestGroup.add(chestBase);
+
+  const chestLid = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.12, 0.58), mats.rustedIron);
+  chestLid.position.set(0, 0.46, -0.12);
+  chestLid.rotation.x = -0.52; // tampa entreaberta
+  chestGroup.add(chestLid);
+
+  chestGroup.position.set(-w * 0.26, 0.38, -d * 0.22);
+  group.add(chestGroup);
+
   group.userData = {
     isGhostHouse: true,
     isDestroyed,
+    hasBloodEye,
     width: w,
     depth: d,
     height: h,
@@ -537,23 +616,71 @@ export function generateGhostTown(townConfig, scene, world) {
 
     const by = world ? world.heightAt(bx, bz) : centerY;
     const isDestroyed = random() < 0.42; // ~42% das casas estão completamente arruinadas
-    const house = buildRuinedHouseMesh(mats, random, isDestroyed);
+    const hasBloodEye = (h === 0); // Casa de destaque porta a Marca Herética do Olho Sangrento do Demiurgo
+    const house = buildRuinedHouseMesh(mats, random, isDestroyed, hasBloodEye);
 
     const houseYaw = random() * Math.PI * 2;
     house.position.set(bx, by, bz);
     house.rotation.y = houseYaw;
     townRoot.add(house);
 
-    // Registra colisão no mundo físico para o jogador colidir com as paredes
+    // Registra colisão no mundo físico:
+    // Decompõe as paredes individuais mantendo o vão da porta arrombada completamente livre para o jogador entrar
     if (world?.addOrientedBox) {
-      const top = by + (isDestroyed ? 2.4 : 3.8);
+      const top = by + (isDestroyed ? 2.4 : 3.6);
       const bottom = by - 0.5;
-      world.addOrientedBox(bx, bz, 5.2, 4.4, houseYaw, bottom, top, {
+      const cosY = Math.cos(houseYaw);
+      const sinY = Math.sin(houseYaw);
+
+      // Parede Traseira (z = -2.2)
+      world.addOrientedBox(bx + sinY * 2.2, bz + cosY * 2.2, 5.2, 0.35, houseYaw, bottom, top, {
         move: true,
         shot: true,
         cam: true,
       });
+      // Parede Esquerda (x = -2.6)
+      world.addOrientedBox(bx - cosY * 2.6, bz + sinY * 2.6, 0.35, 4.4, houseYaw, bottom, top, {
+        move: true,
+        shot: true,
+        cam: true,
+      });
+      // Parede Direita (x = 2.6)
+      world.addOrientedBox(bx + cosY * 2.6, bz - sinY * 2.6, 0.35, 4.4, houseYaw, bottom, top, {
+        move: true,
+        shot: true,
+        cam: true,
+      });
+      // Fachada Frontal Esquerda (x = -1.77, z = 2.2)
+      world.addOrientedBox(bx - cosY * 1.77 - sinY * 2.2, bz + sinY * 1.77 - cosY * 2.2, 1.66, 0.35, houseYaw, bottom, top, {
+        move: true,
+        shot: true,
+        cam: true,
+      });
+      // Fachada Frontal Direita (x = 1.77, z = 2.2)
+      world.addOrientedBox(bx + cosY * 1.77 - sinY * 2.2, bz - sinY * 1.77 - cosY * 2.2, 1.66, 0.35, houseYaw, bottom, top, {
+        move: true,
+        shot: true,
+        cam: true,
+      });
+      // O vão frontal central de 1.88m fica livre para permitir acesso ao interior da casa
     }
+
+    if (world?.addFloor) {
+      world.addFloor(bx, by + 0.38, bz, 5.0, 4.2, houseYaw);
+    }
+
+    // Registra a casa na lista de locais exploráveis com despojos
+    const houseLoot = {
+      townName: name,
+      id: `gh_${name.replace(/\s+/g, "_")}_${h}`,
+      x: bx,
+      y: by,
+      z: bz,
+      hasBloodEye,
+      isDestroyed,
+      looted: false,
+    };
+    ActiveGhostHouses.push(houseLoot);
   }
 
   // --------------------------------------------------------------------------
@@ -705,5 +832,66 @@ export function searchGhostTownRubble(town, ui, audio) {
     PlayerStats.gold = PlayerInventory.gold;
     ui?.showToast?.(`✦ Vasculhaste as ruínas de ${town.name} e recolheste ${goldFound} moedas antigas sob as pedras.`);
   }
+  return true;
+}
+
+/**
+ * Checa se o jogador está no interior ou muito perto do baú de uma casa da vila abandonada.
+ */
+export function checkGhostTownHouseNearby(playerPos) {
+  if (!playerPos || ActiveGhostHouses.length === 0) return null;
+  const px = playerPos.x ?? 0;
+  const pz = playerPos.z ?? 0;
+  for (let i = 0; i < ActiveGhostHouses.length; i++) {
+    const gh = ActiveGhostHouses[i];
+    if (gh.looted) continue;
+    const dx = px - gh.x;
+    const dz = pz - gh.z;
+    if (dx * dx + dz * dz < 2.9 * 2.9) {
+      return gh;
+    }
+  }
+  return null;
+}
+
+/**
+ * Saqueia os espólios e detritos do interior da casa da vila abandonada.
+ */
+export function lootGhostTownHouse(houseLoot, ui, audio, weapons = null) {
+  if (!houseLoot || houseLoot.looted) return false;
+  houseLoot.looted = true;
+
+  if (audio?.bookPage) audio.bookPage();
+  if (audio?.weaponSwing) audio.weaponSwing("blade", false);
+
+  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+
+  // 1. Chance alta de códice / fragmento do Demiurgo
+  let lootedItemText = "";
+  if (!PlayerInventory.hasDemiurgeDiary) {
+    PlayerInventory.hasDemiurgeDiary = true;
+    lootedItemText = "✦ Encontraste o códice Tractatus de Carcere escondido no assoalho! [L] para ler.";
+  } else if (missingPages.length > 0 && Math.random() < 0.65) {
+    const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
+    PlayerInventory.discoveredBookPages.push(gainedPage);
+    const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
+    lootedItemText = `✦ Códice recuperado no interior da casa: Adicionada ${pageTitle} ([L]).`;
+  } else {
+    // 2. Feixe de flechas e moedas antigas
+    const arrowsFound = 8 + Math.floor(Math.random() * 8);
+    if (weapons?.ammo) {
+      weapons.ammo.arrows = (weapons.ammo.arrows || 0) + arrowsFound;
+    }
+    const goldFound = 18 + Math.floor(Math.random() * 26);
+    PlayerInventory.gold = (PlayerInventory.gold || 0) + goldFound;
+    PlayerStats.gold = PlayerInventory.gold;
+    lootedItemText = `✦ Saqueaste a casa arruinada: +${arrowsFound} Flechas · +${goldFound} Moedas Antigas`;
+  }
+
+  if (houseLoot.hasBloodEye) {
+    lootedItemText += " · Sob a Marca do Olho Sangrento, o arrepio do Culto é palpável!";
+  }
+
+  ui?.showToast?.(lootedItemText);
   return true;
 }

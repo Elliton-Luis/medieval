@@ -1863,6 +1863,19 @@ export class WeaponSystem {
       return true;
     }
 
+    if (this.combat?.farmAnimals) {
+      const animals = this.combat.farmAnimals.getNearbyAnimals(projectile.x, projectile.z, 1.2, this._nearbyNPCs);
+      for (let a = 0; a < animals.length; a++) {
+        const animal = animals[a];
+        if (!animal.active || animal.state === "dead") continue;
+        const killed = animal.takeDamage(projectile.damage, this.player);
+        this.effects.play("star", projectile.x, projectile.y, projectile.z, projectile.color, 0.85);
+        this.audio.hit(killed);
+        this._deactivate(projectile);
+        return true;
+      }
+    }
+
     this.houses?.hitAt(projectile.x, projectile.y, projectile.z, 0.12, projectile.damage);
     const ground = this.world.heightAt(projectile.x, projectile.z);
     const hitGround = projectile.y <= ground + 0.05;

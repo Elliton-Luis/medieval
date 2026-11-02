@@ -548,6 +548,61 @@ Durante a noite, o reino mergulha em uma atmosfera aterrorizante e imersiva sem 
    - As `PointLights` físicas (que projetam fótons reais no chão e paredes) são estritamente limitadas a um raio máximo de **25 metros** do jogador.
    - Quando o jogador se afasta além de 25m, a `PointLight` apaga suavemente (`intensity = 0`, `visible = false`), poupando 100% dos cálculos caros de fragment shader de iluminação dinâmica. No lugar, resta apenas o plano emissivo aditivo do Light Impostor perfurando o breu da noite.
 
+## Smart Clutter Generation & Zonas de Pertencimento
+
+O preenchimento do mundo agora adota um sistema estrito de **Zonas de Pertencimento** espaciais em vez de distribuição por ruído caótico (`src/clutter.js` e `src/villageGenerator.js`):
+- **Plantações e Espantalhos (`FarmZone`)**:
+  - Casas de Fazendeiros (`PROFESSIONS.FARMER`) alocam automaticamente uma `FarmZone` adjacente em grid ordenado (ex.: $4\times 4$).
+  - O **Espantalho** spawna *exclusivamente* no centro geométrico exato desse grid.
+  - As áreas em volta do espantalho são preenchidas com instâncias de plantação (trigo dourado e legumes) geradas via 1 único Draw Call (`InstancedMesh`).
+- **Fardos de Feno Contextuais**:
+  - Nascem estritamente atrelados a estábulos, currais de animais ou nas margens imediatas das plantações da `FarmZone`.
+- **Carroças e Pedras**:
+  - Carroças de madeira aparecem unicamente acopladas às laterais das tendas de Mercadores (`PROFESSIONS.MERCHANT`) ou em vértices de estradas procedurais.
+  - Montes de pedras talhadas surgem junto à oficina do Ferreiro (`PROFESSIONS.BLACKSMITH`) ou em biomas rochosos ermos, mantendo distância desobstruída das portas e entradas.
+
+## Fauna Dinâmica, Currais e Consequência Social (Agro System)
+
+A fauna das vilas (galinhas e porcos em `src/farmAnimals.js`) foi integrada ao ecossistema social e de sobrevivência:
+- **Habitats Híbridos**:
+  1. *Curral Acoplado (`coupled_pen`)*: Cercados de mourões e tábuas anexos às paredes das casas. A locomoção dos animais sofre *clamp* rigoroso às coordenadas da caixa do curral (`minX, maxX, minZ, maxZ`), impedindo que atravessem cercas.
+  2. *Curral Solto (`village_pen`)*: Áreas amplas cercadas nas bordas das comunidades.
+  3. *Free-Roam Limitado (`free_roam`)*: Animais soltos na vila que perambulam com raio máximo de 15 metros em torno de sua âncora/bebedouro.
+- **Fauna Matável & Hitboxes de Combate**:
+  - Galinhas (`hitRadius: 0.35`, 2 vigor) e porcos (`hitRadius: 0.55`, 5 vigor) possuem caixas de acerto integradas ao sistema de combate (`src/combat.js` e `src/weapons.js`). Podem ser atacados com armas corpo a corpo (espadas, machados, lanças, montantes) e projéteis (arcos, balestras e arremessos).
+- **Gatilho de Crime & Consequência Social (Agro System)**:
+  - Todo animal gerado atrela-se ao `ownerId` da casa/fazendeiro dono.
+  - Ao agredir ou abater um animal doméstico, o sistema realiza uma varredura espacial de testemunhas num raio de **30 metros**.
+  - Se o dono, um civil ou um guarda estiver no raio de 30m e em linha de visão:
+    - O nível de alerta (`Wanted Level`) do jogador sobe imediatamente.
+    - Moradores entram em pânico correndo e alertando a guarda.
+    - Guardas mudam para estado de combate e caçam o infrator.
+    - A pontuação de maldade/corrupção aumenta (`addEvil`).
+
+## Otimização de Stutters e Impostores de Distância (LOD de Horizonte)
+
+Para garantir 60 FPS lisos sem travamentos (*stutters*) durante viagens a galope ou exploração nos confins do mapa (`src/world.js`):
+- **Impostores 2D Cruzados de Horizonte**:
+  - Árvores e rochas distantes (LOD além de 55-60m) são substituídas por malhas de planos cruzados 2D ultra-leves (`_farTreeGeometry` e `_farRockGeometry`) com silhueta chapada e uma sombra emborrachada escura projetada diretamente no solo (`CircleGeometry` a $y = 0.04$).
+  - Dispensam cálculos complexos de iluminação, normais pesadas e shadow maps.
+- **Eliminação Rígida de Sombras ao Longe**:
+  - No loop de visibilidade (`updateVisibility`), objetos e chunks situados a mais de **35 metros** do jogador têm seu `castShadow` desativado dinamicamente (`mesh.castShadow = false`).
+  - O shadow map da `DirectionalLight` atua exclusivamente no anel de 28-30m em volta do jogador. A GPU não perde tempo gerando sombras de florestas distantes, aliviando 100% da carga de draw calls na passagem de profundidade de sombras.
+- **Zero-GC e Culling Noturno**:
+  - Todas as checagens e matrizes reutilizam buffers globais estáticos sem alocar objetos no Garbage Collector.
+
+## Cidades Fantasma (Ghost Towns) Imersivas e Exploráveis
+
+As cidades abandonadas devastadas pela guerra (`src/ghostTowns.js` e `src/interactions.js`) foram aprofundadas com suspense e exploração:
+- **Poças Orgânicas de Sangue Seco Irregular**:
+  - Substituição de círculos e planos geométricos perfeitos por geometria orgânica procedural irregular (`createIrregularBloodGeometry`), gerando manchas espirradas e fluidas no chão das ruínas e nas cenas de sacrifício.
+- **Marca Herética do Demiurgo (Olho Minimalista em Sangue)**:
+  - A casa de destaque de cada vila abandonada porta na parede da fachada um desenho ritualístico em sangue seco: uma amêndoa estilizada com fenda/pupila vertical e filetes de sangue escorrendo da pálpebra inferior.
+- **Casas Arruinadas Acessíveis com Saque de Espólios [E]**:
+  - As colisões físicas foram modularizadas por paredes, deixando o vão da porta arrombada completamente livre para o jogador entrar no interior das construções.
+  - No interior de cada casa encontram-se assoalhos navegáveis e baús arrombados (`AbandonedHouseChest`).
+  - Ao aproximar-se, o prompt contextual **`[E] Saquear Casa Arruinada`** (ou *CASA SOB O OLHO DE SANGUE*) permite recolher fragmentos e códices do Demiurgo (`Tractatus de Carcere`), feixes de flechas, espadas enferrujadas e moedas antigas.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

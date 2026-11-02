@@ -258,7 +258,8 @@ interactions.dayNight = dayNight;
 const clutter = new ClutterManager(scene, world, 160);
 
 // 2. FarmAnimalManager: Fauna dinâmica (Galinhas e Porcos no ObjectPool e SpatialGrid)
-const farmAnimals = new FarmAnimalManager({ scene, world, drops });
+const farmAnimals = new FarmAnimalManager({ scene, world, drops, npcs, ui });
+combat.farmAnimals = farmAnimals;
 
 // 3. VillageGenerator: Profissões visuais nas casas, Tiers e Sinos de Bronze
 const villageGenerator = new VillageGenerator({ scene, world, clutter, farmAnimals, audio, ui });

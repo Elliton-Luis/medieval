@@ -236,7 +236,7 @@ export class VillageGenerator {
       }
     }
 
-    // 2. Fazendeiro: Curral cercado de madeira e animais (Galinhas e Porcos)
+    // 2. Fazendeiro: Curral cercado acoplado, FarmZone com espantalho e plantação
     else if (profession === PROFESSIONS.FARMER) {
       const pen = new THREE.Group();
       pen.name = "Farmer_Pen";
@@ -261,14 +261,29 @@ export class VillageGenerator {
       this.scene.add(pen);
       this.world.addStaticCollider(penX, penZ, 2.6, 1.2);
 
-      // Spawna os animais da fazenda dentro do curral
+      // Spawna os animais da fazenda com Habitat Acoplado restrito à caixa do curral
       if (this.farmAnimals) {
-        this.farmAnimals.spawnPenAnimals(penX, penZ, 4, 2, 2.0);
+        const penBounds = {
+          minX: penX - 2.4,
+          maxX: penX + 2.4,
+          minZ: penZ - 2.3,
+          maxZ: penZ + 2.3,
+        };
+        this.farmAnimals.spawnPenAnimals(
+          penX,
+          penZ,
+          4,
+          2,
+          1.8,
+          "coupled_pen",
+          penBounds,
+          anchorData.id,
+        );
       }
 
+      // Aloca a FarmZone adjacente (grid ordenado de trigo/cenouras com espantalho no centro)
       if (this.clutter) {
-        this.clutter.addScarecrow(penX + 4.0, penZ + 3.2);
-        this.clutter.addHayMound(penX - 3.5, penZ + 1.8);
+        this.clutter.createFarmZone(hx + 5.2, hz + 3.2, 4, 4, 1.15);
       }
     }
 

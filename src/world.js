@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG } from "./config.js";
 import { hash2, makeRandom, terrainHeight } from "./utils.js";
 import { TreeKit } from "./trees.js";
@@ -20,6 +21,56 @@ const _rayOrigin = new THREE.Vector3();
 const _rayDown = new THREE.Vector3(0, -1, 0);
 const _hitPoint = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
+
+/**
+ * Impostor 2D Cruzado de Árvore Distante (Horizonte):
+ * Silhueta chapada e sombra no solo em uma única BufferGeometry estática ultra-leve (Zero-GC).
+ */
+function createFarTreeImpostorGeometry() {
+  const geos = [];
+  const p1 = new THREE.PlaneGeometry(3.2, 7.2);
+  p1.translate(0, 3.6, 0);
+  geos.push(p1);
+
+  const p2 = new THREE.PlaneGeometry(3.2, 7.2);
+  p2.rotateY(Math.PI / 2);
+  p2.translate(0, 3.6, 0);
+  geos.push(p2);
+
+  // Sombra chapada escura no solo
+  const shadow = new THREE.CircleGeometry(1.65, 8);
+  shadow.rotateX(-Math.PI / 2);
+  shadow.translate(0, 0.04, 0);
+  geos.push(shadow);
+
+  const merged = mergeGeometries(geos, false);
+  for (const g of geos) g.dispose();
+  return merged;
+}
+
+/**
+ * Impostor 2D de Rocha Distante com sombra chapada no solo.
+ */
+function createFarRockImpostorGeometry() {
+  const geos = [];
+  const p1 = new THREE.PlaneGeometry(1.4, 0.85);
+  p1.translate(0, 0.42, 0);
+  geos.push(p1);
+
+  const p2 = new THREE.PlaneGeometry(1.4, 0.85);
+  p2.rotateY(Math.PI / 2);
+  p2.translate(0, 0.42, 0);
+  geos.push(p2);
+
+  const shadow = new THREE.CircleGeometry(0.85, 8);
+  shadow.rotateX(-Math.PI / 2);
+  shadow.translate(0, 0.03, 0);
+  geos.push(shadow);
+
+  const merged = mergeGeometries(geos, false);
+  for (const g of geos) g.dispose();
+  return merged;
+}
 
 // Só o que está perto do jogador entra no mapa de sombras (frustum curto ~30m em volta do jogador).
 export const SHADOW_RADIUS = 30;
@@ -58,10 +109,12 @@ export class World {
     this._camDir = new THREE.Vector3();
     this._terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true });
     this.treeKit = new TreeKit();
-    this._farTreeGeometry = new THREE.ConeGeometry(1.7, 6.8, 5, 1);
+    this._farTreeGeometry = createFarTreeImpostorGeometry();
+    this._farRockGeometry = createFarRockImpostorGeometry();
     this._rockGeometry = new THREE.IcosahedronGeometry(0.7, 0);
     this._clayGeometry = new THREE.DodecahedronGeometry(0.65, 0);
-    this._farTreeMaterial = new THREE.MeshStandardMaterial({ color: "#4c6445", roughness: 1, flatShading: true });
+    this._farTreeMaterial = new THREE.MeshStandardMaterial({ color: "#3c5039", roughness: 1, flatShading: true });
+    this._farRockMaterial = new THREE.MeshStandardMaterial({ color: "#545650", roughness: 1, flatShading: true });
     this._rockMaterial = new THREE.MeshStandardMaterial({ color: "#777a70", roughness: 1, flatShading: true });
     this._clayMaterial = new THREE.MeshStandardMaterial({ color: "#9c5737", roughness: 1, flatShading: true });
     setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, CONFIG.seed)));
@@ -1012,6 +1065,17 @@ export class World {
 
       chunk.near.visible = visible && distanceSq < effectiveLodSq;
       chunk.far.visible = visible && distanceSq >= effectiveLodSq;
+
+      // Eliminação rígida de sombras ao longe:
+      // Objetos além de 35m têm castShadow desativado, poupando a GPU e shadow maps
+      const shouldCastShadow = visible && distanceSq <= 36.0 * 36.0;
+      if (chunk.shadowMeshes) {
+        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
+          if (chunk.shadowMeshes[s].castShadow !== shouldCastShadow) {
+            chunk.shadowMeshes[s].castShadow = shouldCastShadow;
+          }
+        }
+      }
     }
   }
 
@@ -1232,13 +1296,23 @@ export class World {
     const instancedMeshes = [];
 
     const farTrees = this._makeInstances(this._farTreeGeometry, this._farTreeMaterial, farData, (dummy, item) => {
-      dummy.position.set(item.x, item.y + item.scale * 3.4, item.z);
+      dummy.position.set(item.x, item.y, item.z);
       dummy.rotation.set(0, item.rotation, 0);
       dummy.scale.set(item.scale, item.scale, item.scale);
     }, false);
     if (farTrees) {
       farTrees.name = "FarTrees";
       instancedMeshes.push(farTrees);
+    }
+
+    const farRocks = this._makeInstances(this._farRockGeometry, this._farRockMaterial, rockData, (dummy, item) => {
+      dummy.position.set(item.x, item.y, item.z);
+      dummy.rotation.set(0, item.rotation, 0);
+      dummy.scale.set(item.scale, item.scale, item.scale);
+    }, false);
+    if (farRocks) {
+      farRocks.name = "FarRocks";
+      instancedMeshes.push(farRocks);
     }
 
     for (const [kind, data] of Object.entries(speciesData)) {
@@ -1318,6 +1392,7 @@ export class World {
     if (clays) nearMeshes.push(clays);
     if (grass) nearMeshes.push(grass);
     if (farTrees) farMeshes.push(farTrees);
+    if (farRocks) farMeshes.push(farRocks);
 
     const shadowMeshes = [];
     for (let i = 0; i < treeMeshes.length; i++) {
