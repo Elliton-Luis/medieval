@@ -379,10 +379,6 @@ export class World {
       this._pendingChunkQueue.length = 0;
       this._pendingUnloadQueue.length = 0;
 
-      for (const chunk of this.chunks.values()) {
-        chunk.group.visible = false;
-      }
-
       // 1. Identifica chunks já construídos no raio e enfileira os que faltam
       for (let dz = -this.radius; dz <= this.radius; dz++) {
         for (let dx = -this.radius; dx <= this.radius; dx++) {
@@ -398,6 +394,15 @@ export class World {
           } else {
             this._pendingChunkQueue.push({ x: chunkX, z: chunkZ, distSq: dSq });
           }
+        }
+      }
+
+      // Oculta apenas os chunks que agora estão fora do raio de carregamento (sem piscar a cena)
+      for (const [key, chunk] of this.chunks) {
+        const dcx = chunk.x - cx;
+        const dcz = chunk.z - cz;
+        if (dcx * dcx + dcz * dcz > this.loadRadiusSq) {
+          chunk.group.visible = false;
         }
       }
 
@@ -995,14 +1000,10 @@ export class World {
     const cdx = this._camDir.x;
     const cdz = this._camDir.z;
 
-    const shadowRadiusSq = (SHADOW_RADIUS + this.chunkSize * 0.5) * (SHADOW_RADIUS + this.chunkSize * 0.5);
     const camX = camera.position.x;
     const camZ = camera.position.z;
-    const safeRadiusSq = 56 * 56; // Raio seguro cobrindo o chunk atual sob o jogador e câmera (chunkSize=64)
-    // Culling Espacial: durante a noite no breu aos 40m, geometrias complexas além de 45m são ocultadas (visible = false)
-    const isNight = Boolean(this.dayNight && this.dayNight.isNight);
-    const maxNightCullSq = 45.0 * 45.0; // 2025 m²
-    const maxFogCullSq = this.viewDistanceSq;
+    // Raio seguro circular onde o chão e mundo NUNCA somem (135m = > 2 chunks ao redor em 360°, inclusive atrás)
+    const alwaysVisibleRadiusSq = 135.0 * 135.0; // 18.225 m²
 
     for (let i = 0; i < this.activeChunks.length; i++) {
       const chunk = this.activeChunks[i];
@@ -1018,18 +1019,22 @@ export class World {
         continue;
       }
 
-      // Culling Noturno com Light Impostors:
-      // À noite, malhas complexas além de 45m são descartadas da GPU, poupando draw calls e fillrate
-      if (isNight && distanceSq > maxNightCullSq) {
+      // Se o chunk estiver além da distância de visão total, desativa
+      if (distanceSq > this.viewDistanceSq) {
         chunk.group.visible = false;
         chunk.near.visible = false;
         chunk.far.visible = false;
         continue;
       }
 
-      // Se o chunk estiver além da distância de corte da visão/neblina, GPU descarta direto
-      if (distanceSq > maxFogCullSq) {
-        chunk.group.visible = false;
+      // Visibilidade livre de "limbo":
+      // Chunks dentro do raio seguro imediato (135m) ficam SEMPRE visíveis em todas as direções (frente, lados e atrás).
+      // Chunks distantes (> 135m) usam Frustum Culling do Three.js.
+      const inSafeRadius = distanceSq <= alwaysVisibleRadiusSq;
+      const inFrustum = inSafeRadius || this._frustum.intersectsSphere(chunk.bounds);
+
+      chunk.group.visible = inFrustum;
+      if (!inFrustum) {
         chunk.near.visible = false;
         chunk.far.visible = false;
         continue;
@@ -1039,43 +1044,16 @@ export class World {
       const toCamZ = chunk.centerZ - camZ;
       const distToCamSq = toCamX * toCamX + toCamZ * toCamZ;
 
-      const inFrustum = this._frustum.intersectsSphere(chunk.bounds);
-
-      // Culling ATRÁS DA CÂMERA E DO JOGADOR:
-      // O chão imediatamente sob e ao redor da câmera/jogador (<= 56m) NUNCA some.
-      // Chunks distantes além do raio imediato que estejam atrás do campo de visão da câmera são descartados.
-      const dotCam = toCamX * cdx + toCamZ * cdz;
-      if (dotCam < -30.0 && distToCamSq > safeRadiusSq && distanceSq > safeRadiusSq && !inFrustum) {
-        chunk.group.visible = false;
-        chunk.near.visible = false;
-        chunk.far.visible = false;
-        continue;
-      }
-
-      const inShadowRange = distanceSq < shadowRadiusSq;
-      const visible = distanceSq < this.viewDistanceSq && (inShadowRange || inFrustum);
-      chunk.group.visible = visible;
-
       // LOD Dianteiro Direcional:
       // Se o chunk estiver na frente da câmera (dotCam > 0), projeta o limiar do LOD em alta qualidade (near)
       // muito mais à frente (até 130m), impedindo pop-in ou transição brusca na frente do cavalo.
+      const dotCam = toCamX * cdx + toCamZ * cdz;
       const forwardFactor = Math.max(0, dotCam / Math.max(1, Math.sqrt(distToCamSq)));
       const effectiveLodDist = this.lodDistance * (1.0 + forwardFactor * 0.95);
       const effectiveLodSq = effectiveLodDist * effectiveLodDist;
 
-      chunk.near.visible = visible && distanceSq < effectiveLodSq;
-      chunk.far.visible = visible && distanceSq >= effectiveLodSq;
-
-      // Eliminação rígida de sombras ao longe:
-      // Objetos além de 35m têm castShadow desativado, poupando a GPU e shadow maps
-      const shouldCastShadow = visible && distanceSq <= 36.0 * 36.0;
-      if (chunk.shadowMeshes) {
-        for (let s = 0; s < chunk.shadowMeshes.length; s++) {
-          if (chunk.shadowMeshes[s].castShadow !== shouldCastShadow) {
-            chunk.shadowMeshes[s].castShadow = shouldCastShadow;
-          }
-        }
-      }
+      chunk.near.visible = distanceSq < effectiveLodSq;
+      chunk.far.visible = distanceSq >= effectiveLodSq;
     }
   }
 

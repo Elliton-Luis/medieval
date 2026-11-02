@@ -23,6 +23,7 @@ const TIMELINE = {
 const CSS = `
 .wasted-layer { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: none; }
 .wasted-layer.on { display: block; }
+.wasted-sepia { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(160, 95, 25, 0.45) 0%, rgba(55, 25, 8, 0.72) 100%); mix-blend-mode: color; opacity: 0; pointer-events: none; }
 .wasted-vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 28%, rgba(8,4,2,.55) 58%, #000 100%); }
 .wasted-grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; mix-blend-mode: overlay; image-rendering: pixelated; }
 .wasted-content { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 5vw; }
@@ -118,8 +119,9 @@ export class DeathScreen {
     layer.className = "wasted-layer";
     layer.setAttribute("aria-live", "assertive");
     layer.innerHTML = `
+      <div class="wasted-sepia"></div>
       <div class="wasted-vignette"></div>
-      <canvas class="wasted-grain" width="320" height="180"></canvas>
+      <canvas class="wasted-grain" width="160" height="90"></canvas>
       <div class="wasted-content">
         <h1 class="wasted-title">PERECESTE</h1>
         <div class="wasted-line"></div>
@@ -130,10 +132,27 @@ export class DeathScreen {
       <div class="wasted-black"></div>`;
     this.container.append(layer);
     this.layer = layer;
+    this.sepiaOverlay = layer.querySelector(".wasted-sepia");
     this.vignette = layer.querySelector(".wasted-vignette");
     this.grain = layer.querySelector(".wasted-grain");
     this.grainContext = this.grain.getContext("2d");
-    this.grainData = this.grainContext.createImageData(320, 180);
+
+    // Pré-computa 3 frames de ruído estático uma única vez (Zero-GC e Zero-CPU em runtime)
+    this._grainFrames = [];
+    this._grainIndex = 0;
+    for (let f = 0; f < 3; f++) {
+      const imgData = this.grainContext.createImageData(160, 90);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = 90 + Math.random() * 120;
+        data[i] = v;
+        data[i + 1] = v * 0.92;
+        data[i + 2] = v * 0.8;
+        data[i + 3] = 255;
+      }
+      this._grainFrames.push(imgData);
+    }
+
     this.title = layer.querySelector(".wasted-title");
     this.line = layer.querySelector(".wasted-line");
     this.subtitle = layer.querySelector(".wasted-subtitle");
@@ -201,8 +220,8 @@ export class DeathScreen {
       this.time += dt;
       this.scale = 1 + (0.2 - 1) * easeOut(clamp01(this.time / T.slowMo));
       const f = easeInOut(clamp01(this.time / T.fade));
-      // a cor se perde até um sépia escuro
-      this.canvas.style.filter = `sepia(${f.toFixed(3)}) grayscale(${(f * 0.3).toFixed(3)}) saturate(${(1 - 0.5 * f).toFixed(3)}) brightness(${(1 - 0.34 * f).toFixed(3)}) contrast(${(1 + 0.2 * f).toFixed(3)})`;
+      // Transição sépia e vinheta via overlays CSS dedicados (sem sujar o canvas WebGL)
+      if (this.sepiaOverlay) this.sepiaOverlay.style.opacity = String(f);
       this.vignette.style.opacity = String(f);
       this.grain.style.opacity = String(f * 0.3);
       this.cameraRig.deathBlend = easeInOut(clamp01(this.time / T.camera));
@@ -270,7 +289,8 @@ export class DeathScreen {
       } catch (_) {}
     }
     this.music?.resumeAfterDefeat?.();
-    this.canvas.style.filter = "";
+    if (this.canvas) this.canvas.style.filter = "";
+    if (this.sepiaOverlay) this.sepiaOverlay.style.opacity = "0";
     this.vignette.style.opacity = "0";
     this.grain.style.opacity = "0";
     for (const element of [this.title, this.line, this.subtitle, this.coins, this.prompt]) element.classList.remove("show");
@@ -283,15 +303,10 @@ export class DeathScreen {
   _animateGrain(dt) {
     this.grainTimer -= dt;
     if (this.grainTimer > 0) return;
-    this.grainTimer = 0.09;
-    const data = this.grainData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const v = 90 + Math.random() * 120;
-      data[i] = v;
-      data[i + 1] = v * 0.92;
-      data[i + 2] = v * 0.8;
-      data[i + 3] = 255;
+    this.grainTimer = 0.12;
+    if (this._grainFrames && this._grainFrames.length > 0) {
+      this._grainIndex = (this._grainIndex + 1) % this._grainFrames.length;
+      this.grainContext.putImageData(this._grainFrames[this._grainIndex], 0, 0);
     }
-    this.grainContext.putImageData(this.grainData, 0, 0);
   }
 }

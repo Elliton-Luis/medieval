@@ -1420,7 +1420,7 @@ export class WeaponSystem {
 
     if (id === "torch" && this.models.torch) {
       this.models.torch.visible = true;
-      if (this.torchLight) this.torchLight.intensity = 15.0;
+      if (this.torchLight) this.torchLight.intensity = 38.0;
     } else if (this.torchLight) {
       this.torchLight.intensity = 0;
     }

@@ -170,15 +170,39 @@ export class BronzeBell {
  * Estrutura e Gerador de Vilas Vivas com Profissões.
  */
 export class VillageGenerator {
-  constructor({ scene, world, clutter = null, farmAnimals = null, audio = null, ui = null }) {
+  constructor({ scene, world, clutter = null, farmAnimals = null, audio = null, ui = null, churches = [], houses = [] }) {
     this.scene = scene;
     this.world = world;
     this.clutter = clutter;
     this.farmAnimals = farmAnimals;
     this.audio = audio;
     this.ui = ui;
+    this.churches = churches;
+    this.houses = houses;
     this.anchors = [];
     this.bells = [];
+  }
+
+  /**
+   * Checa se a casa está em localização suburbana adequada para atividade agrícola:
+   * 1. NUNCA a menos de 38m de nenhuma Igreja (Igreja de Caldera e templos das vilas)
+   * 2. NUNCA no centro urbano ou praça da cidade (mínimo 32m do poço/centro)
+   */
+  canHouseBeFarmer(hx, hz) {
+    if (this.churches) {
+      for (let i = 0; i < this.churches.length; i++) {
+        const c = this.churches[i];
+        const cx = c.x || 0;
+        const cz = c.z || 0;
+        const dx = hx - cx;
+        const dz = hz - cz;
+        if (dx * dx + dz * dz < 38.0 * 38.0) return false;
+      }
+    }
+    // Centro de Caldera é em torno de (0, -15) até (-14, -8)
+    const distToCenterSq = hx * hx + (hz + 15) * (hz + 15);
+    if (distToCenterSq < 32.0 * 32.0) return false;
+    return true;
   }
 
   /**
@@ -189,6 +213,12 @@ export class VillageGenerator {
     const hx = house.x || group.position.x || 0;
     const hz = house.z || group.position.z || 0;
     const hy = this.world.heightAt(hx, hz);
+
+    // Validação estrita: se a profissão for FARMER mas a casa estiver no centro da vila ou perto de igrejas,
+    // converte imediatamente para VILLAGER para impedir plantações e fenos dentro da cidade ou igreja.
+    if (profession === PROFESSIONS.FARMER && !this.canHouseBeFarmer(hx, hz)) {
+      profession = PROFESSIONS.VILLAGER;
+    }
 
     const anchorData = {
       id: house.id || `anchor_${this.anchors.length}`,

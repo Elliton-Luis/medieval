@@ -195,9 +195,11 @@ function createCartGeometry() {
  * Gerenciador Central de Adereços (ClutterManager).
  */
 export class ClutterManager {
-  constructor(scene, world, capacity = 120) {
+  constructor(scene, world, capacity = 120, churches = [], houses = []) {
     this.scene = scene;
     this.world = world;
+    this.churches = churches;
+    this.houses = houses;
     this.capacity = capacity;
 
     // 1 InstancedMesh por tipo de adereço (Exatamente 1 Draw Call cada)
@@ -337,6 +339,40 @@ export class ClutterManager {
   }
 
   /**
+   * Checa se o ponto está proibido para plantações e clutter rural:
+   * 1. Distância mínima de 38m de qualquer igreja (NENHUM espantalho ou trigo dentro/perto da igreja)
+   * 2. Distância mínima de 8.5m de casas e construções
+   * 3. Colisores estáticos no mundo
+   */
+  isLocationBlocked(x, z, radius = 2.5) {
+    if (this.churches) {
+      for (let i = 0; i < this.churches.length; i++) {
+        const c = this.churches[i];
+        const cx = c.x || 0;
+        const cz = c.z || 0;
+        const dx = x - cx;
+        const dz = z - cz;
+        if (dx * dx + dz * dz < 38.0 * 38.0) return true;
+      }
+    }
+    if (this.houses) {
+      for (let i = 0; i < this.houses.length; i++) {
+        const h = this.houses[i];
+        const hx = h.x || (h.root ? h.root.position.x : 0);
+        const hz = h.z || (h.root ? h.root.position.z : 0);
+        const dx = x - hx;
+        const dz = z - hz;
+        if (dx * dx + dz * dz < 8.5 * 8.5) return true;
+      }
+    }
+    if (this.world && this.world.isBlockedAtHeight) {
+      const y = this.world.heightAt(x, z);
+      if (this.world.isBlockedAtHeight(x, y, z, radius)) return true;
+    }
+    return false;
+  }
+
+  /**
    * ZONAS DE PERTENCIMENTO (Smart Clutter Generation):
    * Cria uma fazenda estruturada (FarmZone):
    * 1. Espantalho nasce EXCLUSIVAMENTE no centro geométrico do grid.
@@ -344,6 +380,9 @@ export class ClutterManager {
    * 3. Fardos de feno nascem unicamente atrelados nas margens imediatas da plantação.
    */
   createFarmZone(centerX, centerZ, gridX = 4, gridZ = 4, spacing = 1.15) {
+    // Validação rígida: se estiver perto de igrejas ou sobre construções, cancela a fazenda inteira
+    if (this.isLocationBlocked(centerX, centerZ, 4.0)) return false;
+
     // 1. Espantalho spawna unicamente no centro desse grid
     this.addScarecrow(centerX, centerZ, Math.PI * 0.15);
 
@@ -357,6 +396,7 @@ export class ClutterManager {
         if (Math.abs(ix) < 0.4 && Math.abs(iz) < 0.4) continue;
         const px = centerX + ix * spacing;
         const pz = centerZ + iz * spacing;
+        if (this.isLocationBlocked(px, pz, 0.4)) continue;
         const jitterRot = ((ix * 13 + iz * 7) % 8) * 0.25;
         this.addCrop(px, pz, jitterRot);
       }
@@ -365,7 +405,10 @@ export class ClutterManager {
     // 3. Fardo de feno na margem imediata da plantação
     const hayEdgeX = centerX + (halfX + 1.2) * spacing;
     const hayEdgeZ = centerZ + (halfZ - 0.5) * spacing;
-    this.addHayMound(hayEdgeX, hayEdgeZ, 0.4);
+    if (!this.isLocationBlocked(hayEdgeX, hayEdgeZ, 1.0)) {
+      this.addHayMound(hayEdgeX, hayEdgeZ, 0.4);
+    }
+    return true;
   }
 
   /**

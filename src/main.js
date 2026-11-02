@@ -255,21 +255,36 @@ interactions.hayBales = settlement.hay;
 interactions.dayNight = dayNight;
 
 // 1. ClutterManager: Instanciação massiva de adereços (1 Draw Call por tipo)
-const clutter = new ClutterManager(scene, world, 160);
+const clutter = new ClutterManager(scene, world, 160, settlement.churches, settlement.houses);
 
 // 2. FarmAnimalManager: Fauna dinâmica (Galinhas e Porcos no ObjectPool e SpatialGrid)
 const farmAnimals = new FarmAnimalManager({ scene, world, drops, npcs, ui });
 combat.farmAnimals = farmAnimals;
 
 // 3. VillageGenerator: Profissões visuais nas casas, Tiers e Sinos de Bronze
-const villageGenerator = new VillageGenerator({ scene, world, clutter, farmAnimals, audio, ui });
+const villageGenerator = new VillageGenerator({
+  scene,
+  world,
+  clutter,
+  farmAnimals,
+  audio,
+  ui,
+  churches: settlement.churches,
+  houses: settlement.houses,
+});
 interactions.villageGenerator = villageGenerator;
 
 // Decora casas e vilas com profissões e currais
 if (settlement.houses && settlement.houses.length > 0) {
-  const profs = [PROFESSIONS.FARMER, PROFESSIONS.MERCHANT, PROFESSIONS.VILLAGER];
+  const profs = [PROFESSIONS.MERCHANT, PROFESSIONS.VILLAGER, PROFESSIONS.BLACKSMITH, PROFESSIONS.FARMER];
   settlement.houses.forEach((h, idx) => {
-    const prof = idx === 0 ? PROFESSIONS.FARMER : profs[idx % profs.length];
+    let prof = profs[idx % profs.length];
+    const hx = h.x || 0;
+    const hz = h.z || 0;
+    // Pousada de Caldera (casa 0) e casas centrais nunca recebem FARMER
+    if (idx === 0 || !villageGenerator.canHouseBeFarmer(hx, hz)) {
+      prof = idx === 0 ? PROFESSIONS.MERCHANT : (idx % 2 === 0 ? PROFESSIONS.VILLAGER : PROFESSIONS.MERCHANT);
+    }
     villageGenerator.decorateProfessionHouse(h, prof);
   });
 }

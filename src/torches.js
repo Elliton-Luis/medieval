@@ -40,8 +40,8 @@ export function setupAtmosphere(scene, renderer) {
  * @param {THREE.PointLight} light
  */
 export function configureDistantLight(light) {
-  light.distance = 75.0; // Visível a longa distância
-  light.decay = 1.38;     // Decaimento suave e envolvente
+  light.distance = 55.0; // Visível a longa distância banhando ruas e praças
+  light.decay = 1.22;     // Decaimento suave e envolvente
   light.castShadow = false; // Obrigatório: evita cálculo de shadow map em luzes secundárias
 }
 
@@ -310,6 +310,7 @@ export class TorchSystem {
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      fog: false,
     }));
     flame.scale.set(0.48, 0.62, 1);
     flame.position.y = 0.38;
@@ -381,6 +382,7 @@ export class TorchSystem {
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      fog: false, // Perfora a neblina noturna
     }));
     sprite.scale.set(spriteScale, spriteScale * 1.35, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
@@ -391,7 +393,7 @@ export class TorchSystem {
     // que banha paredes e chão intensamente sem depender do limite de luzes das vilas
     let torchLight = null;
     if (isPlayerPlaced || alwaysOn) {
-      torchLight = new THREE.PointLight(pal.flameHex, 36.0, 52.0, 1.4);
+      torchLight = new THREE.PointLight(pal.flameHex, 48.0, 58.0, 1.25);
       torchLight.castShadow = false;
       torchLight.position.set(x + nx * 0.27, y + 0.6, z + nz * 0.27);
       this.scene.add(torchLight);
@@ -443,7 +445,7 @@ export class TorchSystem {
   }
 
   addFireSource(x, y, z, house = null) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: "#ffb060", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: "#ffb060", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     sprite.scale.set(1.0, 1.2, 1);
     sprite.position.set(x, y + 0.3, z);
     this.scene.add(sprite);
@@ -490,11 +492,9 @@ export class TorchSystem {
     const candidates = this.pending;
     candidates.length = 0;
 
-    // Regra estrita: PointLights reais só iluminam o chão e paredes a até 25m do jogador
-    const POINTLIGHT_ACTIVATION_DIST = 25.0;
-    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 625 m²
-
-    const impostorsCount = Math.min(this.sources.length, this.maxImpostors);
+    // Regra: PointLights reais iluminam em um raio generoso de 55m do jogador (ilumina toda a vila e arredores)
+    const POINTLIGHT_ACTIVATION_DIST = 55.0;
+    const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 3025 m²
 
     for (let i = 0; i < this.sources.length; i++) {
       const source = this.sources[i];
@@ -505,70 +505,36 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
-      // 1. Gerenciamento de PointLight dedicada (ex: tochas colocadas pelo jogador)
+      // 1. PointLight dedicada (tochas fixadas pelo jogador)
       if (source.pointLight) {
         source.pointLight.visible = nearPointLight;
         if (nearPointLight) {
-          source.pointLight.intensity = 36.0 * flicker;
+          source.pointLight.intensity = 48.0 * flicker;
+          source.pointLight.distance = 58.0;
         } else {
           source.pointLight.intensity = 0;
         }
       }
 
-      // Sprites individuais legados são desativados para delegar 100% ao InstancedMesh (1 Draw Call)
+      // 2. Halo / Chama do Sprite: sempre visível no breu (fog=false), visível mesmo de muito longe
       if (source.sprite) {
-        source.sprite.visible = false;
-      }
-
-      // 2. Atualização das matrizes do InstancedMesh de Light Impostors
-      if (i < this.maxImpostors) {
+        source.sprite.visible = on;
         if (on) {
           const baseScale = source.kind === "hearth" ? 3.4 : (source.isPost ? 2.4 : 1.9);
-          // Halos distantes recebem um boost leve de escala para perfurar o breu com clareza visual
           const dist = Math.sqrt(d);
-          const distScaleBoost = dist > 25.0 ? Math.min(2.4, 1.0 + (dist - 25.0) * 0.007) : 1.0;
+          const distScaleBoost = dist > 25.0 ? Math.min(2.8, 1.0 + (dist - 25.0) * 0.009) : 1.0;
           const s = baseScale * flicker * distScaleBoost;
-
-          this._impostorPos.set(source.x, source.y + 0.14, source.z);
-          this._impostorScale.set(s, s * 1.35, 1.0);
-          this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
-          this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
-
-          if (source.lightColor !== undefined) {
-            this._impostorColor.set(source.lightColor);
-          } else {
-            this._impostorColor.setHex(0xffaa50);
-          }
-          this.impostorMesh.setColorAt(i, this._impostorColor);
-        } else {
-          // Tocha apagada de dia: move para fora do mundo
-          this._impostorPos.set(0, -9999, 0);
-          this._impostorScale.set(0, 0, 0);
-          this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
-          this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
+          source.sprite.scale.set(s, s * 1.35, 1);
         }
       }
 
       // 3. Seleção de fontes para o pool de PointLights reais gerais:
-      // ESTRITAMENTE <= 25m. Além de 25m, a luz apaga e resta apenas o plano Impostor no breu.
       if (!nearPointLight || !source.light) continue;
       // Lareiras de dia só iluminam quem está dentro da casa
       if (source.kind === "hearth" && this.dayNight.daylight > 0.6 && !(source.house && source.house.inside)) continue;
       source.d = d;
       candidates.push(source);
     }
-
-    // Limpa instâncias do InstancedMesh caso o número total de tochas tenha reduzido
-    for (let i = impostorsCount; i < this._prevActiveImpostors; i++) {
-      this._impostorPos.set(0, -9999, 0);
-      this._impostorScale.set(0, 0, 0);
-      this._impostorMatrix.compose(this._impostorPos, this._impostorQuat, this._impostorScale);
-      this.impostorMesh.setMatrixAt(i, this._impostorMatrix);
-    }
-    this._prevActiveImpostors = impostorsCount;
-
-    this.impostorMesh.instanceMatrix.needsUpdate = true;
-    if (this.impostorMesh.instanceColor) this.impostorMesh.instanceColor.needsUpdate = true;
 
     candidates.sort(_sortByDist);
     const chosenCount = Math.min(candidates.length, MAX_LIGHTS);
@@ -618,8 +584,10 @@ export class TorchSystem {
         continue;
       }
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 13 + source.phase);
-      const target = (source.kind === "hearth" ? 220 : 340) * flicker;
+      const target = (source.kind === "hearth" ? 380 : 540) * flicker;
       light.visible = true;
+      light.distance = 55.0;
+      light.decay = 1.22;
       light.intensity += (target - light.intensity) * (1 - Math.exp(-6 * dt));
       light.position.set(source.x, source.y + 0.25, source.z);
       if (source.lightColor !== undefined) {

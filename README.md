@@ -579,17 +579,22 @@ A fauna das vilas (galinhas e porcos em `src/farmAnimals.js`) foi integrada ao e
     - Guardas mudam para estado de combate e caçam o infrator.
     - A pontuação de maldade/corrupção aumenta (`addEvil`).
 
-## Otimização de Stutters e Impostores de Distância (LOD de Horizonte)
+## Otimização de Stutters, Estabilidade de Renderização e Tochas no Breu
 
-Para garantir 60 FPS lisos sem travamentos (*stutters*) durante viagens a galope ou exploração nos confins do mapa (`src/world.js`):
-- **Impostores 2D Cruzados de Horizonte**:
-  - Árvores e rochas distantes (LOD além de 55-60m) são substituídas por malhas de planos cruzados 2D ultra-leves (`_farTreeGeometry` e `_farRockGeometry`) com silhueta chapada e uma sombra emborrachada escura projetada diretamente no solo (`CircleGeometry` a $y = 0.04$).
-  - Dispensam cálculos complexos de iluminação, normais pesadas e shadow maps.
-- **Eliminação Rígida de Sombras ao Longe**:
-  - No loop de visibilidade (`updateVisibility`), objetos e chunks situados a mais de **35 metros** do jogador têm seu `castShadow` desativado dinamicamente (`mesh.castShadow = false`).
-  - O shadow map da `DirectionalLight` atua exclusivamente no anel de 28-30m em volta do jogador. A GPU não perde tempo gerando sombras de florestas distantes, aliviando 100% da carga de draw calls na passagem de profundidade de sombras.
-- **Zero-GC e Culling Noturno**:
-  - Todas as checagens e matrizes reutilizam buffers globais estáticos sem alocar objetos no Garbage Collector.
+Para eliminar travamentos (*stutters* de 1400 FPS para 70 FPS), evitar buracos/limbo no terreno e garantir iluminação noturna envolvente (`src/world.js`, `src/deathScreen.js`, `src/torches.js` e `src/clutter.js`):
+- **Terreno Circular 360° sem Limbo**:
+  - Removido o culling direcional agressivo e o teto noturno estrito de 45m que sumiam com o chão atrás da câmera de 3ª pessoa.
+  - Implementado um anel seguro circular contínuo de **135 metros** em torno do jogador onde o terreno e a vegetação permanecem 100% visíveis em qualquer ângulo de câmera, garantindo transições suaves e sem buracos no mundo.
+- **Eliminação de Invalidação de Render Lists da GPU**:
+  - Removida a alteração dinâmica de `castShadow` frame a frame em tempo de execução, impedindo que o `WebGLRenderer` reconstrua continuamente listas de renderização e shaders de sombras.
+- **Tela de Morte e Eventos sem Congelamento**:
+  - Substituição da manipulação de `canvas.style.filter` CSS por uma camada overlay dedicada (`.wasted-sepia`), preservando a aceleração de hardware do contexto WebGL sem re-rasterizações pesadas.
+  - Otimização do ruído de granulação (`_animateGrain`) através de quadros estáticos pré-computados, reduzindo a zero o custo de CPU na transição.
+- **Tochas e Fogueiras que Furam a Escuridão Noturna**:
+  - Billboards aditivos de alta intensidade com `fog: false` nas chamas e halos das tochas, permitindo que a luz corte a neblina preta e sirva como farol no horizonte a longas distâncias.
+  - Alcance e intensidade das `PointLights` expandidos (55m de raio de ativação nas vilas e ruas) para banhar praças, fachadas e vias medievais com luz quente e acolhedora.
+- **Zoneamento Rigoroso de Fazendas e Clutter (Proteção de Igrejas e Centros Urbanos)**:
+  - Adicionado raio de isolamento mínimo de **38 metros** em torno de todas as Igrejas e templos e **32 metros** do centro urbano de Caldera, impedindo que plantações, espantalhos, cercados ou currais de animais nasçam dentro ou adjacentes a edifícios sagrados ou urbanos. Casas no miolo urbano atuam estritamente como comerciantes e civis.
 
 ## Cidades Fantasma (Ghost Towns) Imersivas e Exploráveis
 
