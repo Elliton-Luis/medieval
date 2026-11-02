@@ -262,7 +262,7 @@ if (settlement.cityData) {
 }
 initProceduralEnv({ scene, world, npcs, activeCities });
 initFixedGhostTowns(scene, world);
-initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio, damageFx, weapons, candle, horses, settlement, activeCities });
+initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio, damageFx, weapons, candle, horses, settlement, activeCities, music });
 setMeleeEnv({ npcs, combat, effects });
 const director = new EnemyDirector(scene, world, npcs, effects, explosions, audio);
 director.combat = combat;
@@ -282,6 +282,15 @@ const beasts = new BeastManager({ scene, world, effects, combat, player, npcs, a
 if (settlement.well) {
   beasts.spawnInitialBeasts(settlement.well);
 }
+
+// Vincula contexto estendido e subsistemas dinâmicos ao Diretor Musical
+music.monstersPool = monstersPool;
+music.cultistsPool = cultistsPool;
+music.beasts = beasts;
+music.worldDecay = WorldDecay;
+music.activeGhostTowns = ActiveGhostTowns;
+music.activeCities = activeCities;
+deathScreen.music = music;
 
 // Inicializa Nós de Cristais Místicos no Terreno (Verde, Azul, Rosa, Vermelho, Branco, Roxo)
 spawnCrystalNodes({ scene, world, cityCenter: settlement.well });

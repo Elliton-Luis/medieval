@@ -84,9 +84,32 @@ Além da capital há seis vilas (Ferrovale, Pedraluz, Salgueiro, Cinzal, Brumas 
 
 Cada arma tem dano, alcance, velocidade, peso (afeta a velocidade de movimento), som e animação próprios (`src/weapondata.js`). As armas leves fazem combo de 3 golpes (o último é mais forte). Você começa com punhos, espada curta, arco curto, balestra leve e bomba incendiária. Novas armas se compram no ferreiro (armeiro) ou saem dos drops de guardas, soldados e cavaleiros.
 
-## Música
+## Música e Trilha Sonora Dinâmica
 
-A música vem da pasta `audio/` e troca com crossfade de 2 s, só depois do primeiro clique: `town.mp3` nas vilas, `explore.mp3` no mundo aberto, `DST-GrassLands.mp3` nas planícies longe das vilas, `forest_2.ogg` dentro da floresta, `wanted.mp3` com procurado 1–3 e `chase.mp3` com procurado 4–5 (se esse arquivo não existir, toca `tense.mp3`). Dentro de casa o volume cai.
+A trilha sonora do Puris é gerenciada pelo `MusicDirector` com carregamento sob demanda e descarregamento dinâmico de memória (Zero-Leak), transicionando organicamente via crossfade suave entre os contextos do jogo:
+
+| Contexto / Cenário | Faixa de Áudio | Comportamento e Gatilho |
+| --- | --- | --- |
+| **Exploração Aberta (Dia)** | `audio/exploração.mp3` | Exploração ativa a pé ou a cavalo pelos caminhos do reino |
+| **Pradarias & Planícies** | `audio/ambiente_calmo_dia.mp3` / `ambiente_calmo_dia_2.ogg` | Planícies abertas distantes de vilas e cidades |
+| **Cidades, Vilas e Mercados** | `audio/cidade_calma_dia.mp3` (alt: `cidade_dia_calmo.mp3`) | Proximidade de vilarejos, feiras, muralhas e centros urbanos |
+| **Florestas e Bosques** | `audio/ambiente_dia_floresta.mp3` | Regiões com aglomerados de árvores e bosques diurnos |
+| **Ermos Profundos e Matas Fechadas** | `audio/ambiente_dia_muito_denso.mp3` | Matas densas (> 18 árvores por perto) e montanhas ermas |
+| **Noite (Anoitecer até Meia-Noite)** | `audio/ambiente_denso_noite_2.ogg` | Início da noite e crepúsculo pelos ermos e estradas |
+| **Madrugada Sombria (00h às 05h)** | `audio/ambiente_denso_madrugada.ogg` | As horas mais escuras e silenciosas da madrugada |
+| **Tavernas e Estalagens** | `audio/generica_calma.ogg` | Interiores acolhedores de tavernas, estalagens e pousadas |
+| **Igrejas e Catedrais** | `audio/generica_calma.ogg` | Serenidade sacra ao sentar nos bancos da igreja ou entrar no templo |
+| **Tensão e Ameaça Iminente** | `audio/tensa_escalando.OGG` | Presença de wendigos, lobisomens, feras ou cultistas a menos de 35m |
+| **Combate Leve (Procurado 1-2)** | `audio/batalha_menos_seria.mp3` | Conflito com camponeses ou perseguição inicial da guarda |
+| **Combate Médio (Procurado 3)** | `audio/batalha_animada.mp3` | Confronto armado intenso com reforços de besteiros e arqueiros |
+| **Perseguição Severa (Procurado 4-5)** | `audio/batalha_séria.mp3` | Caça implacável do reino por cavaleiros montados e canhoneiros |
+| **Vila Fantasma & Acampamentos** | `audio/vila_fantasma_e_acampamento_demiurgo.mp3` | Cidades fantasmas em ruínas e acampamentos noturnos do Demiurgo |
+| **Eclipse Solar & Cataclismo** | `audio/o_fim_maligno.mp3` | Durante o Dia do Eclipse e a descida apocalíptica do Demiurgo |
+| **Descobertas & Missões** | `audio/descoberta.mp3` | Abertura de baús com tesouro e conclusão de missões |
+| **Tela de Morte ("PERECESTE")** | `audio/Derrota_2.ogg` (fallback: `Derrota.wav`) | Pausa a música ambiente e ecoa a melodia fúnebre de derrota |
+
+- **Abafamento em Interiores**: Dentro de qualquer residência ou cômodo fechado, o volume da música ambiente é reduzido automaticamente (filtro acústico suave).
+- **Atalho de Mudo**: Tecla `M` silencia e desilencia a música instantaneamente. Volume independente na tela de pausa (`Esc`).
 
 ## Compêndio de Armas e Arsenal
 

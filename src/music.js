@@ -1,90 +1,174 @@
 import { VILLAGES, locationAt } from "./kingdom.js";
+import { WorldDecay } from "./decay.js";
+import { ActiveGhostTowns } from "./ghostTowns.js";
+import { CULT_CAMP_GROUPS } from "./cult.js";
 
 // ============================================================================
-// Catálogo de Trilhas Sonoras Medievais Homologadas (OpenGameArt CC0 / CC-BY)
-// Formatos: OGG (Vorbis 112k, decodificação rápida e sem engasgos) com fallback MP3.
+// Catálogo de Trilhas Sonoras do Puris
+// Formatos: OGG / MP3 / WAV com carregamento dinâmico sob demanda (Zero-Leak).
 // ============================================================================
 export const TRACK_CATALOG = {
-  // Exploração (Dia): The Bard's Tale / The Old Tower Inn
+  // Exploração Geral (Dia)
   explore: {
-    ogg: "audio/explore.ogg",
-    mp3: "audio/explore.mp3",
-    title: "The Bard's Tale",
-    artist: "RandomMind",
-    license: "CC0 Public Domain",
-    role: "Exploração Geral (Dia)",
+    mp3: "audio/exploração.mp3",
+    ogg: "audio/ambiente_calmo_dia_2.ogg",
+    title: "Exploração Geral",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Exploração Ativa pelo Mundo Aberto (Dia)",
   },
-  // Exploração (Dia): GrassLands Theme
+  // Planícies e Pradarias Abertas
   grass: {
-    ogg: "audio/DST-GrassLands.ogg",
-    mp3: "audio/DST-GrassLands.mp3",
-    title: "GrassLands Theme",
-    artist: "Deceased Superior Technician",
-    license: "CC0 Public Domain",
-    role: "Planícies e Pradarias Abertas",
+    mp3: "audio/ambiente_calmo_dia.mp3",
+    ogg: "audio/ambiente_calmo_dia_2.ogg",
+    title: "Ambiente Calmo (Dia)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Planícies, Pradarias e Campos Abertos",
   },
-  // Exploração (Noite / Tensão): Dark Forest Theme (por cynicmusic)
-  night: {
-    ogg: "audio/tense.ogg",
-    mp3: "audio/tense.mp3",
-    title: "Dark Forest Theme (Night & Tension)",
-    artist: "cynicmusic (The Cynic Project)",
-    license: "CC0 Public Domain",
-    role: "Exploração Noturna e Tensão",
-  },
-  // Florestas e Matas Fechadas: Cathedral in the Forest
-  forest: {
-    ogg: "audio/forest_2.ogg",
-    mp3: "audio/forest_2.ogg",
-    title: "Cathedral in the Forest",
-    artist: "OpenGameArt",
-    license: "CC0 Public Domain",
-    role: "Mata Fechada e Ermos Silenciosos",
-  },
-  // Cidades e Vilas: The Old Tower Inn / King's Feast / Minstrel Dance (RandomMind)
+  // Cidades e Vilarejos
   town: {
-    ogg: "audio/town.ogg",
-    mp3: "audio/town.mp3",
-    title: "The Old Tower Inn",
-    artist: "RandomMind",
-    license: "CC0 Public Domain",
-    role: "Cidades, Vilarejos e Feiras",
+    mp3: "audio/cidade_calma_dia.mp3",
+    altMp3: "audio/cidade_dia_calmo.mp3",
+    title: "Cidade Calma (Dia)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Cidades, Vilarejos, Mercados e Feiras",
   },
-  // Tavernas e Estalagens: The Bard's Tale / Knight's Tale
+  // Florestas e Bosques
+  forest: {
+    mp3: "audio/ambiente_dia_floresta.mp3",
+    title: "Ambiente Dia (Floresta)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Florestas, Matas e Bosques",
+  },
+  // Ermos Profundos e Matas Muito Densas
+  deep_forest: {
+    mp3: "audio/ambiente_dia_muito_denso.mp3",
+    title: "Ambiente Dia Muito Denso",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Ermos Profundos, Montanhas e Selvas Fechadas",
+  },
+  // Exploração Noturna (Anoitecer até a Meia-Noite)
+  night: {
+    ogg: "audio/ambiente_denso_noite_2.ogg",
+    mp3: "audio/ambiente_denso_noite_2.ogg",
+    title: "Ambiente Denso (Noite)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Exploração Noturna e Primeiras Horas da Noite",
+  },
+  // Madrugada Sombria (00h às 05h)
+  late_night: {
+    ogg: "audio/ambiente_denso_madrugada.ogg",
+    mp3: "audio/ambiente_denso_madrugada.ogg",
+    title: "Ambiente Denso (Madrugada)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Madrugada Sombria e Alta Noite (00h às 05h)",
+  },
+  // Tavernas e Estalagens
   tavern: {
-    ogg: "audio/explore.ogg",
-    mp3: "audio/explore.mp3",
-    title: "The Bard's Tale (Tavern Ambient)",
-    artist: "RandomMind",
-    license: "CC0 Public Domain",
-    role: "Tavernas e Estalagens",
+    ogg: "audio/generica_calma.ogg",
+    mp3: "audio/generica_calma.ogg",
+    title: "Genérica Calma (Tavernas & Estalagens)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Tavernas, Estalagens e Interiores Acolhedores",
   },
-  // Igrejas e Templários: Cathedral in the Forest (Sacred Choirs)
+  // Igrejas e Catedrais Sagradas
   church: {
-    ogg: "audio/forest_2.ogg",
-    mp3: "audio/forest_2.ogg",
-    title: "Cathedral in the Forest (Holy Choir)",
-    artist: "OpenGameArt",
-    license: "CC0 Public Domain",
-    role: "Igrejas, Catedrais e Altar Templário",
+    ogg: "audio/generica_calma.ogg",
+    mp3: "audio/generica_calma.ogg",
+    title: "Genérica Calma (Serenidade Sacra)",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Igrejas, Catedrais e Altar Sagrado",
   },
-  // Combate (Procurado Nível 1 a 3): Orcs Victorious / Medieval: Battle (Bobjt & RandomMind)
+  // Tensão / Monstros e Predadores à Espreita
+  tension: {
+    ogg: "audio/tensa_escalando.OGG",
+    mp3: "audio/tensa_escalando.OGG",
+    title: "Tensa Escalando",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Monstros, Criaturas Sombrias e Ameaça Iminente (< 35m)",
+  },
+  // Alias de compatibilidade para intro.js
+  tense: {
+    ogg: "audio/tensa_escalando.OGG",
+    mp3: "audio/tensa_escalando.OGG",
+    title: "Tensa Escalando",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Tensão Cinematográfica",
+  },
+  // Combate Leve (Procurado Nível 1 e 2)
+  wanted_low: {
+    mp3: "audio/batalha_menos_seria.mp3",
+    title: "Batalha Menos Séria",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Combate Leve e Procurado Nível 1 a 2",
+  },
+  // Combate Médio (Procurado Nível 3)
+  wanted_mid: {
+    mp3: "audio/batalha_animada.mp3",
+    title: "Batalha Animada",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Combate Intenso e Procurado Nível 3",
+  },
+  // Combate Geral (compatibilidade retroativa)
   wanted: {
-    ogg: "audio/wanted.ogg",
-    mp3: "audio/wanted.mp3",
-    title: "Orcs Victorious / Medieval: Battle",
-    artist: "Bobjt & RandomMind",
-    license: "CC0 Public Domain",
-    role: "Combate e Nível de Procurado 1-3",
+    mp3: "audio/batalha_animada.mp3",
+    title: "Batalha Animada",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Combate Geral",
   },
-  // Perseguição Extrema (Nível 4 e 5): Heavy Battle Music / Raiders March
+  // Perseguição Máxima (Procurado Nível 4 e 5)
   chase: {
-    ogg: "audio/tense.ogg",
-    mp3: "audio/tense.mp3",
-    title: "Heavy Battle Music / Raiders March",
-    artist: "cynicmusic",
-    license: "CC0 Public Domain",
-    role: "Perseguição Máxima (Procurado Nível 4-5)",
+    mp3: "audio/batalha_séria.mp3",
+    title: "Batalha Séria",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Perseguição Implacável e Nível de Procurado 4 a 5",
+  },
+  // Vilas Fantasmas e Acampamentos do Demiurgo
+  cult_camp: {
+    mp3: "audio/vila_fantasma_e_acampamento_demiurgo.mp3",
+    title: "Vila Fantasma & Acampamento do Demiurgo",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Vilas Fantasmas em Ruínas e Acampamentos Hereges",
+  },
+  // Dia de Eclipse e Cataclismo do Demiurgo
+  eclipse: {
+    mp3: "audio/o_fim_maligno.mp3",
+    title: "O Fim Maligno",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Dia do Eclipse Solar e Cataclismo do Demiurgo",
+  },
+  // Descobertas e Segredos
+  discovery: {
+    mp3: "audio/descoberta.mp3",
+    title: "Descoberta",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Tesouros, Descobertas e Conclusão de Missões",
+  },
+  // Tela de Perecimento / Derrota
+  defeat: {
+    ogg: "audio/Derrota_2.ogg",
+    wav: "audio/Derrota.wav",
+    title: "Trilha de Derrota",
+    artist: "Trilha Puris",
+    license: "Uso Livre / Domínio Público",
+    role: "Morte do Personagem e Tela de Perecimento",
   },
 };
 
@@ -93,19 +177,28 @@ export const TRACK_CATALOG = {
  */
 export function getMusicCredits() {
   return [
-    { track: "GrassLands Theme", artist: "Deceased Superior Technician", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "The Old Tower Inn", artist: "RandomMind", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "The Bard's Tale", artist: "RandomMind", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "Dark Forest Theme", artist: "cynicmusic (The Cynic Project)", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "Cathedral in the Forest", artist: "OpenGameArt Community", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "Orcs Victorious", artist: "Bobjt", source: "OpenGameArt.org", license: "CC0 Public Domain" },
-    { track: "Battle Music (Alternative)", artist: "peastman", source: "OpenGameArt.org", license: "CC-BY 3.0" },
+    { track: "Exploração Geral", file: "audio/exploração.mp3", role: "Exploração Ativa pelo Mundo Aberto", license: "Uso Livre" },
+    { track: "Ambiente Calmo (Dia)", file: "audio/ambiente_calmo_dia.mp3 & ambiente_calmo_dia_2.ogg", role: "Pradarias e Planícies Abertas", license: "Uso Livre" },
+    { track: "Cidade Calma (Dia)", file: "audio/cidade_calma_dia.mp3 & cidade_dia_calmo.mp3", role: "Cidades, Vilarejos e Mercados", license: "Uso Livre" },
+    { track: "Ambiente Dia Floresta", file: "audio/ambiente_dia_floresta.mp3", role: "Florestas e Bosques", license: "Uso Livre" },
+    { track: "Ambiente Dia Muito Denso", file: "audio/ambiente_dia_muito_denso.mp3", role: "Ermos Profundos e Montanhas", license: "Uso Livre" },
+    { track: "Ambiente Denso Noite", file: "audio/ambiente_denso_noite_2.ogg", role: "Exploração Noturna", license: "Uso Livre" },
+    { track: "Ambiente Denso Madrugada", file: "audio/ambiente_denso_madrugada.ogg", role: "Madrugada Sombria (00h às 05h)", license: "Uso Livre" },
+    { track: "Genérica Calma", file: "audio/generica_calma.ogg", role: "Tavernas, Estalagens e Serenidade Sacra nas Igrejas", license: "Uso Livre" },
+    { track: "Tensa Escalando", file: "audio/tensa_escalando.OGG", role: "Ameaça Iminente e Monstros Próximos (< 35m)", license: "Uso Livre" },
+    { track: "Batalha Menos Séria", file: "audio/batalha_menos_seria.mp3", role: "Combate Leve (Procurado 1-2)", license: "Uso Livre" },
+    { track: "Batalha Animada", file: "audio/batalha_animada.mp3", role: "Combate Intenso (Procurado 3)", license: "Uso Livre" },
+    { track: "Batalha Séria", file: "audio/batalha_séria.mp3", role: "Perseguição Máxima (Procurado 4-5)", license: "Uso Livre" },
+    { track: "Vila Fantasma & Acampamento do Demiurgo", file: "audio/vila_fantasma_e_acampamento_demiurgo.mp3", role: "Cidades Fantasmas e Acampamentos Cultistas", license: "Uso Livre" },
+    { track: "O Fim Maligno", file: "audio/o_fim_maligno.mp3", role: "Dia do Eclipse e Cataclismo do Demiurgo", license: "Uso Livre" },
+    { track: "Descoberta", file: "audio/descoberta.mp3", role: "Conclusão de Missões e Tesouros Encontrados", license: "Uso Livre" },
+    { track: "Trilha de Derrota", file: "audio/Derrota_2.ogg & Derrota.wav", role: "Tela de Perecimento e Morte", license: "Uso Livre" },
   ];
 }
 
 const SUPPORTS_VORBIS = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
 const FADE = 2.0;
-const HOLD = 2.5; // Tempo que um novo contexto calmo deve durar para disparar o crossfade
+const HOLD = 2.2; // Tempo que um novo contexto calmo deve durar para disparar o crossfade
 const OPEN_FIELD_NAMES = new Set(["Pradaria de Caldera", "Estrada Real"]);
 const EVICTION_TIME = 16.0; // Descarrega a faixa da RAM 16s após o término do fade-out
 
@@ -113,13 +206,32 @@ const EVICTION_TIME = 16.0; // Descarrega a faixa da RAM 16s após o término do
  * Diretor de Música Dinâmica com Carregamento Sob Demanda e Descarregamento de Memória (Zero-Leak).
  */
 export class MusicDirector {
-  constructor({ audio, world, player, npcs, dayNight = null, houses = null }) {
+  constructor({
+    audio,
+    world,
+    player,
+    npcs,
+    dayNight = null,
+    houses = null,
+    monstersPool = null,
+    cultistsPool = null,
+    beasts = null,
+    worldDecay = null,
+    activeGhostTowns = null,
+    activeCities = null,
+  }) {
     this.audio = audio;
     this.world = world;
     this.player = player;
     this.npcs = npcs;
     this.dayNight = dayNight;
     this.houses = houses;
+    this.monstersPool = monstersPool;
+    this.cultistsPool = cultistsPool;
+    this.beasts = beasts;
+    this.worldDecay = worldDecay;
+    this.activeGhostTowns = activeGhostTowns;
+    this.activeCities = activeCities;
 
     this.tracks = new Map();
     this.current = null;
@@ -133,6 +245,7 @@ export class MusicDirector {
     this.indoor = false;
     this.time = 0;
     this.override = null;
+    this.pausedForDefeat = false;
 
     audio.onUnlock.push(() => this.start());
     if (audio.context) this.start();
@@ -147,7 +260,8 @@ export class MusicDirector {
 
   _urlFor(key) {
     const entry = TRACK_CATALOG[key] || TRACK_CATALOG.explore;
-    return SUPPORTS_VORBIS ? entry.ogg : entry.mp3;
+    if (SUPPORTS_VORBIS && entry.ogg) return entry.ogg;
+    return entry.mp3 || entry.ogg || entry.wav || TRACK_CATALOG.explore.mp3;
   }
 
   /**
@@ -196,7 +310,7 @@ export class MusicDirector {
   }
 
   _switchTo(key) {
-    if (!this.audio.context) return;
+    if (!this.audio.context || this.pausedForDefeat) return;
     const next = this._track(key);
     if (this.current && this.current !== next) {
       this._ramp(this.current, 0);
@@ -225,15 +339,146 @@ export class MusicDirector {
     }
   }
 
+  pauseForDefeat() {
+    this.pausedForDefeat = true;
+    if (this.current) {
+      this._ramp(this.current, 0);
+    }
+  }
+
+  resumeAfterDefeat() {
+    this.pausedForDefeat = false;
+    this.context = this._detect();
+    this._switchTo(this.context);
+  }
+
+  playDiscovery() {
+    try {
+      const audio = new Audio("audio/descoberta.mp3");
+      audio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
+      audio.play().catch(() => {});
+    } catch (_) {}
+  }
+
+  _isThreatNearby() {
+    if (!this.player) return false;
+    const px = this.player.x ?? 0;
+    const pz = this.player.z ?? 0;
+    const maxDistSq = 35 * 35;
+
+    // 1. Feras (lobos, wendigos, etc.)
+    if (this.beasts?.beasts) {
+      for (let i = 0; i < this.beasts.beasts.length; i++) {
+        const b = this.beasts.beasts[i];
+        if (!b || !b.mesh || !b.mesh.visible || b.dead) continue;
+        const dx = b.mesh.position.x - px;
+        const dz = b.mesh.position.z - pz;
+        if (dx * dx + dz * dz < maxDistSq) return true;
+      }
+    }
+
+    // 2. Monstros do MonstersPool (Ghouls, Lobisomens, etc.)
+    if (this.monstersPool) {
+      for (let i = 0; i < this.monstersPool.length; i++) {
+        const m = this.monstersPool[i];
+        if (!m || !m.root || !m.root.visible || m.dead || m.isDead) continue;
+        const dx = m.root.position.x - px;
+        const dz = m.root.position.z - pz;
+        if (dx * dx + dz * dz < maxDistSq) return true;
+      }
+    }
+
+    // 3. Cultistas hostis
+    if (this.cultistsPool) {
+      for (let i = 0; i < this.cultistsPool.length; i++) {
+        const c = this.cultistsPool[i];
+        if (!c || !c.root || !c.root.visible || c.isDead) continue;
+        const dx = c.root.position.x - px;
+        const dz = c.root.position.z - pz;
+        if (dx * dx + dz * dz < maxDistSq) return true;
+      }
+    }
+
+    return false;
+  }
+
+  _isGhostTownOrCultCampNearby() {
+    if (!this.player) return false;
+    const px = this.player.x ?? 0;
+    const pz = this.player.z ?? 0;
+
+    // Cidades Fantasmas (ActiveGhostTowns)
+    const towns = this.activeGhostTowns || ActiveGhostTowns;
+    if (towns && towns.length > 0) {
+      for (let i = 0; i < towns.length; i++) {
+        const t = towns[i];
+        if (!t?.center) continue;
+        const dx = px - t.center.x;
+        const dz = pz - t.center.z;
+        if (dx * dx + dz * dz < 55 * 55) return true;
+      }
+    }
+
+    // Acampamentos Cultistas (CULT_CAMP_GROUPS)
+    if (CULT_CAMP_GROUPS && CULT_CAMP_GROUPS.length > 0) {
+      for (let i = 0; i < CULT_CAMP_GROUPS.length; i++) {
+        const camp = CULT_CAMP_GROUPS[i];
+        if (!camp) continue;
+        const dx = px - camp.position.x;
+        const dz = pz - camp.position.z;
+        if (dx * dx + dz * dz < 45 * 45) return true;
+      }
+    }
+
+    return false;
+  }
+
+  _isEclipseOrCataclysm() {
+    const decay = this.worldDecay || WorldDecay;
+    if (decay?.isEclipse) return true;
+    if (typeof window !== "undefined" && window.__demiurgeCataclysmActive) return true;
+    return false;
+  }
+
+  _isInCity() {
+    if (!this.player) return false;
+    const { x, z } = this.player;
+    if (!OPEN_FIELD_NAMES.has(locationAt(x, z))) return true;
+
+    if (this.activeCities) {
+      for (const city of this.activeCities.values()) {
+        if (!city?.center) continue;
+        const dx = x - city.center.x;
+        const dz = z - city.center.z;
+        if (dx * dx + dz * dz < 60 * 60) return true;
+      }
+    }
+    return false;
+  }
+
   _detect() {
-    // 1. Procurado e Perseguição (Prioridade Máxima)
+    // 1. Eclipse Solar Maligno e Cataclismo do Demiurgo (Prioridade Total)
+    if (this._isEclipseOrCataclysm()) {
+      return "eclipse";
+    }
+
+    // 2. Procurado e Perseguição (Combate Escalonado)
     const wanted = this.npcs?.wanted ?? 0;
     if (wanted >= 4) return "chase";
-    if (wanted >= 1) return "wanted";
+    if (wanted === 3) return "wanted_mid";
+    if (wanted >= 1) return "wanted_low";
 
-    const { x, z } = this.player;
+    // 3. Tensão Iminente: Feras, Lobisomens ou Cultistas à espreita (< 35m)
+    if (this._isThreatNearby()) {
+      return "tension";
+    }
 
-    // 2. Interiores Sagrados ou Boêmios (Igreja e Taverna)
+    // 4. Vilas Fantasmas Amaldiçoadas & Acampamentos do Demiurgo
+    if (this._isGhostTownOrCultCampNearby()) {
+      return "cult_camp";
+    }
+
+    // 5. Interiores Sagrados ou Boêmios (Igreja e Taverna)
     if (this.player.sittingInChurch || this.player.inHouse?.type === "church") {
       return "church";
     }
@@ -242,18 +487,26 @@ export class MusicDirector {
       return "tavern";
     }
 
-    // 3. Exploração Noturna (Noite e Tensão)
+    // 6. Ciclo Noturno: Madrugada Sombria (00h às 05h) vs Noite Geral
     if (this.dayNight && this.dayNight.isNight) {
+      // Progress de 0.0 a ~0.22 corresponde à madrugada in-game (00:00 às 05:15)
+      if (this.dayNight.progress >= 0 && this.dayNight.progress < 0.22) {
+        return "late_night";
+      }
       return "night";
     }
 
-    // 4. Cidades e Vilarejos
-    if (!OPEN_FIELD_NAMES.has(locationAt(x, z))) return "town";
+    // 7. Cidades, Vilas e Mercados Diurnos
+    if (this._isInCity()) {
+      return "town";
+    }
 
-    // 5. Florestas Densas
-    if (this.trees >= 8) return "forest";
+    // 8. Matas Fechadas e Bosques
+    if (this.trees >= 18) return "deep_forest";
+    if (this.trees >= 7) return "forest";
 
-    // 6. Pradarias Abertas vs Exploração Geral
+    // 9. Pradarias Abertas vs Exploração Ativa
+    const { x, z } = this.player;
     let nearest = Infinity;
     for (const village of VILLAGES) {
       nearest = Math.min(nearest, Math.hypot(x - village.x, z - village.z));
@@ -277,7 +530,7 @@ export class MusicDirector {
 
   update(dt) {
     this.time += dt;
-    if (!this.started || !this.audio.context) return;
+    if (!this.started || !this.audio.context || this.pausedForDefeat) return;
 
     // Gerenciamento de Memória & Pausa de Faixas Inativas (Zero-Leak)
     for (const [key, track] of this.tracks.entries()) {
@@ -334,12 +587,17 @@ export class MusicDirector {
       return;
     }
 
-    // O procurado ou perseguição mudam a música instantaneamente; outros contextos exigem estabilidade
+    // Urgências que mudam a música instantaneamente sem esperar HOLD
     const urgent =
+      detected === "eclipse" ||
       detected === "chase" ||
-      detected === "wanted" ||
+      detected === "wanted_mid" ||
+      detected === "wanted_low" ||
+      detected === "tension" ||
+      detected === "cult_camp" ||
       this.context === "chase" ||
-      this.context === "wanted" ||
+      this.context === "wanted_mid" ||
+      this.context === "wanted_low" ||
       detected === "church" ||
       detected === "tavern";
 

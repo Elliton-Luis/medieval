@@ -67,18 +67,20 @@ export const DEATH_MESSAGES = {
 };
 
 export class DeathScreen {
-  constructor({ container, canvas, audio, cameraRig, input, onRespawn }) {
+  constructor({ container, canvas, audio, cameraRig, input, onRespawn, music = null }) {
     this.container = container;
     this.canvas = canvas;
     this.audio = audio;
     this.cameraRig = cameraRig;
     this.input = input;
     this.onRespawn = onRespawn;
+    this.music = music;
     this.state = "idle";
     this.time = 0;
     this.scale = 1;
     this.grainTimer = 0;
     this._shown = {};
+    this._defeatAudio = null;
     this._onKey = (event) => this._wake(event);
 
     this._injectAssets();
@@ -169,8 +171,19 @@ export class DeathScreen {
     this.container.classList.add("wasted");
     this.cameraRig.frozen = true;
     this.input?.setModalOpen(true);
+    this.music?.pauseForDefeat?.();
     this.audio.deathBell();
     this.audio.fadeWorld(1.6);
+    try {
+      if (!this._defeatAudio) {
+        const canVorbis = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
+        this._defeatAudio = new Audio(canVorbis ? "audio/Derrota_2.ogg" : "audio/Derrota.wav");
+        this._defeatAudio.preload = "auto";
+      }
+      this._defeatAudio.currentTime = 0;
+      this._defeatAudio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.05);
+      this._defeatAudio.play().catch(() => {});
+    } catch (_) {}
   }
 
   _reveal(name, element, at) {
@@ -250,6 +263,13 @@ export class DeathScreen {
 
   // limpa tudo atrás da tela preta
   _reset() {
+    if (this._defeatAudio) {
+      try {
+        this._defeatAudio.pause();
+        this._defeatAudio.currentTime = 0;
+      } catch (_) {}
+    }
+    this.music?.resumeAfterDefeat?.();
     this.canvas.style.filter = "";
     this.vignette.style.opacity = "0";
     this.grain.style.opacity = "0";

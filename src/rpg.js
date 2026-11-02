@@ -799,6 +799,8 @@ export function interactWithChest(chest, playerPos, npcs, raycaster = _sharedRay
     _env.player.coins = PlayerStats.gold;
   }
   syncPlayerStatsToPlayer();
+  _env.music?.playDiscovery?.();
+  _env.audio?.coin?.();
 
   return { looted: true, gold: goldFound, isWitnessed };
 }
@@ -3336,6 +3338,7 @@ export function updateWaypointBillboard(playerPos, now = performance.now()) {
 
 function showMissionCompleteUI(message = "Missão Concluída!") {
   _env.audio?.coin?.();
+  _env.music?.playDiscovery?.();
   if (_env.effects && _env.player) {
     _env.effects.play(
       "glint",
