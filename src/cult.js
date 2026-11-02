@@ -768,7 +768,11 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
   }
 
   skullsMesh.instanceMatrix.needsUpdate = true;
+  skullsMesh.computeBoundingBox();
+  skullsMesh.computeBoundingSphere();
   weaponsMesh.instanceMatrix.needsUpdate = true;
+  weaponsMesh.computeBoundingBox();
+  weaponsMesh.computeBoundingSphere();
 }
 
 // ============================================================================

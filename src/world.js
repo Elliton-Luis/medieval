@@ -1318,6 +1318,10 @@ export class World {
   _makeInstances(geometry, material, data, setTransform, castShadow) {
     const count = data.length;
     if (count === 0) return null;
+    if (geometry && !geometry.boundingSphere) {
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+    }
     const mesh = new THREE.InstancedMesh(geometry, material, count);
     mesh.castShadow = castShadow;
     mesh.receiveShadow = false;
@@ -1330,6 +1334,8 @@ export class World {
       mesh.setMatrixAt(i, this._dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
     return mesh;
   }
 }

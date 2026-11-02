@@ -76,6 +76,7 @@ function blob(parts, random, radius, x, y, z, color, squash = 0.85) {
 function build(parts) {
   const merged = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
+  merged.computeBoundingBox();
   merged.computeBoundingSphere();
   return merged;
 }

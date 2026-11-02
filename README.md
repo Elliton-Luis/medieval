@@ -326,6 +326,28 @@ Usar a neblina visual para justificar o não carregamento de partes distantes do
    - Criaturas noturnas (Lobisomens, Gulur, Necron, Hexoculus e Polyphonia) surgem estrategicamente no anel de 78 a 88 metros de distância do jogador.
    - O jogador ouve os passos e uivos na escuridão e assiste à silhueta do monstro emergir lentamente da névoa densa à medida que ele se aproxima, gerando suspense cinematográfico e horror clássico sem modelos complexos ou pop-ins repentinos.
 
+## Auditoria de Renderização e Culling (Backface, Frustum e Oclusão)
+
+Otimização de visibilidade em 3 camadas na GPU e CPU para dispositivos modestos e GPUs integradas:
+
+1. **Backface Culling Rigoroso (Faces Ocultas)**:
+   - Eliminado o uso desnecessário de `THREE.DoubleSide` em telhados de casas (`src/house.js`) e telhados de vilas/cidades (`src/settlement.js`). Como as coberturas são construídas com geometrias 3D fechadas (`BoxGeometry` e prismas volumétricos com normais voltadas para fora), o uso de `FrontSide` padrão ativa o hardware culling na GPU, descartando ~50% dos triângulos e fragmentos rasterizados dos telhados em todo o reino.
+   - `THREE.DoubleSide` permanece reservado estritamente onde a geometria é plana/2D sem espessura (folhagens de árvores, grama cruzada, halos etéreos e asas espectrais).
+
+2. **Correção de Frustum Culling em Geometria Procedural & InstancedMesh**:
+   - **Bounding Volumes Antecipados em InstancedMesh**: No Three.js, por padrão, o culling de um `InstancedMesh` depende da `boundingSphere` da geometria de um único protótipo na origem `(0, 0, 0)`. Nas instâncias de chunks (`world.js`), muralhas (`procedural.js`), estradas/hortas (`settlement.js`) e pistas rituais (`cult.js`), agora são chamados explicitamente `.computeBoundingBox()` e `.computeBoundingSphere()` assim que a matriz de instâncias é preenchida. Isso impede o pop-in prematuro (descarte errôneo de malhas inteiras quando a origem sai da tela) e elimina cálculos pesados de união de esferas no meio do loop de renderização (Zero-GC).
+   - **Geometrias Mescladas (`mergeGeometries`)**: Todas as malhas combinadas proceduralmente de casas, igrejas e vegetação agora recalculam `.computeBoundingBox()` e `.computeBoundingSphere()`, garantindo precisão instantânea no frustum culling da câmera.
+
+3. **Estratégia de Oclusão Angular e Interiores de Construções**:
+   - **Culling de Interiores**: O interior de cada residência e igreja (`interior.visible`) permanece desligado por padrão, sendo ativado somente se o jogador estiver dentro do cômodo ou a menos de 5 metros de uma porta aberta (`houses.js`).
+   - **Oclusão Angular por Estruturas**: Casas e construções bloqueadas no cone de visão por edifícios maiores mais próximos são ocultadas dinamicamente (`group.visible = false`), economizando chamadas de desenho e vértices.
+
+## Iluminação Forte e Independente para Tochas Colocadas
+
+- **Luz Dedicada e Forte (PointLight)**: Ao fixar uma tocha no chão ou na parede (`src/weapons.js`), a tocha agora recebe sua própria fonte de luz pontual forte (`THREE.PointLight`, intensidade 18.0, alcance de 32 metros, decaimento suave de 1.8 e `alwaysOn: true`). Ela ilumina efetivamente o solo, as paredes e os arredores mesmo durante o dia ou à noite, sem disputar ou perder iluminação para o pool genérico de 8 luzes das vilas.
+- **Sprite de Fogo Nítido e Flamejante**: O halo do fogo foi redimensionado (escala 1.4x) com material emissivo intenso (2.5x) que assume a tonalidade do cristal equipado (laranja, azul, verde, púrpura, rubi, etc.).
+- **Ciclo de Vida Limpo (Recolher / Demolir)**: Tanto ao recolher a tocha com `E` quanto ao destruí-la no Modo de Construção/Demolição, a luz pontual, o grupo 3D e o sprite de fogo são removidos e descartados sem vazamento de memória.
+
 ## Fase 1
 
 Terreno procedural em chunks com streaming, culling por frustum, LOD e sombras desativadas; cidade ampliada com casas, portão, mercado, forja, horta e poço. Inclui armadura/escudo, modelos de personagens totalmente 3D com padrões procedurais de tecido, couro e metal, cinco residentes com rotinas, diálogo e compras. Espada, balestra, arco, bomba de mão medieval e mosquete têm projéteis/efeitos próprios. NPCs podem ser derrotados e ficam em ragdoll com estrelas e poeira, sem sangue.

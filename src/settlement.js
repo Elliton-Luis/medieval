@@ -9,7 +9,7 @@ const sharedHouseMat = createSharedHouseMaterial();
 const wallMat = sharedHouseMat;
 const timberMat = new THREE.MeshStandardMaterial({ color: "#563e2b", roughness: 1, flatShading: true });
 const darkTimberMat = new THREE.MeshStandardMaterial({ color: "#392e25", roughness: 1, flatShading: true });
-const roofMat = new THREE.MeshStandardMaterial({ color: "#654a3a", roughness: 1, flatShading: true, side: THREE.DoubleSide });
+const roofMat = new THREE.MeshStandardMaterial({ color: "#654a3a", roughness: 1, flatShading: true });
 const stoneMat = new THREE.MeshStandardMaterial({ color: "#77796d", roughness: 1, flatShading: true });
 const ironMat = new THREE.MeshStandardMaterial({ color: "#454d49", metalness: 0.42, roughness: 0.66, flatShading: true });
 const warmLightMat = new THREE.MeshStandardMaterial({ color: "#e88a3c", emissive: "#bd4918", emissiveIntensity: 1.2, roughness: 0.6, flatShading: true });
@@ -221,6 +221,9 @@ function createFarm(scene, world, centerX = -31, centerZ = 0) {
       cropMesh.setMatrixAt(count++, dummy.matrix);
     }
   }
+  cropMesh.instanceMatrix.needsUpdate = true;
+  cropMesh.computeBoundingBox();
+  cropMesh.computeBoundingSphere();
   cropMesh.castShadow = false;
   cropMesh.receiveShadow = false;
   group.add(cropMesh);
@@ -289,6 +292,9 @@ function createRoad(scene, world) {
     stones.setMatrixAt(index++, dummy.matrix);
   }
   stones.count = index;
+  stones.instanceMatrix.needsUpdate = true;
+  stones.computeBoundingBox();
+  stones.computeBoundingSphere();
   stones.castShadow = false;
   stones.receiveShadow = true;
   scene.add(stones);
@@ -469,6 +475,9 @@ function createKingdomRoads(scene, world) {
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingBox();
+  mesh.computeBoundingSphere();
   mesh.receiveShadow = true;
   scene.add(mesh);
 }

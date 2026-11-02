@@ -288,7 +288,7 @@ export class TorchSystem {
   }
 
   // Tocha presa à parede (nx, nz: direção para fora) ou no alto de um poste.
-  addTorch(x, y, z, nx = 0, nz = 0, post = false, colorKey = "orange") {
+  addTorch(x, y, z, nx = 0, nz = 0, post = false, colorKey = "orange", alwaysOn = false, isPlayerPlaced = false) {
     const pal = CRYSTAL_PALETTE[colorKey] || CRYSTAL_PALETTE.orange || { flameHex: 0xffa040, coreHex: 0xffffff };
     const group = new THREE.Group();
     group.position.set(x + nx * 0.18, y, z + nz * 0.18);
@@ -296,10 +296,11 @@ export class TorchSystem {
     stick.rotation.set(nz * 0.3, 0, -nx * 0.3);
     group.add(stick);
 
+    const isAlwaysLit = Boolean(alwaysOn || isPlayerPlaced);
     const customHeadMaterial = new THREE.MeshStandardMaterial({
       color: "#2c2218",
       emissive: pal.flameHex,
-      emissiveIntensity: this.lit ? 1.8 : 0.05,
+      emissiveIntensity: isAlwaysLit ? 2.5 : (this.lit ? 1.8 : 0.05),
       roughness: 1,
       flatShading: true,
     });
@@ -319,6 +320,7 @@ export class TorchSystem {
       group.position.set(x, y, z);
     }
     this.group.add(group);
+    const spriteScale = isPlayerPlaced ? 1.4 : 0.9;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: this.glow,
       color: pal.flameHex,
@@ -326,10 +328,21 @@ export class TorchSystem {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     }));
-    sprite.scale.set(0.9, 1.1, 1);
+    sprite.scale.set(spriteScale, spriteScale * 1.25, 1);
     sprite.position.set(x + nx * 0.27, y + 0.52, z + nz * 0.27);
-    sprite.visible = false;
+    sprite.visible = isAlwaysLit;
     this.scene.add(sprite);
+
+    // Tochas fixadas pelo jogador recebem iluminação direta dedicada forte (PointLight)
+    // que banha paredes e chão intensamente sem depender do limite de 8 luzes das vilas
+    let torchLight = null;
+    if (isPlayerPlaced || alwaysOn) {
+      torchLight = new THREE.PointLight(pal.flameHex, 18.0, 32.0, 1.8);
+      torchLight.castShadow = false;
+      torchLight.position.set(x + nx * 0.27, y + 0.6, z + nz * 0.27);
+      this.scene.add(torchLight);
+    }
+
     const source = {
       x: x + nx * 0.27,
       y: y + 0.5,
@@ -337,15 +350,41 @@ export class TorchSystem {
       sprite,
       phase: Math.random() * 6.28,
       kind: "torch",
-      alwaysOn: false,
-      light: true,
+      alwaysOn: isAlwaysLit,
+      light: !torchLight, // Se tiver PointLight dedicada, não compete no pool genérico de 8
       group,
       lightColor: pal.flameHex,
       colorKey,
       headMaterial: customHeadMaterial,
+      pointLight: torchLight,
+      isPlayerPlaced: Boolean(isPlayerPlaced),
     };
     this.sources.push(source);
     return source;
+  }
+
+  removeTorch(source) {
+    if (!source) return;
+    const idx = this.sources.indexOf(source);
+    if (idx !== -1) this.sources.splice(idx, 1);
+    if (source.group) {
+      if (source.group.parent) source.group.parent.remove(source.group);
+      source.group.traverse((c) => {
+        if (c.geometry) c.geometry.dispose();
+      });
+    }
+    if (source.sprite) {
+      if (source.sprite.parent) source.sprite.parent.remove(source.sprite);
+    }
+    if (source.pointLight) {
+      if (source.pointLight.parent) source.pointLight.parent.remove(source.pointLight);
+    }
+    for (let i = 0; i < this.lights.length; i++) {
+      if (this.lights[i].userData.source === source) {
+        this.lights[i].userData.source = null;
+        this.lights[i].intensity = 0;
+      }
+    }
   }
 
   addFireSource(x, y, z, house = null) {
@@ -385,8 +424,9 @@ export class TorchSystem {
     else if (this.lit && daylight > 0.55) this.lit = false;
     this.headMaterial.emissiveIntensity = this.lit ? 1.8 : 0.05;
     for (let s = 0; s < this.sources.length; s++) {
-      if (this.sources[s].headMaterial) {
-        this.sources[s].headMaterial.emissiveIntensity = this.lit ? 1.8 : 0.05;
+      const src = this.sources[s];
+      if (src.headMaterial) {
+        src.headMaterial.emissiveIntensity = (src.alwaysOn || this.lit) ? 2.5 : 0.05;
       }
     }
 
@@ -401,6 +441,14 @@ export class TorchSystem {
       const on = this._isOn(source);
       const near = d < 95 * 95;
       const flicker = 0.85 + 0.15 * Math.sin(this.time * 11 + source.phase) + 0.08 * Math.sin(this.time * 23 + source.phase * 2);
+      if (source.pointLight) {
+        source.pointLight.visible = on && near;
+        if (on && near) {
+          source.pointLight.intensity = 18.0 * flicker;
+        } else {
+          source.pointLight.intensity = 0;
+        }
+      }
       if (source.sprite) {
         source.sprite.visible = on && near;
         if (on && near) {

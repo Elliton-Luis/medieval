@@ -225,6 +225,8 @@ export function generateCity(
       }
     }
     wallMesh.instanceMatrix.needsUpdate = true;
+    wallMesh.computeBoundingBox();
+    wallMesh.computeBoundingSphere();
     scene.add(wallMesh);
   }
 

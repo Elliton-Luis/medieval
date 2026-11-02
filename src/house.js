@@ -15,8 +15,8 @@ function materials() {
     stone: std(stoneTexture()),
     wood: std(woodTexture()),
     plaster: std(plasterTexture()),
-    thatch: std(thatchTexture(), { side: THREE.DoubleSide }),
-    tile: std(tileTexture(), { side: THREE.DoubleSide }),
+    thatch: std(thatchTexture()),
+    tile: std(tileTexture()),
     dark: new THREE.MeshStandardMaterial({ color: "#2b2724", roughness: 0.7, metalness: 0.5, flatShading: true }),
     glass: new THREE.MeshStandardMaterial({ color: "#2c3a44", emissive: "#e8a24c", emissiveIntensity: 0.5, roughness: 0.4, flatShading: true }),
     ghostPlaster: ghost(plasterTexture()),
@@ -353,6 +353,8 @@ export function createHouse(scene, world, opts) {
     if (lists[name].length === 0) return null;
     const merged = mergeGeometries(lists[name].map((g) => (g.index ? g.toNonIndexed() : g)), false);
     for (const g of lists[name]) g.dispose();
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
     const mesh = new THREE.Mesh(merged, material);
     mesh.castShadow = castShadow;
     mesh.receiveShadow = false;
@@ -689,6 +691,8 @@ export function createChurchBuilding(scene, world, opts) {
     if (lists[name].length === 0) return null;
     const merged = mergeGeometries(lists[name].map((g) => (g.index ? g.toNonIndexed() : g)), false);
     for (const g of lists[name]) g.dispose();
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
     const mesh = new THREE.Mesh(merged, material);
     mesh.castShadow = castShadow;
     mesh.receiveShadow = false;

@@ -706,9 +706,9 @@ export class WeaponSystem {
       const torchColor = PlayerInventory.torchColor || "orange";
       let placed;
       if (isNearWall) {
-        placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false, torchColor);
+        placed = torchSys?.addTorch?.(targetX, py + 0.3, targetZ, -forwardX, -forwardZ, false, torchColor, true, true);
       } else {
-        placed = torchSys?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true, torchColor);
+        placed = torchSys?.addTorch?.(targetX, ground + 1.6, targetZ, 0, 0, true, torchColor, true, true);
       }
       this.effects.play("star", targetX, py, targetZ, "#ffa834", 1.2);
       this.audio.weaponSwing?.("chop", false);
@@ -778,8 +778,14 @@ export class WeaponSystem {
       if (dx * dx + dz * dz < 2.3 * 2.3) {
         this.placedItems.splice(i, 1);
         if (item.id === "torch") {
-          if (item.torchSource?.group) item.torchSource.group.parent?.remove(item.torchSource.group);
-          if (item.torchSource?.sprite) item.torchSource.sprite.parent?.remove(item.torchSource.sprite);
+          const torchSys = this.gameEnv?.torches || this.torchSystem;
+          if (torchSys?.removeTorch) {
+            torchSys.removeTorch(item.torchSource);
+          } else {
+            if (item.torchSource?.group) item.torchSource.group.parent?.remove(item.torchSource.group);
+            if (item.torchSource?.sprite) item.torchSource.sprite.parent?.remove(item.torchSource.sprite);
+            if (item.torchSource?.pointLight) item.torchSource.pointLight.parent?.remove(item.torchSource.pointLight);
+          }
           this.unlock("torch", false);
           PlayerInventory.torches = (PlayerInventory.torches || 0) + 1;
           this.equip("torch", false);
@@ -1046,8 +1052,16 @@ export class WeaponSystem {
       const idx = this.placedItems ? this.placedItems.indexOf(target) : -1;
       if (idx !== -1) this.placedItems.splice(idx, 1);
 
-      if (target.torchSource?.group) target.torchSource.group.parent?.remove(target.torchSource.group);
-      if (target.torchSource?.sprite) target.torchSource.sprite.parent?.remove(target.torchSource.sprite);
+      if (target.torchSource) {
+        const torchSys = this.gameEnv?.torches || this.torchSystem;
+        if (torchSys?.removeTorch) {
+          torchSys.removeTorch(target.torchSource);
+        } else {
+          if (target.torchSource.group) target.torchSource.group.parent?.remove(target.torchSource.group);
+          if (target.torchSource.sprite) target.torchSource.sprite.parent?.remove(target.torchSource.sprite);
+          if (target.torchSource.pointLight) target.torchSource.pointLight.parent?.remove(target.torchSource.pointLight);
+        }
+      }
       if (target.model) target.model.parent?.remove(target.model);
 
       this.effects?.play("dust", target.x, target.y + 0.3, target.z, "#cdbb97", 1.2);
