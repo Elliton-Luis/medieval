@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { triggerCultistMessenger } from "./decay.js";
+import { triggerCultistMessenger, WorldDecay } from "./decay.js";
 import { CultState } from "./cult.js";
 
 // ============================================================================
@@ -127,6 +127,7 @@ export const PlayerStats = {
   isTemplar: false,
   hasBrokenVow: false,
   wearingDemiurgeRobe: false,
+  lastConfessionDay: null,
 
   // Getters otimizados com penalidade de Voto Quebrado e peso de armadura
   getMaxHp: () => PlayerStats.con * 10,
@@ -232,6 +233,18 @@ export function addGood(amount = 2, reason = null) {
   if (reason && ui) {
     ui.showToast(`✦ Maldade ${evil}% (-${Math.round(amount)}%) · ${reason}`);
   }
+  return evil;
+}
+
+export function setEvilPercent(targetPercent, reason = null) {
+  const pct = Math.max(0, Math.min(100, Math.round(Number(targetPercent) || 0)));
+  PlayerStats.morality = Math.max(-100, Math.min(100, 100 - pct * 2));
+  const evil = getEvilPercent();
+  const ui = _env.ui || window.__game?.ui;
+  if (ui) {
+    ui.showToast(`⚖️ Índice de Maldade definido para ${evil}%${reason ? ` · ${reason}` : ""}`);
+  }
+  checkMessengerEvilProgression(evil);
   return evil;
 }
 
@@ -1145,6 +1158,11 @@ function playChoirSound() {
  * Se o jogador desejar, pode passar uma oferta voluntária opcional (voluntaryOffer > 0).
  */
 export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
+  const currentDay = WorldDecay?.daysPassed ?? 1;
+  if (PlayerStats.lastConfessionDay === currentDay) {
+    return { success: false, reason: "already_confessed_today", currentDay };
+  }
+
   if (_env.player) PlayerStats.gold = _env.player.coins;
 
   // Oferta estritamente opcional: nunca impede a confissão ou bênção
@@ -1154,6 +1172,14 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
     PlayerInventory.gold = PlayerStats.gold;
   }
 
+  PlayerStats.lastConfessionDay = currentDay;
+
+  // A confissão reduz em 10% a maldade
+  const curEvil = getEvilPercent();
+  const reduction = Math.max(1, Math.round(curEvil * 0.10));
+  const newEvil = Math.max(0, curEvil - reduction);
+  setEvilPercent(newEvil, "Confissão e Absolvição dos Pecados (-10% Maldade)");
+
   resetWantedLevel(); // Despista guardas e zera procurado gratuitamente
   PlayerStats.cha = Math.min(20, PlayerStats.cha + 2); // Purifica a alma
   addGood(voluntaryOffer >= 20 ? 8 : 4, "Bênção sacerdotal");
@@ -1162,7 +1188,7 @@ export function interactWithPriest(playerPos, npcPriest, voluntaryOffer = 0) {
     _env.effects.play("glint", _env.player.x, _env.player.root.position.y + 1.9, _env.player.z, "#fff3b0", 1.5);
   }
   syncPlayerStatsToPlayer();
-  return true;
+  return { success: true, reduction, evil: newEvil, currentDay };
 }
 
 /**

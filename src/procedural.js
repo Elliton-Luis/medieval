@@ -5,6 +5,7 @@ import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { WorldDecay } from "./decay.js";
+import { PlayerInventory, PlayerStats } from "./rpg.js";
 import { mergeBufferGeometries } from "./mergeUtils.js";
 import { generateGhostTown } from "./ghostTowns.js";
 import { addCityBeacon } from "./beacons.js";
@@ -862,10 +863,11 @@ export class Werewolf extends NPC {
     }
 
     // Caçada & Massacre de Cavalos, Aldeões e Guardas
+    const hasCultRobe = Boolean(PlayerInventory?.hasDemiurgeRobe || PlayerStats?.wearingDemiurgeRobe);
     let preyX = playerX;
     let preyZ = playerZ;
     let preyEntity = null; // null = caçando o jogador
-    let preyDist = Math.hypot(playerX - this.x, playerZ - this.z);
+    let preyDist = hasCultRobe ? 99999 : Math.hypot(playerX - this.x, playerZ - this.z);
 
     if (this.npcSystem && Array.isArray(this.npcSystem.npcs)) {
       const list = this.npcSystem.npcs;
@@ -962,6 +964,12 @@ export class Werewolf extends NPC {
       moveDirX = preyDist > 1.8 ? pdx / Math.max(preyDist, 0.001) : 0;
       moveDirZ = preyDist > 1.8 ? pdz / Math.max(preyDist, 0.001) : 0;
       moveSpeed = (preyDist > 1.8 ? 1.0 : 0.25) * baseSpeed;
+    } else if (hasCultRobe) {
+      // Reconhece a magia do Demiurgo no manto: não caça nem ataca o jogador
+      const wanderAng = Math.sin(this.animTime * 0.4) * Math.PI;
+      moveDirX = Math.sin(wanderAng);
+      moveDirZ = Math.cos(wanderAng);
+      moveSpeed = baseSpeed * 0.35;
     } else {
       const dx = playerX - this.x;
       const dz = playerZ - this.z;

@@ -1,9 +1,14 @@
+import { WorldDecay } from "./decay.js";
 import {
   PlayerStats,
   PlayerInventory,
   PlayerEquipment,
   equipArmor,
   syncPlayerStatsToPlayer,
+  getEvilPercent,
+  setEvilPercent,
+  addEvil,
+  addGood,
 } from "./rpg.js";
 import { WEAPON_LIST } from "./weapondata.js";
 import { CRYSTAL_PALETTE, applyTorchColor } from "./crystals.js";
@@ -278,6 +283,26 @@ function _updateStatusDisplays() {
     const w = dn.weights ? ` · [D:${Math.round(dn.weights.day * 100)}% T:${Math.round(dn.weights.afternoon * 100)}% N:${Math.round(dn.weights.night * 100)}%]` : "";
     clockEl.textContent = `${hours}:${minutes} (${prof}${w})`;
   }
+
+  const dayEl = _cheatModalEl.querySelector("#cs-day");
+  const curDay = WorldDecay?.daysPassed ?? 1;
+  if (dayEl) dayEl.textContent = `Dia ${curDay}${WorldDecay?.isEclipse ? " (🌑 Eclipse)" : ""}`;
+
+  const evilEl = _cheatModalEl.querySelector("#cs-evil");
+  const curEvil = getEvilPercent();
+  if (evilEl) evilEl.textContent = `${curEvil}%`;
+
+  const dayLabel = _cheatModalEl.querySelector("#cheat-day-label");
+  if (dayLabel) dayLabel.textContent = `Dia ${curDay}${WorldDecay?.isEclipse ? " · 🌑 ECLIPSE" : ""}`;
+
+  const dayInput = _cheatModalEl.querySelector("#cheat-day-input");
+  if (dayInput && document.activeElement !== dayInput) dayInput.value = curDay;
+
+  const evilLabel = _cheatModalEl.querySelector("#cheat-evil-label");
+  if (evilLabel) evilLabel.textContent = `${curEvil}% Maldade`;
+
+  const evilSlider = _cheatModalEl.querySelector("#cheat-evil-slider");
+  if (evilSlider && document.activeElement !== evilSlider) evilSlider.value = curEvil;
 }
 
 export function openCheatModal(env) {
@@ -312,6 +337,8 @@ export function openCheatModal(env) {
       <!-- Status em Tempo Real -->
       <div class="cheat-status-box">
         <div class="cheat-status-item">⏰ Horário: <span class="cheat-status-val" id="cs-clock">--:--</span></div>
+        <div class="cheat-status-item">📅 Dia: <span class="cheat-status-val" id="cs-day">Dia 1</span></div>
+        <div class="cheat-status-item">⚖️ Maldade: <span class="cheat-status-val" id="cs-evil">0%</span></div>
         <div class="cheat-status-item">🪵 Mad: <span class="cheat-status-val" id="cs-wood">0</span></div>
         <div class="cheat-status-item">🪨 Ped: <span class="cheat-status-val" id="cs-stone">0</span></div>
         <div class="cheat-status-item">🏺 Barro: <span class="cheat-status-val" id="cs-clay">0</span></div>
@@ -386,6 +413,43 @@ export function openCheatModal(env) {
             <button class="cheat-btn" data-cheat="time_add_3h">⏩ Avançar +3 Horas</button>
             <button class="cheat-btn" data-cheat="time_add_6h">⏩ Avançar +6 Horas</button>
             <button class="cheat-btn" data-cheat="time_add_12h">⏩ Avançar +12 Horas (Meio Ciclo)</button>
+          </div>
+
+          <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 16px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">📅 Controle de Dias do Mundo (Decaimento & Juízo)</div>
+          <div class="cheat-time-slider-box" style="background: rgba(142, 84, 233, 0.12); border: 1px solid rgba(142, 84, 233, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 700; color: #ffd700; font-size: 13.5px;">📅 Seleção Direta de Dia:</span>
+              <span id="cheat-day-label" style="font-size: 15px; font-weight: 800; color: #ffffff; background: #8e54e9; padding: 3px 12px; border-radius: 12px;">Dia 1</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+              <button class="cheat-btn" id="cheat-prev-day" style="flex: 1;">◀ Dia Anterior</button>
+              <input type="number" id="cheat-day-input" min="1" max="999" value="1" style="width: 75px; text-align: center; background: #160f22; border: 1px solid #8e54e9; color: #fff; font-weight: bold; border-radius: 6px; padding: 6px;">
+              <button class="cheat-btn" id="cheat-next-day" style="flex: 1;">Dia Seguinte ▶</button>
+              <button class="cheat-btn highlight" id="cheat-apply-day" style="flex: 1.2;">🎯 Definir Dia</button>
+            </div>
+            <div class="cheat-grid" style="grid-template-columns: repeat(4, 1fr);">
+              <button class="cheat-btn" data-cheat="set_day_1">Dia 1 (Início)</button>
+              <button class="cheat-btn" data-cheat="set_day_3">Dia 3 (Tensão)</button>
+              <button class="cheat-btn" data-cheat="set_day_5">Dia 5 (Pré-Eclipse)</button>
+              <button class="cheat-btn" data-cheat="set_day_7">Dia 7 (Juízo Final)</button>
+            </div>
+          </div>
+
+          <div style="font-size: 12px; color: #ff6b6b; font-weight: 700; margin: 16px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">⚖️ Manipulador do Índice de Maldade & Corrupção</div>
+          <div class="cheat-time-slider-box" style="background: rgba(233, 84, 84, 0.12); border: 1px solid rgba(233, 84, 84, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 700; color: #ff8888; font-size: 13.5px;">⚖️ Barra de Nível de Maldade:</span>
+              <span id="cheat-evil-label" style="font-size: 15px; font-weight: 800; color: #ffffff; background: #e95454; padding: 3px 12px; border-radius: 12px;">0% Maldade</span>
+            </div>
+            <input type="range" id="cheat-evil-slider" min="0" max="100" step="1" value="0" style="width: 100%; cursor: pointer; accent-color: #e95454; margin-bottom: 12px;">
+            <button class="cheat-btn highlight full-width" id="cheat-apply-evil" style="background: linear-gradient(135deg, #c0392b, #8e44ad); margin-bottom: 10px;">🎯 Aplicar Índice de Maldade do Slider</button>
+            <div class="cheat-grid" style="grid-template-columns: repeat(5, 1fr);">
+              <button class="cheat-btn" data-cheat="evil_0">😇 0% (Santo)</button>
+              <button class="cheat-btn" data-cheat="evil_25">🙂 25% (Puro)</button>
+              <button class="cheat-btn" data-cheat="evil_50">⚖️ 50% (Neutro)</button>
+              <button class="cheat-btn" data-cheat="evil_75">😈 75% (Corrupto)</button>
+              <button class="cheat-btn" data-cheat="evil_100">💀 100% (Herege)</button>
+            </div>
           </div>
         </div>
 
@@ -590,6 +654,44 @@ export function openCheatModal(env) {
       _updateStatusDisplays();
     });
   }
+
+  // Configuração do Seletor de Dia
+  const dayInput = _cheatModalEl.querySelector("#cheat-day-input");
+  const dayLabel = _cheatModalEl.querySelector("#cheat-day-label");
+  const btnPrevDay = _cheatModalEl.querySelector("#cheat-prev-day");
+  const btnNextDay = _cheatModalEl.querySelector("#cheat-next-day");
+  const btnApplyDay = _cheatModalEl.querySelector("#cheat-apply-day");
+
+  btnPrevDay?.addEventListener("click", () => {
+    window.CheatMenu?.addDays(-1);
+    _updateStatusDisplays();
+  });
+  btnNextDay?.addEventListener("click", () => {
+    window.CheatMenu?.addDays(1);
+    _updateStatusDisplays();
+  });
+  btnApplyDay?.addEventListener("click", () => {
+    const d = Number(dayInput?.value) || 1;
+    window.CheatMenu?.setCalendarDay(d);
+    _updateStatusDisplays();
+  });
+
+  // Configuração do Slider de Maldade
+  const evilSlider = _cheatModalEl.querySelector("#cheat-evil-slider");
+  const evilLabel = _cheatModalEl.querySelector("#cheat-evil-label");
+  const btnApplyEvil = _cheatModalEl.querySelector("#cheat-apply-evil");
+
+  if (evilSlider && evilLabel) {
+    evilSlider.value = getEvilPercent();
+    evilLabel.textContent = `${evilSlider.value}% Maldade`;
+    evilSlider.addEventListener("input", () => {
+      evilLabel.textContent = `${evilSlider.value}% Maldade`;
+    });
+    btnApplyEvil?.addEventListener("click", () => {
+      window.CheatMenu?.setEvil(Number(evilSlider.value));
+      _updateStatusDisplays();
+    });
+  }
 }
 
 function _handleCheatAction(type) {
@@ -604,6 +706,33 @@ function _handleCheatAction(type) {
       break;
     case "lighting_night":
       window.CheatMenu.setBakedNight();
+      break;
+    case "set_day_1":
+      window.CheatMenu.setCalendarDay(1);
+      break;
+    case "set_day_3":
+      window.CheatMenu.setCalendarDay(3);
+      break;
+    case "set_day_5":
+      window.CheatMenu.setCalendarDay(5);
+      break;
+    case "set_day_7":
+      window.CheatMenu.setCalendarDay(7);
+      break;
+    case "evil_0":
+      window.CheatMenu.setEvil(0);
+      break;
+    case "evil_25":
+      window.CheatMenu.setEvil(25);
+      break;
+    case "evil_50":
+      window.CheatMenu.setEvil(50);
+      break;
+    case "evil_75":
+      window.CheatMenu.setEvil(75);
+      break;
+    case "evil_100":
+      window.CheatMenu.setEvil(100);
       break;
     case "time_dawn":
       window.CheatMenu.setTime(6, 0);
@@ -934,8 +1063,42 @@ export function initCheatMenu(env = {}) {
       return `Horário: ${clock}`;
     },
 
-    setDay() {
+    setDay(dayNumber = undefined) {
+      if (dayNumber !== undefined && dayNumber !== null && typeof dayNumber !== "boolean") {
+        return this.setCalendarDay(dayNumber);
+      }
       return this.setTime(10, 0);
+    },
+
+    setDaytime() {
+      return this.setTime(10, 0);
+    },
+
+    setCalendarDay(dayNumber) {
+      const d = WorldDecay.setDay(dayNumber, env.ui);
+      env.audio?.bell?.();
+      return `Dia ${d}`;
+    },
+
+    addDays(delta = 1) {
+      const cur = WorldDecay?.daysPassed ?? 1;
+      return this.setCalendarDay(cur + Number(delta));
+    },
+
+    setEvil(targetPercent) {
+      const evil = setEvilPercent(targetPercent, "Cheat Menu");
+      env.audio?.bell?.();
+      return `${evil}% Maldade`;
+    },
+
+    addEvil(amount = 5) {
+      const evil = addEvil(amount, "Cheat Menu");
+      return `${evil}% Maldade`;
+    },
+
+    addGood(amount = 5) {
+      const evil = addGood(amount, "Cheat Menu");
+      return `${evil}% Maldade`;
     },
 
     setNight() {

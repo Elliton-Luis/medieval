@@ -652,7 +652,7 @@ export class InteractionSystem {
         },
         {
           id: "priest:confess",
-          label: "Confissão e Absolvição dos Pecados (Sempre Gratuito · Zera Procurado e +2 CAR)",
+          label: "Confissão e Absolvição dos Pecados (1× por dia · Reduz 10% da Maldade, Zera Procurado e +2 CAR)",
         },
         {
           id: "blessing",
@@ -736,6 +736,11 @@ export class InteractionSystem {
           id: "cult_leader:challenge",
           label: "⚔️ Desafiar o Grão-Mestre: 'Tua seita é uma abominação herética!'",
         },
+        {
+          id: "charity:cult_leader",
+          label: "🪙 Caridade: Fazer oferta de moedas a Morvath (-5 moedas)",
+          disabled: this.player.coins < 5,
+        },
         { id: "close", label: "Retirar-se em silêncio nas sombras" },
       ];
     } else if (npc.name === "Vasco Corvino" || npc.title === "Andarilho") {
@@ -743,6 +748,11 @@ export class InteractionSystem {
         message ||
         "«Vasco ajeita o capuz de couro, olha de esguelha e sussurra: 'Ouvi dizer de uma seita que destruiu algumas cidades proximas, eles deixaram alguns itens escondidos dentros das casas, talvez eu vá dar uma olhada...'»";
       actions = [
+        {
+          id: "charity:vasco",
+          label: "🪙 Caridade: Oferecer moedas de ajuda a Vasco (-5 moedas)",
+          disabled: this.player.coins < 5,
+        },
         {
           id: "tutorial:ghost_towns",
           label: "✦ Segredo das Ruínas: 'O que há escondido nas casas destruídas?'",
@@ -779,6 +789,22 @@ export class InteractionSystem {
           ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
           : []),
         { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.isProud || npc.title === "Nobre" || npc.name === "Lorde Corvino") {
+      body =
+        message ||
+        "«O nobre ajeita sua capa de veludo e olha-te de cima a baixo com altivez: 'O que desejas com a nobreza de Caldera? Nosso tempo é precioso e não deve ser gasto com a plebe.'»";
+      actions = [
+        {
+          id: "charity:noble",
+          label: "🪙 Caridade: Oferecer moedas de cortesia ao nobre (-5 moedas)",
+          disabled: this.player.coins < 5,
+        },
+        {
+          id: "rumor:secrets",
+          label: "✦ Assuntos da Corte: Perguntar sobre as tensões no reino",
+        },
+        { id: "close", label: "Fazer reverência e afastar-se" },
       ];
     } else {
       // Habitantes Comuns e Aldeões: personalidades variadas, pedidos de ajuda, atos de caridade e missões
@@ -1001,14 +1027,37 @@ export class InteractionSystem {
       }
       return;
     }
-    if (
-      action === "charity:alms" ||
-      action === "charity:alms_generous" ||
-      action === "charity:smith" ||
-      action === "charity:merchant" ||
-      action === "charity:farmer" ||
-      action === "charity:guard"
-    ) {
+    if (action.startsWith("charity:")) {
+      const isProudNoble = Boolean(
+        this.activeNPC?.isProud ||
+        this.activeNPC?.title === "Nobre" ||
+        this.activeNPC?.name === "Lorde Corvino" ||
+        action === "charity:noble"
+      );
+      const isCultLeader = Boolean(this.activeNPC?.roleKey === "cult_leader" || action === "charity:cult_leader");
+      const isVasco = Boolean(this.activeNPC?.name === "Vasco Corvino" || action === "charity:vasco");
+
+      if (isProudNoble) {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Doação rejeitada com desdém! O nobre sentiu-se ultrajado pela oferta.");
+        this._showNPCDialogue("«O nobre afasta tua mão com desdém enojado: 'Por quem me tomas, plebeu impertinente?! Não aceito tuas moedas imundas! Guarda tua caridade barata para a gentalha!'»");
+        return;
+      }
+
+      if (isCultLeader) {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Doação rejeitada! O Grão-Mestre abomina as moedas da matéria.");
+        this._showNPCDialogue("«Morvath recua com desprezo absoluto e empurra tuas moedas: 'Ouro? Metal moldado no lodo da matéria pelo Arquiteto Cego? Guarda tua poeira perecível, cego! O Pleroma não negocia com o esterco do mundo!'»");
+        return;
+      }
+
+      if (isVasco) {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Vasco recusa a esmola com um sorriso cínico.");
+        this._showNPCDialogue("«Vasco ajeita a adaga no cinto e dá uma risada debochada: 'Esmola para mim? Guarda isso no bolso antes que eu me ofenda de verdade, viajante. Eu tomo o que preciso na estrada; não vivo da piedade de ninguém.'»");
+        return;
+      }
+
       const cost = action === "charity:alms_generous" ? 8 : 5;
       if (this.player.coins >= cost) {
         this.player.coins -= cost;
@@ -1333,9 +1382,13 @@ export class InteractionSystem {
       this._showNPCDialogue("«Levanta-te e anda em paz». Que a luz sagrada renove tuas forças.");
       return;
     } else if (action === "priest:confess") {
-      if (interactWithPriest(this.player.root.position, this.activeNPC, 0)) {
-        this.ui.showToast("Absolvição concedida gratuitamente! Procurado zerado · Carisma +2");
-        this._showNPCDialogue("«Ego te absolvo a peccatis tuis». Seus pecados estão perdoados pela graça.");
+      const res = interactWithPriest(this.player.root.position, this.activeNPC, 0);
+      if (res && res.success) {
+        this.ui.showToast(`✨ Confissão realizada! Maldade reduzida em 10% (-${res.reduction}%) · Procurado zerado · Carisma +2`);
+        this._showNPCDialogue("«Ego te absolvo a peccatis tuis». Seus pecados foram perdoados pela graça. Tua alma recuperou a virtude e o mal em teu íntimo retrocedeu (-10% de Maldade).");
+      } else {
+        this.ui.showToast("⚠️ Já vos confessastes hoje! O sacramento da penitência deve ser feito uma vez por dia.");
+        this._showNPCDialogue("«Já ouvistes a absolvição neste dia, filho meu. Guarda a bênção no coração e pratica a caridade até o romper do próximo dia.»");
       }
       return;
     } else if (action === "priest:offering:small" && this.player.coins >= 5) {

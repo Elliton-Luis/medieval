@@ -1289,6 +1289,19 @@ export class Cultist {
       return;
     }
 
+    const hasCultRobe = Boolean(PlayerInventory.hasDemiurgeRobe || PlayerStats.wearingDemiurgeRobe);
+    if (this.userData.state === "ATTACKING" && hasCultRobe) {
+      this.userData.state = "REVERING";
+    }
+
+    if (this.userData.state === "REVERING") {
+      const targetYaw = Math.atan2(toPlayerX, toPlayerZ);
+      this.model.rotation.y = THREE.MathUtils.lerp(this.model.rotation.y, targetYaw, 0.1);
+      if (this.armR) this.armR.rotation.x = -0.4;
+      if (this.armL) this.armL.rotation.x = -0.4;
+      return;
+    }
+
     if (this.userData.state === "ATTACKING") {
       this.setSeatedPose(false);
       const d = Math.max(0.001, distToPlayer);

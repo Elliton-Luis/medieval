@@ -3,12 +3,14 @@ import { KINGDOM_NAME, locationAt } from "./kingdom.js";
 import { drawWeaponIcon } from "./weapondata.js";
 import { PlayerStats, getEvilPercent } from "./rpg.js";
 import { CultState } from "./cult.js";
+import { WorldDecay } from "./decay.js";
 
 export class GameUI {
   constructor(renderer) {
     this.renderer = renderer;
     this.fps = document.getElementById("fps");
     this.clock = document.getElementById("clock");
+    this.dayIndicator = document.getElementById("day-indicator");
     this.chunks = document.getElementById("chunk-count");
     this.coordinates = document.getElementById("coordinates");
     this.health = document.getElementById("health");
@@ -196,6 +198,10 @@ export class GameUI {
     this._smoothedFps = this._smoothedFps ? this._smoothedFps * 0.72 + instantaneous * 0.28 : instantaneous;
     this.fps.textContent = Math.round(this._smoothedFps).toString();
     this.clock.textContent = clock;
+    if (this.dayIndicator) {
+      const curDay = WorldDecay?.daysPassed ?? 1;
+      this.dayIndicator.textContent = `Dia ${curDay}`;
+    }
     this.chunks.textContent = `${activeChunks} REGIÕES`;
     this.coordinates.textContent = `X ${Math.round(playerX)} · Z ${Math.round(playerZ)}`;
     const place = locationAt(playerX, playerZ);

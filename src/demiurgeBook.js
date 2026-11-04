@@ -323,14 +323,16 @@ export const DEMIURGE_DIARY_PAGES = [
   {
     id: 12,
     chapter: "OS SACRAMENTOS DA RUÍNA · IV",
-    title: "A Liturgia dos Seis Olhos",
-    stateLabel: "Estado: Manchada de seiva avermelhada",
+    title: "A Transmutação da Carne & As Feras dos Ermos",
+    stateLabel: "Estado: Manchada de seiva avermelhada e runas antigas",
     isTorn: true,
     svg: ``,
     html: `
       <div class="diary-stained-fragment">
-        <p class="diary-text">«...O Observador não é nosso líder, mas o carcereiro do Demiurgo que enlouqueceu ao ver a verdade. Ele vaga pela neblina. Para invocá-lo e aprender seus segredos, o fiel deve permanecer imóvel. Se aceitar o abismo, ganhará a força do vento e a invisibilidade noturna...»</p>
+        <p class="diary-lead">«As abominações que vagam pelos ermos — os Gulurs titânicos, o Observador de Seis Olhos, os Necrons famintos e as feras da lua — não nasceram da terra. Eram homens e mulheres que foram infundidos na magia pura do Demiurgo na tentativa desesperada de libertar a todos da maldição da carne.»</p>
+        <p class="diary-text">«Sua carne rompeu em pesadelo, mas a centelha neles reconhece o Manto Cerimonial da Seita. Aquele que veste a túnica e a máscara do Demiurgo é acolhido pelas feras como um irmão de fé: nenhum monstro ousa erguer garras ou presas contra ele. Mas cuidai-vos dos homens: os guardas das cidades e atalaias reconhecem de pronto o manto da seita e atacam à primeira vista para exterminar o portador!»</p>
       </div>
+      <div class="diary-effect-badge">✦ Segredo do Manto: Feras não atacam quem veste a roupa da seita; guardas da cidade atacam na hora!</div>
     `,
   },
   {

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { spawnLoot, addGood } from "./rpg.js";
+import { spawnLoot, addGood, PlayerInventory, PlayerStats } from "./rpg.js";
 import { WorldDecay } from "./decay.js";
 
 // ============================================================================
@@ -577,9 +577,16 @@ export class Gulur {
     const dz = pz - this.z;
     const distSq = dx * dx + dz * dz;
 
-    // Se o jogador estiver a uma distância prudente (> 28m, distSq > 784):
-    // O Gulur para, ergue o pescoço comprido e ENCARA fixamente com seus olhos amarelos brilhantes e aura etérea
-    if (distSq > 784) {
+    const hasCultRobe = Boolean(PlayerInventory.hasDemiurgeRobe || PlayerStats.wearingDemiurgeRobe);
+
+    // Se o jogador estiver de túnica do culto, o Gulur não se espanta e encara com serenidade:
+    if (hasCultRobe) {
+      this.state = "staring";
+      const targetYaw = Math.atan2(dx, dz);
+      this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 1.8);
+      this.root.rotation.y = this.heading;
+      this.speed = Math.max(0, this.speed - dt * 5.0);
+    } else if (distSq > 784) {
       if (this.fleeTimer > 0) {
         this.fleeTimer -= dt;
         // Desacelera suavemente ao atingir distância segura
@@ -943,8 +950,10 @@ export class Necron {
     const dz = pz - this.z;
     const distSq = dx * dx + dz * dz;
 
-    // O Necron fica esperando; SÓ ATACA QUANDO O PLAYER ESTÁ MUITO PERTO (<= 7.5m, distSq <= 56.25)
-    if (distSq <= 56.25) {
+    const hasCultRobe = Boolean(PlayerInventory.hasDemiurgeRobe || PlayerStats.wearingDemiurgeRobe);
+
+    // O Necron reconhece o Manto da Seita do Demiurgo e não ataca discípulos
+    if (!hasCultRobe && distSq <= 56.25) {
       if (this.state !== "charging" && this._howlCooldown <= 0) {
         this._howlCooldown = 5.0;
         this.audio?.playWolfHowl?.(0.85, Math.sqrt(distSq));
@@ -979,7 +988,7 @@ export class Necron {
         }
       }
     } else {
-      // Quando o jogador está afastado (> 7.5m): O Necron FICA ESPERANDO
+      // Quando o jogador está afastado ou veste o manto da seita: O Necron FICA ESPERANDO
       this.state = "waiting";
       this.speed = 0; // Imóvel esperando a presa
       this.model.rotation.x = 0.08;
@@ -1353,8 +1362,10 @@ export class Hexoculus {
       this.eyes[i].scale.set(pScale, pScale, pScale);
     }
 
-    // Se estiver a <= 18m (distSq <= 324), encara o jogador e persegue em passos espectrais
-    if (distSq <= 324) {
+    const hasCultRobe = Boolean(PlayerInventory.hasDemiurgeRobe || PlayerStats.wearingDemiurgeRobe);
+
+    // Se estiver a <= 18m (distSq <= 324) e o player NÃO vestir o Manto da Seita, encara e persegue
+    if (!hasCultRobe && distSq <= 324) {
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 6.0);
       this.model.rotation.y = this.heading;
@@ -1705,7 +1716,9 @@ export class Polyphonia {
       this.segments[s].position.x = Math.sin(this.slitherPhase + s * 0.8) * 0.14;
     }
 
-    if (distSq <= 196) { // <= 14m
+    const hasCultRobe = Boolean(PlayerInventory.hasDemiurgeRobe || PlayerStats.wearingDemiurgeRobe);
+
+    if (!hasCultRobe && distSq <= 196) { // <= 14m (ignora se o player usar o Manto da Seita)
       const targetYaw = Math.atan2(dx, dz);
       this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 7.5);
       this.model.rotation.y = this.heading;

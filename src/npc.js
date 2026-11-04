@@ -4,7 +4,7 @@ import { makeRandom } from "./utils.js";
 import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js";
-import { NPC_TYPES, NPC_STATES, updateNPCRoutine, addEvil } from "./rpg.js";
+import { NPC_TYPES, NPC_STATES, updateNPCRoutine, addEvil, PlayerInventory, PlayerStats } from "./rpg.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
 import { isOccludedByHouses } from "./houses.js";
 
@@ -765,6 +765,25 @@ export class NPC {
   _findNearbyThreat(radius = 32) {
     if (!this.npcSystem || !Array.isArray(this.npcSystem.npcs)) return null;
     const rSq = radius * radius;
+
+    // Se o jogador estiver vestindo o manto da seita do Demiurgo, a guarda o detecta como ameaça imediata
+    const isWearingCultRobe = Boolean(PlayerInventory?.hasDemiurgeRobe || PlayerStats?.wearingDemiurgeRobe);
+    if (isWearingCultRobe) {
+      const px = this.npcSystem.playerX ?? 0;
+      const pz = this.npcSystem.playerZ ?? 0;
+      const dSq = (px - this.x) ** 2 + (pz - this.z) ** 2;
+      if (dSq < rSq) {
+        return {
+          name: "Herege da Seita",
+          x: px,
+          z: pz,
+          alive: true,
+          removed: false,
+          isPlayerCultist: true,
+        };
+      }
+    }
+
     const list = this.npcSystem.npcs;
     let closest = null;
     let closestDistSq = rSq;
@@ -1196,21 +1215,86 @@ export class NPCSystem {
       npc._spatialCZ = Math.floor(npc.z * 0.0625);
       return npc;
     };
+    // 1. Guardas da Capital (Portão, Muralhas e Ronda)
     add("guard", [
       { x: -3.2, z: -41.5 }, { x: 3.2, z: -41.5 }, { x: 3.2, z: -45.1 }, { x: -3.2, z: -45.1 },
-    ], gate);
+    ], gate, { name: "Capitão Valério", title: "Comandante da Guarda" });
+
+    add("guard", [
+      { x: gate.x - 12.0, z: gate.z - 2.0 }, { x: gate.x - 8.0, z: gate.z + 4.0 }, { x: gate.x - 14.0, z: gate.z + 2.0 }
+    ], { x: gate.x - 10.0, z: gate.z }, { name: "Sentinela Roland", title: "Guarda da Muralha Oeste" });
+
+    add("guard", [
+      { x: gate.x + 12.0, z: gate.z - 2.0 }, { x: gate.x + 16.0, z: gate.z + 4.0 }, { x: gate.x + 10.0, z: gate.z + 2.0 }
+    ], { x: gate.x + 12.0, z: gate.z }, { name: "Vigia Tristan", title: "Guarda da Muralha Leste" });
+
+    add("guard", ringPath(market.x, market.z, 7.5, 0), market, { name: "Ronda Cedric", title: "Patrulheiro do Mercado" });
+
+    // 2. Ferreiros (Mestre, Aprendiz e Armeiro da Cidade)
     add("smith", [
       { x: smith.x, z: smith.z }, { x: 14.1, z: -22 }, { x: 11.7, z: -22.8 },
-    ], smith);
+    ], smith, { name: "Mestre Torvald", title: "Ferreiro-Chefe de Caldera" });
+
+    add("smith", around({ x: smith.x + 3.2, z: smith.z - 2.4 }, 1.4), { x: smith.x + 3.2, z: smith.z - 2.4 }, {
+      name: "Bryan",
+      title: "Aprendiz de Forja",
+      cloth: "#6e4b2d",
+    });
+
+    add("smith", around({ x: gate.x + 6.5, z: gate.z + 6.0 }, 1.5), { x: gate.x + 6.5, z: gate.z + 6.0 }, {
+      name: "Eudes",
+      title: "Armeiro da Guarnição",
+      cloth: "#483c32",
+    });
+
+    // 3. Mercadores e Serviços de Caldera
     add("merchant", [
       { x: market.x, z: market.z }, { x: -18.8, z: -18.7 }, { x: -19.5, z: -22.8 },
-    ], market);
+    ], market, { name: "Barnabé", title: "Taverneiro e Mercador" });
+
+    add("merchant", around({ x: market.x - 4.5, z: market.z - 3.2 }, 1.3), { x: market.x - 4.5, z: market.z - 3.2 }, {
+      name: "Martha",
+      title: "Boticária de Unguentos",
+      cloth: "#2d5a4c",
+    });
+
+    add("merchant", around({ x: well.x + 5.2, z: well.z + 3.8 }, 1.4), { x: well.x + 5.2, z: well.z + 3.8 }, {
+      name: "Gerald",
+      title: "Negociante de Grãos",
+      cloth: "#5c4033",
+    });
+
+    // 4. Fazendeiro
     add("farmer", [
       { x: -35.4, z: 7.1 }, { x: -26.7, z: 7.1 }, { x: -26.7, z: -6.1 }, { x: -35.4, z: -6.1 },
-    ], { x: -31, z: 0 });
+    ], { x: -31, z: 0 }, { name: "Théo", title: "Fazendeiro de Caldera" });
+
+    // 5. Nobre Orgulhoso (Ofende-se ao receber doação)
+    add("villager", ringPath(well.x + 2.0, well.z - 3.0, 4.2, 1.2), well, {
+      name: "Lorde Corvino",
+      title: "Nobre",
+      cloth: "#7a2233",
+      hair: "#2b2024",
+      isProud: true,
+    });
+
+    // 6. Habitantes Comuns e Trabalhadores
     add("villager", [
       { x: well.x + 2, z: well.z + 2 }, { x: -8.2, z: -17.4 }, { x: -4.4, z: -30.5 }, { x: 1.5, z: -35.2 },
-    ], well);
+    ], well, { name: "Helena", title: "Lavadeira da Praça", cloth: "#4a6984" });
+
+    add("villager", around({ x: smith.x - 4.0, z: smith.z + 3.0 }, 2.0), { x: smith.x - 4.0, z: smith.z + 3.0 }, {
+      name: "Walter",
+      title: "Lenhador da Cidade",
+      cloth: "#5d432c",
+    });
+
+    add("villager", ringPath(market.x + 2.0, market.z + 2.5, 3.8, 2.0), market, {
+      name: "Elvira",
+      title: "Costureira",
+      cloth: "#6b4970",
+    });
+
     add("villager", [
       { x: market.x + 2.4, z: market.z + 1.8 }, { x: well.x - 1.8, z: well.z + 1.2 }, { x: smith.x - 2.2, z: smith.z + 1.5 },
     ], market, {
@@ -1220,18 +1304,47 @@ export class NPCSystem {
       hair: "#1c1714",
       isBandit: true,
     });
+
+    // 7. Igreja e Fiéis
     const capitalChurch = settlement.churches?.[0];
     if (capitalChurch) {
       add("priest", around(capitalChurch.spawn, 1.4), capitalChurch.spawn, {
         name: "Padre Anselmo",
         title: "Sacerdote de Caldera",
       });
+
+      add("villager", around({ x: capitalChurch.spawn.x + 2.8, z: capitalChurch.spawn.z - 2.2 }, 1.2), capitalChurch.spawn, {
+        name: "Peregrino Lucas",
+        title: "Devoto da Fé",
+        cloth: "#3c3836",
+      });
     }
+
+    // 8. Mendigos e Necessitados (Múltiplos em Caldera)
     add("beggar", [
       { x: well.x - 2.2, z: well.z + 1.8 }, { x: well.x - 3.0, z: well.z - 1.2 },
     ], well, {
       name: "Bartolomeu",
       title: "Pedinte da Praça",
+    });
+
+    const churchBeggarPos = capitalChurch ? { x: capitalChurch.spawn.x - 3.8, z: capitalChurch.spawn.z + 2.5 } : { x: well.x + 4.2, z: well.z - 4.2 };
+    add("beggar", around(churchBeggarPos, 1.2), churchBeggarPos, {
+      name: "Irmão Lázaro",
+      title: "Pedinte do Adro",
+      cloth: "#4a3c2c",
+    });
+
+    add("beggar", around({ x: gate.x - 4.5, z: gate.z + 2.5 }, 1.4), { x: gate.x - 4.5, z: gate.z + 2.5 }, {
+      name: "Velho Silas",
+      title: "Mendigo das Muralhas",
+      cloth: "#3d3028",
+    });
+
+    add("beggar", around({ x: market.x + 4.5, z: market.z - 3.8 }, 1.3), { x: market.x + 4.5, z: market.z - 3.8 }, {
+      name: "Menino Tico",
+      title: "Órfão dos Becos",
+      cloth: "#554332",
     });
 
     for (const place of settlement.villages || []) this._populateVillage(add, place);
@@ -1263,10 +1376,19 @@ export class NPCSystem {
     }
     add("villager", ringPath(well.x, well.z, 6.4, random() * 6), well, { ...look(), title: "Aldeão" });
     add("villager", ringPath(well.x, well.z, 7.4, random() * 6), well, { ...look(), title: "Aldeão", isBandit: true });
+    add("villager", ringPath(well.x, well.z, 8.4, random() * 6), well, { ...look(), title: "Morador" });
+    add("villager", ringPath(well.x, well.z, 9.6, random() * 6), well, { ...look(), title: "Camponesa" });
+
+    // Ferreiro auxiliar ou ajudante de forja na vila
+    if (village.kind !== "forge") {
+      add("smith", around(well, 4.4), well, { ...look(), cloth: "#504136", title: "Ferreiro Local" });
+    }
+
     if (place.church) {
       add("priest", around(place.church.spawn, 1.3), place.church.spawn, { ...look(), cloth: "#36312d", title: "Sacerdote" });
     }
     add("beggar", around(well, 2.2), well, { ...look(), cloth: "#6b5b4b", title: "Pedinte" });
+    add("beggar", around(well, 3.6), well, { ...look(), cloth: "#5a4d3f", title: "Mendigo da Vila" });
   }
 
   /**
@@ -1438,6 +1560,34 @@ export class NPCSystem {
     }
 
     if (this.wantedCooldown > 0) this.wantedCooldown -= clampedDt;
+
+    // Se o jogador estiver vestindo o manto da seita, todos os guardas próximos entram em caçada imediata
+    const isWearingCultRobe = Boolean(PlayerInventory?.hasDemiurgeRobe || PlayerStats?.wearingDemiurgeRobe);
+    if (isWearingCultRobe) {
+      let spotted = false;
+      for (let i = 0; i < this.npcs.length; i++) {
+        const guard = this.npcs[i];
+        if (!guard || !guard.alive || guard.roleKey !== "guard") continue;
+        const dSq = (guard.x - playerX) ** 2 + (guard.z - playerZ) ** 2;
+        if (dSq < 30 * 30) {
+          spotted = true;
+          if (guard.mode !== "hunt") {
+            this._hunt(guard);
+            guard.targetThreat = null;
+          }
+        }
+      }
+      if (spotted) {
+        this.wanted = Math.max(this.wanted || 0, 3);
+        this.wantedTimer = Math.max(this.wantedTimer || 0, 25);
+        this.onWantedChange?.(this.wanted);
+        if (!this._lastCultRobeShout || performance.now() - this._lastCultRobeShout > 9000) {
+          this._lastCultRobeShout = performance.now();
+          this.onAlert?.("⚔️ A guarda avistou o Manto do Demiurgo! 'Um herege da seita! Matem o servo de Rex Mundi!'");
+        }
+      }
+    }
+
     if (this.wanted > 0) {
       let anyGuardSeesPlayer = false;
       for (let i = 0; i < this.npcs.length; i++) {

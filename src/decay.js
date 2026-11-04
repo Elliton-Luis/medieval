@@ -29,6 +29,18 @@ export const WorldDecay = {
     EventBus.emit(GAME_EVENTS.CORRUPTION_CHANGED, { level: this.decayLevel, delta: this.decayLevel - prev, reason });
   },
 
+  setDay(dayNumber, ui = null) {
+    const d = Math.max(1, Math.round(Number(dayNumber) || 1));
+    this.daysPassed = d;
+    const isTodayEclipse = Array.isArray(this.scheduledEclipseDays) && this.scheduledEclipseDays.includes(d);
+    this.isEclipse = Boolean(isTodayEclipse);
+    const uiRef = ui || window.__game?.ui;
+    if (uiRef?.showToast) {
+      uiRef.showToast(`📅 Dia alterado para o Dia ${d}${this.isEclipse ? " · 🌑 ECLIPSE TOTAL!" : ""}`);
+    }
+    return d;
+  },
+
   /**
    * Sorteia ao menos 1 dia de eclipse estritamente DEPOIS do dia 4 (dia >= 5).
    * Pode ser 1 ou mais dias. Como o final com maldade > 90% pode acontecer no dia 7,
