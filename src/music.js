@@ -262,6 +262,7 @@ export class MusicDirector {
     this._threatActive = false;
     this._cityActive = false;
     this._ghostCampActive = false;
+    this._combatCooldown = 0;
 
     // Pré-carrega o som de descoberta no construtor para evitar I/O no frame
     try {
@@ -278,8 +279,9 @@ export class MusicDirector {
   async start() {
     if (this.started) return;
     this.started = true;
-    this.context = this._detect();
-    this._switchTo(this.context);
+    const initialKey = this.override || this._detect();
+    this.context = initialKey;
+    this._switchTo(initialKey, true);
   }
 
   _urlFor(key) {
@@ -288,38 +290,93 @@ export class MusicDirector {
     return entry.mp3 || entry.ogg || entry.wav || TRACK_CATALOG.explore.mp3;
   }
 
+  _ensureTrackNodes(track) {
+    if (!track || !this.audio || !this.audio.context || !this.audio.musicBus) return;
+    if (!track.source) {
+      try {
+        track.source = this.audio.context.createMediaElementSource(track.element);
+        track.gain = this.audio.context.createGain();
+        track.gain.gain.setValueAtTime(track.currentVolume ?? 0, this.audio.context.currentTime);
+        track.source.connect(track.gain).connect(this.audio.musicBus);
+      } catch (_) {}
+    }
+  }
+
+  _safePlay(track) {
+    if (!track || !track.element) return;
+    this._ensureTrackNodes(track);
+    if (!track.element.paused && track._isPlaying) return;
+    track._isPlaying = true;
+    try {
+      track._playPromise = track.element.play();
+      if (track._playPromise && track._playPromise.catch) {
+        track._playPromise.catch(() => {
+          track._isPlaying = false;
+        });
+      }
+    } catch (_) {
+      track._isPlaying = false;
+    }
+  }
+
+  _safePause(track) {
+    if (!track || !track.element) return;
+    track._isPlaying = false;
+    this._applyTrackVolume(track, 0);
+    const elem = track.element;
+    if (track._playPromise) {
+      track._playPromise
+        .then(() => {
+          try { elem.pause(); } catch (_) {}
+        })
+        .catch(() => {
+          try { elem.pause(); } catch (_) {}
+        });
+      track._playPromise = null;
+    } else {
+      try { elem.pause(); } catch (_) {}
+    }
+  }
+
+  _silenceAllExcept(trackA = null, trackB = null) {
+    for (const [_, track] of this.tracks.entries()) {
+      if (track !== trackA && track !== trackB) {
+        if (track.currentVolume > 0) {
+          this._applyTrackVolume(track, 0);
+        }
+        if (!track.element.paused || track._isPlaying) {
+          this._safePause(track);
+        }
+      }
+    }
+  }
+
   /**
    * Carregamento Sob Demanda: Instancia a faixa na Web Audio API apenas quando solicitada.
    */
   _track(key) {
     let track = this.tracks.get(key);
-    if (track) return track;
+    if (track) {
+      this._ensureTrackNodes(track);
+      return track;
+    }
 
-    const audio = this.audio;
     const url = this._urlFor(key);
     const element = new Audio(url);
     element.loop = true;
     element.preload = "auto";
 
-    let source = null;
-    let gain = null;
-    try {
-      source = audio.context.createMediaElementSource(element);
-      gain = audio.context.createGain();
-      gain.gain.value = 0;
-      source.connect(gain).connect(audio.musicBus);
-    } catch (_) {
-      // Fallback em caso de contexto indisponível
-    }
-
     track = {
       key,
       element,
-      source,
-      gain,
+      source: null,
+      gain: null,
       currentVolume: 0,
       evictAt: 0,
+      _isPlaying: false,
+      _playPromise: null,
     };
+    this._ensureTrackNodes(track);
     this.tracks.set(key, track);
     return track;
   }
@@ -328,6 +385,7 @@ export class MusicDirector {
     if (!track) return;
     const clamped = Math.max(0, Math.min(1, vol));
     track.currentVolume = clamped;
+    this._ensureTrackNodes(track);
     if (track.gain && this.audio.context) {
       try {
         const param = track.gain.gain;
@@ -352,6 +410,32 @@ export class MusicDirector {
     // Se já é a faixa atual e estamos estáveis ou subindo volume, nada a fazer
     if (this.currentKey === key && this.fadePhase !== "fading_out") return;
 
+    if (urgent) {
+      // Interrupção urgente (luta/caça/override): corta imediatamente qualquer faixa anterior
+      if (this.fadingOutTrack) {
+        this._safePause(this.fadingOutTrack);
+        this.fadingOutTrack = null;
+      }
+      if (this.current && this.current.key !== key) {
+        this._safePause(this.current);
+        this.current = null;
+      }
+      const next = this._track(key);
+      this.current = next;
+      this.currentKey = key;
+      this.targetKey = key;
+      this._applyTrackVolume(next, 0);
+      try { next.element.currentTime = 0; } catch (_) {}
+      this._safePlay(next);
+      this.fadePhase = "fading_in";
+      this.startVolume = 0;
+      this.phaseTimer = 0;
+      this.phaseDuration = FADE_URGENT_IN;
+      this._trackStartedTime = this.time;
+      this._silenceAllExcept(this.current);
+      return;
+    }
+
     // Se estávamos fazendo fade out da mesma faixa e ela foi solicitada de volta:
     // podemos reverter o fade de volta para fade-in a partir do volume atual
     if (this.fadingOutTrack && this.fadingOutTrack.key === key && this.fadePhase === "fading_out") {
@@ -362,7 +446,15 @@ export class MusicDirector {
       this.fadePhase = "fading_in";
       this.startVolume = this.current.currentVolume || 0;
       this.phaseTimer = 0;
-      this.phaseDuration = urgent ? FADE_URGENT_IN : FADE_IN_DURATION;
+      this.phaseDuration = FADE_IN_DURATION;
+      this._silenceAllExcept(this.current);
+      return;
+    }
+
+    // Se já estivermos no meio de um fade-out suave para o silêncio:
+    // Apenas atualizamos o targetKey! A faixa saindo continua descendo até 0 antes que a nova comece.
+    if (this.fadePhase === "fading_out") {
+      this.targetKey = key;
       return;
     }
 
@@ -375,13 +467,13 @@ export class MusicDirector {
       this.fadePhase = "fading_out";
       this.startVolume = this.fadingOutTrack.currentVolume;
       this.phaseTimer = 0;
-      this.phaseDuration = urgent ? FADE_URGENT_OUT : FADE_OUT_DURATION;
-      // Nenhuma outra faixa toca enquanto esta estiver diminuindo (overlap zero)
+      this.phaseDuration = FADE_OUT_DURATION;
+      this._silenceAllExcept(this.fadingOutTrack);
     } else {
       // Se não havia faixa tocando, inicia direto o fade in na nova faixa
       if (this.current) {
-        this._applyTrackVolume(this.current, 0);
-        try { this.current.element.pause(); } catch (_) {}
+        this._safePause(this.current);
+        this.current = null;
       }
       const next = this._track(key);
       this.current = next;
@@ -389,12 +481,13 @@ export class MusicDirector {
       this.fadingOutTrack = null;
       this._applyTrackVolume(next, 0);
       try { next.element.currentTime = 0; } catch (_) {}
-      next.element.play().catch(() => {});
+      this._safePlay(next);
       this.fadePhase = "fading_in";
       this.startVolume = 0;
       this.phaseTimer = 0;
-      this.phaseDuration = urgent ? FADE_URGENT_IN : FADE_IN_DURATION;
+      this.phaseDuration = FADE_IN_DURATION;
       this._trackStartedTime = this.time;
+      this._silenceAllExcept(this.current);
     }
   }
 
@@ -413,26 +506,19 @@ export class MusicDirector {
 
   pauseForDefeat() {
     this.pausedForDefeat = true;
-    if (this.current) {
-      this.fadingOutTrack = this.current;
-      this.current = null;
-      this.fadePhase = "fading_out";
-      this.startVolume = this.fadingOutTrack.currentVolume || 1.0;
-      this.phaseTimer = 0;
-      this.phaseDuration = 0.5;
-    }
     for (const [k, track] of this.tracks.entries()) {
-      if (track !== this.fadingOutTrack) {
-        this._applyTrackVolume(track, 0);
-        try { track.element.pause(); } catch (_) {}
-      }
+      this._safePause(track);
     }
+    this.fadingOutTrack = null;
+    this.current = null;
+    this.fadePhase = "idle";
   }
 
   resumeAfterDefeat() {
     this.pausedForDefeat = false;
     this.fadePhase = "idle";
     this.fadingOutTrack = null;
+    this.current = null;
     this.context = this._detect();
     this._switchTo(this.context, true);
   }
@@ -609,10 +695,14 @@ export class MusicDirector {
     const pz = this.player.z ?? 0;
 
     // 1. Procurado nível 1 a 5 (Guarda Real ativamente em perseguição/combate)
-    if ((this.npcs?.wanted ?? 0) >= 1) return true;
+    if ((this.npcs?.wanted ?? 0) >= 1) {
+      this._combatCooldown = 4.5;
+      return true;
+    }
 
     // 2. Dano sofrido ou desferido em combate recente (< 5.5s)
     if (this.player.lastCombatTime && (performance.now() - this.player.lastCombatTime) < 5500) {
+      this._combatCooldown = 4.5;
       return true;
     }
 
@@ -624,7 +714,10 @@ export class MusicDirector {
         if (n.state === "attack" || n.state === "chase" || n.alerted) {
           const dx = n.x - px;
           const dz = n.z - pz;
-          if (dx * dx + dz * dz < 26 * 26) return true;
+          if (dx * dx + dz * dz < 26 * 26) {
+            this._combatCooldown = 4.5;
+            return true;
+          }
         }
       }
     }
@@ -637,7 +730,10 @@ export class MusicDirector {
         if (b.state === "chase" || b.state === "charge" || b.state === "attacking") {
           const dx = b.x - px;
           const dz = b.z - pz;
-          if (dx * dx + dz * dz < 32 * 32) return true;
+          if (dx * dx + dz * dz < 32 * 32) {
+            this._combatCooldown = 4.5;
+            return true;
+          }
         }
       }
     }
@@ -650,9 +746,17 @@ export class MusicDirector {
         if (c.userData?.state === "ATTACKING" || c.hostile) {
           const dx = c.x - px;
           const dz = c.z - pz;
-          if (dx * dx + dz * dz < 28 * 28) return true;
+          if (dx * dx + dz * dz < 28 * 28) {
+            this._combatCooldown = 4.5;
+            return true;
+          }
         }
       }
+    }
+
+    // Mantém a música de combate estável durante o cooldown sem oscilar (anti-flapping)
+    if (this._combatCooldown > 0) {
+      return true;
     }
 
     return false;
@@ -729,6 +833,9 @@ export class MusicDirector {
 
   update(dt) {
     this.time += dt;
+    if (this._combatCooldown > 0) {
+      this._combatCooldown = Math.max(0, this._combatCooldown - dt);
+    }
     if (!this.started || !this.audio.context || this.pausedForDefeat) return;
 
     // -------------------------------------------------------------------------
@@ -741,11 +848,12 @@ export class MusicDirector {
       if (this.fadingOutTrack) {
         this._applyTrackVolume(this.fadingOutTrack, vol);
       }
+      this._silenceAllExcept(this.fadingOutTrack);
+
       if (progress >= 1) {
         // Silêncio completo atingido pela faixa anterior!
         if (this.fadingOutTrack) {
-          this._applyTrackVolume(this.fadingOutTrack, 0);
-          try { this.fadingOutTrack.element.pause(); } catch (_) {}
+          this._safePause(this.fadingOutTrack);
           this.fadingOutTrack.evictAt = this.time + EVICTION_TIME;
           this.fadingOutTrack = null;
         }
@@ -757,12 +865,13 @@ export class MusicDirector {
           this.currentKey = this.targetKey;
           this._applyTrackVolume(next, 0);
           try { next.element.currentTime = 0; } catch (_) {}
-          next.element.play().catch(() => {});
+          this._safePlay(next);
           this.fadePhase = "fading_in";
           this.phaseTimer = 0;
           this.phaseDuration = FADE_IN_DURATION;
           this.startVolume = 0;
           this._trackStartedTime = this.time;
+          this._silenceAllExcept(this.current);
         } else {
           this.fadePhase = "idle";
         }
@@ -774,9 +883,10 @@ export class MusicDirector {
       if (this.current) {
         this._applyTrackVolume(this.current, vol);
         if (this.current.element.paused) {
-          this.current.element.play().catch(() => {});
+          this._safePlay(this.current);
         }
       }
+      this._silenceAllExcept(this.current);
       if (progress >= 1) {
         if (this.current) this._applyTrackVolume(this.current, 1);
         this.fadePhase = "idle";
@@ -785,9 +895,10 @@ export class MusicDirector {
       if (this.current) {
         if (this.current.currentVolume !== 1) this._applyTrackVolume(this.current, 1);
         if (this.current.element.paused) {
-          this.current.element.play().catch(() => {});
+          this._safePlay(this.current);
         }
       }
+      this._silenceAllExcept(this.current);
     }
 
     // -------------------------------------------------------------------------
@@ -802,15 +913,15 @@ export class MusicDirector {
         if (track.currentVolume > 0) {
           this._applyTrackVolume(track, 0);
         }
-        if (!track.element.paused) {
-          try { track.element.pause(); } catch (_) {}
+        if (!track.element.paused || track._isPlaying) {
+          this._safePause(track);
         }
       }
 
       // Descarrega da memória (Eviction) após 16 segundos sem uso
       if (!isAllowedPlaying && track.evictAt && this.time >= track.evictAt) {
         try {
-          track.element.pause();
+          this._safePause(track);
           track.element.removeAttribute("src");
           track.element.load();
           if (track.gain) track.gain.disconnect();
