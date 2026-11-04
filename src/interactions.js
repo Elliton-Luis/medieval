@@ -117,11 +117,11 @@ export class InteractionSystem {
     if (this.input.consumeDiaryPressed?.()) {
       if (isDemiurgeDiaryReaderOpen()) {
         closeDemiurgeDiaryReader();
-      } else if (PlayerInventory.hasDemiurgeDiary) {
+      } else if (PlayerInventory.hasDemiurgeDiary || (Array.isArray(PlayerInventory.discoveredBookPages) && PlayerInventory.discoveredBookPages.length > 0)) {
         if (document.pointerLockElement) document.exitPointerLock();
         openDemiurgeDiaryReader(0, this.audio);
       } else {
-        this.ui.showToast(`✦ Não possuis o Diário dos Demiurgos... Dica: ${getDemiurgeDiaryHint()}`);
+        this.ui.showToast(`✦ Não possuis o Diário dos Demiurgos nem qualquer folha avulsa... Dica: ${getDemiurgeDiaryHint()}`);
       }
       return;
     }
@@ -757,29 +757,117 @@ export class InteractionSystem {
         { id: "close", label: "Encerrar conversa" },
       ];
     } else {
-      body = message || "Psst... Um comprador discreto paga 60 moedas por um Cavalo Puro-Sangue furtado da muralha leste.";
-      actions = [
-        {
-          id: "mission:horse_theft",
-          label: "✦ Missão: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
-        },
-        {
-          id: "rumor:secrets",
-          label: "✦ Segredos dos Viajantes: Ouvir dicas e boatos dos ermos",
-        },
-        {
-          id: "rumor:cult",
-          label: "Ouvir boatos sobre as sombras além dos muros",
-        },
-        {
-          id: "rumor:demiurge_book",
-          label: "✦ Boatos do Submundo: Indagar sobre o Diário dos Demiurgos",
-        },
-        ...(MissionState.activeId
-          ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
-          : []),
-        { id: "close", label: "Encerrar conversa" },
-      ];
+      // Habitantes Comuns e Aldeões: personalidades variadas, pedidos de ajuda, atos de caridade e missões
+      const pCode = Math.abs((npc.name ? npc.name.charCodeAt(0) * 17 + npc.name.length * 3 : 7) % 4);
+
+      if (pCode === 0) {
+        // Aldeão necessitado / Família camponesa
+        body = message || "«O aldeão aperta o casaco puído e olha para o céu cinzento: 'As noites estão geladas e os animais do curral mal têm o que comer. Qualquer ajuda com feno fresco ou auxílio é uma bênção dos céus.'»";
+        actions = [
+          {
+            id: "charity:hay",
+            label: `🌾 Caridade: Doar 3 Fardos de Feno para o rebanho (-3 Feno · +2 CAR) · tens ${PlayerInventory.hay}`,
+            disabled: (PlayerInventory.hay || 0) < 3,
+          },
+          {
+            id: "charity:alms",
+            label: "🪙 Caridade: Entregar 6 Moedas de Auxílio Solidário (-6 moedas · +1 CAR)",
+            disabled: this.player.coins < 6,
+          },
+          {
+            id: "mission:deliver",
+            label: "✦ Missão: Entrega Solidária de Mantimentos (+50 moedas, +1 CAR)",
+          },
+          {
+            id: "rumor:morvath",
+            label: "🌑 Boato: Ouvir avisos sobre o Grão-Mestre Morvath",
+          },
+          ...(MissionState.activeId
+            ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+            : []),
+          { id: "close", label: "Encerrar conversa" },
+        ];
+      } else if (pCode === 1) {
+        // Moradora com frio / Necessidade de lenha e reparos
+        body = message || "«A aldeã treme junto à porta: 'A lenha da lareira acabou. A névoa da floresta parece sugar o calor das nossas casas... Se alguém tiver madeira seca para doar, salvará nossa noite.'»";
+        actions = [
+          {
+            id: "charity:wood",
+            label: `🪵 Caridade: Doar 4 Madeiras secas para a lareira (-4 Madeira · +2 CAR) · tens ${PlayerInventory.wood}`,
+            disabled: (PlayerInventory.wood || 0) < 4,
+          },
+          {
+            id: "charity:stone",
+            label: `🪨 Caridade: Doar 4 Pedras para calafetar o abrigo (-4 Pedra · +2 CAR) · tens ${PlayerInventory.stone}`,
+            disabled: (PlayerInventory.stone || 0) < 4,
+          },
+          {
+            id: "mission:debt",
+            label: "✦ Missão: Cobrança de Devedor da Vila (+55 moedas, +1 CAR)",
+          },
+          {
+            id: "rumor:beasts",
+            label: "👁️ Boato: Relatos sobre os Gulurs de olhos amarelos nos ermos",
+          },
+          ...(MissionState.activeId
+            ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+            : []),
+          { id: "close", label: "Encerrar conversa" },
+        ];
+      } else if (pCode === 2) {
+        // Viajante ou morador ferido
+        body = message || "«O morador se apoia na mureta, gemendo de dor: 'Fui cercado por aquelas feras na estrada além dos muros... Meu braço sangra. Uma poção de cura me colocaria de pé novamente.'»";
+        actions = [
+          {
+            id: "charity:potion",
+            label: `🧪 Caridade Suprema: Entregar Poção de Cura (-1 Poção · +3 CAR) · tens ${this.player.potions || 0}`,
+            disabled: (this.player.potions || 0) < 1,
+          },
+          {
+            id: "charity:alms_generous",
+            label: "🪙 Caridade: Doar 8 Moedas para comprar remédios (-8 moedas · +2 CAR)",
+            disabled: this.player.coins < 8,
+          },
+          {
+            id: "mission:bounty",
+            label: "⚔️ Missão: Caça ao Bandido nas terras ermas (+65 moedas, +2 CAR)",
+          },
+          {
+            id: "rumor:cult",
+            label: "Ouvir boatos sobre as sombras e a seita além dos muros",
+          },
+          ...(MissionState.activeId
+            ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+            : []),
+          { id: "close", label: "Encerrar conversa" },
+        ];
+      } else {
+        // Contrabandista / Tropeiro experiente
+        body = message || "«O homem ajeita o capuz e fala em tom discreto: 'Tenho compradores para cavalos de raça e tarefas especiais para quem tiver coragem nos ermos.'»";
+        actions = [
+          {
+            id: "mission:horse_theft",
+            label: "✦ Missão Clandestina: Roubo de Montaria Puro-Sangue (+60 moedas, +1 CAR)",
+          },
+          {
+            id: "charity:alms",
+            label: "🪙 Caridade: Dar uma moeda de ajuda solidária (-6 moedas · +1 CAR)",
+            disabled: this.player.coins < 6,
+          },
+          {
+            id: "rumor:secrets",
+            label: "✦ Segredos dos Viajantes: Ouvir dicas e boatos dos ermos",
+          },
+          {
+            id: "rumor:demiurge_book",
+            label: "✦ Boatos do Submundo: Indagar sobre o Diário dos Demiurgos",
+          },
+          ...(MissionState.activeId
+            ? [{ id: "mission:cancel", label: `✕ Cancelar missão ativa (${MissionState.title})` }]
+            : []),
+          { id: "close", label: "Encerrar conversa" },
+        ];
+      }
     }
     const finalBody = (eclipseHeader && !body.includes(eclipseHeader)) ? (eclipseHeader + body) : body;
     this.ui.showDialogue(npc.name, finalBody, actions, {
@@ -829,6 +917,82 @@ export class InteractionSystem {
       startMission(m);
       this.ui.closeDialogue();
       this.ui.showToast("Missão Iniciada: Caça ao Bandido! Elimine o alvo fora da muralha.");
+      return;
+    }
+    if (action === "charity:hay") {
+      if ((PlayerInventory.hay || 0) >= 3) {
+        PlayerInventory.hay -= 3;
+        PlayerStats.hay = PlayerInventory.hay;
+        PlayerStats.cha += 2;
+        syncPlayerStatsToPlayer();
+        addGood(4, "Doou feno fresco para uma família camponesa");
+        this.audio?.coin?.();
+        this.ui.showToast("✦ Ato de Caridade! -3 Fenos · +2 Carisma. A família agradece comovida!");
+        this._showNPCDialogue("«O aldeão segura o fardo de feno com olhos marejados: 'Que os santos te abençoem, viajante! Nosso gado agora terá alimento e passará a noite aquecido.'»");
+      }
+      return;
+    }
+    if (action === "charity:wood") {
+      if ((PlayerInventory.wood || 0) >= 4) {
+        PlayerInventory.wood -= 4;
+        PlayerStats.cha += 2;
+        syncPlayerStatsToPlayer();
+        addGood(4, "Doou lenha seca para a lareira de uma aldeã");
+        this.audio?.coin?.();
+        this.ui.showToast("✦ Ato de Caridade! -4 Madeiras · +2 Carisma. A lareira estala com calor!");
+        this._showNPCDialogue("«A aldeã abre um sorriso aliviado: 'Muito obrigada, alma generosa! Minha família e minhas crianças estarão protegidas do frio cortante da noite.'»");
+      }
+      return;
+    }
+    if (action === "charity:stone") {
+      if ((PlayerInventory.stone || 0) >= 4) {
+        PlayerInventory.stone -= 4;
+        PlayerStats.cha += 2;
+        syncPlayerStatsToPlayer();
+        addGood(4, "Doou pedras para consertar abrigo desabado");
+        this.audio?.coin?.();
+        this.ui.showToast("✦ Ato de Caridade! -4 Pedras · +2 Carisma. A estrutura foi reforçada!");
+        this._showNPCDialogue("«'Com essas pedras firmes podemos tapar os buracos da parede antes que os lobos da névoa entrem. Deus te guarde pelos teus caminhos!'»");
+      }
+      return;
+    }
+    if (action === "charity:potion") {
+      if ((this.player.potions || 0) >= 1) {
+        this.player.potions -= 1;
+        PlayerStats.cha += 3;
+        syncPlayerStatsToPlayer();
+        addGood(6, "Salvou um aldeão gravemente ferido com poção de cura");
+        this.audio?.coin?.();
+        if (this.effects && this.activeNPC?.root) {
+          const np = this.activeNPC.root.position;
+          this.effects.play("star", np.x, np.y + 1.2, np.z, "#22ffaa", 2.0);
+        }
+        this.ui.showToast("✦ Gesto Sagrado de Caridade! -1 Poção · +3 Carisma. O ferido foi restaurado!");
+        this._showNPCDialogue("«O aldeão bebe a poção e seu semblante recupera a vitalidade imediatamente: 'É um verdadeiro milagre! A dor do veneno cessou por completo. Caldera nunca esquecerá tua nobreza!'»");
+      }
+      return;
+    }
+    if (action === "charity:alms" || action === "charity:alms_generous") {
+      const cost = action === "charity:alms_generous" ? 8 : 6;
+      if (this.player.coins >= cost) {
+        this.player.coins -= cost;
+        PlayerStats.gold = this.player.coins;
+        PlayerInventory.gold = this.player.coins;
+        PlayerStats.cha += (cost >= 8 ? 2 : 1);
+        syncPlayerStatsToPlayer();
+        addGood(3, "Entregou moedas de auxílio solidário a aldeões necessitados");
+        this.audio?.coin?.();
+        this.ui.showToast(`✦ Auxílio Solidário! -${cost} Moedas · +${cost >= 8 ? 2 : 1} Carisma perante o povo.`);
+        this._showNPCDialogue("«'Tua esmola nobre traz alívio a quem nada tem. Que tua jornada seja próspera e tua lâmina fiel!'»");
+      }
+      return;
+    }
+    if (action === "rumor:morvath") {
+      this._showNPCDialogue("«O aldeão sussurra arrepiado: 'O Grão-Mestre Morvath é o líder supremo da Ordem de Rex Mundi. Ele anda visitando as vilas do reino à noite, realizando sermões proibidos para invocar o Demiurgo. Se um bravo guerreiro encontrá-lo nas estradas e conseguir abatê-lo, quebrará o ritual e salvará o mundo da chegada do Demiurgo!'»");
+      return;
+    }
+    if (action === "rumor:beasts") {
+      this._showNPCDialogue("«'Cuidado ao caminhar nos descampados longe das tochas! Há gigantes de pescoço comprido e pernas monumentais chamados Gulurs que te encaram com olhos amarelos brilhantes. E à noite, os observadores de seis olhos espreitam na escuridão. Fique sempre perto de fogueiras ou armado!'»");
       return;
     }
     if (action === "mission:pay_debt") {

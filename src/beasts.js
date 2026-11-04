@@ -506,26 +506,29 @@ export class Gulur {
     const dz = pz - this.z;
     const distSq = dx * dx + dz * dz;
 
-    // Se o jogador estiver longe (> 36m, distSq > 1296): o Gulur fica parado ou dando passos lentos e ENCARA fixamente com olhos amarelos
-    if (distSq > 1296) {
+    // Se o jogador estiver a uma distância prudente (> 28m, distSq > 784):
+    // O Gulur para, ergue o pescoço comprido e ENCARA fixamente com seus olhos amarelos brilhantes e aura etérea
+    if (distSq > 784) {
       if (this.fleeTimer > 0) {
         this.fleeTimer -= dt;
+        // Desacelera suavemente ao atingir distância segura
+        this.speed = Math.max(0, this.speed - dt * 3.5);
       } else {
         this.state = "staring";
         const targetYaw = Math.atan2(dx, dz);
         this.heading = THREE.MathUtils.lerp(this.heading, targetYaw, dt * 1.8);
         this.root.rotation.y = this.heading;
-        this.speed = Math.max(0, this.speed - dt * 6.0);
+        this.speed = Math.max(0, this.speed - dt * 5.0);
       }
     } else {
-      // Jogador chegou perto (<= 36m): o Gulur se assusta e FOGE COM PASSADAS GIGANTESCAS na direção oposta!
+      // Jogador chegou muito perto (<= 28m): o Gulur se assusta e recua com passadas elegantes na direção oposta
       this.state = "fleeing";
-      this.fleeTimer = 6.0;
+      this.fleeTimer = 3.5;
 
       const fleeYaw = Math.atan2(-dx, -dz);
-      this.heading = THREE.MathUtils.lerp(this.heading, fleeYaw, dt * 3.5);
+      this.heading = THREE.MathUtils.lerp(this.heading, fleeYaw, dt * 3.0);
       this.root.rotation.y = this.heading;
-      this.speed = THREE.MathUtils.lerp(this.speed, 14.5, dt * 4.0);
+      this.speed = THREE.MathUtils.lerp(this.speed, 7.8, dt * 3.5);
     }
 
     // Movimentação e Animação das Pernas Gigantes
@@ -565,6 +568,37 @@ export class Gulur {
         this._spatialCX = curCX;
         this._spatialCZ = curCZ;
       }
+    }
+  }
+
+  reposition(x, z) {
+    this.x = x;
+    this.z = z;
+    this.alive = true;
+    this.health = this.maxHealth;
+    this.state = "staring";
+    this.deadTime = 0;
+    this.fleeTimer = 0;
+    this.speed = 0;
+    this.root.userData.isDead = false;
+    this.bodyGroup.position.set(0, 0, 0);
+    this.bodyGroup.rotation.set(0, 0, 0);
+    for (let i = 0; i < 4; i++) {
+      this.legs[i].legRoot.rotation.set(0, 0, 0);
+      this.legs[i].kneeGroup.rotation.set(0, 0, 0);
+    }
+    if (this.auraLight) this.auraLight.intensity = 1.4;
+    if (this.auraSprite) this.auraSprite.material.opacity = 0.36;
+    if (this.auraMesh) this.auraMesh.material.opacity = 0.16;
+    this._groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this.root.position.set(x, this._groundY, z);
+    this.root.visible = true;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
     }
   }
 }
@@ -889,6 +923,31 @@ export class Necron {
       }
     }
   }
+
+  reposition(x, z) {
+    this.x = x;
+    this.z = z;
+    this.alive = true;
+    this.health = this.maxHealth;
+    this.state = "waiting";
+    this.deadTime = 0;
+    this.speed = 0;
+    this.root.userData.isDead = false;
+    this.torso.rotation.set(0, 0, 0);
+    this.torso.position.set(0, 0.8, 0);
+    this.legs[0].rotation.set(0, 0, 0);
+    this.legs[1].rotation.set(0, 0, 0);
+    this._groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this.root.position.set(x, this._groundY, z);
+    this.root.visible = true;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+  }
 }
 
 // Alias de retrocompatibilidade
@@ -1202,6 +1261,29 @@ export class Hexoculus {
       }
     }
   }
+
+  reposition(x, z) {
+    this.x = x;
+    this.z = z;
+    this.alive = true;
+    this.health = this.maxHealth;
+    this.state = "stalking";
+    this.deadTime = 0;
+    this.speed = 0;
+    this.root.userData.isDead = false;
+    this.model.rotation.set(0, 0, 0);
+    this.model.position.set(0, 0, 0);
+    this._groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this.root.position.set(x, this._groundY, z);
+    this.root.visible = true;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+  }
 }
 
 // ============================================================================
@@ -1474,6 +1556,29 @@ export class Polyphonia {
       }
     }
   }
+
+  reposition(x, z) {
+    this.x = x;
+    this.z = z;
+    this.alive = true;
+    this.health = this.maxHealth;
+    this.state = "slithering";
+    this.deadTime = 0;
+    this.speed = 0;
+    this.root.userData.isDead = false;
+    this.model.rotation.set(0, 0, 0);
+    this.model.position.set(0, 0, 0);
+    this._groundY = this.world ? this.world.heightAt(x, z) : 0;
+    this.root.position.set(x, this._groundY, z);
+    this.root.visible = true;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+  }
 }
 
 // ============================================================================
@@ -1499,11 +1604,11 @@ export class BeastManager {
     const cx = cityCenter.x ?? 0;
     const cz = cityCenter.z ?? 0;
 
-    // 1. Gulurs (Bichos Altões): 3 criaturas imponentes nos ermos com olhos amarelos
+    // 1. Gulurs (Bichos Altões): Criaturas imponentes nos ermos com olhos amarelos visíveis a média distância
     const walkerSpots = [
-      { x: cx - 210, z: cz + 175 },
-      { x: cx + 220, z: cz - 165 },
-      { x: cx - 110, z: cz - 240 },
+      { x: cx - 85, z: cz + 80 },
+      { x: cx + 95, z: cz - 75 },
+      { x: cx - 60, z: cz - 105 },
     ];
     for (const s of walkerSpots) {
       const g = new Gulur(
@@ -1523,13 +1628,13 @@ export class BeastManager {
     }
 
     // 2. Necrons (Cegos): Spawns completamente aleatórios nos ermos
-    this.spawnRandomBiters(cx, cz, 5);
+    this.spawnRandomBiters(cx, cz, 4);
 
     // 3. Hexoculus (O Observador dos 6 Olhos): 3 criaturas esguias nos ermos noturnos
     const hexSpots = [
-      { x: cx + 130, z: cz + 140 },
-      { x: cx - 150, z: cz - 120 },
-      { x: cx + 170, z: cz - 130 },
+      { x: cx + 70, z: cz + 75 },
+      { x: cx - 75, z: cz - 65 },
+      { x: cx + 85, z: cz - 80 },
     ];
     for (const h of hexSpots) {
       const hex = new Hexoculus(
@@ -1550,9 +1655,9 @@ export class BeastManager {
 
     // 4. Polyphonia (Fauce Múltipla): 3 serpentes de várias bocas rastejando na escuridão
     const polySpots = [
-      { x: cx - 130, z: cz + 150 },
-      { x: cx + 140, z: cz - 160 },
-      { x: cx - 80, z: cz - 160 },
+      { x: cx - 70, z: cz + 90 },
+      { x: cx + 80, z: cz - 90 },
+      { x: cx - 55, z: cz - 85 },
     ];
     for (const p of polySpots) {
       const poly = new Polyphonia(
@@ -1599,9 +1704,26 @@ export class BeastManager {
   }
 
   update(dt, isNight = false) {
+    const px = this.player.x ?? 0;
+    const pz = this.player.z ?? 0;
+
     // Atualiza todos os Gulurs
     for (let i = 0; i < this.walkers.length; i++) {
       this.walkers[i].update(dt, isNight);
+    }
+
+    // Reposicionamento dinâmico / Respawn dos Gulurs (Colossos dos Ermos com Olhos Amarelos)
+    for (let i = 0; i < this.walkers.length; i++) {
+      const g = this.walkers[i];
+      const gdx = g.x - px;
+      const gdz = g.z - pz;
+      const gDistSq = gdx * gdx + gdz * gdz;
+      // Se morreu e já passou o colapso, ou se o jogador se afastou muito (> 140m)
+      if ((!g.alive && g.deadTime > 10.0) || gDistSq > 140 * 140) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 65 + Math.random() * 25; // 65m a 90m do player, visível na bruma
+        g.reposition(px + Math.cos(angle) * dist, pz + Math.sin(angle) * dist);
+      }
     }
 
     // Atualiza todos os Necrons
@@ -1622,6 +1744,32 @@ export class BeastManager {
     // À noite ou durante o Eclipse, repõe criaturas mortas periodicamente
     const isDangerous = isNight || (WorldDecay && WorldDecay.isEclipse);
     if (isDangerous) {
+      // Reposicionamento dinâmico dos Hexoculus nos ermos
+      for (let i = 0; i < this.hexoculusList.length; i++) {
+        const hex = this.hexoculusList[i];
+        const hdx = hex.x - px;
+        const hdz = hex.z - pz;
+        const hDistSq = hdx * hdx + hdz * hdz;
+        if ((!hex.alive && hex.deadTime > 6.0) || hDistSq > 130 * 130) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 55 + Math.random() * 25;
+          hex.reposition(px + Math.cos(angle) * dist, pz + Math.sin(angle) * dist);
+        }
+      }
+
+      // Reposicionamento dinâmico das Polyphonias nos ermos
+      for (let i = 0; i < this.polyphoniaList.length; i++) {
+        const poly = this.polyphoniaList[i];
+        const pdx = poly.x - px;
+        const pdz = poly.z - pz;
+        const pDistSq = pdx * pdx + pdz * pdz;
+        if ((!poly.alive && poly.deadTime > 6.0) || pDistSq > 130 * 130) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 50 + Math.random() * 25;
+          poly.reposition(px + Math.cos(angle) * dist, pz + Math.sin(angle) * dist);
+        }
+      }
+
       this.ambientHowlTimer = (this.ambientHowlTimer || (25 + Math.random() * 25)) - dt;
       if (this.ambientHowlTimer <= 0) {
         this.ambientHowlTimer = 45 + Math.random() * 45;
@@ -1643,8 +1791,6 @@ export class BeastManager {
         const maxBiters = isEclipse ? 8 : 4; // Dobro do limite de feras ativas no eclipse
         const activeBiters = this.biters.filter((b) => b.alive && b.root.visible).length;
         if (activeBiters < maxBiters) {
-          const px = this.player.x ?? 0;
-          const pz = this.player.z ?? 0;
           const spawnCount = isEclipse ? 4 : 2; // Dobro da quantidade spawnada por leva
           this.spawnRandomBiters(px, pz, spawnCount);
         }

@@ -848,15 +848,17 @@ export function searchGhostTownRubble(town, ui, audio) {
   town.lastSearched = performance.now();
   if (audio?.bookPage) audio.bookPage();
 
-  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
-  if (!PlayerInventory.hasDemiurgeDiary) {
-    PlayerInventory.hasDemiurgeDiary = true;
-    ui?.showToast?.(`✦ Encontraste o códice Tractatus de Carcere soterrado sob os escombros de ${town.name}! [L] para ler.`);
-  } else if (missingPages.length > 0) {
+  const possiblePages = [3, 7, 11, 16, 19, 21];
+  const missingPages = possiblePages.filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+  if (missingPages.length > 0 && Math.random() < 0.75) {
     const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
     PlayerInventory.discoveredBookPages.push(gainedPage);
     const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
-    ui?.showToast?.(`✦ Vasculhaste ${town.name}: Fragmento recuperado! Adicionada ${pageTitle} ao códice ([L]).`);
+    if (PlayerInventory.hasDemiurgeDiary) {
+      ui?.showToast?.(`✦ Vasculhaste ${town.name}: Fragmento recuperado! Adicionada ${pageTitle} ao códice ([L]).`);
+    } else {
+      ui?.showToast?.(`✦ Vasculhaste ${town.name}: Fragmento avulso encontrado (${pageTitle})! [L] para inspecionar a folha.`);
+    }
   } else {
     const goldFound = 8 + Math.floor(Math.random() * 14);
     PlayerInventory.gold = (PlayerInventory.gold || 0) + goldFound;
@@ -895,18 +897,20 @@ export function lootGhostTownHouse(houseLoot, ui, audio, weapons = null) {
   if (audio?.bookPage) audio.bookPage();
   if (audio?.weaponSwing) audio.weaponSwing("blade", false);
 
-  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+  const possiblePages = [3, 7, 11, 16, 19, 21];
+  const missingPages = possiblePages.filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
 
-  // 1. Chance alta de códice / fragmento do Demiurgo
+  // 1. Chance alta de página / fragmento avulso
   let lootedItemText = "";
-  if (!PlayerInventory.hasDemiurgeDiary) {
-    PlayerInventory.hasDemiurgeDiary = true;
-    lootedItemText = "✦ Encontraste o códice Tractatus de Carcere escondido no assoalho! [L] para ler.";
-  } else if (missingPages.length > 0 && Math.random() < 0.65) {
+  if (missingPages.length > 0 && Math.random() < 0.65) {
     const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
     PlayerInventory.discoveredBookPages.push(gainedPage);
     const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
-    lootedItemText = `✦ Códice recuperado no interior da casa: Adicionada ${pageTitle} ([L]).`;
+    if (PlayerInventory.hasDemiurgeDiary) {
+      lootedItemText = `✦ Códice recuperado no interior da casa: Adicionada ${pageTitle} ao livro ([L]).`;
+    } else {
+      lootedItemText = `✦ Fragmento recuperado no interior da casa: Folha avulsa (${pageTitle})! [L] para ler a folha.`;
+    }
   } else {
     // 2. Feixe de flechas e moedas antigas
     const arrowsFound = 8 + Math.floor(Math.random() * 8);

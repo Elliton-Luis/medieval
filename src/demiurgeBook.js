@@ -914,19 +914,71 @@ function _ensureDiaryModal(audio) {
   return overlay;
 }
 
+function _getReadablePages() {
+  const hasBook = Boolean(PlayerInventory.hasDemiurgeDiary);
+  if (hasBook) {
+    return DEMIURGE_DIARY_PAGES;
+  }
+  const discovered = Array.isArray(PlayerInventory.discoveredBookPages) ? PlayerInventory.discoveredBookPages : [];
+  return DEMIURGE_DIARY_PAGES.filter((p) => discovered.includes(p.id));
+}
+
 function _renderCurrentPage() {
   if (!_diaryReaderModalEl) return;
-  const page = DEMIURGE_DIARY_PAGES[_currentReadingPage] || DEMIURGE_DIARY_PAGES[0];
+  const hasBook = Boolean(PlayerInventory.hasDemiurgeDiary);
+  const pagesList = _getReadablePages();
+
+  const titleBadge = _diaryReaderModalEl.querySelector(".diary-book-title-badge");
+  const closeBtn = _diaryReaderModalEl.querySelector("#diary-close-btn");
   const viewport = _diaryReaderModalEl.querySelector("#diary-viewport");
   const indicator = _diaryReaderModalEl.querySelector("#diary-page-indicator");
   const prevBtn = _diaryReaderModalEl.querySelector("#diary-prev-btn");
   const nextBtn = _diaryReaderModalEl.querySelector("#diary-next-btn");
 
-  indicator.textContent = `Página ${_currentReadingPage + 1} de ${DEMIURGE_DIARY_PAGES.length}`;
-  prevBtn.disabled = _currentReadingPage === 0;
-  nextBtn.disabled = _currentReadingPage === DEMIURGE_DIARY_PAGES.length - 1;
+  if (!hasBook) {
+    if (titleBadge) {
+      titleBadge.innerHTML = `<span>📜</span><span>FRAGMENTO AVULSO DO TRACTATUS DE CARCERE</span>`;
+    }
+    if (closeBtn) {
+      closeBtn.textContent = "✕ Guardar Fragmento (ESC / L)";
+    }
+  } else {
+    if (titleBadge) {
+      titleBadge.innerHTML = `<span>👁️</span><span>TRACTATUS DE CARCERE · O LIVRO DO BARRO</span>`;
+    }
+    if (closeBtn) {
+      closeBtn.textContent = "✕ Fechar Tomo (ESC / L)";
+    }
+  }
 
-  const isDiscovered = !PlayerInventory.discoveredBookPages || PlayerInventory.discoveredBookPages.includes(page.id);
+  if (pagesList.length === 0) {
+    indicator.textContent = "Nenhum fragmento encontrado";
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    viewport.innerHTML = `
+      <div class="diary-parchment-sheet" style="text-align: center; padding: 40px 20px;">
+        <h2 class="diary-page-heading" style="color: #ea4d3d;">[NENHUM FRAGMENTO RECOLHIDO]</h2>
+        <p style="color: #ba796c; margin-top: 20px;">Não possuis o tomo encadernado nem qualquer folha solta.</p>
+      </div>
+    `;
+    return;
+  }
+
+  _currentReadingPage = Math.max(0, Math.min(pagesList.length - 1, _currentReadingPage));
+  const page = pagesList[_currentReadingPage];
+
+  if (!hasBook) {
+    indicator.textContent = `Fragmento ${_currentReadingPage + 1} de ${pagesList.length} (Página ${page.id})`;
+  } else {
+    indicator.textContent = `Página ${_currentReadingPage + 1} de ${pagesList.length}`;
+  }
+
+  prevBtn.disabled = _currentReadingPage === 0;
+  nextBtn.disabled = _currentReadingPage === pagesList.length - 1;
+
+  const isDiscovered = hasBook
+    ? (!PlayerInventory.discoveredBookPages || PlayerInventory.discoveredBookPages.includes(page.id))
+    : true;
 
   if (!isDiscovered) {
     viewport.innerHTML = `
@@ -960,6 +1012,7 @@ function _renderCurrentPage() {
       <div class="diary-state-badge">
         ${page.origin ? `<span class="diary-origin-tag">[${page.origin}]</span> · ` : ""}
         ${page.stateLabel || ""}
+        ${!hasBook ? ` · <span style="color:#d49b4b;">[Folha Avulsa Desprendida]</span>` : ""}
       </div>
       ${page.svg || ""}
       ${page.html || ""}
@@ -968,7 +1021,12 @@ function _renderCurrentPage() {
 }
 
 export function openDemiurgeDiaryReader(pageIndex = 0, audio = null) {
-  _currentReadingPage = Math.max(0, Math.min(DEMIURGE_DIARY_PAGES.length - 1, pageIndex));
+  const pagesList = _getReadablePages();
+  if (pagesList.length === 0) {
+    window.__game?.ui?.showToast?.(`✦ Não possuis o Diário dos Demiurgos nem qualquer fragmento... Dica: ${getDemiurgeDiaryHint()}`);
+    return;
+  }
+  _currentReadingPage = Math.max(0, Math.min(pagesList.length - 1, pageIndex));
   const modal = _ensureDiaryModal(audio);
   _renderCurrentPage();
   modal.classList.add("active");
@@ -1002,8 +1060,9 @@ export function isDemiurgeDiaryReaderOpen() {
 }
 
 export function changeDiaryPage(delta) {
+  const pagesList = _getReadablePages();
   const next = _currentReadingPage + delta;
-  if (next >= 0 && next < DEMIURGE_DIARY_PAGES.length) {
+  if (next >= 0 && next < pagesList.length) {
     _currentReadingPage = next;
     _renderCurrentPage();
     if (_cachedAudio?.bookPage) {
@@ -1139,6 +1198,17 @@ export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
   // Coleta o Tomo para o Inventário do Jogador
   _isCollected = true;
   PlayerInventory.hasDemiurgeDiary = true;
+
+  // Ao coletar o tomo físico encadernado, desbloqueia as páginas base
+  const basePages = [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20];
+  if (!Array.isArray(PlayerInventory.discoveredBookPages)) {
+    PlayerInventory.discoveredBookPages = [];
+  }
+  for (const bp of basePages) {
+    if (!PlayerInventory.discoveredBookPages.includes(bp)) {
+      PlayerInventory.discoveredBookPages.push(bp);
+    }
+  }
 
   if (_demiurgeBookGroup) {
     _demiurgeBookGroup.visible = false;

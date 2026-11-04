@@ -68,6 +68,10 @@ WorldDecay.initEclipseSchedule();
  * 3. Se maldade <= 90%: só pode acontecer estritamente DEPOIS do Dia 15 (Dia 16+).
  */
 export function canDemiurgeCataclysmTrigger() {
+  if (WorldDecay.demiurgePrevented) {
+    return false; // Grão-Mestre Morvath foi derrotado, impedindo a chegada do Demiurgo
+  }
+
   if ((WorldDecay.eclipsesExperienced || 0) < 1) {
     return false; // Obrigatório: ao menos 1 eclipse precisa ter acontecido antes
   }

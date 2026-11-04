@@ -197,12 +197,12 @@ export function getMusicCredits() {
 }
 
 const SUPPORTS_VORBIS = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
-const FADE_OUT_DURATION = 1.4; // Fade-out suave da música saindo (silêncio antes da próxima)
-const FADE_IN_DURATION = 1.4;  // Fade-in suave da nova música
-const FADE_URGENT_OUT = 0.6;   // Fade-out rápido para combate/tensão
-const FADE_URGENT_IN = 0.8;    // Fade-in rápido para combate/tensão
-const HOLD = 2.8;              // Tempo de confirmação para trocar para contexto calmo
-const MIN_TRACK_STAY = 4.0;    // Tempo mínimo que uma música toca antes de aceitar troca calma
+const FADE_OUT_DURATION = 2.0; // Fade-out suave da música saindo (silêncio antes da próxima)
+const FADE_IN_DURATION = 2.0;  // Fade-in suave da nova música
+const FADE_URGENT_OUT = 0.8;   // Fade-out para combate/perseguição
+const FADE_URGENT_IN = 1.0;    // Fade-in para combate/perseguição
+const HOLD = 5.0;              // Tempo de sustentação contínua (5s) para confirmar mudança de contexto
+const MIN_TRACK_STAY = 28.0;   // Tempo mínimo que uma música toca (28s) para manter a imersão sem cortes frequentes
 const OPEN_FIELD_NAMES = new Set(["Pradaria de Caldera", "Estrada Real"]);
 const EVICTION_TIME = 16.0;    // Descarrega a faixa da RAM 16s após o término do fade-out
 
@@ -801,19 +801,8 @@ export class MusicDirector {
       return;
     }
 
-    // Urgências que mudam a música com prioridade máxima
-    const urgent =
-      detected === "eclipse" ||
-      detected === "chase" ||
-      detected === "wanted_mid" ||
-      detected === "wanted_low" ||
-      detected === "tension" ||
-      detected === "cult_camp" ||
-      this.context === "chase" ||
-      this.context === "wanted_mid" ||
-      this.context === "wanted_low" ||
-      detected === "church" ||
-      detected === "tavern";
+    // Urgências reais de vida ou morte que sobrepõem faixas calmas
+    const urgent = (detected === "eclipse" || detected === "chase") && this.context !== detected;
 
     if (this.pending !== detected) {
       this.pending = detected;
@@ -821,8 +810,15 @@ export class MusicDirector {
     }
 
     this.pendingTime += 0.4;
-    const timeSinceStarted = this.time - this._trackStartedTime;
+    const timeSinceStarted = this.time - (this._trackStartedTime || 0);
+
+    // Transição calma exige que a faixa atual tenha tocado pelo menos MIN_TRACK_STAY (28s)
+    // e que o novo contexto tenha se mantido estável por pelo menos HOLD (5s)
     const canSwitchCalm = this.pendingTime >= HOLD && timeSinceStarted >= MIN_TRACK_STAY;
+
+    // Se estiver no meio de um fade, evita chavear novamente a menos que seja perigo de vida (chase/eclipse)
+    const isTransitioning = this.fadePhase === "fading_out" || this.fadePhase === "fading_in";
+    if (isTransitioning && !urgent) return;
 
     if (urgent || canSwitchCalm) {
       this.context = detected;

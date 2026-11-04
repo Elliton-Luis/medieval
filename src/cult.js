@@ -335,10 +335,17 @@ export function investigateCultCamp(altar, ui, audio, input) {
   showCampInvestigationModal(altar, note);
 
   // Chance / Garantia de recuperar o Tractatus de Carcere ou páginas faltantes
-  const missingPages = [7, 11, 16, 19, 21].filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
-  if (!PlayerInventory.hasDemiurgeDiary) {
+  const possiblePages = [3, 7, 11, 16, 19, 21];
+  const missingPages = possiblePages.filter((p) => !PlayerInventory.discoveredBookPages.includes(p));
+  if (tier === "huge" && !PlayerInventory.hasDemiurgeDiary) {
     PlayerInventory.hasDemiurgeDiary = true;
-    ui?.showToast?.(`✦ Encontraste o Tractatus de Carcere esquecido junto ao altar herético! (+${goldGain} moedas · [L] para ler).`);
+    const basePages = [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20];
+    for (const bp of basePages) {
+      if (!PlayerInventory.discoveredBookPages.includes(bp)) {
+        PlayerInventory.discoveredBookPages.push(bp);
+      }
+    }
+    ui?.showToast?.(`✦ Encontraste o Tomo do Tractatus de Carcere no Altar Maior! (+${goldGain} moedas · [L] para ler).`);
   } else if (missingPages.length > 0) {
     if (tier === "huge") {
       // No acampamento enorme recupera TODAS as páginas restantes!
@@ -352,7 +359,11 @@ export function investigateCultCamp(altar, ui, audio, input) {
       const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
       PlayerInventory.discoveredBookPages.push(gainedPage);
       const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;
-      ui?.showToast?.(`✦ Fragmento herético recuperado: ${pageTitle} anexada ao Tractatus de Carcere (+${goldGain} moedas)!`);
+      if (PlayerInventory.hasDemiurgeDiary) {
+        ui?.showToast?.(`✦ Fragmento herético recuperado: ${pageTitle} anexada ao Tractatus de Carcere (+${goldGain} moedas)!`);
+      } else {
+        ui?.showToast?.(`✦ Fragmento herético avulso recolhido: ${pageTitle} (+${goldGain} moedas · [L] para inspecionar)!`);
+      }
     }
   } else {
     ui?.showToast?.(`✦ Saque herético realizado no ${altar.name}! (+${goldGain} moedas · +${chaGain} Carisma)`);
@@ -1431,12 +1442,14 @@ export function buildCultLeaderMesh() {
 }
 
 export class CultLeader {
-  constructor(scene, world, effects, combat, player) {
+  constructor(scene, world, effects, combat, player, npcs = null) {
     this.scene = scene;
     this.world = world;
     this.effects = effects;
     this.combat = combat;
     this.player = player;
+    this.npcs = npcs || window.__game?.npcs || null;
+    this._inGrid = false;
 
     const { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight } = buildCultLeaderMesh();
     this.root = root;
@@ -1499,10 +1512,34 @@ export class CultLeader {
     this.userData.isDead = true;
     this.task = "Colapsado no abraço silencioso do Pleroma";
 
+    if (this.npcs?.spatialGrid && this._inGrid) {
+      this.npcs.spatialGrid.remove(this);
+      this._inGrid = false;
+    }
+
+    // 1. Remove qualquer waypoint de missão ativo
+    import("./rpg.js").then(({ removeWaypointMarker }) => {
+      removeWaypointMarker();
+    }).catch(() => {});
+
+    // 2. MATA-LO IMPEDE A CHEGADA DO DEMIURGO!
+    import("./decay.js").then(({ WorldDecay, DemiurgeCataclysm }) => {
+      if (WorldDecay) {
+        WorldDecay.demiurgePrevented = true;
+        WorldDecay.decayLevel = Math.max(0, (WorldDecay.decayLevel || 0) - 0.75);
+        if (WorldDecay.isEclipse) {
+          WorldDecay.isEclipse = false;
+        }
+      }
+      if (DemiurgeCataclysm) {
+        DemiurgeCataclysm.active = false;
+      }
+    }).catch(() => {});
+
     if (this.effects) {
-      this.effects.play("dust", this.x, this.root.position.y + 1.0, this.z, "#0a0610", 4.5);
-      this.effects.play("star", this.x, this.root.position.y + 1.8, this.z, "#bb22ff", 3.5);
-      this.effects.play("star", this.x, this.root.position.y + 1.2, this.z, "#ff3322", 3.0);
+      this.effects.play("dust", this.x, this.root.position.y + 1.0, this.z, "#0a0610", 5.5);
+      this.effects.play("star", this.x, this.root.position.y + 1.8, this.z, "#bb22ff", 4.5);
+      this.effects.play("star", this.x, this.root.position.y + 1.2, this.z, "#ffea00", 4.0);
     }
 
     // Saque Roubado Lendário: 150 moedas, 4 cristais raros e Túnica do Demiurgo
@@ -1514,8 +1551,11 @@ export class CultLeader {
 
     import("./rpg.js").then(({ unlockDemiurgeAttire, addGood }) => {
       unlockDemiurgeAttire();
-      addGood(10, "Morvath, o Grão-Mestre Cátaro, foi derrotado em combate");
+      addGood(15, "Morvath, o Grão-Mestre Cátaro, foi derrotado em combate");
     }).catch(() => {});
+
+    window.__game?.ui?.showToast?.("⚔️ VITÓRIA: O Grão-Mestre Morvath foi derrotado! O ritual herético foi quebrado e a vinda do Demiurgo foi IMPEDIDA!", 9500);
+    window.__game?.audio?.bell?.();
 
     // Animação solene de colapso
     this.model.rotation.x = -Math.PI / 2.2;
@@ -1532,6 +1572,15 @@ export class CultLeader {
     this.model.position.y = 0;
     this.userData.isDead = false;
 
+    this.npcs = this.npcs || window.__game?.npcs;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
     this.root.position.set(x, groundY, z);
     this.root.visible = true;
@@ -1544,6 +1593,26 @@ export class CultLeader {
 
   update(dt, player, isNight = true) {
     if (!this.root.visible) return;
+
+    // Atualização celular na Spatial Grid para garantir que armas e flechas acertem Morvath
+    this.npcs = this.npcs || window.__game?.npcs;
+    if (this.npcs?.spatialGrid) {
+      if (!this._inGrid) {
+        this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+        this._spatialCX = Math.floor(this.x * 0.0625);
+        this._spatialCZ = Math.floor(this.z * 0.0625);
+        this._inGrid = true;
+      } else {
+        const curCX = Math.floor(this.x * 0.0625);
+        const curCZ = Math.floor(this.z * 0.0625);
+        if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
+          this.npcs.spatialGrid.remove(this);
+          this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+          this._spatialCX = curCX;
+          this._spatialCZ = curCZ;
+        }
+      }
+    }
 
     const px = player?.x ?? player?.position?.x ?? 0;
     const pz = player?.z ?? player?.position?.z ?? 0;
@@ -1600,7 +1669,7 @@ export function summonCultLeader(player, scene, world, effects, combat) {
   const pz = p.z ?? p.position?.z ?? 0;
 
   if (!ACTIVE_CULT_LEADER) {
-    ACTIVE_CULT_LEADER = new CultLeader(sc, w, eff, cmb, p);
+    ACTIVE_CULT_LEADER = new CultLeader(sc, w, eff, cmb, p, window.__game?.npcs);
     if (window.__game?.npcs?.npcs && !window.__game.npcs.npcs.includes(ACTIVE_CULT_LEADER)) {
       window.__game.npcs.npcs.push(ACTIVE_CULT_LEADER);
     }
@@ -1627,6 +1696,9 @@ export function createCultistsPool(scene, world, effects, combat, count = 16) {
 }
 
 let _cultistCheckTimer = 0;
+
+let _lastCycleIsNight = false;
+let _morvathInvasionAlertDone = false;
 
 /**
  * Atualiza o ciclo de vida dos Cultistas do Demiurgo fora dos muros.
@@ -1666,6 +1738,20 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 
   // 2. Se for de dia, nenhum servo comum do demiurgo atua e os que estiverem ativos desvanecem imediatamente
   if (!isNightBool) {
+    if (_lastCycleIsNight) {
+      _lastCycleIsNight = false;
+      _morvathInvasionAlertDone = false;
+      if (ACTIVE_CULT_LEADER && ACTIVE_CULT_LEADER.root.visible) {
+        ACTIVE_CULT_LEADER.root.visible = false;
+        if (ACTIVE_CULT_LEADER.npcs?.spatialGrid && ACTIVE_CULT_LEADER._inGrid) {
+          ACTIVE_CULT_LEADER.npcs.spatialGrid.remove(ACTIVE_CULT_LEADER);
+          ACTIVE_CULT_LEADER._inGrid = false;
+        }
+        import("./rpg.js").then(({ removeWaypointMarker }) => {
+          removeWaypointMarker();
+        }).catch(() => {});
+      }
+    }
     for (let i = 0; i < cultistsPool.length; i++) {
       const c = cultistsPool[i];
       if (c.root.visible) {
@@ -1678,26 +1764,49 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
     return;
   }
 
-  // 3. Atualiza e spawna o Líder da Seita Cátara no Acampamento Enorme à noite (otimizado com cache)
-  if (!_cachedHugeCamp) {
-    _cachedHugeCamp = CULT_ALTARS.find((a) => a.hasLeader && a.tier === "huge") || null;
+  if (!_lastCycleIsNight) {
+    _lastCycleIsNight = true;
+    _morvathInvasionAlertDone = false;
   }
-  const hugeCamp = _cachedHugeCamp;
-  if (hugeCamp) {
+
+  // 3. Spawna e comanda Morvath à noite: invasão aleatória nas vilas do Reino!
+  const decayMod = window.__game?.WorldDecay;
+  const isPrevented = Boolean(decayMod?.demiurgePrevented);
+
+  if (!isPrevented) {
     if (!ACTIVE_CULT_LEADER && window.__game?.scene) {
       ACTIVE_CULT_LEADER = new CultLeader(
         window.__game.scene,
         window.__game.world,
         window.__game.effects,
         window.__game.combat,
-        player
+        player,
+        npcs
       );
       if (window.__game?.npcs?.npcs && !window.__game.npcs.npcs.includes(ACTIVE_CULT_LEADER)) {
         window.__game.npcs.npcs.push(ACTIVE_CULT_LEADER);
       }
-      ACTIVE_CULT_LEADER.spawnAt(hugeCamp.x, hugeCamp.z + 1.8);
-    } else if (ACTIVE_CULT_LEADER && !ACTIVE_CULT_LEADER.root.visible && ACTIVE_CULT_LEADER.alive) {
-      ACTIVE_CULT_LEADER.spawnAt(hugeCamp.x, hugeCamp.z + 1.8);
+    }
+
+    if (ACTIVE_CULT_LEADER && ACTIVE_CULT_LEADER.alive && !_morvathInvasionAlertDone) {
+      _morvathInvasionAlertDone = true;
+      const targetVillages = Array.isArray(VILLAGES) && VILLAGES.length > 0 ? VILLAGES : [{ name: "Caldera", x: -2, z: -20 }];
+      const chosen = targetVillages[Math.floor(Math.random() * targetVillages.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 18 + Math.random() * 8;
+      const sx = chosen.x + Math.cos(angle) * dist;
+      const sz = chosen.z + Math.sin(angle) * dist;
+
+      ACTIVE_CULT_LEADER.spawnAt(sx, sz);
+
+      import("./rpg.js").then(({ spawnWaypointMarker }) => {
+        spawnWaypointMarker({ x: sx, z: sz });
+      }).catch(() => {});
+
+      if (window.__game?.ui?.showToast) {
+        window.__game.ui.showToast(`🌑 ALERTA: Um mensageiro do acampamento avisa: 'O Grão-Mestre Morvath foi avistado nos arredores de ${chosen.name} esta noite! Abata-o antes que o ritual traga o Demiurgo!'`, 9500);
+      }
+      window.__game?.audio?.playWolfHowl?.(0.65, 45);
     }
   }
 

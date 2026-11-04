@@ -344,7 +344,7 @@ export const PlayerInventory = {
   hasQuestItem: false,
   hasDemiurgeRobe: false,
   hasDemiurgeDiary: false,
-  discoveredBookPages: [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20],
+  discoveredBookPages: [],
   torchColor: "orange",
   crystals: { green: 0, blue: 0, pink: 0, red: 0, white: 0, purple: 0 },
 
