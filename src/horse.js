@@ -31,7 +31,8 @@ const GEO = {
 
 const CORPSE_TIME = 5;
 const MAX_TURN = 2.6;
-const FLASH_COLOR = new THREE.Color("#85764a");
+const WHITE_FLASH_COLOR = new THREE.Color("#ffffff");
+const RED_FLASH_COLOR = new THREE.Color("#ff1122");
 const ZERO_COLOR = new THREE.Color("#000000");
 
 function add(parent, geometry, material, x, y, z) {
@@ -100,6 +101,8 @@ export class Horse {
     this._knockZ = 0;
     this._knock = 0;
     this._flash = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
 
     const hide = makeSkinnedMaterial("leather", coat, 0, 0.9);
     const dark = makeSkinnedMaterial("leather", "#241812", 0, 0.95);
@@ -251,10 +254,12 @@ export class Horse {
     this.health = Math.max(0, this.health - amount);
     this.rear = 0.6;
     this.rearMax = 0.6;
-    this._flash = 0.18;
+    this._flash = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
     this._knockX = directionX;
     this._knockZ = directionZ;
-    this._knock = force * 0.6;
+    this._knock = Math.max(force * 2.2, 5.0);
     if (this.effects) {
       this.effects.play("star", this.x, (this.root?.position?.y || 0) + 1.2, this.z, "#ff3322", 1.4);
     }
@@ -303,8 +308,9 @@ export class Horse {
 
     if (this._flash > 0) {
       this._flash = Math.max(0, this._flash - dt);
-      const c = this._flash > 0 ? FLASH_COLOR : ZERO_COLOR;
-      const intensity = this._flash > 0 ? 0.65 : 0;
+      const isWhite = this._flash > 0.12;
+      const c = this._flash > 0 ? (isWhite ? WHITE_FLASH_COLOR : RED_FLASH_COLOR) : ZERO_COLOR;
+      const intensity = this._flash > 0 ? (isWhite ? 1.0 : 0.85) : 0;
       for (let i = 0; i < this.materials.length; i++) {
         this.materials[i].emissive.copy(c);
         this.materials[i].emissiveIntensity = intensity;
@@ -571,6 +577,19 @@ export class Horse {
     this.model.rotation.y = this.heading;
     this.model.rotation.z = 0;
     this.model.position.y = this.bob;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      this.model.position.y += this._hitHop * 1.8;
+    }
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      this.model.position.x = (Math.random() - 0.5) * trem;
+      this.model.position.z = (Math.random() - 0.5) * trem;
+    } else {
+      this.model.position.x = 0;
+      this.model.position.z = 0;
+    }
     const groundY = this.world.horseHeightAt ? this.world.horseHeightAt(this.x, this.z) : this.world.heightAt(this.x, this.z);
     this.root.position.set(this.x, groundY + this.height, this.z);
 

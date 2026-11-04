@@ -72,6 +72,10 @@ const _amethystMat = new THREE.MeshStandardMaterial({
   roughness: 0.15,
   metalness: 0.85,
 });
+
+const _WHITE_FLASH = new THREE.Color("#ffffff");
+const _RED_FLASH = new THREE.Color("#ff1122");
+const _ZERO_FLASH = new THREE.Color("#000000");
 const _ebonyHornMat = new THREE.MeshStandardMaterial({
   color: 0x141018,
   roughness: 0.85,
@@ -994,6 +998,25 @@ export class Cultist {
       isDead: true,
     };
 
+    this.flashMaterials = [];
+    this.model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+    this._knockX = 0;
+    this._knockZ = 0;
+    this._knockPower = 0;
+    this._inGrid = false;
+    this.hitRadius = 0.65;
+
     this.root.visible = false;
     if (scene) scene.add(root);
   }
@@ -1044,6 +1067,18 @@ export class Cultist {
     this.setSeatedPose(true);
     this.root.visible = true;
 
+    this.npcs = this.combat?.npcs || window.__game?.npcs || null;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+    if (this.npcs?.npcs && !this.npcs.npcs.includes(this)) {
+      this.npcs.npcs.push(this);
+    }
+
     if (this.effects) {
       this.effects.play("dust", this.x, y + 0.35, this.z, "#1c1b22", 1.2);
     }
@@ -1064,6 +1099,18 @@ export class Cultist {
     this.setSeatedPose(false);
     this.root.visible = true;
 
+    this.npcs = this.combat?.npcs || window.__game?.npcs || null;
+    if (this.npcs?.spatialGrid) {
+      if (this._inGrid) this.npcs.spatialGrid.remove(this);
+      this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+      this._spatialCX = Math.floor(this.x * 0.0625);
+      this._spatialCZ = Math.floor(this.z * 0.0625);
+      this._inGrid = true;
+    }
+    if (this.npcs?.npcs && !this.npcs.npcs.includes(this)) {
+      this.npcs.npcs.push(this);
+    }
+
     if (this.effects) {
       this.effects.play("dust", this.x, y + 0.8, this.z, "#1c1b22", 1.8);
     }
@@ -1072,6 +1119,12 @@ export class Cultist {
   takeHit(amount, dirX, dirZ, force = 1.8, launch = 0) {
     if (!this.alive || !this.root.visible) return false;
     this.health -= amount;
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
+    this._knockX = dirX || 0;
+    this._knockZ = dirZ || 0;
+    this._knockPower = Math.max(force * 2.8, 6.0);
 
     if (this.effects) {
       this.effects.play("dust", this.x, this.root.position.y + 1.1, this.z, "#111116", 2.2);
@@ -1096,6 +1149,11 @@ export class Cultist {
     this.userData.state = "DESPAWNED";
     this.userData.isDead = true;
 
+    if (this.npcs?.spatialGrid && this._inGrid) {
+      this.npcs.spatialGrid.remove(this);
+      this._inGrid = false;
+    }
+
     if (this.effects) {
       this.effects.play("dust", this.x, this.root.position.y + 0.9, this.z, "#14141a", 2.8);
       this.effects.play("dust", this.x, this.root.position.y + 1.6, this.z, "#221a2c", 2.2);
@@ -1113,6 +1171,64 @@ export class Cultist {
 
   update(dt, player, npcs, firePool, time = performance.now()) {
     if (!this.alive || !this.root.visible) return;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        this.flashMaterials[i].emissive.copy(c);
+        this.flashMaterials[i].emissiveIntensity = intensity;
+      }
+    }
+
+    if (this._knockPower > 0) {
+      const step = this._knockPower * dt;
+      const nx = this.x + this._knockX * step;
+      const nz = this.z + this._knockZ * step;
+      if (!this.world || !this.world.isBlockedAt(nx, nz, 0.35)) {
+        this.x = nx;
+        this.z = nz;
+      }
+      this._knockPower = Math.max(0, this._knockPower - dt * 18);
+    }
+
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.model.position.x = tremX;
+    this.model.position.z = tremZ;
+    this.model.position.y = (this.isSeated ? -0.42 : 0) + hopY;
+
+    // Atualiza Spatial Grid
+    if (this.npcs?.spatialGrid) {
+      if (!this._inGrid) {
+        this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+        this._spatialCX = Math.floor(this.x * 0.0625);
+        this._spatialCZ = Math.floor(this.z * 0.0625);
+        this._inGrid = true;
+      } else {
+        const curCX = Math.floor(this.x * 0.0625);
+        const curCZ = Math.floor(this.z * 0.0625);
+        if (curCX !== this._spatialCX || curCZ !== this._spatialCZ) {
+          this.npcs.spatialGrid.remove(this);
+          this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
+          this._spatialCX = curCX;
+          this._spatialCZ = curCZ;
+        }
+      }
+    }
 
     this.floatPhase += dt * 3.2;
     const px = player?.x ?? player?.position?.x ?? 0;
@@ -1481,6 +1597,23 @@ export class CultLeader {
       isDead: false,
     };
 
+    this.flashMaterials = [];
+    this.model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+    this._knockX = 0;
+    this._knockZ = 0;
+    this._knockPower = 0;
+
     if (scene) scene.add(root);
   }
 
@@ -1492,6 +1625,12 @@ export class CultLeader {
     if (!this.alive) return false;
     this.health -= amount;
     this.hostile = true; // Se for atacado, passa a lutar
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
+    this._knockX = dirX || 0;
+    this._knockZ = dirZ || 0;
+    this._knockPower = Math.max(force * 2.0, 4.5);
 
     if (this.effects) {
       this.effects.play("dust", this.x, this.root.position.y + 1.2, this.z, "#1c1722", 2.0);
@@ -1593,6 +1732,47 @@ export class CultLeader {
 
   update(dt, player, isNight = true) {
     if (!this.root.visible) return;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        this.flashMaterials[i].emissive.copy(c);
+        this.flashMaterials[i].emissiveIntensity = intensity;
+      }
+    }
+
+    if (this._knockPower > 0) {
+      const step = this._knockPower * dt;
+      const nx = this.x + this._knockX * step;
+      const nz = this.z + this._knockZ * step;
+      if (!this.world || !this.world.isBlockedAt(nx, nz, 0.4)) {
+        this.x = nx;
+        this.z = nz;
+      }
+      this._knockPower = Math.max(0, this._knockPower - dt * 14);
+    }
+
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.model.position.x = tremX;
+    this.model.position.z = tremZ;
+    if (this.alive) {
+      this.model.position.y = hopY;
+    }
 
     // Atualização celular na Spatial Grid para garantir que armas e flechas acertem Morvath
     this.npcs = this.npcs || window.__game?.npcs;

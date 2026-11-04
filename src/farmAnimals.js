@@ -28,6 +28,10 @@ const _bloodDecalMat = new THREE.MeshBasicMaterial({
   depthWrite: false,
 });
 
+const _WHITE_FLASH = new THREE.Color("#ffffff");
+const _RED_FLASH = new THREE.Color("#ff1122");
+const _ZERO_FLASH = new THREE.Color("#000000");
+
 /**
  * Cria geometria de poça de sangue orgânica irregular (sem círculos perfeitos).
  */
@@ -202,6 +206,23 @@ export class BaseFarmAnimal {
     this.state = "idle"; // 'idle' | 'walk' | 'dead'
     this.peckTimer = 0;
     this.speed = kind === "chicken" ? 1.6 : 1.1;
+
+    this.flashMaterials = [];
+    this.root.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+    this._knockX = 0;
+    this._knockZ = 0;
+    this._knockPower = 0;
   }
 
   spawn(x, z, homeX, homeZ, radius = 4.5, habitatType = "coupled_pen", bounds = null, ownerId = null) {
@@ -223,9 +244,24 @@ export class BaseFarmAnimal {
     this.root.rotation.set(0, this.angle, 0);
   }
 
-  takeDamage(amount, attacker = null) {
+  takeHit(amount, dirX = 0, dirZ = 0, force = 1.8, launch = 0) {
+    this._knockX = dirX;
+    this._knockZ = dirZ;
+    this._knockPower = Math.max(force * 2.5, 5.0);
+    return this.takeDamage(amount, this.manager?.player, dirX, dirZ, force);
+  }
+
+  takeDamage(amount, attacker = null, dirX = 0, dirZ = 0, force = 1.8) {
     if (!this.active || this.state === "dead") return false;
     this.health -= amount;
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
+    if (dirX !== 0 || dirZ !== 0) {
+      this._knockX = dirX;
+      this._knockZ = dirZ;
+      this._knockPower = Math.max(force * 2.5, 5.0);
+    }
     const isFatal = this.health <= 0;
 
     // Consequência Social & Agro System se o jogador for o agressor
@@ -271,6 +307,40 @@ export class BaseFarmAnimal {
 
   update(dt) {
     if (!this.active || this.state === "dead") return;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        if (this.flashMaterials[i].emissive) {
+          this.flashMaterials[i].emissive.copy(c);
+          this.flashMaterials[i].emissiveIntensity = intensity;
+        }
+      }
+    }
+
+    if (this._knockPower > 0) {
+      const step = this._knockPower * dt;
+      this.x += this._knockX * step;
+      this.z += this._knockZ * step;
+      this._knockPower = Math.max(0, this._knockPower - dt * 18);
+    }
+
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.5);
+      hopY = this._hitHop * 1.6;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.16;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
 
     this.timer -= dt;
     if (this.timer <= 0) {
@@ -338,7 +408,7 @@ export class BaseFarmAnimal {
     }
 
     this.y = this.manager.world.heightAt(this.x, this.z);
-    this.root.position.set(this.x, this.y, this.z);
+    this.root.position.set(this.x + tremX, this.y + hopY, this.z + tremZ);
     this.root.rotation.y = this.angle;
 
     // Animação de ciscada/farejo

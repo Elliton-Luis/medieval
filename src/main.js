@@ -506,6 +506,7 @@ if (saved) {
     PlayerInventory.torches = saved.stats.torches ?? PlayerInventory.torches;
     PlayerInventory.hasSword = saved.stats.hasSword ?? PlayerInventory.hasSword;
     PlayerInventory.hasDemiurgeDiary = Boolean(saved.stats.hasDemiurgeDiary || saved.hasDemiurgeDiary);
+    PlayerInventory.hasCollectedGroundBook = Boolean(saved.stats.hasCollectedGroundBook || saved.hasCollectedGroundBook);
     PlayerInventory.discoveredBookPages = Array.isArray(saved.stats.discoveredBookPages) ? saved.stats.discoveredBookPages : [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20];
     PlayerInventory.torchColor = saved.stats.torchColor || "orange";
     PlayerInventory.crystals = saved.stats.crystals || { green: 0, blue: 0, pink: 0, red: 0, white: 0, purple: 0 };
@@ -536,7 +537,7 @@ initDemiurgeDiary({
   scene,
   world,
   savedSpotIndex: saved?.demiurgeBookSpotIndex,
-  isCollected: PlayerInventory.hasDemiurgeDiary,
+  isCollected: PlayerInventory.hasCollectedGroundBook,
 });
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");

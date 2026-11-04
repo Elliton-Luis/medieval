@@ -201,6 +201,7 @@ export class CombatSystem {
 
   damageNPC(npc, amount, directionX, directionZ, color = "#f5d36e", size = 0.95, force = 1.8, launch = 0, headshot = false, silent = false) {
     if (!npc.alive) return false;
+    this.player.lastCombatTime = performance.now();
 
     // Se o jogador atirar ou bater no alvo, a mira fica locked nele
     if (this.aim?.lockOnTarget) {
@@ -236,6 +237,20 @@ export class CombatSystem {
         this.effects.play("dust", npc.x, npc.root.position.y + 1.1, npc.z, "#14141a", 2.6);
         this.effects.play("star", npc.x, npc.root.position.y + 1.2, npc.z, "#8844cc", 1.8);
         this.ui.showToast("✦ O Cultista do Demiurgo desvaneceu em cinzas e névoa negra! Relíquias recuperadas.");
+      }
+    } else if (npc.roleKey === "cult_leader") {
+      if (defeated && typeof npc.die === "function" && npc.alive) {
+        npc.die();
+      }
+    } else if (npc.roleKey === "gulur" || npc.roleKey === "necron" || npc.roleKey === "hexoculus" || npc.roleKey === "polyphonia" || npc.root?.userData?.isBeast) {
+      // Monstros e Feras dos Ermos: sem crime ou penalidade de assassinato de cidadão
+      if (defeated) {
+        if (PlayerStats.isTemplar && PlayerStats.hasBrokenVow) {
+          PlayerStats.hasBrokenVow = false;
+          this.ui?.showToast?.("✦ O sangue da fera das trevas expiou tua culpa! Teu voto de Templário foi restaurado pelos céus!");
+          this.effects?.play("star", this.player.x, this.player.root.position.y + 1.8, this.player.z, "#ffe48f", 2.5);
+          this.audio?.choir?.();
+        }
       }
     } else if (npc.temporary) {
       if (npc.roleKey === "horse") {
@@ -309,6 +324,7 @@ export class CombatSystem {
 
   _damagePlayer(amount, awayX, awayZ, knock = 3.4, weapon = "blade") {
     if (this.player.health <= 0 || this.player.rolling) return;
+    this.player.lastCombatTime = performance.now();
     // Chance passiva de deflexão da armadura (0% a 70%) e redução pelo Colar da Bênção (15%)
     const dmgCheck = takeDamage(amount);
     if (dmgCheck.negated) {

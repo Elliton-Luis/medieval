@@ -107,6 +107,7 @@ export class SleepSystem {
           torches: PlayerInventory.torches,
           hasSword: PlayerInventory.hasSword,
           hasDemiurgeDiary: Boolean(PlayerInventory.hasDemiurgeDiary),
+          hasCollectedGroundBook: Boolean(PlayerInventory.hasCollectedGroundBook),
           discoveredBookPages: Array.isArray(PlayerInventory.discoveredBookPages) ? PlayerInventory.discoveredBookPages : [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20],
           torchColor: PlayerInventory.torchColor || "orange",
           crystals: PlayerInventory.crystals || {},

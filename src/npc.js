@@ -33,7 +33,8 @@ const FADE_TIME = 0.8;
 const RESPAWN_DELAY = 14;
 const RESPAWN_CLEARANCE = 18;
 const ACTIVE_DISTANCE_SQ = 95 * 95;
-const FLASH_COLOR = new THREE.Color("#85764a");
+const WHITE_FLASH_COLOR = new THREE.Color("#ffffff");
+const RED_FLASH_COLOR = new THREE.Color("#ff1122");
 const ZERO_COLOR = new THREE.Color("#000000");
 const SIDE_SIGNS = [1, -1];
 
@@ -128,6 +129,8 @@ export class NPC {
     this.maxHealth = 3;
     this._hitStun = 0;
     this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
     this._ragdollTime = 0;
     this._fallSide = 1;
     this._knockX = 0;
@@ -304,14 +307,15 @@ export class NPC {
     }
     this.animTime += dt;
     if (this._hitStun > 0) {
-      const stun = this._hitStun / 0.82;
+      const stun = this._hitStun / 0.85;
       this._hitStun = Math.max(0, this._hitStun - dt);
       this._knockMove(dt, stun);
     }
     if (this._flashTimer > 0) {
       this._flashTimer = Math.max(0, this._flashTimer - dt);
-      const c = this._flashTimer > 0 ? FLASH_COLOR : ZERO_COLOR;
-      const intensity = this._flashTimer > 0 ? 0.65 : 0;
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? WHITE_FLASH_COLOR : RED_FLASH_COLOR) : ZERO_COLOR;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
       for (let i = 0; i < this.flashMaterials.length; i++) {
         this.flashMaterials[i].emissive.copy(c);
         this.flashMaterials[i].emissiveIntensity = intensity;
@@ -467,6 +471,23 @@ export class NPC {
       this.rightArm.rotation.x = 0.78;
     } else if (this.roleKey !== "farmer") {
       this.model.rotation.x = 0;
+    }
+    this._applyHitVisuals(dt);
+  }
+
+  _applyHitVisuals(dt) {
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      this.model.position.y += this._hitHop * 1.8;
+    }
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      this.model.position.x = (Math.random() - 0.5) * trem;
+      this.model.position.z = (Math.random() - 0.5) * trem;
+    } else {
+      this.model.position.x = 0;
+      this.model.position.z = 0;
     }
   }
 
@@ -970,16 +991,19 @@ export class NPC {
 
     if (arrived) this.onReport?.(this);
     else if (this.mode !== "hunt" && this.modeTimer <= 0) this.endAlert();
+    this._applyHitVisuals(dt);
   }
 
   takeHit(amount, directionX, directionZ, force = 1.8, launch = 0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
-    this._hitStun = 0.82;
-    this._flashTimer = 0.18;
+    this._hitStun = 0.85;
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
     this._knockX = directionX;
     this._knockZ = directionZ;
-    this._knockPower = force;
+    this._knockPower = Math.max(force * 2.8, 6.0);
     if (this.roleKey === "guard") this.alerted = true;
     if (this.health > 0) return false;
     this.alive = false;

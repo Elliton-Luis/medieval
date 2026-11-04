@@ -118,6 +118,10 @@ const _teethMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
+const _WHITE_FLASH = new THREE.Color("#ffffff");
+const _RED_FLASH = new THREE.Color("#ff1122");
+const _ZERO_FLASH = new THREE.Color("#000000");
+
 const _mouthInteriorMat = new THREE.MeshBasicMaterial({
   color: 0x4a0a0e,
 });
@@ -408,6 +412,20 @@ export class Gulur {
       this.legs.push({ legRoot, kneeGroup, upper, lower });
     }
 
+    this.flashMaterials = [];
+    this.root.traverse((child) => {
+      if (child.isMesh && child.material && child.material.emissive) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+
     this._groundY = this.world ? this.world.heightAt(x, z) : 0;
     this.root.position.set(x, this._groundY, z);
     scene.add(this.root);
@@ -420,6 +438,15 @@ export class Gulur {
   takeHit(amount, dirX = 0, dirZ = 0, force = 2.0, launch = 0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
+    this._flashTimer = 0.24;
+    this._hitHop = 0.55;
+    this._tremorTimer = 0.35;
+
+    const mag = Math.hypot(dirX, dirZ);
+    if (mag > 0.01) {
+      this.x += (dirX / mag) * (0.6 * force);
+      this.z += (dirZ / mag) * (0.6 * force);
+    }
 
     if (this.effects) {
       this.effects.play("star", this.x, this.root.position.y + 2.8, this.z, "#ffea00", 2.2);
@@ -494,6 +521,17 @@ export class Gulur {
     }
 
     if (!this.root.visible) this.root.visible = true;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        this.flashMaterials[i].emissive.copy(c);
+        this.flashMaterials[i].emissiveIntensity = intensity;
+      }
+    }
 
     // Pulsação suave e respiração etérea da Aura Amarela e dos Olhos
     const tNow = performance.now() * 0.002;
@@ -589,7 +627,20 @@ export class Gulur {
     if (this._groundY === undefined || this.speed > 0.1) {
       this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
     }
-    this.root.position.set(this.x, this._groundY, this.z);
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 2.8);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.35) * 0.28;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.root.position.set(this.x + tremX, this._groundY + hopY, this.z + tremZ);
 
     // Atualização celular na Spatial Hash Grid
     if (this.npcs?.spatialGrid && this._inGrid) {
@@ -614,7 +665,7 @@ export class Gulur {
     this.fleeTimer = 0;
     this.speed = 0;
     this.root.userData.isDead = false;
-    this.bodyGroup.position.set(0, 0, 0);
+    this.bodyGroup.position.set(0, 16.2, 0);
     this.bodyGroup.rotation.set(0, 0, 0);
     for (let i = 0; i < 4; i++) {
       this.legs[i].legRoot.rotation.set(0, 0, 0);
@@ -774,6 +825,20 @@ export class Necron {
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    this.flashMaterials = [];
+    this.root.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+
     this._inGrid = false;
   }
 
@@ -784,6 +849,9 @@ export class Necron {
   takeHit(amount, dirX = 0, dirZ = 0, force = 2.0, launch = 0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
 
     if (this.effects) {
       this.effects.play("star", this.x, this.root.position.y + 1.1, this.z, "#ff2233", 1.4);
@@ -793,8 +861,8 @@ export class Necron {
     // Recuo de impacto
     const mag = Math.hypot(dirX, dirZ);
     if (mag > 0.01) {
-      this.x += (dirX / mag) * (0.45 * force);
-      this.z += (dirZ / mag) * (0.45 * force);
+      this.x += (dirX / mag) * (0.85 * force);
+      this.z += (dirZ / mag) * (0.85 * force);
     }
 
     if (this.health <= 0) {
@@ -843,6 +911,19 @@ export class Necron {
     }
 
     if (!this.root.visible) this.root.visible = true;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        if (this.flashMaterials[i].emissive) {
+          this.flashMaterials[i].emissive.copy(c);
+          this.flashMaterials[i].emissiveIntensity = intensity;
+        }
+      }
+    }
 
     // Garante presença na Spatial Grid de combate à noite para ser atingido e focado
     if (this.npcs?.spatialGrid && !this._inGrid) {
@@ -941,7 +1022,20 @@ export class Necron {
     if (this._groundY === undefined || this.speed > 0.05) {
       this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
     }
-    this.root.position.set(this.x, this._groundY, this.z);
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.root.position.set(this.x + tremX, this._groundY + hopY, this.z + tremZ);
 
     // Atualização celular na Spatial Hash Grid
     if (this.npcs?.spatialGrid && this._inGrid) {
@@ -1137,6 +1231,20 @@ export class Hexoculus {
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    this.flashMaterials = [];
+    this.root.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+
     this._inGrid = false;
   }
 
@@ -1147,6 +1255,9 @@ export class Hexoculus {
   takeHit(amount, dirX = 0, dirZ = 0, force = 2.0, launch = 0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
 
     if (this.effects) {
       this.effects.play("star", this.x, this.root.position.y + 2.2, this.z, "#ffea00", 2.0);
@@ -1204,6 +1315,19 @@ export class Hexoculus {
     }
 
     if (!this.root.visible) this.root.visible = true;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        if (this.flashMaterials[i].emissive) {
+          this.flashMaterials[i].emissive.copy(c);
+          this.flashMaterials[i].emissiveIntensity = intensity;
+        }
+      }
+    }
 
     if (this.npcs?.spatialGrid && !this._inGrid) {
       this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
@@ -1280,7 +1404,20 @@ export class Hexoculus {
     if (this._groundY === undefined || this.speed > 0.05) {
       this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
     }
-    this.root.position.set(this.x, this._groundY, this.z);
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.root.position.set(this.x + tremX, this._groundY + hopY, this.z + tremZ);
 
     if (this.npcs?.spatialGrid && this._inGrid) {
       const curCX = Math.floor(this.x * 0.0625);
@@ -1435,6 +1572,20 @@ export class Polyphonia {
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    this.flashMaterials = [];
+    this.root.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (!child._origMaterial) {
+          child.material = child.material.clone();
+          child._origMaterial = true;
+        }
+        this.flashMaterials.push(child.material);
+      }
+    });
+    this._flashTimer = 0;
+    this._hitHop = 0;
+    this._tremorTimer = 0;
+
     this._inGrid = false;
   }
 
@@ -1445,6 +1596,9 @@ export class Polyphonia {
   takeHit(amount, dirX = 0, dirZ = 0, force = 2.0, launch = 0) {
     if (!this.alive) return false;
     this.health = Math.max(0, this.health - amount);
+    this._flashTimer = 0.24;
+    this._hitHop = 0.45;
+    this._tremorTimer = 0.28;
 
     if (this.effects) {
       this.effects.play("slash", this.x, this.root.position.y + 1.2, this.z, "#cc1122", 1.8);
@@ -1501,6 +1655,19 @@ export class Polyphonia {
     }
 
     if (!this.root.visible) this.root.visible = true;
+
+    if (this._flashTimer > 0) {
+      this._flashTimer = Math.max(0, this._flashTimer - dt);
+      const isWhite = this._flashTimer > 0.12;
+      const c = this._flashTimer > 0 ? (isWhite ? _WHITE_FLASH : _RED_FLASH) : _ZERO_FLASH;
+      const intensity = this._flashTimer > 0 ? (isWhite ? 1.0 : 0.85) : 0;
+      for (let i = 0; i < this.flashMaterials.length; i++) {
+        if (this.flashMaterials[i].emissive) {
+          this.flashMaterials[i].emissive.copy(c);
+          this.flashMaterials[i].emissiveIntensity = intensity;
+        }
+      }
+    }
 
     if (this.npcs?.spatialGrid && !this._inGrid) {
       this.npcs.spatialGrid.insertCircle(this, this.x, this.z, this.hitRadius);
@@ -1575,7 +1742,20 @@ export class Polyphonia {
     if (this._groundY === undefined || this.speed > 0.05) {
       this._groundY = this.world ? this.world.heightAt(this.x, this.z) : 0;
     }
-    this.root.position.set(this.x, this._groundY, this.z);
+    let hopY = 0;
+    if (this._hitHop > 0) {
+      this._hitHop = Math.max(0, this._hitHop - dt * 3.2);
+      hopY = this._hitHop * 1.8;
+    }
+    let tremX = 0;
+    let tremZ = 0;
+    if (this._tremorTimer > 0) {
+      this._tremorTimer = Math.max(0, this._tremorTimer - dt);
+      const trem = (this._tremorTimer / 0.28) * 0.18;
+      tremX = (Math.random() - 0.5) * trem;
+      tremZ = (Math.random() - 0.5) * trem;
+    }
+    this.root.position.set(this.x + tremX, this._groundY + hopY, this.z + tremZ);
 
     if (this.npcs?.spatialGrid && this._inGrid) {
       const curCX = Math.floor(this.x * 0.0625);

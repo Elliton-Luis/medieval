@@ -197,12 +197,12 @@ export function getMusicCredits() {
 }
 
 const SUPPORTS_VORBIS = typeof Audio !== "undefined" && Boolean(new Audio().canPlayType('audio/ogg; codecs="vorbis"'));
-const FADE_OUT_DURATION = 2.0; // Fade-out suave da música saindo (silêncio antes da próxima)
-const FADE_IN_DURATION = 2.0;  // Fade-in suave da nova música
-const FADE_URGENT_OUT = 0.8;   // Fade-out para combate/perseguição
-const FADE_URGENT_IN = 1.0;    // Fade-in para combate/perseguição
-const HOLD = 5.0;              // Tempo de sustentação contínua (5s) para confirmar mudança de contexto
-const MIN_TRACK_STAY = 28.0;   // Tempo mínimo que uma música toca (28s) para manter a imersão sem cortes frequentes
+const FADE_OUT_DURATION = 2.2; // Fade-out suave da música saindo (silêncio antes da próxima)
+const FADE_IN_DURATION = 2.2;  // Fade-in suave da nova música
+const FADE_URGENT_OUT = 0.6;   // Fade-out rápido para entrada imediata de combate
+const FADE_URGENT_IN = 0.8;    // Fade-in rápido de combate
+const HOLD = 6.0;              // Tempo de sustentação contínua (6s) para confirmar mudança de bioma calmo
+const MIN_TRACK_STAY = 40.0;   // Tempo mínimo que uma música ambiente toca (40s) para manter a imersão
 const OPEN_FIELD_NAMES = new Set(["Pradaria de Caldera", "Estrada Real"]);
 const EVICTION_TIME = 16.0;    // Descarrega a faixa da RAM 16s após o término do fade-out
 
@@ -603,29 +603,81 @@ export class MusicDirector {
     return found;
   }
 
+  _isCombatOrHuntActive() {
+    if (!this.player) return false;
+    const px = this.player.x ?? 0;
+    const pz = this.player.z ?? 0;
+
+    // 1. Procurado nível 1 a 5 (Guarda Real ativamente em perseguição/combate)
+    if ((this.npcs?.wanted ?? 0) >= 1) return true;
+
+    // 2. Dano sofrido ou desferido em combate recente (< 5.5s)
+    if (this.player.lastCombatTime && (performance.now() - this.player.lastCombatTime) < 5500) {
+      return true;
+    }
+
+    // 3. Inimigos atacando ou perseguindo o jogador por perto (< 26m)
+    if (this.npcs?.npcs) {
+      for (let i = 0; i < this.npcs.npcs.length; i++) {
+        const n = this.npcs.npcs[i];
+        if (!n || !n.alive || !n.root || !n.root.visible) continue;
+        if (n.state === "attack" || n.state === "chase" || n.alerted) {
+          const dx = n.x - px;
+          const dz = n.z - pz;
+          if (dx * dx + dz * dz < 26 * 26) return true;
+        }
+      }
+    }
+
+    // 4. Feras em perseguição ou investida (< 32m)
+    if (this.beasts?.beasts) {
+      for (let i = 0; i < this.beasts.beasts.length; i++) {
+        const b = this.beasts.beasts[i];
+        if (!b || !b.alive || !b.root || !b.root.visible) continue;
+        if (b.state === "chase" || b.state === "charge" || b.state === "attacking") {
+          const dx = b.x - px;
+          const dz = b.z - pz;
+          if (dx * dx + dz * dz < 32 * 32) return true;
+        }
+      }
+    }
+
+    // 5. Cultistas em combate ativo (< 28m)
+    if (this.cultistsPool) {
+      for (let i = 0; i < this.cultistsPool.length; i++) {
+        const c = this.cultistsPool[i];
+        if (!c || !c.alive || !c.root || !c.root.visible) continue;
+        if (c.userData?.state === "ATTACKING" || c.hostile) {
+          const dx = c.x - px;
+          const dz = c.z - pz;
+          if (dx * dx + dz * dz < 28 * 28) return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   _detect() {
     // 1. Eclipse Solar Maligno e Cataclismo do Demiurgo (Prioridade Total)
     if (this._isEclipseOrCataclysm()) {
       return "eclipse";
     }
 
-    // 2. Procurado e Perseguição (Combate Escalonado)
-    const wanted = this.npcs?.wanted ?? 0;
-    if (wanted >= 4) return "chase";
-    if (wanted === 3) return "wanted_mid";
-    if (wanted >= 1) return "wanted_low";
-
-    // 3. Tensão Iminente: Feras, Lobisomens ou Cultistas à espreita (< 35m)
-    if (this._isThreatNearby()) {
-      return "tension";
+    // 2. LUTA / CAÇA: ÚNICA SITUAÇÃO COM AUTORIZAÇÃO DE SOBREPOR SUBITAMENTE A MÚSICA
+    if (this._isCombatOrHuntActive()) {
+      const wanted = this.npcs?.wanted ?? 0;
+      if (wanted >= 4) return "chase";
+      if (wanted >= 2) return "wanted_mid";
+      return "wanted_low";
     }
 
-    // 4. Vilas Fantasmas Amaldiçoadas & Acampamentos do Demiurgo
+    // 3. Vilas Fantasmas Amaldiçoadas & Acampamentos do Demiurgo
     if (this._isGhostTownOrCultCampNearby()) {
       return "cult_camp";
     }
 
-    // 5. Interiores Sagrados ou Boêmios (Igreja e Taverna)
+    // 4. Interiores Sagrados ou Boêmios (Igreja e Taverna)
     if (this.player.sittingInChurch || this.player.inHouse?.type === "church") {
       return "church";
     }
@@ -634,7 +686,7 @@ export class MusicDirector {
       return "tavern";
     }
 
-    // 6. Ciclo Noturno: Madrugada Sombria (00h às 05h) vs Noite Geral
+    // 5. Ciclo Noturno: Madrugada Sombria (00h às 05h) vs Noite Geral
     if (this.dayNight && this.dayNight.isNight) {
       // Progress de 0.0 a ~0.22 corresponde à madrugada in-game (00:00 às 05:15)
       if (this.dayNight.progress >= 0 && this.dayNight.progress < 0.22) {
@@ -643,16 +695,16 @@ export class MusicDirector {
       return "night";
     }
 
-    // 7. Cidades, Vilas e Mercados Diurnos
+    // 6. Cidades, Vilas e Mercados Diurnos
     if (this._isInCity()) {
       return "town";
     }
 
-    // 8. Matas Fechadas e Bosques
+    // 7. Matas Fechadas e Bosques
     if (this.trees >= 18) return "deep_forest";
     if (this.trees >= 7) return "forest";
 
-    // 9. Pradarias Abertas vs Exploração Ativa
+    // 8. Pradarias Abertas vs Exploração Ativa
     const { x, z } = this.player;
     let nearest = Infinity;
     for (const village of VILLAGES) {
@@ -795,15 +847,39 @@ export class MusicDirector {
     }
 
     const detected = this._detect();
+    const isCombat = detected === "chase" || detected === "wanted_mid" || detected === "wanted_low" || detected === "eclipse";
     const currentActiveOrTarget = this.targetKey || this.context;
+    const isCurrentlyCombat = currentActiveOrTarget === "chase" || currentActiveOrTarget === "wanted_mid" || currentActiveOrTarget === "wanted_low" || currentActiveOrTarget === "eclipse";
+
+    // 1. A ÚNICA MÚSICA QUE PODE SOBRESCREVER (MUDAR DO NADA) É A DE LUTA / CAÇA!
+    const urgent = isCombat && !isCurrentlyCombat;
+    if (urgent) {
+      if (!isCurrentlyCombat && currentActiveOrTarget) {
+        this._savedAmbientTrack = currentActiveOrTarget;
+      }
+      this.context = detected;
+      this.pending = null;
+      this._switchTo(detected, true);
+      return;
+    }
+
+    // 2. A MÚSICA DE LUTA SÓ DEVE TOCAR ENQUANTO A LUTA ESTIVER ACONTECENDO!
+    // Quando a luta finda, transiciona de volta à faixa ambiente salva.
+    if (isCurrentlyCombat && !isCombat) {
+      const returnTrack = this._savedAmbientTrack || detected;
+      this.context = returnTrack;
+      this.pending = null;
+      this._switchTo(returnTrack, false);
+      return;
+    }
+
     if (detected === currentActiveOrTarget) {
       this.pending = null;
       return;
     }
 
-    // Urgências reais de vida ou morte que sobrepõem faixas calmas
-    const urgent = (detected === "eclipse" || detected === "chase") && this.context !== detected;
-
+    // 3. FAIXAS AMBIENTES: NUNCA SOBRESCREVEM DO NADA.
+    // Exigem estabilidade no bioma (HOLD >= 6s) e tempo mínimo de permanência (MIN_TRACK_STAY >= 40s).
     if (this.pending !== detected) {
       this.pending = detected;
       this.pendingTime = 0;
@@ -812,18 +888,14 @@ export class MusicDirector {
     this.pendingTime += 0.4;
     const timeSinceStarted = this.time - (this._trackStartedTime || 0);
 
-    // Transição calma exige que a faixa atual tenha tocado pelo menos MIN_TRACK_STAY (28s)
-    // e que o novo contexto tenha se mantido estável por pelo menos HOLD (5s)
     const canSwitchCalm = this.pendingTime >= HOLD && timeSinceStarted >= MIN_TRACK_STAY;
-
-    // Se estiver no meio de um fade, evita chavear novamente a menos que seja perigo de vida (chase/eclipse)
     const isTransitioning = this.fadePhase === "fading_out" || this.fadePhase === "fading_in";
-    if (isTransitioning && !urgent) return;
+    if (isTransitioning) return;
 
-    if (urgent || canSwitchCalm) {
+    if (canSwitchCalm) {
       this.context = detected;
       this.pending = null;
-      this._switchTo(detected, urgent);
+      this._switchTo(detected, false);
     }
   }
 }

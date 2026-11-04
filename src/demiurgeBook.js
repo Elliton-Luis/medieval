@@ -9,45 +9,38 @@ import { PlayerStats, PlayerInventory, syncPlayerStatsToPlayer } from "./rpg.js"
 export const DEMIURGE_BOOK_SPOTS = [
   {
     id: 0,
-    name: "Cemitério da Igreja",
-    x: -16.8,
-    z: -12.5,
-    hint: "Vi vultos de bico de pássaro sussurrando entre as lápides frias do cemitério atrás da igreja de Caldera.",
+    name: "Marco de Pedra Além do Portão Norte",
+    x: 12.0,
+    z: -64.0,
+    hint: "Dizem que o Livro do Barro foi deixado além do Portão Norte, fora das muralhas da cidade sob um marco de pedra antigo.",
   },
   {
     id: 1,
-    name: "Beco da Taverna",
-    x: 10.5,
-    z: -17.5,
-    hint: "Dizem que o Livro do Barro foi jogado atrás dos barris de vinho no beco escuro da taverna da praça.",
+    name: "Ruínas a Oeste das Muralhas",
+    x: -58.0,
+    z: -14.0,
+    hint: "Vi um brilho carmesim pulsando entre os escombros do lado de fora da muralha oeste, onde a floresta começa.",
   },
   {
     id: 2,
-    name: "Alcova do Velho Poço",
-    x: 2.2,
-    z: -8.8,
-    hint: "Na calada da noite vi um brilho carmesim e cheiro de terra velha pulsando na base do poço central da vila.",
+    name: "Penhasco Além da Muralha Leste",
+    x: 54.0,
+    z: 24.0,
+    hint: "Um viajante sussurrou que o Livro do Barro repousa entre as rochas frias, do lado de fora das muralhas a leste.",
   },
   {
     id: 3,
-    name: "Entulho do Ferreiro",
-    x: -21.0,
-    z: 14.5,
-    hint: "O ferreiro jurou que deixaram um códice encadernado em couro áspero sob a escória atrás de sua forja.",
+    name: "Carroça Tombada ao Sul dos Muros",
+    x: -24.0,
+    z: 62.0,
+    hint: "Fora dos muros ao sul, perto de uma carroça quebrada nas colinas ermas, cheira a terra velha e cobre oxidado.",
   },
   {
     id: 4,
-    name: "Bancas do Mercado Antigo",
-    x: -8.0,
-    z: -23.5,
-    hint: "Um viajante de capa escura esqueceu um tomo que cheira a cobre sob os caixotes do mercado velho.",
-  },
-  {
-    id: 5,
-    name: "Portão da Muralha Sul",
-    x: 5.5,
-    z: -38.0,
-    hint: "Guardas encontraram marcas de sangue oxidado e um tomo com páginas de pergaminho irregular perto do grande portão.",
+    name: "Acampamento Arruinado a Nordeste",
+    x: 38.0,
+    z: -58.0,
+    hint: "Saindo pelos portões e contornando as paliçadas a nordeste, há cinzas de um acampamento profano com um livro negro.",
   },
 ];
 
@@ -1085,13 +1078,13 @@ export function getDemiurgeDiaryHint() {
 }
 
 export function isDemiurgeDiaryCollected() {
-  return _isCollected || Boolean(PlayerInventory.hasDemiurgeDiary);
+  return _isCollected || Boolean(PlayerInventory.hasCollectedGroundBook);
 }
 
 export function initDemiurgeDiary({ scene, world, savedSpotIndex = null, isCollected = false }) {
   _cachedScene = scene;
   _cachedWorld = world;
-  _isCollected = Boolean(isCollected || PlayerInventory.hasDemiurgeDiary);
+  _isCollected = Boolean(isCollected || PlayerInventory.hasCollectedGroundBook);
 
   if (
     savedSpotIndex !== null &&
@@ -1111,7 +1104,7 @@ export function initDemiurgeDiary({ scene, world, savedSpotIndex = null, isColle
     _demiurgeBookGroup.parent.remove(_demiurgeBookGroup);
   }
 
-  // Se já foi coletado, não coloca o livro no chão
+  // Se o livro físico do chão já foi pego, não recoloca o modelo
   if (_isCollected) {
     return null;
   }
@@ -1184,22 +1177,23 @@ export function updateDemiurgeDiary(dt, now = performance.now()) {
 }
 
 export function checkDemiurgeDiaryNearby(playerPos) {
-  if (!_demiurgeBookGroup || !_demiurgeBookGroup.visible || _isCollected || PlayerInventory.hasDemiurgeDiary) {
+  if (!_demiurgeBookGroup || !_demiurgeBookGroup.visible || _isCollected || PlayerInventory.hasCollectedGroundBook) {
     return false;
   }
   const dx = (playerPos.x ?? 0) - _demiurgeBookGroup.position.x;
   const dz = (playerPos.z ?? 0) - _demiurgeBookGroup.position.z;
-  return dx * dx + dz * dz < 2.5 * 2.5;
+  return dx * dx + dz * dz < 2.8 * 2.8;
 }
 
 export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
   if (!checkDemiurgeDiaryNearby(playerPos)) return false;
 
-  // Coleta o Tomo para o Inventário do Jogador
+  // Coleta o Tomo Básico para o Inventário do Jogador
   _isCollected = true;
+  PlayerInventory.hasCollectedGroundBook = true;
   PlayerInventory.hasDemiurgeDiary = true;
 
-  // Ao coletar o tomo físico encadernado, desbloqueia as páginas base
+  // O livro no chão é o conjunto básico de páginas do Tractatus de Carcere
   const basePages = [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20];
   if (!Array.isArray(PlayerInventory.discoveredBookPages)) {
     PlayerInventory.discoveredBookPages = [];
@@ -1224,7 +1218,7 @@ export function interactWithDemiurgeDiary(playerPos, ui, audio, input) {
     addEvil(2, "Recolheu o Tractatus de Carcere (O Livro do Barro)");
   });
 
-  ui?.showToast?.("✦ Tractatus de Carcere recolhido! Pressione [L] para ler o Tomo do Barro a qualquer momento. (+1 Carisma)");
+  ui?.showToast?.("✦ Tractatus de Carcere recolhido! As páginas básicas do Tomo do Barro foram reunidas [L]! (+1 Carisma)");
   audio?.bookPage?.();
 
   // Abre imediatamente o leitor na página 1

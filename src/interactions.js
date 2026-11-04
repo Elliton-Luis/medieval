@@ -138,10 +138,10 @@ export class InteractionSystem {
         !this.drops?.tryPickup() &&
         !this.candle?.interact() &&
         !this.houses?.interact() &&
+        !this._tryInteractDemiurgeDiary() &&
         !this.farming?.interact(this.player, this.ui, this.audio, this.effects) &&
         !this._tryGatherHayBale() &&
         !this._tryCollectCrystal() &&
-        !this._tryInteractDemiurgeDiary() &&
         !this._tryInteractAltar() &&
         !this._trySearchGhostTown() &&
         !this._tryInteractBell()
@@ -149,13 +149,15 @@ export class InteractionSystem {
         this._interactNearby();
       }
     }
-    const cropPrompted = this.farming?.checkPrompt(this.player.x, this.player.z, this.ui);
-    if (!cropPrompted) {
-      this._checkAltarNearby();
-      this._checkDemiurgeDiaryNearby();
-      this._checkCrystalNearby();
-      this._checkGhostTownNearby();
-      this._checkBellNearby();
+    const diaryPrompted = this._checkDemiurgeDiaryNearby();
+    if (!diaryPrompted) {
+      const cropPrompted = this.farming?.checkPrompt(this.player.x, this.player.z, this.ui);
+      if (!cropPrompted) {
+        this._checkAltarNearby();
+        this._checkCrystalNearby();
+        this._checkGhostTownNearby();
+        this._checkBellNearby();
+      }
     }
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
@@ -333,7 +335,9 @@ export class InteractionSystem {
   _checkDemiurgeDiaryNearby() {
     if (checkDemiurgeDiaryNearby(this.player.root.position)) {
       this.ui.setPrompt?.("✦ DIÁRIO DOS DEMIURGOS [E] Recolher Diário Proibido");
+      return true;
     }
+    return false;
   }
 
   _tryInteractDemiurgeDiary() {
@@ -556,6 +560,11 @@ export class InteractionSystem {
         { id: "bolts", label: `Virotes de balestra ×4 · ${pBolts} moedas`, disabled: this.player.coins < pBolts },
         { id: "knives", label: `Facas de arremesso ×5 · ${pKnives} moedas`, disabled: this.player.coins < pKnives },
         { id: "oil", label: `Potes de óleo ×2 · ${pOil} moedas`, disabled: this.player.coins < pOil },
+        {
+          id: "charity:smith",
+          label: "🪙 Caridade: Auxiliar os aprendizes e a forja de Caldera (-5 moedas · +1 CAR)",
+          disabled: this.player.coins < 5,
+        },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "merchant") {
@@ -572,6 +581,11 @@ export class InteractionSystem {
           id: "tavern:meal",
           label: `Banquete Reforçado da Taverna (+1 CON permanente e Cura Total) · ${pMeal} moedas`,
           disabled: this.player.coins < pMeal,
+        },
+        {
+          id: "charity:merchant",
+          label: "🪙 Caridade: Doar ao fundo de socorro aos peregrinos pobres (-5 moedas · +1 CAR)",
+          disabled: this.player.coins < 5,
         },
         {
           id: "mission:deliver",
@@ -601,6 +615,11 @@ export class InteractionSystem {
       const pTrainCon = this._price(20);
       const pTrainSpd = this._price(16);
       actions = [
+        {
+          id: "charity:farmer",
+          label: "🪙 Caridade: Auxílio solidário às famílias camponesas (-5 moedas · +1 CAR)",
+          disabled: this.player.coins < 5,
+        },
         {
           id: "sell:farmer",
           label: `Trabalhar: Vender 5 Fenos colhidos (+10 moedas) · tens ${PlayerInventory.hay} Feno`,
@@ -677,6 +696,11 @@ export class InteractionSystem {
     } else if (npc.roleKey === "guard") {
       body = message || "Mantenha a estrada principal. Há bandidos acampados além das muralhas com recompensa pela cabeça.";
       actions = [
+        {
+          id: "charity:guard",
+          label: "🪙 Caridade: Doar para o auxílio a veteranos da vigília (-5 moedas · +1 CAR)",
+          disabled: this.player.coins < 5,
+        },
         {
           id: "mission:bounty",
           label: "✦ Missão: Caça ao Bandido nas terras ermas (+65 moedas, +2 CAR)",
@@ -771,8 +795,8 @@ export class InteractionSystem {
           },
           {
             id: "charity:alms",
-            label: "🪙 Caridade: Entregar 6 Moedas de Auxílio Solidário (-6 moedas · +1 CAR)",
-            disabled: this.player.coins < 6,
+            label: "🪙 Caridade: Entregar moedas de auxílio solidário (-5 moedas · +1 CAR)",
+            disabled: this.player.coins < 5,
           },
           {
             id: "mission:deliver",
@@ -791,6 +815,11 @@ export class InteractionSystem {
         // Moradora com frio / Necessidade de lenha e reparos
         body = message || "«A aldeã treme junto à porta: 'A lenha da lareira acabou. A névoa da floresta parece sugar o calor das nossas casas... Se alguém tiver madeira seca para doar, salvará nossa noite.'»";
         actions = [
+          {
+            id: "charity:alms",
+            label: "🪙 Caridade: Doar moedas para a lenha e o aquecimento da casa (-5 moedas · +1 CAR)",
+            disabled: this.player.coins < 5,
+          },
           {
             id: "charity:wood",
             label: `🪵 Caridade: Doar 4 Madeiras secas para a lareira (-4 Madeira · +2 CAR) · tens ${PlayerInventory.wood}`,
@@ -824,9 +853,9 @@ export class InteractionSystem {
             disabled: (this.player.potions || 0) < 1,
           },
           {
-            id: "charity:alms_generous",
-            label: "🪙 Caridade: Doar 8 Moedas para comprar remédios (-8 moedas · +2 CAR)",
-            disabled: this.player.coins < 8,
+            id: "charity:alms",
+            label: "🪙 Caridade: Doar moedas para comprar remédios (-5 moedas · +1 CAR)",
+            disabled: this.player.coins < 5,
           },
           {
             id: "mission:bounty",
@@ -851,8 +880,8 @@ export class InteractionSystem {
           },
           {
             id: "charity:alms",
-            label: "🪙 Caridade: Dar uma moeda de ajuda solidária (-6 moedas · +1 CAR)",
-            disabled: this.player.coins < 6,
+            label: "🪙 Caridade: Dar uma moeda de ajuda solidária (-5 moedas · +1 CAR)",
+            disabled: this.player.coins < 5,
           },
           {
             id: "rumor:secrets",
@@ -972,18 +1001,36 @@ export class InteractionSystem {
       }
       return;
     }
-    if (action === "charity:alms" || action === "charity:alms_generous") {
-      const cost = action === "charity:alms_generous" ? 8 : 6;
+    if (
+      action === "charity:alms" ||
+      action === "charity:alms_generous" ||
+      action === "charity:smith" ||
+      action === "charity:merchant" ||
+      action === "charity:farmer" ||
+      action === "charity:guard"
+    ) {
+      const cost = action === "charity:alms_generous" ? 8 : 5;
       if (this.player.coins >= cost) {
         this.player.coins -= cost;
         PlayerStats.gold = this.player.coins;
         PlayerInventory.gold = this.player.coins;
         PlayerStats.cha += (cost >= 8 ? 2 : 1);
         syncPlayerStatsToPlayer();
-        addGood(3, "Entregou moedas de auxílio solidário a aldeões necessitados");
+        addGood(3, "Ato nobre de caridade e auxílio solidário");
         this.audio?.coin?.();
         this.ui.showToast(`✦ Auxílio Solidário! -${cost} Moedas · +${cost >= 8 ? 2 : 1} Carisma perante o povo.`);
-        this._showNPCDialogue("«'Tua esmola nobre traz alívio a quem nada tem. Que tua jornada seja próspera e tua lâmina fiel!'»");
+
+        let reply = "«'Tua esmola nobre traz alívio a quem nada tem. Que tua jornada seja próspera e tua lâmina fiel!'»";
+        if (action === "charity:smith") {
+          reply = "«O ferreiro limpa a fuligem da testa e sorri comovido: 'Que os céus te abençoem, viajante! Essa ajuda garantirá pão e carvão para os jovens aprendizes da forja. O bom aço nunca te faltará!'»";
+        } else if (action === "charity:merchant") {
+          reply = "«O mercador agradece com sincera reverência: 'Tua generosidade socorrerá peregrinos e viajantes sem teto que chegam com frio a Caldera. A estima dos justos te acompanhará!'»";
+        } else if (action === "charity:farmer") {
+          reply = "«O fazendeiro aperta tuas mãos calejadas: 'Deus te pague, viajante! Esse auxílio comprará grãos e protegerá as famílias do campo do inverno. A terra florescerá!'»";
+        } else if (action === "charity:guard") {
+          reply = "«O guarda bate o punho no peito em saudação militar solene: 'Em nome dos veteranos e das famílias dos caídos na patrulha além dos muros, a guarda de Caldera honra tua nobreza!'»";
+        }
+        this._showNPCDialogue(reply);
       }
       return;
     }
