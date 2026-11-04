@@ -1,20 +1,20 @@
 const CSS = `
 .pause-layer { position: absolute; inset: 0; z-index: 10; display: none; place-items: center; background: radial-gradient(ellipse at center, #0b0f0dcc, #050706f0); }
 .pause-layer.on { display: grid; }
-.pause-card { width: min(440px, calc(100vw - 36px)); padding: 28px 30px 24px; border: 2px solid #d2a96988; border-radius: 6px; background: linear-gradient(145deg, #202922f8, #111813f8); box-shadow: 0 20px 80px #000c; color: #eee4cc; }
-.pause-card h2 { margin: 0 0 4px; font: 900 30px Georgia, serif; letter-spacing: .12em; color: #f3ead2; }
-.pause-card p { margin: 0 0 22px; color: #d6b266; font: italic 15px Georgia, serif; }
-.pause-row { display: grid; gap: 8px; margin-bottom: 20px; }
-.pause-row label { display: flex; justify-content: space-between; font: 700 14px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: #e0d3ab; }
-.pause-row input[type=range] { width: 100%; accent-color: #d2a969; cursor: pointer; }
-.pause-toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 18px; border: 1px solid #d2a96955; border-radius: 4px; background: #141c17cc; cursor: pointer; user-select: none; }
-.pause-toggle:hover { border-color: #d2a969; background: #1a251ecc; }
-.pause-toggle span { font: 700 13px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #e0d3ab; }
-.pause-toggle strong { font: 700 13px ui-monospace, monospace; letter-spacing: .1em; color: #82e08a; }
+.pause-card { width: min(540px, calc(100vw - 36px)); padding: 32px 36px 28px; border: 2px solid #d2a969aa; border-radius: 8px; background: linear-gradient(145deg, #202922fa, #111813fd); box-shadow: 0 24px 90px #000e, 0 0 25px rgba(210, 169, 105, 0.2); color: #eee4cc; }
+.pause-card h2 { margin: 0 0 6px; font: 900 34px Georgia, serif; letter-spacing: .12em; color: #f3ead2; }
+.pause-card p { margin: 0 0 24px; color: #d6b266; font: italic 16px Georgia, serif; }
+.pause-row { display: grid; gap: 10px; margin-bottom: 22px; }
+.pause-row label { display: flex; justify-content: space-between; font: 700 15px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: #e0d3ab; }
+.pause-row input[type=range] { width: 100%; accent-color: #d2a969; cursor: pointer; height: 8px; }
+.pause-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 20px; border: 1px solid #d2a96966; border-radius: 6px; background: #141c17dd; cursor: pointer; user-select: none; }
+.pause-toggle:hover { border-color: #f0cf7a; background: #1a251eee; }
+.pause-toggle span { font: 700 14px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #e0d3ab; }
+.pause-toggle strong { font: 700 14px ui-monospace, monospace; letter-spacing: .1em; color: #82e08a; }
 .pause-toggle.off strong { color: #ff6a55; }
-.pause-card button { width: 100%; margin-top: 6px; padding: 13px; border: 1px solid #d2a969; background: #d2a96922; color: #fff4d6; font: 700 16px Georgia, serif; letter-spacing: .1em; cursor: pointer; }
-.pause-card button:hover { background: #d2a96940; }
-.pause-card small { display: block; margin-top: 14px; color: #c7b994a0; font: 12px ui-monospace, monospace; text-align: center; }
+.pause-card button { width: 100%; margin-top: 8px; padding: 15px; border: 1px solid #d2a969; background: #d2a96928; color: #fff4d6; font: 700 17px Georgia, serif; letter-spacing: .1em; cursor: pointer; border-radius: 4px; transition: background 0.15s, transform 0.1s; }
+.pause-card button:hover { background: #d2a96950; transform: translateY(-1px); }
+.pause-card small { display: block; margin-top: 16px; color: #c7b994b0; font: 13px ui-monospace, monospace; text-align: center; }
 `;
 
 // Menu de pausa (Esc): volumes separados de música e efeitos + opção de Assist Aim. O jogo congela enquanto está aberto.

@@ -609,13 +609,13 @@ const TRACTATUS_CSS = `
 }
 .diary-book-wrapper {
   position: relative;
-  width: 92%;
-  max-width: 840px;
-  min-height: 570px;
+  width: 94%;
+  max-width: 1020px;
+  min-height: 640px;
   background: #140b09; /* Couro que cheira a terra velha e cobre */
   border: 4px solid #4a1912;
   border-radius: 10px;
-  box-shadow: 0 0 60px rgba(0, 0, 0, 0.98), 0 0 30px rgba(160, 20, 20, 0.5);
+  box-shadow: 0 0 70px rgba(0, 0, 0, 0.98), 0 0 35px rgba(160, 20, 20, 0.55);
   display: flex;
   flex-direction: column;
   overflow: hidden;

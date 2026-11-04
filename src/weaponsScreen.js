@@ -31,10 +31,10 @@ const CODEX_CSS = `
   background: linear-gradient(180deg, #181320 0%, #0d0a12 100%);
   border: 2px solid #d4af37;
   border-radius: 8px;
-  box-shadow: 0 0 45px rgba(212, 175, 55, 0.35), inset 0 0 30px rgba(0, 0, 0, 0.85);
-  max-width: 920px;
+  box-shadow: 0 0 55px rgba(212, 175, 55, 0.45), inset 0 0 30px rgba(0, 0, 0, 0.85);
+  max-width: 1140px;
   width: 96%;
-  max-height: 88vh;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   position: relative;

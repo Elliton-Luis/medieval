@@ -167,22 +167,32 @@
 
       <section id="dialogue-panel" class="dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="dialogue-title" hidden>
         <button id="dialogue-close" class="dialogue-close" type="button" aria-label="Fechar">×</button>
-        <div class="dialogue-layout">
-          <!-- Coluna Esquerda: Identidade, Avatar, Lore e Status do Jogador -->
-          <aside class="dialogue-sidebar">
-            <span class="eyebrow" id="dialogue-eyebrow">CALDERA · CONVERSA</span>
-            <div class="dialogue-speaker">
-              <span id="dialogue-portrait" class="dialogue-portrait" aria-hidden="true"></span>
-              <div>
+        
+        <!-- SEÇÃO SUPERIOR: LORE & FALA DO PERSONAGEM (À PARTE, NO TOPO, DESTAQUE VISUAL TOTAL) -->
+        <header class="dialogue-lore-section">
+          <div class="dialogue-speaker-banner">
+            <span id="dialogue-portrait" class="dialogue-portrait" aria-hidden="true"></span>
+            <div class="dialogue-speaker-info">
+              <span class="dialogue-lore-badge" id="dialogue-eyebrow">📜 LORE & CONVERSA</span>
+              <div class="dialogue-name-wrap">
                 <h2 id="dialogue-title">—</h2>
-                <small id="dialogue-role" class="dialogue-role">—</small>
+                <span id="dialogue-role" class="dialogue-role">—</span>
               </div>
             </div>
-            <div class="dialogue-narrative">
-              <p id="dialogue-body">—</p>
-            </div>
+          </div>
+          <!-- Caixa de fala da Lore: Ampla, elevada e facilmente identificável como texto narrativo -->
+          <div class="dialogue-lore-box">
+            <span class="dialogue-quote-symbol" aria-hidden="true">“</span>
+            <p id="dialogue-body">—</p>
+          </div>
+        </header>
+
+        <!-- SEÇÃO INFERIOR: ABAS, PROVISÕES E RESPOSTAS / AÇÕES DO JOGADOR -->
+        <div class="dialogue-actions-section">
+          <div class="dialogue-subbar">
+            <nav id="dialogue-tabs" class="dialogue-tabs" role="tablist"></nav>
             <div class="dialogue-player-funds">
-              <span class="funds-label">SUAS PROVISÕES</span>
+              <span class="funds-label">SUAS PROVISÕES:</span>
               <div class="funds-badges">
                 <span class="fund-badge gold"><i class="glyph">◈</i> <strong id="dialogue-coins">0</strong> moedas</span>
                 <span class="fund-badge"><i class="glyph">♣</i> <strong id="dialogue-wood">0</strong> mad</span>
@@ -191,13 +201,8 @@
                 <span class="fund-badge"><i class="glyph">❖</i> <strong id="dialogue-hay">0</strong> feno</span>
               </div>
             </div>
-          </aside>
-
-          <!-- Coluna Direita: Abas de Categoria e Grid em Cards com Preços -->
-          <section class="dialogue-main">
-            <nav id="dialogue-tabs" class="dialogue-tabs" role="tablist"></nav>
-            <div id="dialogue-actions" class="dialogue-actions-grid" role="tabpanel"></div>
-          </section>
+          </div>
+          <div id="dialogue-actions" class="dialogue-actions-grid" role="tabpanel"></div>
         </div>
       </section>
       <div id="prompt" class="prompt" hidden></div>

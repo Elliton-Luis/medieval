@@ -241,17 +241,38 @@ export class Gulur {
       this.neck.add(fang);
     }
 
-    // Olhos Amarelos Intensos e Brilhantes com Halos Espetaculares e Fendas de Pupila Predatória Negra
-    const eyeGeo = new THREE.SphereGeometry(0.24, 10, 8);
-    const leftEye = new THREE.Mesh(eyeGeo, _gulurGlowingEyeMat);
-    leftEye.position.set(0.38, 1.15, -1.35);
-    this.neck.add(leftEye);
+    // ========================================================================
+    // Visual Aterrorizante do Gulur: Crista Óssea Espinhosa & Chifres Negros
+    // ========================================================================
+    // Chifres curvos e retorcidos brotando do topo do crânio
+    for (let side of [-1, 1]) {
+      const hornGroup = new THREE.Group();
+      hornGroup.position.set(side * 0.32, 1.35, -0.85);
+      hornGroup.rotation.set(0.3, side * 0.25, side * 0.4);
 
-    const rightEye = new THREE.Mesh(eyeGeo, _gulurGlowingEyeMat);
-    rightEye.position.set(-0.38, 1.15, -1.35);
-    this.neck.add(rightEye);
+      const hornBase = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.7, 5), _boneSpineMat);
+      hornBase.position.set(0, 0.35, 0);
+      hornGroup.add(hornBase);
 
-    // Halos luminosos aditivos nos olhos para visibilidade de longo alcance
+      const hornTip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.6, 4), _boneSpineMat);
+      hornTip.position.set(side * 0.08, 0.85, -0.12);
+      hornTip.rotation.set(-0.35, 0, side * 0.2);
+      hornGroup.add(hornTip);
+
+      this.neck.add(hornGroup);
+    }
+
+    // Crista dorsal espinhosa ao longo do topo do crânio e pescoço
+    for (let s = 0; s < 4; s++) {
+      const crestSpike = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.45 - s * 0.06, 4), _boneSpineMat);
+      crestSpike.position.set(0, 1.25 - s * 0.2, -0.55 + s * 0.28);
+      crestSpike.rotation.x = -0.45;
+      this.neck.add(crestSpike);
+    }
+
+    // ========================================================================
+    // Olhos Amarelos Múltiplos, Grandes e Ameaçadores (Cluster Eldritch)
+    // ========================================================================
     const eyeGlowTex = getYellowGlowTexture();
     const eyeSpriteMat = new THREE.SpriteMaterial({
       map: eyeGlowTex,
@@ -261,57 +282,71 @@ export class Gulur {
       depthWrite: false,
     });
 
-    const leftEyeHalo = new THREE.Sprite(eyeSpriteMat.clone());
-    leftEyeHalo.scale.set(1.8, 1.8, 1.0);
-    leftEyeHalo.position.set(0, 0, -0.12);
-    leftEye.add(leftEyeHalo);
+    this.eyeHalos = [];
 
-    const rightEyeHalo = new THREE.Sprite(eyeSpriteMat.clone());
-    rightEyeHalo.scale.set(1.8, 1.8, 1.0);
-    rightEyeHalo.position.set(0, 0, -0.12);
-    rightEye.add(rightEyeHalo);
+    // Conjunto de 10 Grandes Olhos Amarelos espalhados pelo Crânio, Têmporas, Focinho e Pescoço
+    const eyeConfigs = [
+      // 2 Olhos Frontais Principais (Grandes, colossais na face dianteira)
+      { pos: [0.38, 1.18, -1.35], r: 0.28, pupilH: 0.32, haloScale: 2.2 },
+      { pos: [-0.38, 1.18, -1.35], r: 0.28, pupilH: 0.32, haloScale: 2.2 },
+      // 2 Olhos Superiores da Fronte (No alto da testa, encarando o céu/presa)
+      { pos: [0.24, 1.42, -1.05], r: 0.22, pupilH: 0.26, haloScale: 1.8 },
+      { pos: [-0.24, 1.42, -1.05], r: 0.22, pupilH: 0.26, haloScale: 1.8 },
+      // 2 Olhos Temporais Laterais (Nas laterais da cabeça, vigiando os flancos)
+      { pos: [0.44, 0.98, -0.75], r: 0.24, pupilH: 0.28, haloScale: 1.9 },
+      { pos: [-0.44, 0.98, -0.75], r: 0.24, pupilH: 0.28, haloScale: 1.9 },
+      // 2 Olhos Inferiores do Focinho (Próximos às mandíbulas caninas e presas)
+      { pos: [0.28, 0.76, -1.58], r: 0.19, pupilH: 0.22, haloScale: 1.6 },
+      { pos: [-0.28, 0.76, -1.58], r: 0.19, pupilH: 0.22, haloScale: 1.6 },
+      // 2 Olhos Aberrantes no Pescoço (Brotando no dorso do pescoço)
+      { pos: [0.36, 0.45, -0.55], r: 0.21, pupilH: 0.24, haloScale: 1.7 },
+      { pos: [-0.36, 0.45, -0.55], r: 0.21, pupilH: 0.24, haloScale: 1.7 },
+    ];
 
-    this.eyeHalos = [leftEyeHalo, rightEyeHalo];
+    for (const ec of eyeConfigs) {
+      const eyeMesh = new THREE.Mesh(new THREE.SphereGeometry(ec.r, 8, 6), _gulurGlowingEyeMat);
+      eyeMesh.position.set(ec.pos[0], ec.pos[1], ec.pos[2]);
+      this.neck.add(eyeMesh);
 
-    // Fenda vertical de pupila preta predadora
-    for (const eyeMesh of [leftEye, rightEye]) {
-      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.28, 0.08), _pupilMat);
-      pupil.position.set(0, 0, -0.20);
+      // Fenda preta predadora de pupila
+      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.04, ec.pupilH, ec.r * 0.4), _pupilMat);
+      pupil.position.set(0, 0, -ec.r * 0.85);
       eyeMesh.add(pupil);
+
+      // Halo luminoso aditivo
+      const halo = new THREE.Sprite(eyeSpriteMat.clone());
+      halo.scale.set(ec.haloScale, ec.haloScale, 1.0);
+      halo.position.set(0, 0, -ec.r * 0.5);
+      halo.userData = { baseScale: ec.haloScale };
+      eyeMesh.add(halo);
+      this.eyeHalos.push(halo);
     }
 
     // ========================================================================
-    // Leve Aura Amarela Etérea do Gulur (Luz, Halo, Casulo 3D e Motes)
+    // Aura Amarela Simples e Elegante do Gulur (Sem cilindro artificial)
     // ========================================================================
     // 1. Luz pontual suave banhando o dorso e pernas superiores do colosso
-    this.auraLight = new THREE.PointLight(0xffea44, 2.8, 28, 1.6);
+    this.auraLight = new THREE.PointLight(0xffea44, 2.6, 26, 1.5);
     this.auraLight.position.set(0, 0.4, -0.5);
     this.bodyGroup.add(this.auraLight);
 
-    // 2. Halo/Sprite de neblina de aura suave em volta do corpo
+    // 2. Halo/Sprite de neblina etérea suave em volta do corpo
     const auraMistTex = getAuraMistTexture();
     const auraSpriteMat = new THREE.SpriteMaterial({
       map: auraMistTex,
       color: 0xffe244,
       transparent: true,
-      opacity: 0.36,
+      opacity: 0.32,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     this.auraSprite = new THREE.Sprite(auraSpriteMat);
-    this.auraSprite.scale.set(13.5, 10.0, 1.0);
+    this.auraSprite.scale.set(13.0, 9.5, 1.0);
     this.auraSprite.position.set(0, 0.2, 0);
     this.bodyGroup.add(this.auraSprite);
 
-    // 3. Casulo 3D translúcido envolvente do torso
-    const auraMeshGeo = new THREE.CylinderGeometry(1.6, 1.3, 4.4, 12, 1, true);
-    auraMeshGeo.rotateX(Math.PI / 2);
-    this.auraMesh = new THREE.Mesh(auraMeshGeo, _gulurAuraMeshMat);
-    this.auraMesh.position.set(0, 0.1, -0.2);
-    this.bodyGroup.add(this.auraMesh);
-
-    // 4. Motes / partículas douradas flutuantes ao redor do corpo
-    const moteCount = 14;
+    // 3. Motes / partículas douradas flutuantes ao redor do corpo
+    const moteCount = 16;
     const moteGeo = new THREE.BufferGeometry();
     const motePos = new Float32Array(moteCount * 3);
     for (let m = 0; m < moteCount; m++) {
@@ -447,9 +482,6 @@ export class Gulur {
         if (this.auraSprite) {
           this.auraSprite.material.opacity = Math.max(0, this.auraSprite.material.opacity - dt * 0.18);
         }
-        if (this.auraMesh) {
-          this.auraMesh.material.opacity = Math.max(0, this.auraMesh.material.opacity - dt * 0.1);
-        }
         if (this.eyeHalos) {
           for (let i = 0; i < this.eyeHalos.length; i++) {
             this.eyeHalos[i].scale.multiplyScalar(Math.max(0, 1.0 - dt * 1.2));
@@ -466,18 +498,19 @@ export class Gulur {
     // Pulsação suave e respiração etérea da Aura Amarela e dos Olhos
     const tNow = performance.now() * 0.002;
     const auraPulse = 1.0 + Math.sin(tNow * 1.8) * 0.08;
-    if (this.auraSprite) {
-      this.auraSprite.scale.set(13.5 * auraPulse, 10.0 * auraPulse, 1.0);
-      this.auraSprite.material.opacity = 0.36 + Math.sin(tNow * 1.2) * 0.06;
+    if (this.auraLight) {
+      this.auraLight.intensity = 2.6 + Math.sin(tNow * 1.8) * 0.4;
     }
-    if (this.auraMesh) {
-      this.auraMesh.rotation.y += dt * 0.25;
-      this.auraMesh.material.opacity = 0.16 + Math.sin(tNow * 2.0) * 0.04;
+    if (this.auraSprite) {
+      this.auraSprite.scale.set(13.0 * auraPulse, 9.5 * auraPulse, 1.0);
+      this.auraSprite.material.opacity = 0.32 + Math.sin(tNow * 1.2) * 0.05;
     }
     if (this.eyeHalos) {
-      const eyeFlicker = 1.8 + Math.sin(tNow * 3.2) * 0.15;
+      const eyeFlicker = 1.0 + Math.sin(tNow * 3.2) * 0.12;
       for (let i = 0; i < this.eyeHalos.length; i++) {
-        this.eyeHalos[i].scale.set(eyeFlicker, eyeFlicker, 1.0);
+        const h = this.eyeHalos[i];
+        const s = (h.userData?.baseScale || 2.0) * eyeFlicker;
+        h.scale.set(s, s, 1.0);
       }
     }
     if (this.auraMotes) {
@@ -587,9 +620,8 @@ export class Gulur {
       this.legs[i].legRoot.rotation.set(0, 0, 0);
       this.legs[i].kneeGroup.rotation.set(0, 0, 0);
     }
-    if (this.auraLight) this.auraLight.intensity = 1.4;
-    if (this.auraSprite) this.auraSprite.material.opacity = 0.36;
-    if (this.auraMesh) this.auraMesh.material.opacity = 0.16;
+    if (this.auraLight) this.auraLight.intensity = 2.6;
+    if (this.auraSprite) this.auraSprite.material.opacity = 0.32;
     this._groundY = this.world ? this.world.heightAt(x, z) : 0;
     this.root.position.set(x, this._groundY, z);
     this.root.visible = true;

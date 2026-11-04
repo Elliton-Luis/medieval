@@ -43,6 +43,9 @@ export class GameUI {
     this.dialogueEyebrow = document.getElementById("dialogue-eyebrow");
     this._dialogueActiveTab = "all";
     this.toast = document.getElementById("toast");
+    this._toastStack = [];
+    this._activeToast = null;
+    this._toastTimeout = null;
     this.location = document.getElementById("location");
     this.locationLabel = document.getElementById("location-label");
     // 9 slots de arma com ícones desenhados em canvas
@@ -836,11 +839,63 @@ export class GameUI {
     this.onDialogClose?.();
   }
 
-  showToast(message) {
-    this.toast.textContent = message;
+  showToast(message, customDuration) {
+    if (!message) return;
+    const now = performance.now();
+    // Duração padrão: 10 segundos (10000ms), conforme regra de retenção do jogador
+    const duration = typeof customDuration === "number" && customDuration > 0 ? customDuration : 10000;
+
+    if (!this._toastStack) {
+      this._toastStack = [];
+      this._activeToast = null;
+    }
+
+    // Se já havia um toast na tela, calcula quanto tempo sobrou, pausa e empilha
+    if (this._activeToast) {
+      window.clearTimeout(this._toastTimeout);
+      const elapsed = now - this._activeToast.startedAt;
+      const remaining = Math.max(0, this._activeToast.remainingMs - elapsed);
+      if (remaining > 200) {
+        this._activeToast.remainingMs = remaining;
+        this._toastStack.push(this._activeToast);
+      }
+    }
+
+    // O novo popup entra no topo com seus 10s
+    this._activeToast = {
+      message,
+      remainingMs: duration,
+      startedAt: now,
+    };
+
+    this._displayActiveToast();
+  }
+
+  _displayActiveToast() {
+    if (!this._activeToast || !this.toast) {
+      if (this.toast) this.toast.classList.remove("visible");
+      return;
+    }
+
+    this.toast.textContent = this._activeToast.message;
     this.toast.classList.add("visible");
+    this._activeToast.startedAt = performance.now();
+
     window.clearTimeout(this._toastTimeout);
-    this._toastTimeout = window.setTimeout(() => this.toast.classList.remove("visible"), 1700);
+    this._toastTimeout = window.setTimeout(() => {
+      this._onToastExpired();
+    }, this._activeToast.remainingMs);
+  }
+
+  _onToastExpired() {
+    // Quando o popup superior termina, retoma o anterior com o resto de tempo que tinha
+    if (this._toastStack && this._toastStack.length > 0) {
+      this._activeToast = this._toastStack.pop();
+      this._displayActiveToast();
+    } else {
+      this._activeToast = null;
+      if (this.toast) this.toast.classList.remove("visible");
+    }
   }
 }
 

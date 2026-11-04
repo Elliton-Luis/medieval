@@ -34,11 +34,11 @@ const CHEAT_MODAL_CSS = `
   background: linear-gradient(180deg, #1b1424 0%, #100b17 100%);
   border: 2px solid #8e54e9;
   border-radius: 12px;
-  box-shadow: 0 0 45px rgba(142, 84, 233, 0.5), inset 0 0 25px rgba(0, 0, 0, 0.85);
-  padding: 22px 28px;
-  max-width: 1020px;
-  width: 95%;
-  max-height: 90vh;
+  box-shadow: 0 0 55px rgba(142, 84, 233, 0.55), inset 0 0 30px rgba(0, 0, 0, 0.85);
+  padding: 24px 32px;
+  max-width: 1180px;
+  width: 96%;
+  max-height: 94vh;
   display: flex;
   flex-direction: column;
   color: #f0e6ff;
@@ -54,12 +54,12 @@ const CHEAT_MODAL_CSS = `
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(142, 84, 233, 0.35);
-  padding-bottom: 10px;
-  margin-bottom: 14px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
 }
 .cheat-title {
   margin: 0;
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: 1.2px;
   color: #c9a9ff;
