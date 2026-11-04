@@ -344,15 +344,12 @@ export function startIntroSequence(env) {
   window.addEventListener("pointerdown", unlockCutsceneAudio, { once: true });
   window.addEventListener("keydown", unlockCutsceneAudio, { once: true });
 
-  // FORÇA NOITE PROFUNDA E MUITA NEBLINA
-  if (dayNight) {
-    dayNight.progress = 0.88;
+  // FORÇA NOITE PROFUNDA ESTÁVEL (01h12 - Plena Noite dos Ermos, zero trepidação de iluminação)
+  if (dayNight?.setTime) {
+    dayNight.setTime(0.05, true);
+  } else if (dayNight) {
+    dayNight.progress = 0.05;
   }
-  if (scene.fog) {
-    scene.fog.density = 0.048;
-    scene.fog.color.set("#05080e");
-  }
-  scene.background.set("#05080e");
 
   GameState.isIntroPlaying = true;
   GameState.introPhase = 0;
@@ -567,8 +564,8 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
 
       if (t >= 10.6 && GameState.introPhase < 2) {
         GameState.introPhase = 2;
+        // Toca apenas as camadas reais do monstro da cutscene especificadas
         if (audio?.playCutsceneMonster) audio.playCutsceneMonster(1.0);
-        if (audio?.supernaturalScare) audio.supernaturalScare();
       }
 
       if (t >= 11.2 && _fadeOverlay) {
@@ -625,14 +622,11 @@ export function endIntroSequence(isSkipped = false) {
         player._animate(0.016, null, false, false, 0);
       }
 
-      // TRANSIÇÃO PARA AMANHECER SUAVE (6h da manhã, névoa limpa)
-      if (dayNight) {
-        dayNight.progress = 0.25; // 6:00 AM (Amanhecer claro)
-      }
-      if (scene && scene.fog) {
-        scene.fog.density = CONFIG.fogDensity || 0.0165;
-        scene.fog.color.set("#aebfae");
-        scene.background.set("#aebfae");
+      // TRANSIÇÃO PARA PLENO DIA ESTÁVEL (09h36 da manhã, iluminação estável e sem piscar)
+      if (dayNight?.setTime) {
+        dayNight.setTime(0.40, true);
+      } else if (dayNight) {
+        dayNight.progress = 0.40;
       }
 
       if (cameraRig) {

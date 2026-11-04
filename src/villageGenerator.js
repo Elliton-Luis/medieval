@@ -209,6 +209,9 @@ export class VillageGenerator {
    * Atrela adereços físicos à casa de acordo com a profissão da âncora.
    */
   decorateProfessionHouse(house, profession = PROFESSIONS.VILLAGER) {
+    if (house.isChurch || house.type === "church" || (house.name && house.name.includes("Igreja"))) {
+      return;
+    }
     const group = house.root || house.group || house;
     const hx = house.x || group.position.x || 0;
     const hz = house.z || group.position.z || 0;

@@ -138,6 +138,7 @@ export class InteractionSystem {
         !this.drops?.tryPickup() &&
         !this.candle?.interact() &&
         !this.houses?.interact() &&
+        !this.farming?.interact(this.player, this.ui, this.audio, this.effects) &&
         !this._tryGatherHayBale() &&
         !this._tryCollectCrystal() &&
         !this._tryInteractDemiurgeDiary() &&
@@ -148,11 +149,14 @@ export class InteractionSystem {
         this._interactNearby();
       }
     }
-    this._checkAltarNearby();
-    this._checkDemiurgeDiaryNearby();
-    this._checkCrystalNearby();
-    this._checkGhostTownNearby();
-    this._checkBellNearby();
+    const cropPrompted = this.farming?.checkPrompt(this.player.x, this.player.z, this.ui);
+    if (!cropPrompted) {
+      this._checkAltarNearby();
+      this._checkDemiurgeDiaryNearby();
+      this._checkCrystalNearby();
+      this._checkGhostTownNearby();
+      this._checkBellNearby();
+    }
     this._vitalsTimer += dt;
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;

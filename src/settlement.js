@@ -194,7 +194,11 @@ function createWell(scene, world, x = 5, z = -14) {
   return { x, z };
 }
 
-function createFarm(scene, world, centerX = -31, centerZ = 0) {
+function createFarm(scene, world, centerX = -95, centerZ = -12) {
+  if (world && world.farming) {
+    world.farming.createFarmlandField(centerX, centerZ, 4, 8, 1.8, 1.5);
+    return;
+  }
   const group = new THREE.Group();
   group.position.set(0, 0, 0);
   scene.add(group);
@@ -486,7 +490,12 @@ function createKingdomRoads(scene, world) {
 export function createSettlement(scene, world) {
   createRoad(scene, world);
   const well = createWell(scene, world);
-  createFarm(scene, world);
+  // Plantações geradas FORA das muralhas da capital (raio 88m a 105m), sem invadir o interior da cidade
+  if (world && world.farming) {
+    world.farming.createFarmlandField(-95, -12, 4, 9, 1.8, 1.5); // Campos do Poente (Oeste)
+    world.farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);  // Campos do Noroeste
+    world.farming.createFarmlandField(92, -46, 3, 7, 1.8, 1.5);   // Campos da Alvorada (Leste)
+  }
   const blacksmith = createBlacksmith(scene, world);
   const market = createMarket(scene, world);
   const gate = createGate(scene, world);

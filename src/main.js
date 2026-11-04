@@ -129,6 +129,7 @@ import {
 } from "./intro.js";
 import { ClutterManager } from "./clutter.js";
 import { FarmAnimalManager } from "./farmAnimals.js";
+import { FarmFieldManager } from "./farming.js";
 import { VillageGenerator, PROFESSIONS, HOUSE_TIERS } from "./villageGenerator.js";
 import { LoadingScreen } from "./loadingScreen.js";
 
@@ -245,6 +246,15 @@ const combat = new CombatSystem(player, npcs, input, effects, ui, settlement, au
 combat.aim = aim;
 const weapons = new WeaponSystem(scene, player, input, combat, effects, ui, world, npcs, aim, cameraRig, explosions, audio);
 const interactions = new InteractionSystem(player, npcs, input, ui, weapons);
+const farming = new FarmFieldManager({ scene, world, effects, audio, ui });
+world.farming = farming;
+interactions.farming = farming;
+// Plantações geradas FORA das muralhas da capital (raio 88m a 105m) e em vilas agrícolas
+farming.createFarmlandField(-95, -12, 4, 9, 1.8, 1.5); // Campos do Poente (Oeste)
+farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);  // Campos do Noroeste
+farming.createFarmlandField(92, -46, 3, 7, 1.8, 1.5);   // Campos da Alvorada (Leste)
+farming.createFarmlandField(-98, -52, 4, 8, 1.8, 1.5);  // Pedraluz
+farming.createFarmlandField(-84, -130, 4, 8, 1.8, 1.5); // Brumas
 const minimap = new Minimap(document.getElementById("minimap"));
 const drops = new DropSystem(scene, world, player, ui, audio, effects);
 drops.weapons = weapons;
@@ -328,6 +338,10 @@ interactions.villageGenerator = villageGenerator;
 if (settlement.houses && settlement.houses.length > 0) {
   const profs = [PROFESSIONS.MERCHANT, PROFESSIONS.VILLAGER, PROFESSIONS.BLACKSMITH, PROFESSIONS.FARMER];
   settlement.houses.forEach((h, idx) => {
+    // IGREJAS NUNCA RECEBEM MERCADO, FORJA OU CURRAL DECORATIVO
+    if (h.isChurch || h.type === "church" || (h.name && h.name.includes("Igreja"))) {
+      return;
+    }
     let prof = profs[idx % profs.length];
     const hx = h.x || 0;
     const hz = h.z || 0;
@@ -465,7 +479,7 @@ const debugScreen = new DebugScreen({
   audio,
 });
 
-window.__game = { autoSave, loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
+window.__game = { farming, autoSave, loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
 const saved = loadGame();
@@ -504,7 +518,9 @@ if (saved) {
   player.potions = saved.potions ?? player.potions;
   weapons.restore(saved.weapons || { ammo: saved.ammo });
   candle.count = saved.candles ?? candle.count;
-  if (typeof saved.progress === "number") dayNight.progress = saved.progress;
+  if (typeof saved.progress === "number") {
+    dayNight.setTime(saved.progress, true);
+  }
   if (typeof saved.x === "number" && !world.isBlockedAt(saved.x, saved.z, player.radius)) {
     player.x = saved.x;
     player.z = saved.z;
@@ -524,6 +540,7 @@ initDemiurgeDiary({
 
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {
+  dayNight.setTime(0.05, true);
   startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music, loadingScreen, renderer, camera });
 } else {
   // Transição inicial fluida fora da tela ao restaurar save existente
@@ -697,6 +714,7 @@ function frame(now) {
   fire.update(dt);
   horses.update(dt);
   farmAnimals.update(dt);
+  farming.update(dt);
   villageGenerator.update(dt);
   const isNightStrict = Boolean(dayNight.isNight && dayNight.daylight < 0.45);
   beasts.update(dt, isNightStrict);

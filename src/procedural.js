@@ -93,23 +93,53 @@ export function createSharedHouseMaterial() {
 // 2. Geração da Cidade, Muralhas e Âncoras de Rotina
 // ============================================================================
 
-function _isAreaClearForBuilding(x, z, existingRects, world, center) {
-  // Evita estradas reais e centro da praça da cidade
-  if (distanceToRoad(x, z) < 7.5) return false;
-  if (center && Math.abs(x) < 10 && Math.abs(z) < 10) {
-    if (x > -38 && x < 34 && z > -52 && z < 12) return false;
-  } else if (center) {
-    const cdx = x - center.x;
-    const cdz = z - center.z;
-    if (cdx * cdx + cdz * cdz < 18 * 18) return false;
+function _isAreaClearForBuilding(x, z, existingRects, world, center, settlement = null) {
+  // 1. Distância segura de qualquer estrada (mínimo 9.5m)
+  if (distanceToRoad(x, z) < 9.5) return false;
+
+  // 2. Distância radial da muralha (o raio da muralha é 80m):
+  // Não pode ficar colado na muralha nem fora dela
+  const cdx = center ? x - center.x : x;
+  const cdz = center ? z - center.z : z;
+  const distFromCenter = Math.hypot(cdx, cdz);
+  if (distFromCenter < 24.0 || distFromCenter > 68.0) return false;
+
+  // 3. Área central de Caldera e pátios da igreja e mercado
+  if (!center || (Math.abs(center.x) < 5 && Math.abs(center.z) < 5)) {
+    if (x > -42 && x < 38 && z > -58 && z < 15) return false;
   }
-  if (world && world.isBlockedAt(x, z, 4.8)) return false;
+
+  // 4. Checagem estrita de distância com TODAS as estruturas prévias do settlement
+  if (settlement) {
+    if (settlement.churches) {
+      for (let i = 0; i < settlement.churches.length; i++) {
+        const c = settlement.churches[i];
+        if (Math.hypot(x - (c.x || 0), z - (c.z || 0)) < 26.0) return false;
+      }
+    }
+    if (settlement.houses) {
+      for (let i = 0; i < settlement.houses.length; i++) {
+        const h = settlement.houses[i];
+        if (Math.hypot(x - (h.x || 0), z - (h.z || 0)) < 16.5) return false;
+      }
+    }
+    if (settlement.blacksmith && Math.hypot(x - settlement.blacksmith.x, z - settlement.blacksmith.z) < 20.0) return false;
+    if (settlement.market && Math.hypot(x - settlement.market.x, z - settlement.market.z) < 20.0) return false;
+    if (settlement.gate && Math.hypot(x - settlement.gate.x, z - settlement.gate.z) < 22.0) return false;
+    if (settlement.well && Math.hypot(x - settlement.well.x, z - settlement.well.z) < 16.0) return false;
+  }
+
+  // 5. Checagem com construções procedurais já posicionadas (distância mínima de 16m)
   for (let i = 0; i < existingRects.length; i++) {
     const b = existingRects[i];
     const dx = x - b.x;
     const dz = z - b.z;
-    if (dx * dx + dz * dz < 11.5 * 11.5) return false;
+    if (dx * dx + dz * dz < 16.0 * 16.0) return false;
   }
+
+  // 6. Colisores estáticos do mundo físico
+  if (world && world.isBlockedAt(x, z, 5.5)) return false;
+
   return true;
 }
 
@@ -240,23 +270,21 @@ export function generateCity(
     let theta = 0;
     let foundSpot = false;
 
-    for (let attempt = 0; attempt < 14; attempt++) {
+    for (let attempt = 0; attempt < 32; attempt++) {
       // Sorteia raio determinístico na faixa residencial dentro da muralha
-      r = 38 + random() * (cityRadius - 53);
+      r = 28 + random() * (cityRadius - 42); // 28m a 66m
       theta = random() * Math.PI * 2;
       bx = _cityCenter.x + Math.cos(theta) * r;
       bz = _cityCenter.z + Math.sin(theta) * r;
-      if (_isAreaClearForBuilding(bx, bz, placedBuildings, world, _cityCenter)) {
+      if (_isAreaClearForBuilding(bx, bz, placedBuildings, world, _cityCenter, settlement)) {
         foundSpot = true;
         break;
       }
     }
 
     if (!foundSpot) {
-      r = random() * (cityRadius - 15);
-      theta = random() * Math.PI * 2;
-      bx = _cityCenter.x + Math.cos(theta) * r;
-      bz = _cityCenter.z + Math.sin(theta) * r;
+      // Se não encontrou vaga segura livre de sobreposição, pula ordenadamente
+      continue;
     }
 
     const groundY = world ? world.heightAt(bx, bz) : 0;
@@ -280,9 +308,7 @@ export function generateCity(
       anchors.houses.push(bPos.clone());
     }
 
-    if (foundSpot) {
-      placedBuildings.push({ x: bx, z: bz, y: groundY, ry: faceCenterYaw, type: bType });
-    }
+    placedBuildings.push({ x: bx, z: bz, y: groundY, ry: faceCenterYaw, type: bType });
   }
 
   // Condensação Estática: Funde todas as 20 casas e telhados em 1 único Mesh de 1 Draw Call

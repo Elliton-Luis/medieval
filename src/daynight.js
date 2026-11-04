@@ -214,6 +214,9 @@ export class DayNightCycle {
     if (this.scene) {
       this.scene.add(this.fixedAstroGroup);
     }
+
+    // Aplica imediatamente iluminação estável para evitar piscar de luzes na inicialização
+    this.setTime(0.40, true);
   }
 
   getLightingWeights() {
@@ -222,6 +225,149 @@ export class DayNightCycle {
 
   getLightingProfileName() {
     return this.currentProfile;
+  }
+
+  /**
+   * Define o horário do dia e recalcula a iluminação pré-assada sem atrasos ou glitches.
+   */
+  setTime(prog, immediate = true, playerX = 0, playerZ = 0, renderer = null) {
+    this.progress = ((prog % 1) + 1) % 1;
+    this._prevProgress = this.progress;
+
+    const { wDay, wAfternoon, wNight } = computeLightingWeights(this.progress);
+    this.weights.day = wDay;
+    this.weights.afternoon = wAfternoon;
+    this.weights.night = wNight;
+
+    if (wAfternoon > wDay && wAfternoon > wNight) {
+      this.currentProfile = "tarde";
+    } else if (wNight > wDay) {
+      this.currentProfile = "noite";
+    } else {
+      this.currentProfile = "dia";
+    }
+
+    this.daylight = wDay * 1.0 + wAfternoon * 0.72 + wNight * 0.05;
+    this.isNight = wNight > 0.55;
+    this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
+
+    if (immediate) {
+      this.applyLighting(playerX, playerZ, renderer);
+    }
+  }
+
+  /**
+   * Interpolação e envio para materiais e Three.js das luzes pré-assadas (Zero-GC).
+   */
+  applyLighting(playerX = 0, playerZ = 0, renderer = null) {
+    const { day: wDay, afternoon: wAfternoon, night: wNight } = this.weights;
+    const P_D = BAKED_LIGHTING.day;
+    const P_A = BAKED_LIGHTING.afternoon;
+    const P_N = BAKED_LIGHTING.night;
+
+    // A) Sol / Luz Direcional Pré-Assada
+    _tempSunColor.setRGB(
+      P_D.sun.color.r * wDay + P_A.sun.color.r * wAfternoon + P_N.sun.color.r * wNight,
+      P_D.sun.color.g * wDay + P_A.sun.color.g * wAfternoon + P_N.sun.color.g * wNight,
+      P_D.sun.color.b * wDay + P_A.sun.color.b * wAfternoon + P_N.sun.color.b * wNight
+    );
+    if (this.sun) {
+      this.sun.color.copy(_tempSunColor);
+      this.sun.intensity = P_D.sun.intensity * wDay + P_A.sun.intensity * wAfternoon + P_N.sun.intensity * wNight;
+    }
+
+    // Vetor Direcional do Sol/Luar interpolado suavemente
+    _tempSunDir.set(
+      P_D.sun.dir.x * wDay + P_A.sun.dir.x * wAfternoon + P_N.sun.dir.x * wNight,
+      P_D.sun.dir.y * wDay + P_A.sun.dir.y * wAfternoon + P_N.sun.dir.y * wNight,
+      P_D.sun.dir.z * wDay + P_A.sun.dir.z * wAfternoon + P_N.sun.dir.z * wNight
+    ).normalize();
+
+    // B) Luz Hemisférica Pré-Assada (Céu e Solo)
+    _tempHemiSky.setRGB(
+      P_D.hemisphere.skyColor.r * wDay + P_A.hemisphere.skyColor.r * wAfternoon + P_N.hemisphere.skyColor.r * wNight,
+      P_D.hemisphere.skyColor.g * wDay + P_A.hemisphere.skyColor.g * wAfternoon + P_N.hemisphere.skyColor.g * wNight,
+      P_D.hemisphere.skyColor.b * wDay + P_A.hemisphere.skyColor.b * wAfternoon + P_N.hemisphere.skyColor.b * wNight
+    );
+    _tempHemiGround.setRGB(
+      P_D.hemisphere.groundColor.r * wDay + P_A.hemisphere.groundColor.r * wAfternoon + P_N.hemisphere.groundColor.r * wNight,
+      P_D.hemisphere.groundColor.g * wDay + P_A.hemisphere.groundColor.g * wAfternoon + P_N.hemisphere.groundColor.g * wNight,
+      P_D.hemisphere.groundColor.b * wDay + P_A.hemisphere.groundColor.b * wAfternoon + P_N.hemisphere.groundColor.b * wNight
+    );
+    if (this.hemisphere) {
+      this.hemisphere.color.copy(_tempHemiSky);
+      this.hemisphere.groundColor.copy(_tempHemiGround);
+      this.hemisphere.intensity = P_D.hemisphere.intensity * wDay + P_A.hemisphere.intensity * wAfternoon + P_N.hemisphere.intensity * wNight;
+    }
+
+    // C) Céu / Fundo / Limpeza do Canvas
+    _tempSkyColor.setRGB(
+      P_D.sky.color.r * wDay + P_A.sky.color.r * wAfternoon + P_N.sky.color.r * wNight,
+      P_D.sky.color.g * wDay + P_A.sky.color.g * wAfternoon + P_N.sky.color.g * wNight,
+      P_D.sky.color.b * wDay + P_A.sky.color.b * wAfternoon + P_N.sky.color.b * wNight
+    );
+    this.currentColor.copy(_tempSkyColor);
+    if (this.scene && this.scene.background) {
+      this.scene.background.copy(_tempSkyColor);
+    }
+    if (renderer) renderer.setClearColor(_tempSkyColor);
+
+    // D) Neblina Pré-Assada (Fog)
+    if (this.scene && this.scene.fog) {
+      _tempFogColor.setRGB(
+        P_D.fog.color.r * wDay + P_A.fog.color.r * wAfternoon + P_N.fog.color.r * wNight,
+        P_D.fog.color.g * wDay + P_A.fog.color.g * wAfternoon + P_N.fog.color.g * wNight,
+        P_D.fog.color.b * wDay + P_A.fog.color.b * wAfternoon + P_N.fog.color.b * wNight
+      );
+      this.scene.fog.color.copy(_tempFogColor);
+      this.scene.fog.density = P_D.fog.density * wDay + P_A.fog.density * wAfternoon + P_N.fog.density * wNight;
+    }
+
+    // E) Astro Celeste Fixo (Sol poente, Sol diurno e Lua mística)
+    if (this.astroMesh && this.astroHaloMesh) {
+      _tempAstroColor.setRGB(
+        P_D.astro.color.r * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight,
+        P_D.astro.color.g * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight,
+        P_D.astro.color.b * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight
+      );
+      _tempAstroHaloColor.setRGB(
+        P_D.astro.haloColor.r * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight,
+        P_D.astro.haloColor.g * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight,
+        P_D.astro.haloColor.b * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight
+      );
+      this.astroMesh.material.color.copy(_tempAstroColor);
+      this.astroHaloMesh.material.color.copy(_tempAstroHaloColor);
+      this.astroHaloMesh.material.opacity = P_D.astro.haloOpacity * wDay + P_A.astro.haloOpacity * wAfternoon + P_N.astro.haloOpacity * wNight;
+      const astroScale = P_D.astro.scale * wDay + P_A.astro.scale * wAfternoon + P_N.astro.scale * wNight;
+      this.fixedAstroGroup.scale.set(astroScale, astroScale, astroScale);
+    }
+
+    // Efeitos Atmosféricos de Decadência / Eclipse do Demiurgo (se ativos)
+    updateAtmosphereDecay(this, this.scene, renderer);
+
+    // Posicionamento Estável da Luz Direcional (Sem trepidação de sombras)
+    if (this.sun) {
+      this.sun.castShadow = true;
+      const sx = Math.round((playerX ?? 0) / 4) * 4;
+      const sz = Math.round((playerZ ?? 0) / 4) * 4;
+      const sunDist = 56.0;
+      this.sun.position.set(
+        sx + _tempSunDir.x * sunDist,
+        Math.max(12.0, _tempSunDir.y * 64.0),
+        sz + _tempSunDir.z * sunDist
+      );
+      this.sun.target.position.set(sx, 0, sz);
+      this.sun.target.updateMatrixWorld();
+    }
+
+    // Astro Celeste Fixo no Firmamento (Azimute 215°, Elevação 32°)
+    if (this.fixedAstroGroup) {
+      const fixedX = (playerX ?? 0) - 150.5;
+      const fixedY = 164.0;
+      const fixedZ = (playerZ ?? 0) - 215.3;
+      this.fixedAstroGroup.position.set(fixedX, fixedY, fixedZ);
+      this.fixedAstroGroup.lookAt(playerX ?? 0, 15, playerZ ?? 0);
+    }
   }
 
   update(dt, playerX = 0, playerZ = 0, renderer = null) {
@@ -254,106 +400,8 @@ export class DayNightCycle {
     // Ângulo solar mantido para compatibilidade
     this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
 
-    // 2. Interpolação das Luzes Pré-Assadas (Zero-GC)
-    const P_D = BAKED_LIGHTING.day;
-    const P_A = BAKED_LIGHTING.afternoon;
-    const P_N = BAKED_LIGHTING.night;
-
-    // A) Sol / Luz Direcional Pré-Assada
-    _tempSunColor.setRGB(
-      P_D.sun.color.r * wDay + P_A.sun.color.r * wAfternoon + P_N.sun.color.r * wNight,
-      P_D.sun.color.g * wDay + P_A.sun.color.g * wAfternoon + P_N.sun.color.g * wNight,
-      P_D.sun.color.b * wDay + P_A.sun.color.b * wAfternoon + P_N.sun.color.b * wNight
-    );
-    this.sun.color.copy(_tempSunColor);
-    this.sun.intensity = P_D.sun.intensity * wDay + P_A.sun.intensity * wAfternoon + P_N.sun.intensity * wNight;
-
-    // Vetor Direcional do Sol/Luar interpolado suavemente
-    _tempSunDir.set(
-      P_D.sun.dir.x * wDay + P_A.sun.dir.x * wAfternoon + P_N.sun.dir.x * wNight,
-      P_D.sun.dir.y * wDay + P_A.sun.dir.y * wAfternoon + P_N.sun.dir.y * wNight,
-      P_D.sun.dir.z * wDay + P_A.sun.dir.z * wAfternoon + P_N.sun.dir.z * wNight
-    ).normalize();
-
-    // B) Luz Hemisférica Pré-Assada (Céu e Solo)
-    _tempHemiSky.setRGB(
-      P_D.hemisphere.skyColor.r * wDay + P_A.hemisphere.skyColor.r * wAfternoon + P_N.hemisphere.skyColor.r * wNight,
-      P_D.hemisphere.skyColor.g * wDay + P_A.hemisphere.skyColor.g * wAfternoon + P_N.hemisphere.skyColor.g * wNight,
-      P_D.hemisphere.skyColor.b * wDay + P_A.hemisphere.skyColor.b * wAfternoon + P_N.hemisphere.skyColor.b * wNight
-    );
-    _tempHemiGround.setRGB(
-      P_D.hemisphere.groundColor.r * wDay + P_A.hemisphere.groundColor.r * wAfternoon + P_N.hemisphere.groundColor.r * wNight,
-      P_D.hemisphere.groundColor.g * wDay + P_A.hemisphere.groundColor.g * wAfternoon + P_N.hemisphere.groundColor.g * wNight,
-      P_D.hemisphere.groundColor.b * wDay + P_A.hemisphere.groundColor.b * wAfternoon + P_N.hemisphere.groundColor.b * wNight
-    );
-    this.hemisphere.color.copy(_tempHemiSky);
-    this.hemisphere.groundColor.copy(_tempHemiGround);
-    this.hemisphere.intensity = P_D.hemisphere.intensity * wDay + P_A.hemisphere.intensity * wAfternoon + P_N.hemisphere.intensity * wNight;
-
-    // C) Céu / Fundo / Limpeza do Canvas
-    _tempSkyColor.setRGB(
-      P_D.sky.color.r * wDay + P_A.sky.color.r * wAfternoon + P_N.sky.color.r * wNight,
-      P_D.sky.color.g * wDay + P_A.sky.color.g * wAfternoon + P_N.sky.color.g * wNight,
-      P_D.sky.color.b * wDay + P_A.sky.color.b * wAfternoon + P_N.sky.color.b * wNight
-    );
-    this.currentColor.copy(_tempSkyColor);
-    this.scene.background.copy(_tempSkyColor);
-    if (renderer) renderer.setClearColor(_tempSkyColor);
-
-    // D) Neblina Pré-Assada (Fog)
-    if (this.scene.fog) {
-      _tempFogColor.setRGB(
-        P_D.fog.color.r * wDay + P_A.fog.color.r * wAfternoon + P_N.fog.color.r * wNight,
-        P_D.fog.color.g * wDay + P_A.fog.color.g * wAfternoon + P_N.fog.color.g * wNight,
-        P_D.fog.color.b * wDay + P_A.fog.color.b * wAfternoon + P_N.fog.color.b * wNight
-      );
-      this.scene.fog.color.copy(_tempFogColor);
-      this.scene.fog.density = P_D.fog.density * wDay + P_A.fog.density * wAfternoon + P_N.fog.density * wNight;
-    }
-
-    // E) Astro Celeste Fixo (Sol poente, Sol diurno e Lua mística)
-    if (this.astroMesh && this.astroHaloMesh) {
-      _tempAstroColor.setRGB(
-        P_D.astro.color.r * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight,
-        P_D.astro.color.g * wDay + P_A.astro.color.g * wAfternoon + P_N.astro.color.r * wNight,
-        P_D.astro.color.b * wDay + P_A.astro.color.b * wAfternoon + P_N.astro.color.b * wNight
-      );
-      _tempAstroHaloColor.setRGB(
-        P_D.astro.haloColor.r * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight,
-        P_D.astro.haloColor.g * wDay + P_A.astro.haloColor.g * wAfternoon + P_N.astro.haloColor.r * wNight,
-        P_D.astro.haloColor.b * wDay + P_A.astro.haloColor.b * wAfternoon + P_N.astro.haloColor.b * wNight
-      );
-      this.astroMesh.material.color.copy(_tempAstroColor);
-      this.astroHaloMesh.material.color.copy(_tempAstroHaloColor);
-      this.astroHaloMesh.material.opacity = P_D.astro.haloOpacity * wDay + P_A.astro.haloOpacity * wAfternoon + P_N.astro.haloOpacity * wNight;
-      const astroScale = P_D.astro.scale * wDay + P_A.astro.scale * wAfternoon + P_N.astro.scale * wNight;
-      this.fixedAstroGroup.scale.set(astroScale, astroScale, astroScale);
-    }
-
-    // 3. Efeitos Atmosféricos de Decadência / Eclipse do Demiurgo (se ativos)
-    updateAtmosphereDecay(this, this.scene, renderer);
-
-    // 4. Posicionamento Estável da Luz Direcional (Sem trepidação de sombras)
-    this.sun.castShadow = true;
-    const sx = Math.round((playerX ?? 0) / 4) * 4;
-    const sz = Math.round((playerZ ?? 0) / 4) * 4;
-    const sunDist = 56.0;
-    this.sun.position.set(
-      sx + _tempSunDir.x * sunDist,
-      Math.max(12.0, _tempSunDir.y * 64.0),
-      sz + _tempSunDir.z * sunDist
-    );
-    this.sun.target.position.set(sx, 0, sz);
-    this.sun.target.updateMatrixWorld();
-
-    // 5. Astro Celeste Fixo no Firmamento (Azimute 215°, Elevação 32°)
-    if (this.fixedAstroGroup) {
-      const fixedX = (playerX ?? 0) - 150.5;
-      const fixedY = 164.0;
-      const fixedZ = (playerZ ?? 0) - 215.3;
-      this.fixedAstroGroup.position.set(fixedX, fixedY, fixedZ);
-      this.fixedAstroGroup.lookAt(playerX ?? 0, 15, playerZ ?? 0);
-    }
+    // 2. Aplica interpolação das luzes pré-assadas
+    this.applyLighting(playerX, playerZ, renderer);
 
     // 6. Relógio HUD
     const totalMinutes = Math.floor(this.progress * 24 * 60);
