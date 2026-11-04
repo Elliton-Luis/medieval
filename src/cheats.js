@@ -274,8 +274,9 @@ function _updateStatusDisplays() {
     const totalMinutes = Math.floor((dn.progress ?? 0.36) * 24 * 60);
     const hours = Math.floor(totalMinutes / 60).toString().padStart(2, "0");
     const minutes = (totalMinutes % 60).toString().padStart(2, "0");
-    const isNight = dn.isNight ? "🌙 Noite" : "☀️ Dia";
-    clockEl.textContent = `${hours}:${minutes} (${isNight})`;
+    const prof = dn.currentProfile ? dn.currentProfile.toUpperCase() : (dn.isNight ? "NOITE" : "DIA");
+    const w = dn.weights ? ` · [D:${Math.round(dn.weights.day * 100)}% T:${Math.round(dn.weights.afternoon * 100)}% N:${Math.round(dn.weights.night * 100)}%]` : "";
+    clockEl.textContent = `${hours}:${minutes} (${prof}${w})`;
   }
 }
 
@@ -354,6 +355,13 @@ export function openCheatModal(env) {
             </div>
             <input type="range" id="cheat-time-slider" min="0" max="23" step="1" value="12" style="width: 100%; cursor: pointer; accent-color: #8e54e9; margin-bottom: 12px;">
             <button class="cheat-btn highlight full-width" id="cheat-apply-slider-time">🎯 Aplicar Horário Selecionado no Slider</button>
+          </div>
+
+          <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 10px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">🎨 Perfis de Iluminação Pré-Assados (Baked Lighting)</div>
+          <div class="cheat-grid" style="margin-bottom: 12px;">
+            <button class="cheat-btn highlight" data-cheat="lighting_day">☀️ Perfil Assado: DIA (12:00)</button>
+            <button class="cheat-btn highlight" data-cheat="lighting_afternoon">🌇 Perfil Assado: TARDE (18:00)</button>
+            <button class="cheat-btn highlight" data-cheat="lighting_night">🌙 Perfil Assado: NOITE (22:00)</button>
           </div>
 
           <div style="font-size: 12px; color: #bba8d8; font-weight: 700; margin: 10px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">Presets de Horário Imediatos</div>
@@ -588,6 +596,15 @@ function _handleCheatAction(type) {
   if (!window.CheatMenu) return;
   switch (type) {
     // Horário & Ciclo Dia/Noite
+    case "lighting_day":
+      window.CheatMenu.setBakedDay();
+      break;
+    case "lighting_afternoon":
+      window.CheatMenu.setBakedAfternoon();
+      break;
+    case "lighting_night":
+      window.CheatMenu.setBakedNight();
+      break;
     case "time_dawn":
       window.CheatMenu.setTime(6, 0);
       break;
@@ -923,6 +940,24 @@ export function initCheatMenu(env = {}) {
 
     setNight() {
       return this.setTime(22, 0);
+    },
+
+    setBakedDay() {
+      const res = this.setTime(12, 0);
+      env.ui?.showToast?.("☀️ Iluminação Pré-Assada: DIA ativado");
+      return res;
+    },
+
+    setBakedAfternoon() {
+      const res = this.setTime(18, 0);
+      env.ui?.showToast?.("🌇 Iluminação Pré-Assada: TARDE (Golden Hour) ativado");
+      return res;
+    },
+
+    setBakedNight() {
+      const res = this.setTime(22, 0);
+      env.ui?.showToast?.("🌙 Iluminação Pré-Assada: NOITE ativado");
+      return res;
     },
 
     addHours(delta = 1) {
