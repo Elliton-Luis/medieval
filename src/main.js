@@ -246,6 +246,8 @@ const combat = new CombatSystem(player, npcs, input, effects, ui, settlement, au
 combat.aim = aim;
 const weapons = new WeaponSystem(scene, player, input, combat, effects, ui, world, npcs, aim, cameraRig, explosions, audio);
 const interactions = new InteractionSystem(player, npcs, input, ui, weapons);
+interactions.audio = audio;
+interactions.effects = effects;
 world.settlement = settlement;
 const farming = new FarmFieldManager({ scene, world, settlement, effects, audio, ui });
 world.farming = farming;
@@ -376,6 +378,7 @@ world.environmentInstancedMeshes.push(
 
 initRPGSystem({ scene, world, npcs, drops, player, ui, effects, audio });
 const music = new MusicDirector({ audio, world, player, npcs, dayNight, houses });
+audio.musicDirector = music;
 const pause = new PauseMenu({ container: gameRoot, canvas: renderer.domElement, audio, input, aim });
 pause.onPlayIntro = () => {
   startIntroSequence({ scene, world, player, cameraRig, audio, input, settlement, ui, dayNight, music, loadingScreen, renderer, camera });

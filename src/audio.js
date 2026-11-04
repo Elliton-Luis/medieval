@@ -432,19 +432,45 @@ export class GameAudio {
   applyMusicGain() {
     if (!this.musicBus) return;
     const target = this.musicMuted ? 0 : this.settings.music * this.musicIndoor;
-    this.musicBus.gain.setTargetAtTime(target, this.context.currentTime, 0.35);
+    if (this.context) {
+      try {
+        this.musicBus.gain.cancelScheduledValues(this.context.currentTime);
+        this.musicBus.gain.setValueAtTime(target, this.context.currentTime);
+      } catch (_) {
+        try { this.musicBus.gain.value = target; } catch (__) {}
+      }
+    } else {
+      try { this.musicBus.gain.value = target; } catch (__) {}
+    }
+    if (this.musicDirector && typeof this.musicDirector.onVolumeChange === "function") {
+      this.musicDirector.onVolumeChange();
+    }
   }
 
   setMusicVolume(value) {
     this.settings.music = Math.max(0, Math.min(1, value));
     this._save();
     this.applyMusicGain();
+    if (this.musicDirector && typeof this.musicDirector.onVolumeChange === "function") {
+      this.musicDirector.onVolumeChange();
+    }
   }
 
   setSfxVolume(value) {
     this.settings.sfx = Math.max(0, Math.min(1, value));
     this._save();
-    if (this.sfx) this.sfx.gain.setTargetAtTime(this.settings.sfx, this.context.currentTime, 0.05);
+    if (this.sfx) {
+      if (this.context) {
+        try {
+          this.sfx.gain.cancelScheduledValues(this.context.currentTime);
+          this.sfx.gain.setValueAtTime(this.settings.sfx, this.context.currentTime);
+        } catch (_) {
+          try { this.sfx.gain.value = this.settings.sfx; } catch (__) {}
+        }
+      } else {
+        try { this.sfx.gain.value = this.settings.sfx; } catch (__) {}
+      }
+    }
   }
 
   toggleMusic() {
@@ -768,6 +794,30 @@ export class GameAudio {
 
   coinDrop() {
     this._tone("triangle", 2200 + Math.random() * 600, 1800, 0.06, 0.05);
+  }
+
+  charity() {
+    if (!this.context) return;
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    // Acorde arpegiado sagrado e angelical (Dó Maior estendido: C5, E5, G5, C6) com ressonância dourada
+    const freqs = [523.25, 659.25, 783.99, 1046.50];
+    freqs.forEach((freq, idx) => {
+      const t = now + idx * 0.075;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.85);
+      osc.connect(gain).connect(this.sfx);
+      osc.start(t);
+      osc.stop(t + 0.9);
+    });
+    // Tilintar límpido duplo de moedas de ouro
+    this.coin();
+    window.setTimeout(() => this.coin(), 110);
   }
 
   fuse() {

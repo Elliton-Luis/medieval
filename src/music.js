@@ -263,6 +263,7 @@ export class MusicDirector {
     this._cityActive = false;
     this._ghostCampActive = false;
     this._combatCooldown = 0;
+    this.audio.musicDirector = this;
 
     // Pré-carrega o som de descoberta no construtor para evitar I/O no frame
     try {
@@ -386,6 +387,8 @@ export class MusicDirector {
     const clamped = Math.max(0, Math.min(1, vol));
     track.currentVolume = clamped;
     this._ensureTrackNodes(track);
+    const musicSetting = (this.audio?.settings?.music ?? 0.6) * (this.audio?.musicIndoor ?? 1);
+    const effectiveVol = this.audio?.musicMuted ? 0 : clamped * musicSetting;
     if (track.gain && this.audio.context) {
       try {
         const param = track.gain.gain;
@@ -395,8 +398,17 @@ export class MusicDirector {
     }
     if (track.element) {
       try {
-        track.element.volume = clamped;
+        track.element.volume = Math.max(0, Math.min(1, effectiveVol));
       } catch (_) {}
+    }
+  }
+
+  onVolumeChange() {
+    if (this.current) {
+      this._applyTrackVolume(this.current, this.current.currentVolume ?? 1);
+    }
+    if (this.fadingOutTrack) {
+      this._applyTrackVolume(this.fadingOutTrack, this.fadingOutTrack.currentVolume ?? 0);
     }
   }
 

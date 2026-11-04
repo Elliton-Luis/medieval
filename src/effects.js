@@ -7,6 +7,7 @@ const EFFECTS = {
   flame: { file: "flame_01.png", duration: 0.34, size: 0.78, rise: 0.35, spin: 0.7, add: true },
   dust: { file: "smoke_01.png", duration: 0.55, size: 0.55, rise: 0.22, spin: 0.9, grow: 1.5, fade: 0.55 },
   glint: { canvas: "glint", duration: 0.5, size: 0.5, rise: 0.35, spin: 2.2, add: true },
+  heart: { canvas: "heart", duration: 1.25, size: 0.9, rise: 0.85, spin: 0, grow: 0.2, pop: true },
   alert: { canvas: "alert", duration: 1.15, size: 0.8, rise: 0.5, spin: 0, grow: 0.15, pop: true },
   caution: { canvas: "caution", duration: 1.15, size: 0.8, rise: 0.5, spin: 0, grow: 0.15, pop: true },
 };
@@ -17,7 +18,21 @@ export function makeIconTexture(kind) {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
-  if (kind === "glint") {
+  if (kind === "heart") {
+    // Coração radiante de caridade / bênção
+    ctx.fillStyle = "#ff2a55";
+    ctx.strokeStyle = "#ffe288";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(32, 20);
+    ctx.bezierCurveTo(32, 12, 20, 6, 12, 14);
+    ctx.bezierCurveTo(4, 22, 6, 36, 32, 56);
+    ctx.bezierCurveTo(58, 36, 60, 22, 52, 14);
+    ctx.bezierCurveTo(44, 6, 32, 12, 32, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (kind === "glint") {
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
     gradient.addColorStop(0, "rgba(255,255,255,1)");
     gradient.addColorStop(0.18, "rgba(255,255,255,0.85)");

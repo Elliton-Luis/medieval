@@ -1,12 +1,15 @@
 const CSS = `
-.pause-layer { position: absolute; inset: 0; z-index: 10; display: none; place-items: center; background: radial-gradient(ellipse at center, #0b0f0dcc, #050706f0); }
+.pause-layer { position: absolute; inset: 0; z-index: 999999; display: none; place-items: center; background: radial-gradient(ellipse at center, #0b0f0dcc, #050706f0); pointer-events: auto; }
 .pause-layer.on { display: grid; }
 .pause-card { width: min(540px, calc(100vw - 36px)); padding: 32px 36px 28px; border: 2px solid #d2a969aa; border-radius: 8px; background: linear-gradient(145deg, #202922fa, #111813fd); box-shadow: 0 24px 90px #000e, 0 0 25px rgba(210, 169, 105, 0.2); color: #eee4cc; }
 .pause-card h2 { margin: 0 0 6px; font: 900 34px Georgia, serif; letter-spacing: .12em; color: #f3ead2; }
 .pause-card p { margin: 0 0 24px; color: #d6b266; font: italic 16px Georgia, serif; }
 .pause-row { display: grid; gap: 10px; margin-bottom: 22px; }
 .pause-row label { display: flex; justify-content: space-between; font: 700 15px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: #e0d3ab; }
-.pause-row input[type=range] { width: 100%; accent-color: #d2a969; cursor: pointer; height: 8px; }
+.pause-vol-wrap { display: flex; align-items: center; gap: 8px; width: 100%; }
+.pause-vol-wrap input[type=range] { flex: 1; accent-color: #d2a969; cursor: pointer; height: 8px; }
+.pause-vol-btn { width: auto !important; margin: 0 !important; padding: 6px 12px !important; font: 700 13px ui-monospace, monospace !important; white-space: nowrap; border: 1px solid #d2a96988 !important; background: #1a251e !important; color: #f0e6cf !important; border-radius: 4px; cursor: pointer; user-select: none; transition: background 0.15s, border-color 0.15s; }
+.pause-vol-btn:hover { background: #283a2f !important; border-color: #f0cf7a !important; color: #fff; }
 .pause-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 20px; border: 1px solid #d2a96966; border-radius: 6px; background: #141c17dd; cursor: pointer; user-select: none; }
 .pause-toggle:hover { border-color: #f0cf7a; background: #1a251eee; }
 .pause-toggle span { font: 700 14px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #e0d3ab; }
@@ -38,8 +41,22 @@ export class PauseMenu {
       <div class="pause-card" role="dialog" aria-modal="true" aria-label="Jogo pausado">
         <h2>PAUSADO</h2>
         <p>o reino aguarda o seu retorno</p>
-        <div class="pause-row"><label for="vol-music"><span>Música</span><span id="vol-music-n"></span></label><input id="vol-music" type="range" min="0" max="100" step="1"></div>
-        <div class="pause-row"><label for="vol-sfx"><span>Efeitos</span><span id="vol-sfx-n"></span></label><input id="vol-sfx" type="range" min="0" max="100" step="1"></div>
+        <div class="pause-row">
+          <label for="vol-music"><span>Música</span><span id="vol-music-n"></span></label>
+          <div class="pause-vol-wrap">
+            <button type="button" class="pause-vol-btn" id="vol-music-sub" title="Diminuir Música">🔉 -10%</button>
+            <input id="vol-music" type="range" min="0" max="100" step="1">
+            <button type="button" class="pause-vol-btn" id="vol-music-add" title="Aumentar Música">🔊 +10%</button>
+          </div>
+        </div>
+        <div class="pause-row">
+          <label for="vol-sfx"><span>Efeitos</span><span id="vol-sfx-n"></span></label>
+          <div class="pause-vol-wrap">
+            <button type="button" class="pause-vol-btn" id="vol-sfx-sub" title="Diminuir Efeitos">🔉 -10%</button>
+            <input id="vol-sfx" type="range" min="0" max="100" step="1">
+            <button type="button" class="pause-vol-btn" id="vol-sfx-add" title="Aumentar Efeitos">🔊 +10%</button>
+          </div>
+        </div>
         <div class="pause-toggle" id="aim-assist-row" role="switch" aria-checked="true" tabindex="0">
           <span>Assist. Mira (Ser mais próximo)</span>
           <strong id="aim-assist-state">ATIVADO</strong>
@@ -89,10 +106,32 @@ export class PauseMenu {
         syncAssist();
       }
     });
-    music.addEventListener("input", () => { audio.setMusicVolume(Number(music.value) / 100); show(); });
-    sfx.addEventListener("input", () => { audio.setSfxVolume(Number(sfx.value) / 100); show(); });
-    // ao soltar o controle de efeitos toca um som de exemplo
-    sfx.addEventListener("change", () => audio.hit(false));
+
+    const updateMusic = (newVal) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(newVal)));
+      music.value = String(clamped);
+      audio.setMusicVolume(clamped / 100);
+      show();
+    };
+
+    const updateSfx = (newVal, playSample = false) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(newVal)));
+      sfx.value = String(clamped);
+      audio.setSfxVolume(clamped / 100);
+      show();
+      if (playSample) audio.hit(false);
+    };
+
+    music.addEventListener("input", () => updateMusic(Number(music.value)));
+    music.addEventListener("change", () => updateMusic(Number(music.value)));
+    layer.querySelector("#vol-music-sub")?.addEventListener("click", () => updateMusic(Number(music.value) - 10));
+    layer.querySelector("#vol-music-add")?.addEventListener("click", () => updateMusic(Number(music.value) + 10));
+
+    sfx.addEventListener("input", () => updateSfx(Number(sfx.value)));
+    sfx.addEventListener("change", () => updateSfx(Number(sfx.value), true));
+    layer.querySelector("#vol-sfx-sub")?.addEventListener("click", () => updateSfx(Number(sfx.value) - 10, true));
+    layer.querySelector("#vol-sfx-add")?.addEventListener("click", () => updateSfx(Number(sfx.value) + 10, true));
+
     layer.querySelector("#pause-continue").addEventListener("click", () => this.resume());
     layer.querySelector("#pause-debug")?.addEventListener("click", () => {
       this.resume();
@@ -136,6 +175,20 @@ export class PauseMenu {
   _open() {
     this.open = true;
     this.layer.classList.add("on");
+    const music = this.layer.querySelector("#vol-music");
+    const sfx = this.layer.querySelector("#vol-sfx");
+    const musicN = this.layer.querySelector("#vol-music-n");
+    const sfxN = this.layer.querySelector("#vol-sfx-n");
+    if (music && musicN) {
+      const mv = Math.round((this.audio?.settings?.music ?? 0.6) * 100);
+      music.value = String(mv);
+      musicN.textContent = `${mv}%`;
+    }
+    if (sfx && sfxN) {
+      const sv = Math.round((this.audio?.settings?.sfx ?? 0.85) * 100);
+      sfx.value = String(sv);
+      sfxN.textContent = `${sv}%`;
+    }
   }
 
   _close() {

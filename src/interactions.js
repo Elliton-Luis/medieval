@@ -942,6 +942,32 @@ export class InteractionSystem {
     });
   }
 
+  _triggerCharityFeedback(npc, successToast, dialogueText) {
+    if (this.audio?.charity) {
+      this.audio.charity();
+    } else {
+      this.audio?.coin?.();
+    }
+
+    if (this.effects && npc?.root) {
+      const pos = npc.root.position;
+      // Coração radiante subindo acima da cabeça do NPC
+      this.effects.play("heart", pos.x, pos.y + 1.8, pos.z, "#ff3366", 1.3);
+      // Estrelas e centelhas douradas de bênção
+      this.effects.play("glint", pos.x + 0.25, pos.y + 1.4, pos.z + 0.15, "#ffd700", 2.0);
+      this.effects.play("star", pos.x - 0.25, pos.y + 1.6, pos.z - 0.15, "#ffe266", 2.2);
+    } else if (this.effects && this.player?.root) {
+      const pos = this.player.root.position;
+      this.effects.play("heart", pos.x, pos.y + 1.8, pos.z, "#ff3366", 1.3);
+      this.effects.play("glint", pos.x, pos.y + 1.4, pos.z, "#ffd700", 2.0);
+    }
+
+    this.ui.showToast(successToast);
+    if (dialogueText) {
+      this._showNPCDialogue(dialogueText);
+    }
+  }
+
   _choose(action) {
     if (action === "close") { this.ui.closeDialogue(); return; }
 
@@ -981,9 +1007,14 @@ export class InteractionSystem {
         PlayerStats.cha += 2;
         syncPlayerStatsToPlayer();
         addGood(4, "Doou feno fresco para uma família camponesa");
-        this.audio?.coin?.();
-        this.ui.showToast("✦ Ato de Caridade! -3 Fenos · +2 Carisma. A família agradece comovida!");
-        this._showNPCDialogue("«O aldeão segura o fardo de feno com olhos marejados: 'Que os santos te abençoem, viajante! Nosso gado agora terá alimento e passará a noite aquecido.'»");
+        this._triggerCharityFeedback(
+          this.activeNPC,
+          "✦ Caridade Feita! -3 Fenos · +2 Carisma. A família agradece comovida!",
+          "«O aldeão segura o fardo de feno com olhos marejados: 'Que os santos te abençoem, viajante! Nosso gado agora terá alimento e passará a noite aquecido.'»"
+        );
+      } else {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Feno insuficiente! Você precisa de 3 feixes de feno.");
       }
       return;
     }
@@ -993,9 +1024,14 @@ export class InteractionSystem {
         PlayerStats.cha += 2;
         syncPlayerStatsToPlayer();
         addGood(4, "Doou lenha seca para a lareira de uma aldeã");
-        this.audio?.coin?.();
-        this.ui.showToast("✦ Ato de Caridade! -4 Madeiras · +2 Carisma. A lareira estala com calor!");
-        this._showNPCDialogue("«A aldeã abre um sorriso aliviado: 'Muito obrigada, alma generosa! Minha família e minhas crianças estarão protegidas do frio cortante da noite.'»");
+        this._triggerCharityFeedback(
+          this.activeNPC,
+          "✦ Caridade Feita! -4 Madeiras · +2 Carisma. A lareira estala com calor!",
+          "«A aldeã abre um sorriso aliviado: 'Muito obrigada, alma generosa! Minha família e minhas crianças estarão protegidas do frio cortante da noite.'»"
+        );
+      } else {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Madeira insuficiente! Você precisa de 4 unidades de madeira.");
       }
       return;
     }
@@ -1005,9 +1041,14 @@ export class InteractionSystem {
         PlayerStats.cha += 2;
         syncPlayerStatsToPlayer();
         addGood(4, "Doou pedras para consertar abrigo desabado");
-        this.audio?.coin?.();
-        this.ui.showToast("✦ Ato de Caridade! -4 Pedras · +2 Carisma. A estrutura foi reforçada!");
-        this._showNPCDialogue("«'Com essas pedras firmes podemos tapar os buracos da parede antes que os lobos da névoa entrem. Deus te guarde pelos teus caminhos!'»");
+        this._triggerCharityFeedback(
+          this.activeNPC,
+          "✦ Caridade Feita! -4 Pedras · +2 Carisma. A estrutura foi reforçada!",
+          "«'Com essas pedras firmes podemos tapar os buracos da parede antes que os lobos da névoa entrem. Deus te guarde pelos teus caminhos!'»"
+        );
+      } else {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Pedras insuficientes! Você precisa de 4 pedras.");
       }
       return;
     }
@@ -1017,13 +1058,14 @@ export class InteractionSystem {
         PlayerStats.cha += 3;
         syncPlayerStatsToPlayer();
         addGood(6, "Salvou um aldeão gravemente ferido com poção de cura");
-        this.audio?.coin?.();
-        if (this.effects && this.activeNPC?.root) {
-          const np = this.activeNPC.root.position;
-          this.effects.play("star", np.x, np.y + 1.2, np.z, "#22ffaa", 2.0);
-        }
-        this.ui.showToast("✦ Gesto Sagrado de Caridade! -1 Poção · +3 Carisma. O ferido foi restaurado!");
-        this._showNPCDialogue("«O aldeão bebe a poção e seu semblante recupera a vitalidade imediatamente: 'É um verdadeiro milagre! A dor do veneno cessou por completo. Caldera nunca esquecerá tua nobreza!'»");
+        this._triggerCharityFeedback(
+          this.activeNPC,
+          "✦ Gesto Sagrado de Caridade! -1 Poção · +3 Carisma. O ferido foi restaurado!",
+          "«O aldeão bebe a poção e seu semblante recupera a vitalidade imediatamente: 'É um verdadeiro milagre! A dor do veneno cessou por completo. Caldera nunca esquecerá tua nobreza!'»"
+        );
+      } else {
+        this.audio?.block?.();
+        this.ui.showToast("⚠️ Poções insuficientes! Você não possui frascos de poção.");
       }
       return;
     }
@@ -1066,8 +1108,6 @@ export class InteractionSystem {
         PlayerStats.cha += (cost >= 8 ? 2 : 1);
         syncPlayerStatsToPlayer();
         addGood(3, "Ato nobre de caridade e auxílio solidário");
-        this.audio?.coin?.();
-        this.ui.showToast(`✦ Auxílio Solidário! -${cost} Moedas · +${cost >= 8 ? 2 : 1} Carisma perante o povo.`);
 
         let reply = "«'Tua esmola nobre traz alívio a quem nada tem. Que tua jornada seja próspera e tua lâmina fiel!'»";
         if (action === "charity:smith") {
@@ -1079,7 +1119,15 @@ export class InteractionSystem {
         } else if (action === "charity:guard") {
           reply = "«O guarda bate o punho no peito em saudação militar solene: 'Em nome dos veteranos e das famílias dos caídos na patrulha além dos muros, a guarda de Caldera honra tua nobreza!'»";
         }
-        this._showNPCDialogue(reply);
+
+        this._triggerCharityFeedback(
+          this.activeNPC,
+          `✦ Caridade Feita com Sucesso! -${cost} Moedas · +${cost >= 8 ? 2 : 1} Carisma perante o povo.`,
+          reply
+        );
+      } else {
+        this.audio?.block?.();
+        this.ui.showToast(`⚠️ Moedas insuficientes! Você precisa de ${cost} moedas para doar.`);
       }
       return;
     }
