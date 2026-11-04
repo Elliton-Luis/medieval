@@ -149,9 +149,10 @@ function createHayBaleMesh(x, y, z, ry = 0) {
  * Gerenciador de Plantações, Colheitas e Agricultura de Puris.
  */
 export class FarmFieldManager {
-  constructor({ scene, world, effects = null, audio = null, ui = null }) {
+  constructor({ scene, world, settlement = null, effects = null, audio = null, ui = null }) {
     this.scene = scene;
     this.world = world;
+    this.settlement = settlement || world?.settlement || null;
     this.effects = effects;
     this.audio = audio;
     this.ui = ui;
@@ -166,7 +167,137 @@ export class FarmFieldManager {
   }
 
   /**
+   * Checa se uma coordenada (x, z) cai dentro ou muito perto do perímetro de uma casa,
+   * capela ou construção com piso/paredes sólidas, impedindo que plantações invadam o interior.
+   */
+  isInsideOrNearBuilding(x, z, margin = 2.4) {
+    // 1. Checa todas as casas e capelas do assentamento (Caldera e vilas)
+    const settlement = this.settlement || this.world?.settlement || window.__game?.settlement;
+    if (settlement) {
+      if (Array.isArray(settlement.houses)) {
+        for (let i = 0; i < settlement.houses.length; i++) {
+          const h = settlement.houses[i];
+          if (!h) continue;
+          if (h.outer) {
+            if (
+              x >= h.outer.minX - margin &&
+              x <= h.outer.maxX + margin &&
+              z >= h.outer.minZ - margin &&
+              z <= h.outer.maxZ + margin
+            ) {
+              return true;
+            }
+          }
+          if (h.rect) {
+            if (
+              x >= h.rect.minX - margin &&
+              x <= h.rect.maxX + margin &&
+              z >= h.rect.minZ - margin &&
+              z <= h.rect.maxZ + margin
+            ) {
+              return true;
+            }
+          }
+          if (h.x !== undefined && h.z !== undefined) {
+            const rMax = Math.max(h.W || 6.2, h.D || 5.8) * 0.5 + margin;
+            const dx = x - h.x;
+            const dz = z - h.z;
+            if (dx * dx + dz * dz < rMax * rMax) {
+              return true;
+            }
+          }
+        }
+      }
+
+      if (Array.isArray(settlement.churches)) {
+        for (let i = 0; i < settlement.churches.length; i++) {
+          const ch = settlement.churches[i];
+          if (!ch) continue;
+          if (ch.outer) {
+            if (
+              x >= ch.outer.minX - margin &&
+              x <= ch.outer.maxX + margin &&
+              z >= ch.outer.minZ - margin &&
+              z <= ch.outer.maxZ + margin
+            ) {
+              return true;
+            }
+          }
+          const cdx = x - (ch.x || 0);
+          const cdz = z - (ch.z || 0);
+          if (cdx * cdx + cdz * cdz < (13.0 + margin) * (13.0 + margin)) {
+            return true;
+          }
+        }
+      }
+
+      if (settlement.blacksmith) {
+        const bdx = x - settlement.blacksmith.x;
+        const bdz = z - settlement.blacksmith.z;
+        if (bdx * bdx + bdz * bdz < (9.5 + margin) * (9.5 + margin)) return true;
+      }
+      if (settlement.market) {
+        const mdx = x - settlement.market.x;
+        const mdz = z - settlement.market.z;
+        if (mdx * mdx + mdz * mdz < (9.5 + margin) * (9.5 + margin)) return true;
+      }
+      if (settlement.gate) {
+        const gdx = x - settlement.gate.x;
+        const gdz = z - settlement.gate.z;
+        if (gdx * gdx + gdz * gdz < (9.0 + margin) * (9.0 + margin)) return true;
+      }
+      if (settlement.well) {
+        const wdx = x - settlement.well.x;
+        const wdz = z - settlement.well.z;
+        if (wdx * wdx + wdz * wdz < (3.5 + margin) * (3.5 + margin)) return true;
+      }
+    }
+
+    // 2. Checa todos os pisos de construções registrados no mundo (world.floors)
+    if (this.world && Array.isArray(this.world.floors)) {
+      for (let i = 0; i < this.world.floors.length; i++) {
+        const f = this.world.floors[i];
+        if (!f) continue;
+        if (
+          x >= f.minX - margin &&
+          x <= f.maxX + margin &&
+          z >= f.minZ - margin &&
+          z <= f.maxZ + margin
+        ) {
+          return true;
+        }
+      }
+    }
+
+    // 3. Checa caixas de colisão de paredes e estruturas sólidas (world.boxes)
+    if (this.world && Array.isArray(this.world.boxes)) {
+      for (let i = 0; i < this.world.boxes.length; i++) {
+        const b = this.world.boxes[i];
+        if (!b || !b.active || (!b.move && !b.shot)) continue;
+        if (
+          x >= b.minX - margin &&
+          x <= b.maxX + margin &&
+          z >= b.minZ - margin &&
+          z <= b.maxZ + margin
+        ) {
+          return true;
+        }
+      }
+    }
+
+    // 4. Checa colisores estáticos
+    if (this.world && typeof this.world.isBlockedAt === "function") {
+      if (this.world.isBlockedAt(x, z, margin * 0.65)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Adiciona um campo agrícola completo com canteiros arados, fardos e slots de cultivo.
+   * Canteiros que caírem dentro ou rente a casas são limpos automaticamente sem quebrar o layout.
    */
   createFarmlandField(centerX, centerZ, rows = 4, cols = 8, spacingX = 1.6, spacingZ = 1.35) {
     const fieldGroup = new THREE.Group();
@@ -181,6 +312,12 @@ export class FarmFieldManager {
       const rx = centerX - (totalWidth * 0.5) + (r + 0.5) * spacingX;
       for (let c = 0; c < cols; c++) {
         const rz = centerZ - (totalDepth * 0.5) + (c + 0.5) * spacingZ;
+
+        // Se este canteiro estiver dentro ou rente a uma casa ou construção, pula para nunca invadir a casa!
+        if (this.isInsideOrNearBuilding(rx, rz, 2.2)) {
+          continue;
+        }
+
         const groundY = this.world.heightAt(rx, rz);
 
         // Base do sulco de terra fértil
@@ -231,31 +368,40 @@ export class FarmFieldManager {
     // 3. Fardos de feno empilhados ordenadamente na margem do campo
     const baleEdgeX = centerX + (totalWidth * 0.5) + 1.2;
     const baleEdgeZ = centerZ;
-    const by1 = this.world.heightAt(baleEdgeX, baleEdgeZ - 1.2);
-    const by2 = this.world.heightAt(baleEdgeX, baleEdgeZ + 1.2);
-    fieldGroup.add(createHayBaleMesh(baleEdgeX, by1, baleEdgeZ - 1.2, 0.15));
-    fieldGroup.add(createHayBaleMesh(baleEdgeX, by2, baleEdgeZ + 1.2, -0.22));
-    this.world.addStaticCollider(baleEdgeX, baleEdgeZ - 1.2, 0.8, 1.2);
-    this.world.addStaticCollider(baleEdgeX, baleEdgeZ + 1.2, 0.8, 1.2);
+    const bz1 = baleEdgeZ - 1.2;
+    const bz2 = baleEdgeZ + 1.2;
+    if (!this.isInsideOrNearBuilding(baleEdgeX, bz1, 1.8)) {
+      const by1 = this.world.heightAt(baleEdgeX, bz1);
+      fieldGroup.add(createHayBaleMesh(baleEdgeX, by1, bz1, 0.15));
+      this.world.addStaticCollider(baleEdgeX, bz1, 0.8, 1.2);
+    }
+    if (!this.isInsideOrNearBuilding(baleEdgeX, bz2, 1.8)) {
+      const by2 = this.world.heightAt(baleEdgeX, bz2);
+      fieldGroup.add(createHayBaleMesh(baleEdgeX, by2, bz2, -0.22));
+      this.world.addStaticCollider(baleEdgeX, bz2, 0.8, 1.2);
+    }
 
     // 4. Mourões de madeira rústica e cerca nas extremidades
     for (let c = 0; c <= cols; c += 2) {
       const pz = centerZ - (totalDepth * 0.5) + c * spacingZ;
       const leftX = centerX - (totalWidth * 0.5) - 0.7;
       const rightX = centerX + (totalWidth * 0.5) + 0.7;
-      const yL = this.world.heightAt(leftX, pz);
-      const yR = this.world.heightAt(rightX, pz);
 
-      const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5), _timberFenceMat);
-      postL.position.set(leftX, yL + 0.55, pz);
-      fieldGroup.add(postL);
+      if (!this.isInsideOrNearBuilding(leftX, pz, 1.6)) {
+        const yL = this.world.heightAt(leftX, pz);
+        const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5), _timberFenceMat);
+        postL.position.set(leftX, yL + 0.55, pz);
+        fieldGroup.add(postL);
+        this.world.addStaticCollider(leftX, pz, 0.15, 1.1);
+      }
 
-      const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5), _timberFenceMat);
-      postR.position.set(rightX, yR + 0.55, pz);
-      fieldGroup.add(postR);
-
-      this.world.addStaticCollider(leftX, pz, 0.15, 1.1);
-      this.world.addStaticCollider(rightX, pz, 0.15, 1.1);
+      if (!this.isInsideOrNearBuilding(rightX, pz, 1.6)) {
+        const yR = this.world.heightAt(rightX, pz);
+        const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5), _timberFenceMat);
+        postR.position.set(rightX, yR + 0.55, pz);
+        fieldGroup.add(postR);
+        this.world.addStaticCollider(rightX, pz, 0.15, 1.1);
+      }
     }
   }
 

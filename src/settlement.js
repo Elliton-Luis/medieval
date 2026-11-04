@@ -194,54 +194,11 @@ function createWell(scene, world, x = 5, z = -14) {
   return { x, z };
 }
 
-function createFarm(scene, world, centerX = -95, centerZ = -12) {
+function createFarm(scene, world, centerX = -58, centerZ = -14) {
   if (world && world.farming) {
     world.farming.createFarmlandField(centerX, centerZ, 4, 8, 1.8, 1.5);
-    return;
   }
-  const group = new THREE.Group();
-  group.position.set(0, 0, 0);
-  scene.add(group);
-  const plotMaterial = new THREE.MeshStandardMaterial({ color: "#756345", roughness: 1, flatShading: true });
-  const rowGeometry = new THREE.BoxGeometry(0.24, 0.07, 17);
-  for (let row = 0; row < 5; row++) {
-    const x = centerX - 4 + row * 2;
-    const z = centerZ;
-    const y = world.heightAt(x, z) + 0.035;
-    addMesh(group, rowGeometry, plotMaterial, x, y, z, false);
-  }
-  const cropGeometry = new THREE.ConeGeometry(0.24, 0.72, 4, 1);
-  const cropMesh = new THREE.InstancedMesh(cropGeometry, cropMat, 54);
-  cropMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-  const dummy = new THREE.Object3D();
-  let count = 0;
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 18; col++) {
-      const x = centerX - 3.8 + row * 3.8;
-      const z = centerZ - 7.2 + col * 0.82;
-      dummy.position.set(x, world.heightAt(x, z) + 0.36, z);
-      dummy.rotation.set(0, (row * 17 + col * 11) % 6 * 0.17, 0);
-      dummy.scale.set(0.76, 0.7 + (col % 3) * 0.12, 0.76);
-      dummy.updateMatrix();
-      cropMesh.setMatrixAt(count++, dummy.matrix);
-    }
-  }
-  cropMesh.instanceMatrix.needsUpdate = true;
-  cropMesh.computeBoundingBox();
-  cropMesh.computeBoundingSphere();
-  cropMesh.castShadow = false;
-  cropMesh.receiveShadow = false;
-  group.add(cropMesh);
-  const fenceMaterial = timberMat;
-  for (let i = 0; i < 9; i++) {
-    const z = centerZ - 8 + i * 2;
-    const yL = world.heightAt(centerX - 8, z);
-    const yR = world.heightAt(centerX + 3, z);
-    addMesh(group, new THREE.CylinderGeometry(0.08, 0.1, 1.1, 4), fenceMaterial, centerX - 8, yL + 0.55, z);
-    addMesh(group, new THREE.CylinderGeometry(0.08, 0.1, 1.1, 4), fenceMaterial, centerX + 3, yR + 0.55, z);
-    world.addStaticCollider(centerX - 8, z, 0.12, 1.1);
-    world.addStaticCollider(centerX + 3, z, 0.12, 1.1);
-  }
+  return { x: centerX, z: centerZ };
 }
 
 function createRoad(scene, world) {
@@ -419,8 +376,8 @@ function createVillage(scene, world, village, houses) {
   } else if (village.kind === "market") {
     points.work = createMarket(scene, world, workSlot.x, workSlot.z, faceCenter(workSlot.x, workSlot.z));
   } else if (village.kind === "farm") {
-    const fx = cx + Math.cos(workSlot.angle) * 24;
-    const fz = cz + Math.sin(workSlot.angle) * 24;
+    const fx = cx + Math.cos(workSlot.angle) * 38;
+    const fz = cz + Math.sin(workSlot.angle) * 38;
     createFarm(scene, world, fx, fz);
     points.work = { x: fx, z: fz };
     points.farmPath = [
@@ -490,12 +447,6 @@ function createKingdomRoads(scene, world) {
 export function createSettlement(scene, world) {
   createRoad(scene, world);
   const well = createWell(scene, world);
-  // Plantações geradas FORA das muralhas da capital (raio 88m a 105m), sem invadir o interior da cidade
-  if (world && world.farming) {
-    world.farming.createFarmlandField(-95, -12, 4, 9, 1.8, 1.5); // Campos do Poente (Oeste)
-    world.farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);  // Campos do Noroeste
-    world.farming.createFarmlandField(92, -46, 3, 7, 1.8, 1.5);   // Campos da Alvorada (Leste)
-  }
   const blacksmith = createBlacksmith(scene, world);
   const market = createMarket(scene, world);
   const gate = createGate(scene, world);

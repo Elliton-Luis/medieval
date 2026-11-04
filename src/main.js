@@ -246,15 +246,16 @@ const combat = new CombatSystem(player, npcs, input, effects, ui, settlement, au
 combat.aim = aim;
 const weapons = new WeaponSystem(scene, player, input, combat, effects, ui, world, npcs, aim, cameraRig, explosions, audio);
 const interactions = new InteractionSystem(player, npcs, input, ui, weapons);
-const farming = new FarmFieldManager({ scene, world, effects, audio, ui });
+world.settlement = settlement;
+const farming = new FarmFieldManager({ scene, world, settlement, effects, audio, ui });
 world.farming = farming;
 interactions.farming = farming;
-// Plantações geradas FORA das muralhas da capital (raio 88m a 105m) e em vilas agrícolas
-farming.createFarmlandField(-95, -12, 4, 9, 1.8, 1.5); // Campos do Poente (Oeste)
-farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);  // Campos do Noroeste
-farming.createFarmlandField(92, -46, 3, 7, 1.8, 1.5);   // Campos da Alvorada (Leste)
-farming.createFarmlandField(-98, -52, 4, 8, 1.8, 1.5);  // Pedraluz
-farming.createFarmlandField(-84, -130, 4, 8, 1.8, 1.5); // Brumas
+// Plantações com canteiros arados e trigo, posicionadas em áreas abertas nos arredores das vilas e fora das muralhas
+farming.createFarmlandField(-58, -14, 4, 8, 1.8, 1.5);   // Campos do Poente (Oeste de Caldera)
+farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);    // Campos do Noroeste
+farming.createFarmlandField(88, -48, 3, 7, 1.8, 1.5);     // Campos da Alvorada (Leste de Caldera)
+farming.createFarmlandField(-126, -42, 4, 8, 1.8, 1.5);  // Campos de Pedraluz (Pastos oeste da vila)
+farming.createFarmlandField(-92, -144, 4, 8, 1.8, 1.5);  // Campos de Brumas (Pastos sul da vila)
 const minimap = new Minimap(document.getElementById("minimap"));
 const drops = new DropSystem(scene, world, player, ui, audio, effects);
 drops.weapons = weapons;
