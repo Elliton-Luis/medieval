@@ -154,6 +154,8 @@ export class PauseMenu {
     layer.querySelector("#pause-reset-save")?.addEventListener("click", () => {
       if (confirm("Tem certeza que deseja apagar todo o progresso do save e reiniciar o jogo?")) {
         try {
+          localStorage.removeItem("rex-mundi-save-v1");
+          localStorage.removeItem("rex-mundi-audio-v1");
           localStorage.removeItem("gta-medieval-save-v1");
           localStorage.removeItem("gta-medieval-audio-v1");
         } catch (_) {}

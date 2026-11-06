@@ -1,4 +1,4 @@
-# GTA Medieval — Caldera
+# rex-mundi — Caldera
 
 Protótipo standalone em JavaScript puro e Three.js ES modules, sem build ou framework. Os personagens e armas são modelos 3D proceduralmente montados; inclui sprites CC0 locais para efeitos e retratos. Three.js é carregado pelo import map no CDN.
 

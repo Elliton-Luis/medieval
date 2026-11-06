@@ -1,10 +1,12 @@
 // Efeitos sintetizados com Web Audio (nenhum arquivo externo). A música vem de audio/ (music.js).
 // Dois barramentos separados: efeitos (sfx) e música (musicBus), com volume salvo no navegador.
-const SETTINGS_KEY = "gta-medieval-audio-v1";
+const SETTINGS_KEY = "rex-mundi-audio-v1";
+const LEGACY_SETTINGS_KEY = "gta-medieval-audio-v1";
 
 function loadSettings() {
   try {
-    const data = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    const raw = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_SETTINGS_KEY);
+    const data = JSON.parse(raw);
     if (data && typeof data.music === "number" && typeof data.sfx === "number") return data;
   } catch { /* sem preferências salvas */ }
   return { music: 0.6, sfx: 0.85 };

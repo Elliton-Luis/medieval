@@ -7,7 +7,8 @@ import { WorldDecay } from "./decay.js";
 // Sistema de Salvamento & Autosave Periódico do Puris
 // Salva inventário, stats, itens, ouro, progresso do mundo e posições.
 // ============================================================================
-const KEY = "gta-medieval-save-v1";
+const KEY = "rex-mundi-save-v1";
+const LEGACY_KEY = "gta-medieval-save-v1";
 
 /**
  * Serializa todo o estado relevante do jogador e do mundo para o formato do save.
@@ -68,7 +69,7 @@ export function saveGame(game) {
 
 export function loadGame() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY);
     const data = raw ? JSON.parse(raw) : null;
     return data && data.v === 1 ? data : null;
   } catch {
@@ -79,6 +80,7 @@ export function loadGame() {
 export function clearSave() {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(LEGACY_KEY);
     return true;
   } catch {
     return false;

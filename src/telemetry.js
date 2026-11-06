@@ -208,7 +208,7 @@ class TelemetryProfiler {
 
     const report = {
       meta: {
-        title: "GTA Medieval (Caldera) — Telemetria de Performance para IA",
+        title: "rex-mundi (Caldera) — Telemetria de Performance para IA",
         generatedAt: new Date().toISOString(),
         totalRecordedFrames: this._totalSamples,
         bufferSamplesAnalyzed: samplesCount,
