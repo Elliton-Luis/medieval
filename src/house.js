@@ -27,6 +27,12 @@ function materials() {
     clay: new THREE.MeshStandardMaterial({ color: "#a65c3c", roughness: 0.9, flatShading: true }),
     fire: new THREE.MeshStandardMaterial({ color: "#ff8a3a", emissive: "#ff6a1a", emissiveIntensity: 1.6, flatShading: true }),
   };
+  // cor-base de cada material com vertexColors, usada por peças soltas (torre, altar...) que não passam pelas listas mescladas
+  shared.stone.userData.tint = "#b4aea0";
+  shared.wood.userData.tint = "#7a5a3c";
+  shared.plaster.userData.tint = "#e2d2b4";
+  shared.thatch.userData.tint = "#c9b06a";
+  shared.tile.userData.tint = "#9a5238";
   return shared;
 }
 
@@ -75,8 +81,40 @@ function boxGeometry(w, h, d, x, y, z, color, random, rot = null, ao = 0.34) {
   return g;
 }
 
+// Material com vertexColors precisa de atributo "color": sem ele a peça renderiza PRETA (era o caso da torre e do altar).
+function tintGeometry(geo, material, w, h, d) {
+  const uv = geo.attributes.uv;
+  if (uv) {
+    const sizes = geo.type === "BoxGeometry" ? [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]] : null;
+    if (sizes) {
+      for (let face = 0; face < 6; face++) {
+        for (let v = 0; v < 4; v++) {
+          const i = face * 4 + v;
+          uv.setXY(i, uv.getX(i) * sizes[face][0] * 0.5, uv.getY(i) * sizes[face][1] * 0.5);
+        }
+      }
+    }
+  }
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  geo.computeBoundingBox();
+  const minY = geo.boundingBox.min.y;
+  const span = Math.max(0.001, geo.boundingBox.max.y - minY);
+  _color.set(material.userData.tint || "#b4aea0");
+  for (let i = 0; i < pos.count; i++) {
+    const f = 0.8 + 0.2 * ((pos.getY(i) - minY) / span); // base levemente mais escura (AO falso)
+    colors[i * 3] = _color.r * f;
+    colors[i * 3 + 1] = _color.g * f;
+    colors[i * 3 + 2] = _color.b * f;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
 function furnMesh(material, w, h, d, x, y, z, parent) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  const geo = new THREE.BoxGeometry(w, h, d);
+  if (material.vertexColors) tintGeometry(geo, material, w, h, d);
+  const mesh = new THREE.Mesh(geo, material);
   mesh.position.set(x, y, z);
   mesh.castShadow = false;
   parent.add(mesh);
@@ -731,23 +769,43 @@ export function createChurchBuilding(scene, world, opts) {
   towerTop.position.set(0, H + 0.2, D / 2 - 1.35);
   group.add(towerTop);
   meshes.towerTop = towerTop;
-  furnMesh(M.stone, 2.75, 4.6, 2.75, 0, 2.3, 0, towerTop);
-  furnMesh(M.furnDark, 3.15, 0.28, 3.15, 0, 4.65, 0, towerTop);
-  const spire = new THREE.Mesh(new THREE.ConeGeometry(2.15, 3.2, 4), M.tile);
-  spire.position.set(0, 6.35, 0);
+  // Campanário: base maciça de pedra (que se funde ao telhado) + câmara do sino ABERTA em 4 pilares com arcos
+  furnMesh(M.stone, 2.75, 2.5, 2.75, 0, 1.25, 0, towerTop);
+  furnMesh(M.stone, 3.0, 0.2, 3.0, 0, 2.55, 0, towerTop); // cornija da base
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) furnMesh(M.stone, 0.52, 2.0, 0.52, sx * 1.12, 3.65, sz * 1.12, towerTop);
+  }
+  for (const sd of [-1, 1]) {
+    furnMesh(M.stone, 2.75, 0.34, 0.5, 0, 4.48, sd * 1.12, towerTop); // verga dos arcos (frente/fundo)
+    furnMesh(M.stone, 0.5, 0.34, 2.75, sd * 1.12, 4.48, 0, towerTop); // laterais
+  }
+  furnMesh(M.furnDark, 3.15, 0.28, 3.15, 0, 4.78, 0, towerTop);
+  const spire = new THREE.Mesh(tintGeometry(new THREE.ConeGeometry(2.15, 3.2, 4), M.tile, 2, 3, 2), M.tile);
+  spire.position.set(0, 6.5, 0);
   spire.rotation.y = Math.PI / 4;
   towerTop.add(spire);
   const goldMat = new THREE.MeshStandardMaterial({ color: "#e6c15c", metalness: 0.65, roughness: 0.35, flatShading: true });
-  furnMesh(goldMat, 0.14, 1.25, 0.14, 0, 8.35, 0, towerTop);
-  furnMesh(goldMat, 0.78, 0.14, 0.14, 0, 8.65, 0, towerTop);
+  furnMesh(goldMat, 0.14, 1.25, 0.14, 0, 8.5, 0, towerTop);
+  furnMesh(goldMat, 0.78, 0.14, 0.14, 0, 8.8, 0, towerTop);
 
-  // Sino articulado dentro do campanário
+  // Sino pendurado de verdade: viga mestra apoiada nos pilares, cavalete, mancal e badalo
+  furnMesh(M.furnDark, 2.6, 0.26, 0.26, 0, 4.22, 0, towerTop); // viga mestra (eixo do sino) apoiada nas vergas laterais
+  furnMesh(M.furnDark, 0.18, 0.5, 0.18, -0.62, 4.0, 0, towerTop); // cavaletes
+  furnMesh(M.furnDark, 0.18, 0.5, 0.18, 0.62, 4.0, 0, towerTop);
   const bellPivot = new THREE.Group();
-  bellPivot.position.set(0, 4.2, 0);
+  bellPivot.position.set(0, 3.95, 0);
   towerTop.add(bellPivot);
-  const bellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 0.58, 8), goldMat);
-  bellBody.position.set(0, -0.32, 0);
+  furnMesh(goldMat, 0.5, 0.34, 0.07, 0, -0.1, 0, bellPivot); // mancal / canga que prende o sino à viga
+  const bellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.46, 0.7, 10), goldMat);
+  bellBody.position.set(0, -0.58, 0);
   bellPivot.add(bellBody);
+  const bellLip = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.5, 0.07, 10), goldMat);
+  bellLip.position.set(0, -0.96, 0);
+  bellPivot.add(bellLip);
+  furnMesh(M.dark, 0.06, 0.34, 0.06, 0, -1.05, 0, bellPivot); // haste do badalo
+  const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), M.dark);
+  clapper.position.set(0, -1.25, 0);
+  bellPivot.add(clapper);
 
   // Porta da igreja articulada
   const hinge = -doorW / 2;

@@ -5,6 +5,9 @@ import { createHouse, createChurchBuilding } from "./house.js";
 import { createHay } from "./fire.js";
 import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js";
 import { addCityBeacon } from "./beacons.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { resetPlacement, reserve, findSpot, canPlace, BUILDING_GAP } from "./placement.js";
+import { weatheredStoneTexture, weatheredWallTexture, tileTexture, woodTexture } from "./textures.js";
 
 const sharedHouseMat = createSharedHouseMaterial();
 const wallMat = sharedHouseMat;
@@ -75,35 +78,295 @@ function sampleFoundation(world, x, z, ry, width, depth) {
   return { baseY, depthY };
 }
 
+// ---------------------------------------------------------------------------
+// Construtor de malhas mescladas: tudo que for do mesmo material vira UM mesh (poucos draw calls).
+// ---------------------------------------------------------------------------
+const _bm = new THREE.Matrix4();
+const _bq = new THREE.Quaternion();
+const _be = new THREE.Euler();
+const _bp = new THREE.Vector3();
+const _bs = new THREE.Vector3(1, 1, 1);
+
+class MeshBuilder {
+  constructor() {
+    this.parts = new Map();
+  }
+
+  _add(mat, geo, x, y, z, rx, ry, rz) {
+    _be.set(rx, ry, rz);
+    _bq.setFromEuler(_be);
+    _bp.set(x, y, z);
+    _bm.compose(_bp, _bq, _bs);
+    geo.applyMatrix4(_bm);
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    if (g !== geo) geo.dispose();
+    let list = this.parts.get(mat);
+    if (!list) this.parts.set(mat, (list = []));
+    list.push(g);
+  }
+
+  // caixa com UV proporcional ao tamanho (a textura repete em vez de esticar)
+  box(mat, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    const uv = g.attributes.uv;
+    const sizes = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+    for (let f = 0; f < 6; f++) {
+      for (let v = 0; v < 4; v++) {
+        const i = f * 4 + v;
+        uv.setXY(i, uv.getX(i) * sizes[f][0] * 0.5, uv.getY(i) * sizes[f][1] * 0.5);
+      }
+    }
+    this._add(mat, g, x, y, z, rx, ry, rz);
+  }
+
+  cyl(mat, rt, rb, h, seg, x, y, z, rx = 0, ry = 0, rz = 0) {
+    this._add(mat, new THREE.CylinderGeometry(rt, rb, h, seg), x, y, z, rx, ry, rz);
+  }
+
+  cone(mat, r, h, seg, x, y, z, rx = 0, ry = 0, rz = 0) {
+    this._add(mat, new THREE.ConeGeometry(r, h, seg), x, y, z, rx, ry, rz);
+  }
+
+  // triângulo (empena): vértices em ordem anti-horária vista de fora; UV em metros/2
+  tri(mat, a, b, c) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute([...a, ...b, ...c], 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute([a[0] * 0.5, a[1] * 0.5, b[0] * 0.5, b[1] * 0.5, c[0] * 0.5, c[1] * 0.5], 2));
+    g.computeVertexNormals();
+    this._add(mat, g, 0, 0, 0, 0, 0, 0);
+  }
+
+  build(parent, castShadow = true) {
+    for (const [mat, list] of this.parts) {
+      const merged = mergeGeometries(list, false);
+      for (const g of list) g.dispose();
+      if (!merged) continue;
+      merged.computeBoundingSphere();
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      parent.add(mesh);
+    }
+    this.parts.clear();
+  }
+}
+
+const smithStoneMat = new THREE.MeshStandardMaterial({ map: weatheredStoneTexture(), color: "#aaa497", roughness: 1, flatShading: true });
+const smithPlasterMat = new THREE.MeshStandardMaterial({ map: weatheredWallTexture(), color: "#c9b48c", roughness: 1, flatShading: true });
+const smithRoofMat = new THREE.MeshStandardMaterial({ map: tileTexture(), color: "#8a452f", roughness: 1, flatShading: true });
+const smithWoodMat = new THREE.MeshStandardMaterial({ map: woodTexture(), color: "#7a5a3c", roughness: 1, flatShading: true });
+const smithDarkWoodMat = new THREE.MeshStandardMaterial({ map: woodTexture(), color: "#3f2d1f", roughness: 1, flatShading: true });
+const smithIronMat = new THREE.MeshStandardMaterial({ color: "#3d4244", metalness: 0.55, roughness: 0.5, flatShading: true });
+const smithGlassMat = new THREE.MeshStandardMaterial({ color: "#2c3a44", emissive: "#e8a24c", emissiveIntensity: 0.55, roughness: 0.4, flatShading: true });
+const smithEmberMat = new THREE.MeshStandardMaterial({ color: "#ff7b1c", emissive: "#dd4511", emissiveIntensity: 1.6, roughness: 0.5, flatShading: true });
+const smithWaterMat = new THREE.MeshStandardMaterial({ color: "#10181c", metalness: 0.2, roughness: 0.2, flatShading: true });
+
+/** Pegada da ferraria no espaço local: construção + abrigo da forja à direita. */
+export const BLACKSMITH_FOOTPRINT = { hw: 5.1, hd: 3.45, cx: 1.5, cz: 0.1 };
+
 function createBlacksmith(scene, world, x = 15, z = -27, ry = 0) {
-  const { baseY: y, depthY } = sampleFoundation(world, x, z, ry, 7.6, 8.2);
+  const W = 7.2;
+  const D = 5.8;
+  const H = 3.5;
+  const pitch = 2.3;
+  const LX = W / 2; // face externa da parede direita
+  // chão: o ponto mais alto sob a construção E sob o abrigo da forja (nada flutua nem afunda)
+  const sA = sampleFoundation(world, x, z, ry, W + 0.6, D + 1.2);
+  const hearthC = toWorld(x, z, ry, LX + 1.7, 0);
+  const sB = sampleFoundation(world, hearthC.x, hearthC.z, ry, 3.6, 5.8);
+  const y = Math.max(sA.baseY, sB.baseY);
+  const depthY = Math.max(sA.depthY, sB.depthY, y - Math.min(sA.baseY - sA.depthY, sB.baseY - sB.depthY) + 0.4);
   const group = new THREE.Group();
   group.position.set(x, y, z);
   group.rotation.y = ry;
   scene.add(group);
-  // Terreno/fundação de pedra sólido sob a forja e a bigorna externa até o chão
-  addBox(group, stoneMat, 0, -depthY / 2 + 0.06, 0, 7.6, depthY + 0.12, 6.2, true);
-  addBox(group, stoneMat, 2.5, -depthY / 2 + 0.04, 3.6, 1.5, depthY + 0.08, 1.4, true);
-  addBox(group, wallMat, 0, 2, 0, 7.2, 4, 5.8, true);
-  const roof = addMesh(group, createGableRoof(), roofMat, 0, 4, 0);
-  roof.scale.set(7.2 / 5.4, 1, 5.8 / 4.4);
-  roof.castShadow = true;
-  addBox(group, darkTimberMat, 0, 1.1, 2.96, 1.05, 2.2, 0.16);
-  addBox(group, timberMat, -2.25, 2, 2.98, 0.28, 4.15, 0.22);
-  addBox(group, timberMat, 2.25, 2, 2.98, 0.28, 4.15, 0.22);
-  addBox(group, ironMat, -2.65, 1.05, 0.2, 0.42, 0.4, 0.42);
 
-  const chimney = addMesh(group, new THREE.CylinderGeometry(0.42, 0.56, 2.9, 5), darkTimberMat, 2.55, 5.1, -1.1);
-  chimney.rotation.z = -0.14;
-  addMesh(group, new THREE.BoxGeometry(0.82, 0.28, 0.82), stoneMat, 2.5, 0.18, 3.6);
-  addMesh(group, new THREE.BoxGeometry(1.05, 0.42, 0.74), ironMat, 2.5, 0.5, 3.6);
-  addMesh(group, new THREE.BoxGeometry(0.58, 0.3, 0.5), warmLightMat, 2.5, 0.86, 3.6, false);
-  addMesh(group, new THREE.CylinderGeometry(0.12, 0.16, 1.8, 5), darkTimberMat, 2.5, 1.25, 4.05).rotation.z = Math.PI / 2;
+  const b = new MeshBuilder();
+  const stone = smithStoneMat;
+  const plaster = smithPlasterMat;
+  const wood = smithWoodMat;
+  const dark = smithDarkWoodMat;
+  const iron = smithIronMat;
 
-  world.addOrientedBox(x, z, 7.2, 5.8, ry, y - depthY, y + 5.8, { move: true, shot: true, cam: true });
-  const forgePos = toWorld(x, z, ry, 2.5, 3.6);
-  world.addOrientedBox(forgePos.x, forgePos.z, 1.15, 1.0, ry, y - depthY, y + 1.2, { move: true, shot: true, cam: false });
-  return { ...toWorld(x, z, ry, -4.5, 5.6), name: "Forja de Bracken" };
+  // --- fundação de pedra até o chão (construção + plataforma da forja) ---
+  b.box(stone, W + 0.5, depthY + 0.04, D + 0.5, 0, -depthY / 2 + 0.02, 0);
+  b.box(stone, 3.7, depthY + 0.04, 5.9, LX + 1.85, -depthY / 2 + 0.02, 0.0);
+  b.box(stone, 2.2, depthY - 0.06, 0.8, 0, -depthY / 2 - 0.03, D / 2 + 0.45); // degrau da porta
+  b.box(stone, 2.5, 0.16, 0.7, 0, 0.04, D / 2 + 0.4);
+
+  // --- paredes: soco de pedra + reboco texturizado + enxaimel ---
+  const wt = 0.34;
+  b.box(stone, W, 0.9, wt, 0, 0.45, D / 2 - wt / 2); // frente
+  b.box(stone, W, 0.9, wt, 0, 0.45, -D / 2 + wt / 2);
+  b.box(stone, wt, 0.9, D - 2 * wt, -W / 2 + wt / 2, 0.45, 0);
+  b.box(stone, wt, 0.9, D - 2 * wt, W / 2 - wt / 2, 0.45, 0);
+  b.box(plaster, W, H - 0.9, wt, 0, 0.9 + (H - 0.9) / 2, D / 2 - wt / 2);
+  b.box(plaster, W, H - 0.9, wt, 0, 0.9 + (H - 0.9) / 2, -D / 2 + wt / 2);
+  b.box(plaster, wt, H - 0.9, D - 2 * wt, -W / 2 + wt / 2, 0.9 + (H - 0.9) / 2, 0);
+  b.box(plaster, wt, H - 0.9, D - 2 * wt, W / 2 - wt / 2, 0.9 + (H - 0.9) / 2, 0);
+  // vigas de enxaimel: cantos, travessas e contraventos
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) b.box(dark, 0.32, H + 0.1, 0.32, sx * (W / 2 - 0.06), (H + 0.1) / 2, sz * (D / 2 - 0.06));
+  }
+  for (const sz of [-1, 1]) {
+    b.box(dark, W + 0.1, 0.26, 0.3, 0, H - 0.06, sz * (D / 2 - 0.04));
+    b.box(dark, W - 0.2, 0.2, 0.28, 0, 1.95, sz * (D / 2 - 0.04));
+    for (const sx of [-1, 1]) b.box(dark, 0.22, 1.5, 0.26, sx * 1.5, 2.2, sz * (D / 2 - 0.04), 0, 0, sx * sz * 0.55);
+  }
+  for (const sx of [-1, 1]) {
+    b.box(dark, 0.3, 0.26, D + 0.1, sx * (W / 2 - 0.04), H - 0.06, 0);
+    b.box(dark, 0.28, 0.2, D - 0.2, sx * (W / 2 - 0.04), 1.95, 0);
+    for (const sz of [-1, 1]) b.box(dark, 0.22, 1.5, 0.26, sx * (W / 2 - 0.04), 2.2, sz * 1.3, sx * sz * 0.55, 0, 0);
+  }
+
+  // --- porta dupla de madeira com ferragens, soleira e verga de pedra ---
+  const fz = D / 2;
+  b.box(dark, 1.36, 2.35, 0.12, 0, 1.2, fz + 0.02);
+  b.box(wood, 0.62, 2.2, 0.08, -0.33, 1.2, fz + 0.1);
+  b.box(wood, 0.62, 2.2, 0.08, 0.33, 1.2, fz + 0.1);
+  for (const yy of [0.55, 1.15, 1.8]) b.box(iron, 1.3, 0.1, 0.05, 0, yy, fz + 0.16);
+  b.box(iron, 0.1, 0.16, 0.06, -0.14, 1.15, fz + 0.18);
+  b.box(iron, 0.1, 0.16, 0.06, 0.14, 1.15, fz + 0.18);
+  b.box(stone, 0.26, 2.5, 0.4, -0.78, 1.25, fz + 0.05);
+  b.box(stone, 0.26, 2.5, 0.4, 0.78, 1.25, fz + 0.05);
+  b.box(stone, 1.9, 0.3, 0.44, 0, 2.55, fz + 0.05);
+  // --- janelas com moldura, vidro quente e venezianas abertas ---
+  const win = (wx, wy, wz, rot) => {
+    // rot = 0: janela na frente/fundo; rot = π/2: janela lateral
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const at = (lx, lz) => [wx + lx * c + lz * s, wz - lx * s + lz * c];
+    const [gx, gz] = at(0, 0);
+    b.box(smithGlassMat, 0.8, 0.8, 0.06, gx, wy, gz, 0, rot, 0);
+    b.box(dark, 1.04, 0.12, 0.14, gx, wy + 0.46, gz, 0, rot, 0);
+    b.box(dark, 1.04, 0.12, 0.14, gx, wy - 0.46, gz, 0, rot, 0);
+    b.box(dark, 0.12, 0.92, 0.14, gx - 0.46 * c, wy, gz + 0.46 * s, 0, rot, 0);
+    b.box(dark, 0.12, 0.92, 0.14, gx + 0.46 * c, wy, gz - 0.46 * s, 0, rot, 0);
+    b.box(dark, 0.06, 0.8, 0.1, gx, wy, gz, 0, rot, 0);
+    const [lx1, lz1] = at(-0.78, 0.2);
+    const [lx2, lz2] = at(0.78, 0.2);
+    b.box(wood, 0.5, 0.95, 0.06, lx1, wy, lz1, 0, rot + 0.5, 0);
+    b.box(wood, 0.5, 0.95, 0.06, lx2, wy, lz2, 0, rot - 0.5, 0);
+  };
+  win(-2.3, 1.75, fz + 0.04, 0);
+  win(2.3, 1.75, fz + 0.04, 0);
+  win(-W / 2 + 0.04, 1.75, -0.9, -Math.PI / 2);
+  win(-W / 2 + 0.04, 1.75, 1.0, -Math.PI / 2);
+  // placa pendurada: suporte de ferro + tábua com bigorna entalhada
+  b.box(iron, 0.08, 0.08, 1.0, 1.85, 2.9, fz + 0.5);
+  b.box(wood, 0.06, 0.62, 0.78, 1.85, 2.5, fz + 0.52);
+  b.box(iron, 0.05, 0.16, 0.5, 1.9, 2.52, fz + 0.52);
+  b.box(iron, 0.05, 0.08, 0.28, 1.9, 2.64, fz + 0.52);
+
+  // --- telhado de duas águas com empenas, beiral e cumeeira ---
+  const ovS = 0.55;
+  const ovF = 0.5;
+  const run = W / 2 + ovS;
+  const rise = pitch + 0.12;
+  const slopeLen = Math.hypot(run, rise);
+  const ang = Math.atan2(rise, run);
+  for (const sd of [-1, 1]) {
+    b.box(smithRoofMat, slopeLen + 0.06, 0.2, D + 2 * ovF, sd * (run / 2), H - 0.1 + rise / 2 + 0.02, 0, 0, 0, -sd * ang);
+    b.box(dark, 0.2, 0.18, D + 2 * ovF, sd * (W / 2 - 0.05), H - 0.2, 0); // barrote sob o beiral
+  }
+  b.box(dark, 0.4, 0.22, D + 2 * ovF + 0.1, 0, H + pitch + 0.1, 0);
+  // empenas (triângulos de reboco) frente e fundo, com viga central
+  for (const sz of [-1, 1]) {
+    const zz = sz * (D / 2 - 0.08);
+    if (sz > 0) b.tri(plaster, [-W / 2, H, zz], [W / 2, H, zz], [0, H + pitch, zz]);
+    else b.tri(plaster, [W / 2, H, zz], [-W / 2, H, zz], [0, H + pitch, zz]);
+    b.box(dark, 0.22, pitch, 0.26, 0, H + pitch / 2, zz + sz * 0.05);
+    b.box(dark, 0.24, pitch * 0.95, 0.24, -W / 4, H + pitch * 0.36, zz + sz * 0.05, 0, 0, 0.52);
+    b.box(dark, 0.24, pitch * 0.95, 0.24, W / 4, H + pitch * 0.36, zz + sz * 0.05, 0, 0, -0.52);
+  }
+
+  // --- abrigo da forja à direita: telhado inclinado + 2 postes ---
+  const shedX0 = LX + 0.1;
+  const shedX1 = LX + 3.5;
+  const shedTop = H - 0.45;
+  const shedLow = 2.45;
+  const shedLen = Math.hypot(shedX1 - shedX0, shedTop - shedLow);
+  const shedAng = Math.atan2(shedTop - shedLow, shedX1 - shedX0);
+  b.box(smithRoofMat, shedLen + 0.3, 0.16, 5.6, (shedX0 + shedX1) / 2, (shedTop + shedLow) / 2, 0, 0, 0, shedAng);
+  for (const sz of [-1, 1]) {
+    b.box(dark, 0.22, shedLow, 0.22, shedX1 - 0.15, shedLow / 2, sz * 2.6);
+    b.box(dark, 0.14, 0.14, 5.5, shedX1 - 0.15, shedLow - 0.1, 0);
+  }
+
+  // --- forja: lareira de pedra, brasas, coifa e chaminé que sobe além do beiral ---
+  const hx = LX + 1.0;
+  const hz = -1.2;
+  b.box(stone, 1.7, 0.95, 1.5, hx, 0.475, hz);
+  b.box(stone, 1.9, 0.12, 1.7, hx, 0.98, hz);
+  b.box(smithEmberMat, 1.0, 0.1, 0.9, hx + 0.05, 1.0, hz + 0.1);
+  b.box(smithEmberMat, 0.5, 0.45, 0.06, hx + 0.05, 0.45, hz + 0.78); // boca de brasa
+  b.box(stone, 1.5, 0.8, 0.14, hx - 0.05, 1.5, hz - 0.62); // fundo da coifa
+  b.box(stone, 0.14, 0.8, 1.2, hx - 0.78, 1.5, hz - 0.05);
+  b.box(stone, 0.14, 0.8, 1.2, hx + 0.68, 1.5, hz - 0.05);
+  b.box(stone, 1.7, 0.2, 1.4, hx, 1.95, hz - 0.1);
+  const stackTop = H + pitch + 1.0;
+  b.box(stone, 0.95, stackTop - 1.9, 0.95, hx, 1.9 + (stackTop - 1.9) / 2, hz - 0.2);
+  b.box(stone, 1.2, 0.22, 1.2, hx, stackTop + 0.1, hz - 0.2);
+  b.box(dark, 0.8, 0.12, 0.8, hx, stackTop + 0.28, hz - 0.2);
+  // fole de couro com bico
+  b.box(wood, 0.9, 0.12, 0.5, hx - 1.05, 0.62, hz + 0.5, 0, 0, -0.2);
+  b.box(dark, 0.9, 0.12, 0.5, hx - 1.05, 0.9, hz + 0.5, 0, 0, -0.2);
+  b.cyl(iron, 0.04, 0.06, 0.8, 5, hx - 0.6, 0.8, hz + 0.45, 0, 0, Math.PI / 2 + 0.2);
+  // bigorna sobre toco, tina de têmpera, bancada e cremalheira de ferramentas
+  const ax = LX + 2.35;
+  const az = 0.9;
+  b.cyl(dark, 0.34, 0.4, 0.6, 7, ax, 0.3, az);
+  b.box(iron, 0.42, 0.22, 0.62, ax, 0.71, az);
+  b.box(iron, 0.62, 0.14, 0.26, ax, 0.89, az);
+  b.cone(iron, 0.12, 0.42, 5, ax + 0.5, 0.88, az, 0, 0, -Math.PI / 2);
+  b.cyl(dark, 0.4, 0.44, 0.9, 8, LX + 2.95, 0.45, -1.8);
+  b.cyl(smithWaterMat, 0.34, 0.34, 0.04, 8, LX + 2.95, 0.88, -1.8);
+  for (const yy of [0.25, 0.7]) b.cyl(iron, 0.425, 0.425, 0.05, 8, LX + 2.95, yy, -1.8);
+  const bx = LX + 2.55;
+  const bz = 2.05;
+  b.box(wood, 1.7, 0.1, 0.7, bx, 0.95, bz);
+  for (const lx of [-0.75, 0.75]) for (const lz of [-0.28, 0.28]) b.box(dark, 0.12, 0.92, 0.12, bx + lx, 0.46, bz + lz);
+  b.box(iron, 0.3, 0.07, 0.12, bx - 0.4, 1.03, bz); // martelo
+  b.box(dark, 0.05, 0.05, 0.5, bx - 0.4, 1.03, bz + 0.1);
+  b.box(iron, 0.07, 0.04, 0.45, bx + 0.2, 1.01, bz - 0.1, 0, 0.3, 0); // tenaz
+  b.box(iron, 0.18, 0.12, 0.18, bx + 0.6, 1.06, bz + 0.1); // bloco de ferro
+  b.box(wood, 0.06, 0.7, 1.6, LX + 0.1, 1.7, 1.55); // cremalheira na parede
+  for (let i = 0; i < 4; i++) {
+    b.box(iron, 0.05, 0.5 - i * 0.04, 0.07, LX + 0.17, 1.65, 0.95 + i * 0.36);
+    b.box(dark, 0.05, 0.22, 0.09, LX + 0.17, 1.35 - i * 0.02, 0.95 + i * 0.36);
+  }
+  // barras de ferro encostadas e sacos de carvão
+  for (let i = 0; i < 4; i++) b.box(iron, 0.07, 1.5, 0.07, -W / 2 + 0.5 + i * 0.12, 0.78, D / 2 + 0.2, 0.18, 0, 0.04 * i);
+  b.box(dark, 0.55, 0.45, 0.4, -W / 2 + 1.6, 0.23, D / 2 + 0.35, 0, 0.3, 0);
+  b.box(dark, 0.5, 0.4, 0.38, -W / 2 + 2.1, 0.2, D / 2 + 0.3, 0, -0.2, 0);
+
+  // --- pilha de lenha encostada na parede esquerda (toras empilhadas em fileiras) ---
+  const wx0 = -W / 2 - 0.45;
+  for (let row = 0; row < 3; row++) {
+    const n = 5 - row;
+    for (let k = 0; k < n; k++) {
+      const zz = (k - (n - 1) / 2) * 0.32;
+      b.cyl(wood, 0.14, 0.14, 0.9, 6, wx0 + (k % 2) * 0.03, 0.15 + row * 0.27, zz, Math.PI / 2, 0, 0);
+    }
+  }
+  b.box(dark, 0.9, 0.08, 1.8, wx0, 0.82 + 0.3, 0, 0, 0, 0.08);
+
+  b.build(group, true);
+
+  // colisores: corpo da construção, lareira, bigorna, tina e bancada (o resto fica livre)
+  world.addOrientedBox(x, z, W, D, ry, y - depthY, y + H + pitch, { move: true, shot: true, cam: true });
+  const hp = toWorld(x, z, ry, hx, hz);
+  world.addOrientedBox(hp.x, hp.z, 1.8, 1.6, ry, y - depthY, y + 1.1, { move: true, shot: true, cam: false });
+  const ap = toWorld(x, z, ry, ax, az);
+  world.addOrientedBox(ap.x, ap.z, 0.7, 0.7, ry, y, y + 0.95, { move: true, shot: true, cam: false });
+  const bp = toWorld(x, z, ry, bx, bz);
+  world.addOrientedBox(bp.x, bp.z, 1.7, 0.7, ry, y, y + 1.05, { move: true, shot: true, cam: false });
+  const tp = toWorld(x, z, ry, LX + 2.95, -1.8);
+  world.addOrientedBox(tp.x, tp.z, 0.85, 0.85, ry, y, y + 0.95, { move: true, shot: true, cam: false });
+  // plataforma da forja caminhável (o terreno ao redor pode estar mais baixo: degraus virtuais evitam o salto)
+  const platC = toWorld(x, z, ry, LX + 1.85, 0);
+  world.addOrientedFloor?.(platC.x, platC.z, 3.7, 5.9, ry, y - 0.02);
+  return { ...toWorld(x, z, ry, -4.5, 5.6), name: "Forja de Bracken", footprint: BLACKSMITH_FOOTPRINT, ry, buildingX: x, buildingZ: z };
 }
 
 function createMarket(scene, world, x = -15, z = -22, ry = 0) {
@@ -343,11 +606,61 @@ function createWatchTower(scene, world, x, z) {
   world.addStaticCollider(x, z, 3.38, 14);
 }
 
+// ---------------------------------------------------------------------------
+// Colocação sem sobreposição: toda construção consulta o registro de pegadas (placement.js).
+// Se o local sorteado estiver ocupado, usa o ponto livre mais próximo; se não houver, a construção é pulada.
+// ---------------------------------------------------------------------------
+const snapYaw = (r) => (((Math.round(r / (Math.PI / 2)) % 4) + 4) % 4) * (Math.PI / 2);
+
+function houseDims(seed) {
+  const r = makeRandom(seed * 40503 + 7);
+  return { width: 5.4 + r() * 2.4, depth: 4.8 + r() * 2.0 };
+}
+
+// Cria a casa no ponto livre mais próximo de base.x/z. center = (cx, cz) para manter a porta voltada ao centro.
+function placeHouse(scene, world, houses, base, center = null, search = 16) {
+  const dims = base.width && base.depth ? { width: base.width, depth: base.depth } : houseDims(base.seed);
+  const hw = dims.width / 2 + 0.7;
+  const hd = dims.depth / 2 + 1.0;
+  let ry = snapYaw(base.ry);
+  const spot = findSpot(base.x, base.z, hw, hd, ry, { world, maxRadius: search, maxSlope: 3.0 });
+  if (!spot) return null;
+  if (center) {
+    const ry2 = snapYaw(Math.atan2(center.x - spot.x, center.z - spot.z));
+    if (ry2 !== ry && canPlace(spot.x, spot.z, hw, hd, ry2)) ry = ry2;
+  }
+  const house = createHouse(scene, world, { ...base, x: spot.x, z: spot.z, ry, width: dims.width, depth: dims.depth });
+  reserve(spot.x, spot.z, hw, hd, ry, "house", base.id);
+  houses.push(house);
+  return house;
+}
+
+// Igreja: pegada do prédio + corredor da escadaria de acesso à frente da porta
+function reserveChurch(x, z, ry, id) {
+  const r = snapYaw(ry);
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  reserve(x, z, 3.4 + 0.7, 4.9 + 0.7, r, "church", id);
+  const sd = 4.9 + 3.6; // centro do corredor da escadaria, à frente da porta
+  reserve(x + sd * s, z + sd * c, 1.7, 3.6, r, "stairs", id + "-stairs", null, id);
+}
+
+function reserveBlacksmith(x, z, ry, id) {
+  const fp = BLACKSMITH_FOOTPRINT;
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  reserve(x + fp.cx * c + fp.cz * s, z - fp.cx * s + fp.cz * c, fp.hw, fp.hd, ry, "blacksmith", id);
+}
+
+const MARKET_FOOTPRINT = { hw: 3.2, hd: 2.9 };
+
 function createVillage(scene, world, village, houses) {
   const random = makeRandom(village.seed * 7919);
   const cx = village.x;
   const cz = village.z;
+  const center = { x: cx, z: cz };
   const well = createWell(scene, world, cx, cz);
+  reserve(cx, cz, 1.8, 1.8, 0, "well", `${village.id}-well`);
   const faceCenter = (x, z) => Math.atan2(cx - x, cz - z);
 
   // Chalés em anel, com a porta voltada para o poço.
@@ -366,44 +679,87 @@ function createVillage(scene, world, village, houses) {
   else if (village.kind === "market") workSlot = slots.pop();
   else if (village.kind === "farm") workSlot = slots.pop();
 
-  for (const slot of slots) {
-    houses.push(createHouse(scene, world, { id: `${village.id}-${houses.length}`, name: `Casa de ${village.name}`, x: slot.x, z: slot.z, ry: faceCenter(slot.x, slot.z), seed: village.seed * 31 + houses.length }));
-    points.home.push({ x: cx + Math.cos(slot.angle) * 9, z: cz + Math.sin(slot.angle) * 9 });
-  }
-
-  if (village.kind === "forge") {
-    points.work = createBlacksmith(scene, world, workSlot.x, workSlot.z, faceCenter(workSlot.x, workSlot.z));
-  } else if (village.kind === "market") {
-    points.work = createMarket(scene, world, workSlot.x, workSlot.z, faceCenter(workSlot.x, workSlot.z));
-  } else if (village.kind === "farm") {
-    const fx = cx + Math.cos(workSlot.angle) * 38;
-    const fz = cz + Math.sin(workSlot.angle) * 38;
-    createFarm(scene, world, fx, fz);
-    points.work = { x: fx, z: fz };
-    points.farmPath = [
-      { x: fx - 4.4, z: fz + 7.1 }, { x: fx + 4.4, z: fz + 7.1 },
-      { x: fx + 4.4, z: fz - 6.1 }, { x: fx - 4.4, z: fz - 6.1 },
-    ];
-  } else {
-    const tx = cx + 7;
-    const tz = cz - 8;
-    createWatchTower(scene, world, tx, tz);
-    points.patrol = [
-      { x: tx - 5.4, z: tz + 5.4 }, { x: tx + 5.4, z: tz + 5.4 },
-      { x: tx + 5.4, z: tz - 5.4 }, { x: tx - 5.4, z: tz - 5.4 },
-    ];
-  }
-
-  // capela entre dois chalés, com a porta voltada para o poço
+  // 1) pontos FIXOS primeiro (igreja no eixo cardeal e torre de vigia): as casas se acomodam ao redor deles.
   // A igreja só gira em passos de 90° (colisores alinhados aos eixos). Para a porta ficar EXATAMENTE
   // voltada para o poço, a capela é posta sobre o eixo cardeal mais próximo do ângulo sorteado.
   const rawChurchAngle = startAngle + Math.PI / count;
   const cardinal = Math.round(rawChurchAngle / (Math.PI / 2)) * (Math.PI / 2);
   const dirX = Math.round(Math.cos(cardinal));
   const dirZ = Math.round(Math.sin(cardinal));
-  const churchX = cx + dirX * 28;
-  const churchZ = cz + dirZ * 28;
-  points.church = createChurch(scene, world, churchX, churchZ, Math.atan2(-dirX, -dirZ), `Igreja de ${village.name}`, houses);
+  const churchRy = Math.atan2(-dirX, -dirZ);
+  let churchDist = 28;
+  for (let d = 28; d <= 40; d += 2) {
+    const px = cx + dirX * d;
+    const pz = cz + dirZ * d;
+    if (canPlace(px, pz, 4.1, 5.6, churchRy)) { churchDist = d; break; }
+  }
+  const churchX = cx + dirX * churchDist;
+  const churchZ = cz + dirZ * churchDist;
+  reserveChurch(churchX, churchZ, churchRy, `${village.id}-church`);
+
+  let tower = null;
+  if (village.kind === "watch") {
+    tower = findSpot(cx + 7, cz - 8, 4.1, 4.1, 0, { world, maxRadius: 10, step: 1.0, maxSlope: 3.5 }) || { x: cx + 7, z: cz - 8 };
+    reserve(tower.x, tower.z, 4.1, 4.1, 0, "tower", `${village.id}-tower`);
+  }
+
+  // 2) chalés do anel
+  for (const slot of slots) {
+    const house = placeHouse(scene, world, houses, {
+      id: `${village.id}-${houses.length}`,
+      name: `Casa de ${village.name}`,
+      x: slot.x,
+      z: slot.z,
+      ry: faceCenter(slot.x, slot.z),
+      seed: village.seed * 31 + houses.length,
+    }, center);
+    if (house) points.home.push({ x: cx + Math.cos(slot.angle) * 9, z: cz + Math.sin(slot.angle) * 9 });
+  }
+  if (points.home.length === 0) points.home.push({ x: cx + 9, z: cz });
+
+  // 3) construção de trabalho da vila
+  const fp = BLACKSMITH_FOOTPRINT;
+  if (village.kind === "forge") {
+    const ry = faceCenter(workSlot.x, workSlot.z);
+    const spot = findSpot(workSlot.x, workSlot.z, fp.hw, fp.hd, ry, { world, maxRadius: 18, maxSlope: 1.4, offset: { lx: fp.cx, lz: fp.cz } })
+      || findSpot(workSlot.x, workSlot.z, fp.hw, fp.hd, ry, { world, maxRadius: 24, maxSlope: 2.4, offset: { lx: fp.cx, lz: fp.cz } });
+    if (spot) {
+      reserveBlacksmith(spot.x, spot.z, ry, `${village.id}-forge`);
+      points.work = createBlacksmith(scene, world, spot.x, spot.z, ry);
+    }
+  } else if (village.kind === "market") {
+    const ry = faceCenter(workSlot.x, workSlot.z);
+    const spot = findSpot(workSlot.x, workSlot.z, MARKET_FOOTPRINT.hw, MARKET_FOOTPRINT.hd, ry, { world, maxRadius: 18, maxSlope: 1.6 });
+    if (spot) {
+      reserve(spot.x, spot.z, MARKET_FOOTPRINT.hw, MARKET_FOOTPRINT.hd, ry, "market", `${village.id}-market`);
+      points.work = createMarket(scene, world, spot.x, spot.z, ry);
+    }
+  } else if (village.kind === "farm") {
+    const fx0 = cx + Math.cos(workSlot.angle) * 38;
+    const fz0 = cz + Math.sin(workSlot.angle) * 38;
+    const spot = findSpot(fx0, fz0, 4.9, 7.6, 0, { world, maxRadius: 16, margin: 2.4, maxSlope: 2.6 });
+    const fx = spot ? spot.x : fx0;
+    const fz = spot ? spot.z : fz0;
+    if (spot) {
+      reserve(fx, fz, 4.9, 7.6, 0, "field", `${village.id}-field`);
+      createFarm(scene, world, fx, fz);
+    }
+    points.work = { x: fx, z: fz };
+    points.farmPath = [
+      { x: fx - 4.4, z: fz + 7.1 }, { x: fx + 4.4, z: fz + 7.1 },
+      { x: fx + 4.4, z: fz - 6.1 }, { x: fx - 4.4, z: fz - 6.1 },
+    ];
+  } else if (tower) {
+    createWatchTower(scene, world, tower.x, tower.z);
+    const tx = tower.x;
+    const tz = tower.z;
+    points.patrol = [
+      { x: tx - 5.4, z: tz + 5.4 }, { x: tx + 5.4, z: tz + 5.4 },
+      { x: tx + 5.4, z: tz - 5.4 }, { x: tx - 5.4, z: tz - 5.4 },
+    ];
+  }
+
+  points.church = createChurch(scene, world, churchX, churchZ, churchRy, `Igreja de ${village.name}`, houses);
 
   return { village, ...points };
 }
@@ -449,15 +805,29 @@ function createKingdomRoads(scene, world) {
   scene.add(mesh);
 }
 
+// Campos de cultivo criados em main.js: reservados aqui para nenhuma construção nascer em cima deles
+const CAPITAL_FIELDS = [
+  [-58, -14, 4, 8], [-74, 38, 3, 7], [88, -48, 3, 7], [-126, -42, 4, 8], [-92, -144, 4, 8],
+];
+
 export function createSettlement(scene, world) {
+  resetPlacement();
+  for (const [fx, fz, rows, cols] of CAPITAL_FIELDS) {
+    reserve(fx, fz, (rows * 1.8) / 2 + 1.8, (cols * 1.5) / 2 + 1.8, 0, "field", `field-${fx}-${fz}`);
+  }
   createRoad(scene, world);
   const well = createWell(scene, world);
+  reserve(5, -14, 1.8, 1.8, 0, "well", "caldera-well");
   const blacksmith = createBlacksmith(scene, world);
+  reserveBlacksmith(15, -27, 0, "caldera-forge");
   const market = createMarket(scene, world);
+  reserve(-15, -22, MARKET_FOOTPRINT.hw, MARKET_FOOTPRINT.hd, 0, "market", "caldera-market");
   const gate = createGate(scene, world);
+  reserve(0, -48, 5.6, 1.4, 0, "gate", "caldera-gate");
+  reserveChurch(-14, -8, 0, "caldera-church");
 
   const houses = [];
-  const house = (x, z, ry, seed, extra = {}) => houses.push(createHouse(scene, world, { id: `caldera-${houses.length}`, x, z, ry, seed, ...extra }));
+  const house = (x, z, ry, seed, extra = {}) => placeHouse(scene, world, houses, { id: `caldera-${houses.length}`, x, z, ry, seed, ...extra }, null, 14);
   house(25, -14, -Math.PI / 2, 101, { type: "inn", name: "Pousada de Caldera", price: 5, width: 7.4, depth: 6.4 });
   house(26, -31, -Math.PI / 2, 102, { name: "Casa de Caldera" });
   house(-24, -28, Math.PI / 2, 103, { name: "Casa de Caldera" });

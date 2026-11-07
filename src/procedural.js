@@ -1,3 +1,4 @@
+import { canPlace, reserve, slopeSpan, BUILDING_GAP } from "./placement.js";
 import * as THREE from "three";
 import { distanceToRoad, VILLAGES } from "./kingdom.js";
 import { NPC } from "./npc.js";
@@ -292,6 +293,9 @@ export function generateCity(
       bx = _cityCenter.x + Math.cos(theta) * r;
       bz = _cityCenter.z + Math.sin(theta) * r;
       if (_isAreaClearForBuilding(bx, bz, placedBuildings, world, _cityCenter, settlement)) {
+        // registro global de pegadas: nada de construção dentro de outra (casas, igreja, ferraria, campos...)
+        const yaw = Math.atan2(_cityCenter.x - bx, _cityCenter.z - bz);
+        if (!canPlace(bx, bz, 3.7, 3.3, yaw, BUILDING_GAP) || (world && slopeSpan(world, bx, bz, 3.1, 2.7, yaw) > 2.6)) continue;
         foundSpot = true;
         break;
       }
@@ -324,6 +328,7 @@ export function generateCity(
     }
 
     placedBuildings.push({ x: bx, z: bz, y: groundY, ry: faceCenterYaw, type: bType });
+    reserve(bx, bz, 3.7, 3.3, faceCenterYaw, "house", `city-${placedBuildings.length}`);
   }
 
   // Condensação Estática: Funde todas as 20 casas e telhados em 1 único Mesh de 1 Draw Call
