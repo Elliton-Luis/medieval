@@ -1122,9 +1122,10 @@ export class GameUI {
    * Teclas globais de tela, em fase de CAPTURA (nenhum outro handler consegue engolir o evento e funcionam com menu,
    * diálogo ou ponteiro travado):
    *   F7 ou N  -> limpa todos os avisos (o ativo e a pilha)
-   *   F9 ou P  -> TELA LIMPA para capturas: some tudo que não é o mundo 3D (HUD, avisos, vinheta, menus, legendas)
+   *   F9 ou Z  -> TELA LIMPA para capturas: some tudo que não é o mundo 3D (HUD, avisos, vinheta, menus, legendas)
    *   ESC      -> sai da tela limpa (sem abrir o menu de pausa)
-   * Em notebooks as F-teclas costumam exigir Fn; por isso N e P existem como alternativas.
+   * Em notebooks as F-teclas costumam exigir Fn; por isso N e Z existem como alternativas. (NÃO usar P/O/T/A/H/I/E/F/S/C:
+   * são as letras dos códigos de cheat POTATO e CHIEFS, digitá-los acionaria a tela limpa.)
    */
   _bindScreenKeys() {
     window.addEventListener("keydown", (event) => {
@@ -1142,7 +1143,7 @@ export class GameUI {
       if (key === "F7" || key === "KeyN") {
         event.preventDefault();
         this.clearToasts();
-      } else if (key === "F9" || key === "KeyP") {
+      } else if (key === "F9" || key === "KeyZ") {
         event.preventDefault();
         this.setCleanScreen(!document.body.classList.contains("clean-screen"));
       }

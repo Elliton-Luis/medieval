@@ -7,6 +7,7 @@
 //  - Motor de conversa: perguntas prontas, respostas por ofício/humor/confiança/fase/diário, sem repetir.
 //  - Custo por frame ≈ 0: um timer de 1 s checa o dia; DOM só quando o menu abre.
 // ============================================================================
+import { getWorldSeed, getWorldChaos, worldRand } from "./worldgen.js";
 import { portraitFor, visualKey } from "./npcPortrait.js";
 
 const KEY = "rex-mundi-npclife";
@@ -21,8 +22,9 @@ function fresh() {
     dead: [], // { name, role, day, cause, village }
     sick: null, // { name, role, sinceDay, deathDay, cured }
     profiles: {}, // por nome
-    flags: { shortageUntil: 0, fightPair: null, fightDay: 0, funeralFor: null },
-    player: { kills: 0, cures: 0, charity: 0, lastVictim: null, lastKillDay: 0 },
+    flags: { shortageUntil: 0, fightPair: null, fightDay: 0, funeralFor: null, world: {} },
+    player: { kills: 0, cures: 0, charity: 0, lastVictim: null, lastKillDay: 0, diary: [] },
+    rumors: [],
   };
 }
 
@@ -43,7 +45,25 @@ function hash(str) {
   }
   return h >>> 0;
 }
-const rnd = Math.random;
+// Eventos do mundo (mortos do dia 1, doença, boatos, brigas) usam um fluxo DETERMINÍSTICO por seed+dia (withWorldRng):
+// o mesmo mundo conta a mesma história, e mundos diferentes contam histórias diferentes. Fora disso (falas, efeitos)
+// continua Math.random, para a conversa não repetir.
+let _evt = null;
+const rnd = () => (_evt ? _evt() : Math.random());
+function withWorldRng(tag, fn) {
+  let a = (getWorldSeed() ^ Math.imul(tag | 0, 2654435761)) >>> 0;
+  _evt = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  try {
+    return fn();
+  } finally {
+    _evt = null;
+  }
+}
 const choice = (arr) => arr[(rnd() * arr.length) | 0];
 const day = () => G().WorldDecay?.daysPassed ?? 1;
 const phaseOf = (d) => (d <= 2 ? "war" : d <= 6 ? "adapt" : "routine");
@@ -68,7 +88,7 @@ function findNPC(name) {
 function isCivilian(n) {
   if (!n || n.hostile || n.isBandit || n.temporary) return false;
   const rk = n.roleKey;
-  if (!["guard", "smith", "merchant", "farmer", "villager", "priest", "beggar"].includes(rk)) return false;
+  if (!["guard", "smith", "merchant", "baker", "farmer", "villager", "priest", "beggar"].includes(rk)) return false;
   const ud = n.root?.userData || {};
   return !ud.isMissionDebtor && !ud.isBountyBoss;
 }
@@ -93,8 +113,8 @@ function placeList() {
 // ---------------------------------------------------------------------------
 // perfis
 // ---------------------------------------------------------------------------
-const AGE_RANGE = { guard: [24, 48], smith: [34, 58], merchant: [32, 60], farmer: [26, 62], villager: [19, 54], priest: [48, 74], beggar: [44, 76] };
-const BASE_TRUST = { guard: 22, smith: 14, merchant: 26, farmer: 24, villager: 24, priest: 34, beggar: 18 };
+const AGE_RANGE = { baker: [30, 58], guard: [24, 48], smith: [34, 58], merchant: [32, 60], farmer: [26, 62], villager: [19, 54], priest: [48, 74], beggar: [44, 76] };
+const BASE_TRUST = { baker: 30, guard: 22, smith: 14, merchant: 26, farmer: 24, villager: 24, priest: 34, beggar: 18 };
 
 function profile(npc) {
   let p = state.profiles[npc.name];
@@ -111,6 +131,8 @@ function profile(npc) {
       met: 0,
       lastTalkDay: 0,
       bio: null,
+      flags: {},
+      layerBoost: 0,
     };
   }
   return p;
@@ -210,6 +232,9 @@ function killStory(npc, cause) {
 }
 
 function seedDayOne() {
+  withWorldRng(101, seedDayOneInner);
+}
+function seedDayOneInner() {
   state.seeded = true;
   const pool = allNPCs().filter((n) => n.alive && isCivilian(n) && ["farmer", "villager", "beggar"].includes(n.roleKey));
   // 2 mortos "de ontem" (reais): somem permanentemente
@@ -343,18 +368,23 @@ function rollEvents(d) {
   };
   const forced = eligible.find((o) => o.w >= 99);
   (forced || pickOne()).f();
-  if (!forced && d >= 2 && rnd() < 0.4) pickOne().f();
+  if (!forced && d >= 2 && rnd() < 0.25 + 0.5 * getWorldChaos()) pickOne().f(); // caos: mais ou menos dias com 2 eventos
 }
 
 function maybeStartSickness(d) {
   if (state.sick) return;
-  if (d === 2 || (d > 2 && rnd() < 0.3)) startSickness(d);
+  // CAOS: a primeira doença pode demorar até 3 dias a mais e as seguintes ficam mais (ou menos) frequentes
+  const chaos = getWorldChaos();
+  const firstDay = 2 + Math.floor(worldRand(6001) * chaos * 3);
+  if (d === firstDay || (d > firstDay && rnd() < 0.15 + 0.3 * chaos)) startSickness(d);
 }
 
 function processDay(d) {
-  progressSickness(d);
-  maybeStartSickness(d);
-  rollEvents(d);
+  withWorldRng(d * 7919 + 13, () => {
+    progressSickness(d);
+    maybeStartSickness(d);
+    rollEvents(d);
+  });
   // luto/esquecimento: entradas antigas saem
   for (const p of Object.values(state.profiles)) p.diary = p.diary.filter((e) => d - e.day <= 12);
   persist();
@@ -469,6 +499,11 @@ function context(npc) {
     civilians: civilians(),
     findNPC,
     say: (arr) => recentNoRepeat(p, arr),
+    coins: G().player?.coins ?? 0,
+    potions: G().player?.potions ?? 0,
+    hay: G().PlayerInventory?.hay ?? 0,
+    flagDays: (k) => (p.flags && p.flags[k] !== undefined ? d - p.flags[k] : null),
+    wflagDays: (k) => (state.flags.world && state.flags.world[k] !== undefined ? d - state.flags.world[k] : null),
   };
 }
 
@@ -484,6 +519,116 @@ function setHooks(list) {
   _hooks = list || [];
   _hookData.clear();
   for (const h of _hooks) _hookData.set(h.id, h.data);
+}
+
+// ---------------------------------------------------------------------------
+// OPÇÕES DE RESPOSTA: lista ativa da fala atual, testes de carisma e consequências persistentes
+// ---------------------------------------------------------------------------
+let _opts = [];
+function setOptions(list) {
+  _opts = list || [];
+}
+function optionQuestions() {
+  const q = _opts.map((o, i) => ({ id: "o:" + i, label: o.label + (o.test ? ` [CAR ${o.test.cha}]` : ""), kind: "opt" }));
+  q.push({ id: "o:ok", label: _opts.some((o) => o.test) ? "Mudar de assunto" : "Entendo.", kind: "neutral" });
+  return q;
+}
+function currentQuestions() {
+  return _opts.length ? optionQuestions() : buildQuestions();
+}
+const clamp100 = (v) => Math.max(0, Math.min(100, v));
+
+function applyEffects(npc, fx, ctx) {
+  const out = [];
+  if (!fx) return out;
+  const p = profile(npc);
+  const pl = G().player;
+  if (fx.trust) { p.trust = clamp100(p.trust + fx.trust); out.push(`Confiança ${fx.trust > 0 ? "+" : ""}${fx.trust}`); }
+  if (fx.evil) { G().addEvil?.(fx.evil, "Diálogo"); out.push(`+${fx.evil}% Maldade`); }
+  if (fx.good) { G().addGood?.(fx.good, "Diálogo"); out.push(`-${fx.good}% Maldade`); }
+  if (fx.coins && pl) { pl.coins = Math.max(0, (pl.coins || 0) + fx.coins); out.push(`${fx.coins > 0 ? "+" : ""}${fx.coins} moedas`); }
+  if (fx.items) {
+    const inv = G().PlayerInventory;
+    if (fx.items.hay && inv) { inv.hay = Math.max(0, (inv.hay || 0) + fx.items.hay); out.push(`${fx.items.hay > 0 ? "+" : ""}${fx.items.hay} feno`); }
+    if (fx.items.potions && pl) { pl.potions = Math.max(0, (pl.potions || 0) + fx.items.potions); out.push(`${fx.items.potions > 0 ? "+" : ""}${fx.items.potions} poção`); }
+    if (fx.items.candles && G().candle) { G().candle.count = Math.max(0, (G().candle.count || 0) + fx.items.candles); out.push(`${fx.items.candles > 0 ? "+" : ""}${fx.items.candles} vela`); }
+  }
+  if (fx.mood || fx.diary) addDiary(npc, "choice", fx.diary || "conversa marcante", fx.mood || 0);
+  if (fx.diary) {
+    state.player.diary.push({ day: day(), text: `${npc.name}: ${fx.diary}` });
+    if (state.player.diary.length > 40) state.player.diary.shift();
+  }
+  if (fx.flag) p.flags[fx.flag] = day();
+  if (fx.wflag) state.flags.world[fx.wflag] = day();
+  if (fx.event === "cure_sick") {
+    const target = npc.sick ? npc : state.sick ? findNPC(state.sick.name) : null;
+    if (target) { NpcLife.onCured(target); out.push(`${target.name} curado(a)`); }
+  } else if (fx.event && typeof fx.event === "object") {
+    pushEvent(fx.event.type, fx.event.text, fx.event.names || [], fx.event.mood || 0);
+  }
+  if (fx.unlock) {
+    if (fx.unlock.layer) { p.layerBoost = (p.layerBoost || 0) + 1; out.push("Ele(a) se abriu um pouco mais"); }
+    if (fx.unlock.rumor) { state.rumors.push(fx.unlock.rumor); if (state.rumors.length > 20) state.rumors.shift(); pushEvent("rumor", fx.unlock.rumor, [], -0.1); out.push("Novo boato"); }
+    if (fx.unlock.discount) { p.flags.discount = day(); out.push("Desconto conquistado"); }
+  }
+  return out;
+}
+
+function packResult(npc, r, forceEnd = false) {
+  const p = profile(npc);
+  const t = trustEff(npc);
+  const expr = expression(npc);
+  return {
+    n: r.n || "",
+    t: r.t || "",
+    extra: r.extra || null,
+    end: Boolean(forceEnd || r.end),
+    silent: Boolean(r.silent),
+    trust: t,
+    trustLabel: trustLabel(t),
+    mood: moodLabel(npc),
+    portrait: portraitFor(npc, expr, p.age),
+    questions: currentQuestions(),
+  };
+}
+
+function chooseOption(npc, qid) {
+  if (qid === "o:ok") {
+    setOptions([]);
+    setHooks([]);
+    return packResult(npc, { silent: true });
+  }
+  const opt = _opts[Number(qid.slice(2))];
+  if (!opt) { setOptions([]); return packResult(npc, { silent: true }); }
+  const ctx = context(npc);
+  let branch = opt;
+  let note = "";
+  if (opt.test) {
+    const chance = Math.max(0.05, Math.min(0.95, 0.5 + (ctx.cha - opt.test.cha) * 0.07));
+    const ok = rnd() < chance;
+    branch = ok ? opt.test.onSuccess : opt.test.onFail;
+    note = ok ? "[Teste de Carisma: sucesso]" : "[Teste de Carisma: falhou]";
+  }
+  const reply = Array.isArray(branch.reply) ? choice(branch.reply) : branch.reply;
+  const bits = applyEffects(npc, branch.effects || opt.effects, ctx);
+  if (bits.length) G().ui?.showToast?.(bits.join(" · "), 3500);
+  state.player.diary.push({ day: day(), text: `${npc.name}: "${opt.label}"` });
+  if (state.player.diary.length > 40) state.player.diary.shift();
+  setOptions([]);
+  setHooks([]);
+  let extra = null;
+  const nextId = branch.next || opt.next;
+  const endNow = Boolean(branch.effects?.end || opt.effects?.end || branch.end || opt.end);
+  if (nextId && !endNow) {
+    const c2 = context(npc);
+    const line = Stories.lineById(nextId, c2);
+    if (line) {
+      extra = { n: line.n || "", t: line.t };
+      setOptions(Stories.filterOptions(c2, line.options || []));
+    }
+  }
+  saveSoon();
+  return packResult(npc, { n: note || (reply ? "" : ""), t: reply || "", extra, end: endNow });
 }
 
 export const NpcLife = {
@@ -554,6 +699,7 @@ export const NpcLife = {
     setHooks([]);
     const ctx = context(npc);
     const first = Stories.greeting(ctx);
+    setOptions(Stories.filterOptions(ctx, first.options || []));
     const expr = expression(npc);
     const t = trustEff(npc);
     return {
@@ -564,10 +710,11 @@ export const NpcLife = {
       trustLabel: trustLabel(t),
       portrait: portraitFor(npc, expr, p.age),
       greeting: first,
-      questions: buildQuestions(),
+      questions: currentQuestions(),
     };
   },
   ask(npc, qid) {
+    if (qid.startsWith("o:")) return chooseOption(npc, qid);
     const p = profile(npc);
     const ctx = context(npc);
     const data = _hookData.get(qid);
@@ -580,19 +727,35 @@ export const NpcLife = {
       if (r.trustBonus) p.trust = Math.min(100, p.trust + r.trustBonus);
     } else p.trust = Math.min(100, p.trust + 1);
     p.lastTalkDay = ctx.day;
-    setHooks(qid === "bye" ? [] : Stories.makeHooks(ctx, r.topics || []));
+    const opts = qid === "bye" ? [] : Stories.filterOptions(ctx, r.options || []);
+    setOptions(opts);
+    setHooks(qid === "bye" || opts.length ? [] : Stories.makeHooks(ctx, r.topics || []));
     saveSoon();
-    const t = trustEff(npc);
-    const expr = expression(npc);
-    return { n: r.n || "", t: r.t, trust: t, trustLabel: trustLabel(t), mood: moodLabel(npc), portrait: portraitFor(npc, expr, p.age), questions: qid === "bye" ? buildQuestions().slice(-1) : buildQuestions() };
+    const res = packResult(npc, r);
+    if (qid === "bye") res.questions = buildQuestions().slice(-1);
+    return res;
   },
   // estado atual do cabeçalho (sem saudação): humor, confiança, retrato e perguntas
   status(npc) {
     const p = profile(npc);
     const t = trustEff(npc);
     const expr = expression(npc);
-    return { age: p.age, mood: moodLabel(npc), expr, trust: t, trustLabel: trustLabel(t), portrait: portraitFor(npc, expr, p.age), questions: Stories ? buildQuestions() : [] };
+    return { age: p.age, mood: moodLabel(npc), expr, trust: t, trustLabel: trustLabel(t), portrait: portraitFor(npc, expr, p.age), questions: Stories ? currentQuestions() : [] };
   },
+  // falas ANTIGAS (interactions.js): se o texto for reconhecido, ganham opções próprias
+  optionsForText(npc, text) {
+    if (!Stories || !text) { setOptions([]); return null; }
+    const ctx = context(npc);
+    const opts = Stories.filterOptions(ctx, Stories.optionsForText(ctx, text) || []);
+    setOptions(opts);
+    if (opts.length) setHooks([]);
+    return opts.length ? optionQuestions() : null;
+  },
+  discountMult(npc) {
+    const p = npc ? state.profiles[npc.name] : null;
+    return p?.flags?.discount !== undefined && day() - p.flags.discount <= 12 ? 0.88 : 1;
+  },
+  hasFlag(npc, key) { return Boolean(state.profiles[npc?.name]?.flags?.[key] !== undefined); },
   portrait(npc) {
     return portraitFor(npc, expression(npc), profile(npc).age);
   },
@@ -628,6 +791,8 @@ export const NpcLife = {
     clearSick(npc);
     if (state.sick && state.sick.name === npc.name) state.sick.cured = true, state.sick = null;
     state.player.cures++;
+    profile(npc).flags.curedMe = day();
+    state.flags.world.curedSomeone = day();
     addDiary(npc, "cured", "o viajante me curou", 0.8);
     pushEvent("cured", `${npc.name} se recuperou da peste graças a um forasteiro generoso.`, [], 0.4);
     const p = profile(npc);
@@ -636,6 +801,29 @@ export const NpcLife = {
   onPlayerHelped() {
     state.player.charity++;
     saveSoon();
+  },
+  // Doação de comida (pão/maçã): confiança, diário do NPC e fofoca dos vizinhos. Devolve true na 1ª doação do dia
+  // para aquela pessoa (só aí conta como caridade e bondade: sem exploit).
+  onDonated(npc, kind) {
+    if (!npc) return false;
+    const p = profile(npc);
+    const first = p.flags.donatedDay !== day();
+    p.flags.donatedDay = day();
+    p.trust = Math.min(100, p.trust + (first ? 4 : 1));
+    addDiary(npc, "donated", kind === "bread" ? "me deu um pão" : "me deu uma maçã", 0.5);
+    if (first) {
+      state.player.charity++;
+      let n = 0;
+      for (const o of allNPCs()) {
+        if (n >= 2) break;
+        if (o !== npc && o.alive && isCivilian(o) && (o.x - npc.x) ** 2 + (o.z - npc.z) ** 2 < 30 * 30) {
+          addDiary(o, "gossip", `viu o forasteiro dividir comida com ${npc.name}`, 0.2);
+          n++;
+        }
+      }
+    }
+    saveSoon();
+    return first;
   },
   getState: () => state,
   trustLabel,

@@ -151,6 +151,23 @@ const MOD = {
   eclipse: ["O sol sangrou. Nunca vi nada assim em toda a minha vida.", "Esse eclipse é um mau presságio, todo mundo sabe.", "Os animais ficam quietos quando o céu escurece assim."],
   decayMid: ["As plantações murcham mais rápido que o normal; algo está errado.", "O ar está pesado nos últimos dias. Dizem que é a corrupção.", "As águas do poço mudaram de gosto, e ninguém quer falar disso."],
   decayHigh: ["A podridão está em tudo: nas árvores, no pão, no olhar das pessoas.", "O mundo está apodrecendo e todo mundo finge não ver.", "Não sobra muito tempo, sabe? As coisas estão se desfazendo."],
+  fHelped: ["Ainda penso no que você fez por mim. Não esqueço quem me ajuda.", "Você me estendeu a mão quando ninguém estendeu. Anotei isso no coração.", "Devo muito a você. Se precisar, fale."],
+  fDebtPaid: ["Você pagou minha dívida... durmo melhor desde então.", "Nunca mais passei a noite em claro por causa daquela dívida. Obrigado."],
+  fThreatened: ["Prefiro falar pouco com você depois do que aconteceu.", "Não quero confusão. Diga o que quer e siga.", "Mantenho distância. Você me assustou da outra vez."],
+  fBetrayed: ["Você me traiu. Não tenho mais nada a dizer.", "Contei um segredo a você e você o usou contra mim."],
+  fExtorted: ["Ainda me lembro de como você me arrancou aquele dinheiro."],
+  fSilenced: ["Prometi ficar calado e vou ficar. Mas não gosto disso."],
+  fKeptSecret: ["Você guardou meu segredo. Isso vale mais que moedas.", "Poucos sabem o que eu te contei. Que continue assim."],
+  fPromisedPotion: ["Você prometeu trazer o remédio. Estou esperando, hein.", "Lembra da poção? O tempo está acabando."],
+  fOwesFavor: ["Lembre-se: eu devo um favor a você. Pode cobrar."],
+  fBlessed: ["O padre rezou por você, e eu também."],
+  wCured: ["Dizem que um forasteiro curou um doente com uma poção. A vila toda comenta.", "Ouvi falar de alguém que curou a peste de um vizinho. Milagre, dizem."],
+  wGaveFood: ["Dizem que alguém dividiu comida com quem passava fome. Ainda existe bondade."],
+  wDenounced: ["Alguém andou denunciando vizinhos à guarda. Agora ninguém se olha direito.", "Soube que houve denúncia. A vila anda desconfiada."],
+  wExtorted: ["Dizem que há alguém chantageando gente por aí. Tranco a porta duas vezes."],
+  wCharity: ["O padre elogiou as doações de um viajante. Disseram que fez bem a muita gente."],
+  wQuarantine: ["Houve quem exigisse afastar um doente da vila. A vila ficou dividida."],
+  wMediated: ["Os briguentos fizeram as pazes, e dizem que foi um forasteiro quem conseguiu."],
   capital: ["Caldera sempre foi barulhenta, mas agora o barulho é de medo.", "Aqui na capital as paredes ainda protegem, mas por quanto tempo?"],
   village: ["Na vila, a gente se conhece pelo nome e pelas dívidas.", "Aqui é um lugar pequeno; qualquer segredo vira praça em um dia."],
   church: ["O sino da capela marca o ritmo do meu dia.", "Com a igreja aqui perto, a gente dorme um pouco mais seguro."],
@@ -291,6 +308,24 @@ function modifiers(ctx) {
   if (ctx.eclipse) add(7, "eclipse");
   if (ctx.decay > 0.6) add(3, "decayHigh");
   else if (ctx.decay > 0.3) add(2, "decayMid");
+  // consequências lembradas (flags do NPC e do mundo)
+  if (ctx.flagDays("curedMe") !== null || ctx.flagDays("dreamHelp") !== null || ctx.flagDays("willHelpFarm") !== null) add(7, "fHelped");
+  if (ctx.flagDays("debtPaid") !== null) add(7, "fDebtPaid");
+  if (ctx.flagDays("threatened") !== null) add(8, "fThreatened");
+  if (ctx.flagDays("betrayed") !== null) add(9, "fBetrayed");
+  if (ctx.flagDays("extorted") !== null) add(5, "fExtorted");
+  if (ctx.flagDays("silenced") !== null) add(4, "fSilenced");
+  if (ctx.flagDays("keptSecret") !== null) add(6, "fKeptSecret");
+  if (ctx.flagDays("promisedPotion") !== null && ctx.sickOther) add(6, "fPromisedPotion");
+  if (ctx.flagDays("owesFavor") !== null) add(4, "fOwesFavor");
+  if (ctx.flagDays("blessed") !== null) add(2, "fBlessed");
+  if (ctx.wflagDays("curedSomeone") !== null) add(4, "wCured");
+  if (ctx.wflagDays("gaveFood") !== null) add(3, "wGaveFood");
+  if (ctx.wflagDays("denounced") !== null) add(4, "wDenounced");
+  if (ctx.wflagDays("extorted") !== null) add(4, "wExtorted");
+  if (ctx.wflagDays("charityDone") !== null) add(3, "wCharity");
+  if (ctx.wflagDays("quarantine") !== null) add(3, "wQuarantine");
+  if (ctx.wflagDays("mediated") !== null) add(3, "wMediated");
   if (ctx.nearChurch) add(1, "church");
   if (ctx.nearGate) add(1, "gate");
   if (ctx.guardsNear) add(1, "guards");
@@ -492,6 +527,7 @@ function unlockedLayer(ctx) {
   if (t >= 28 || talks >= 3) L = 2;
   if (t >= 52 || (ctx.cha >= 13 && talks >= 3 && t >= 35)) L = 3;
   if (t >= 76 && talks >= 6) L = 4;
+  L = Math.min(4, L + (ctx.p.layerBoost || 0));
   if (ctx.evil > 65 && L > 1) L -= 1;
   return L;
 }
@@ -685,16 +721,24 @@ const GREET_TIME = {
 function greeting(ctx) {
   const p = ctx.p;
   const first = (p.met || 0) <= 1;
-  if (ctx.selfSick) return { n: pick(GEST_SICK), t: "Coff... viajante... me perdoe, não estou bem." };
+  if (ctx.selfSick) return { n: pick(GEST_SICK), t: "Coff... viajante... me perdoe, não estou bem.", options: OPTS.selfSick(ctx) };
   let t;
-  if (ctx.cultRobe || ctx.wanted) t = ctx.say(["Eu... não quero problemas. Diga logo o que quer.", "*recua um passo* Fale baixo. O que quer de mim?", "Não sei quem você é e prefiro não saber. Seja breve."]);
+  let flagged = null;
+  if (ctx.flagDays("betrayed") !== null) { t = ctx.say(MOD.fBetrayed); flagged = "suspicious"; }
+  else if (ctx.flagDays("threatened") !== null) { t = ctx.say(["*vira o rosto* ...O que você quer agora?", "Ah. É você. Seja breve."].concat(MOD.fThreatened)); flagged = "suspicious"; }
+  else if (ctx.flagDays("debtPaid") !== null || ctx.flagDays("curedMe") !== null) t = ctx.say(["*sorri largo* Meu benfeitor! Que bom te ver!", "Você! Eu nunca esqueço quem me ajudou. Chegue."]);
+  else if (ctx.flagDays("keptSecret") !== null) t = ctx.say(["Ah, o guardador de segredos. Entre, entre.", "Você, de novo. Gosto de ver você por aqui."]);
+  else if (ctx.cultRobe || ctx.wanted) t = ctx.say(["Eu... não quero problemas. Diga logo o que quer.", "*recua um passo* Fale baixo. O que quer de mim?", "Não sei quem você é e prefiro não saber. Seja breve."]);
   else if (ctx.evil > 70 && ctx.trust < 40) t = ctx.say(["Você... ouvi coisas ruins sobre você. Seja breve.", "Não sei o que você fez, mas dizem que fez. Fale logo.", "Pelo menos ainda fala comigo. Diga, antes que mude de ideia."]);
   else if (ctx.templar) t = ctx.say(["Cavaleiro! Que bom ver alguém jurado a algo bom neste reino.", "Saudações, templário. A cruz no seu peito me dá algum alívio.", "Bem-vindo, senhor. Que Deus guie sua espada."]);
   else if (first) t = (R() < 0.45 ? ctx.say(GREET_TIME[ctx.timeBucket]) + " " : "") + ctx.say(FIRST_MEET[ctx.k] || FIRST_MEET.commoner);
   else if (ctx.trust >= 60) t = ctx.say(["Ah, você de novo! Que bom. Senta, conta como andam as coisas.", "Meu amigo! Sorte te encontrar. O que há de novo?", "Eu estava justamente pensando em você. Chegue mais."]);
   else t = ctx.say(["De novo por aqui? Hm. Fale.", "Voltou. Diga, no que posso ajudar?", "Sim? O que deseja agora?", ctx.say(GREET_TIME[ctx.timeBucket])]);
   if (!first && ctx.scared && R() < 0.4) t += " " + pick(MOD.scared);
-  return { n: gestureFor(ctx), t: style(ctx, t) };
+  const out = { n: gestureFor(ctx), t: style(ctx, t) };
+  if (flagged || ctx.cultRobe || ctx.wanted || (ctx.evil > 70 && ctx.trust < 40)) out.options = OPTS.suspicious(ctx);
+  else if (ctx.templar && first) out.options = OPTS.templarGreet(ctx);
+  return out;
 }
 
 const BYE = {
@@ -716,6 +760,263 @@ function byeLine(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// OPÇÕES DE RESPOSTA (cada fala pode trazer as suas, com consequências próprias)
+//   { label, reply: string|string[], effects?, requires?, test?, next?, end? }
+//   effects: { trust, evil, good, coins, items:{hay,potions,candles}, mood, flag, wflag,
+//              event:{type,text,names,mood}|"cure_sick", diary, unlock:{layer,rumor,discount}, end }
+//   requires: { cha, coins, potions, hay, evilBelow, evilAbove, templar, cultRobe, noCultRobe,
+//               hours:[a,b], trustAtLeast, trustBelow, flag, noFlag, wflag, sickOther, hungry }
+//   test: { cha: dificuldade, onSuccess:{reply,effects,next}, onFail:{reply,effects,next} }  (CAR vs dificuldade)
+//   next: id de outra fala (LINES) que o NPC diz em seguida, com as próprias opções.
+// Sempre há uma saída neutra ("Entendo." / "Mudar de assunto") que volta ao menu normal, sem consequência.
+// ---------------------------------------------------------------------------
+const O = (label, reply, effects = null, extra = {}) => ({ label, reply, effects, ...extra });
+
+function meets(c, r) {
+  if (!r) return true;
+  if (r.cha !== undefined && c.cha < r.cha) return false;
+  if (r.coins !== undefined && c.coins < r.coins) return false;
+  if (r.potions !== undefined && c.potions < r.potions) return false;
+  if (r.hay !== undefined && c.hay < r.hay) return false;
+  if (r.evilBelow !== undefined && c.evil >= r.evilBelow) return false;
+  if (r.evilAbove !== undefined && c.evil <= r.evilAbove) return false;
+  if (r.templar && !c.templar) return false;
+  if (r.cultRobe && !c.cultRobe) return false;
+  if (r.noCultRobe && c.cultRobe) return false;
+  if (r.hours) { const [a, b] = r.hours; const h = c.hour; if (a <= b ? !(h >= a && h < b) : !(h >= a || h < b)) return false; }
+  if (r.trustAtLeast !== undefined && c.trust < r.trustAtLeast) return false;
+  if (r.trustBelow !== undefined && c.trust >= r.trustBelow) return false;
+  if (r.flag && c.flagDays(r.flag) === null) return false;
+  if (r.noFlag && c.flagDays(r.noFlag) !== null) return false;
+  if (r.wflag && c.wflagDays(r.wflag) === null) return false;
+  if (r.sickOther && !c.sickOther) return false;
+  if (r.hungry && !c.hungry) return false;
+  return true;
+}
+export function filterOptions(ctx, raw) {
+  return (raw || []).filter((o) => meets(ctx, o.requires));
+}
+
+const who = (c, d) => d?.names?.[0] || c.dead[0]?.name || "ele";
+const SICK_NAME = (c) => (c.sickOther ? c.sickOther.name : c.selfSick ? c.npc.name : "o doente");
+
+const OPTS = {
+  dead: (c, d) => [
+    O("Meus pêsames.", ["Obrigado. Poucos dizem isso sem pressa.", "...Obrigado. Faz bem ouvir.", "É bom saber que alguém notou."], { trust: 3, mood: 0.2, diary: `o viajante me deu os pêsames por ${who(c, d)}` }),
+    O("Era importante pra você?", ["Era. Mais do que deixei transparecer.", "Era família, de um jeito ou de outro."], { trust: 2 }, { next: "dead_detail" }),
+    O("Ele devia dinheiro a alguém?", ["Devia, mas não é hora de cobrar de defunto.", "Todo mundo deve. Quem morreu, ao menos descansa."], { trust: -1, flag: "gossipDead" }),
+    ...(c.cultNear ? [O("Foi obra do culto?", ["Há quem jure que sim. Eu só sei que vi gente de máscara perto da casa dele.", "Não posso afirmar. Mas a coincidência cheira mal."], { trust: 1, unlock: { rumor: `Dizem que a morte de ${who(c, d)} teve dedo do culto.` } })] : []),
+  ],
+  deadhow: (c, d) => [
+    O("Posso ajudar a família?", ["Se puder... qualquer moeda ajuda a pagar o enterro.", "Você faria isso? Que Deus lhe pague."], { coins: -5, good: 2, trust: 4, mood: 0.3, diary: "o viajante ajudou a família do falecido", wflag: "charityDone" }, { requires: { coins: 5 } }),
+    O("Quem fez isso vai pagar.", ["Não prometa o que não pode cumprir... mas obrigado por dizer.", "Promessa de vingança dá raiva e esperança, tudo junto."], { trust: 2, flag: "vengeancePromised", event: { type: "vengeance", text: "Um forasteiro jurou vingar a morte de um morador.", names: [], mood: 0.1 } }),
+    O("Isso é só mais um número.", ["Pra você, talvez. Pra gente, é o nome de alguém.", "Frio. Mas é isso mesmo que a guerra faz com a gente."], { trust: -4, evil: 1, mood: -0.2 }),
+  ],
+  cult: (c) => [
+    O("Onde exatamente?", ["Perto de uma casa abandonada, ao norte; à noite, só à noite.", "Na estrada velha. Não vá sozinho."], { trust: 1, unlock: { rumor: "Mascarados foram vistos nas ruínas ao redor da vila, sempre à noite." } }),
+    O("Vou investigar isso.", ["Corajoso, ou tolo. Se voltar, me conte.", "Que Deus guie seus passos. Leve luz."], { trust: 2, flag: "willInvestigate", diary: "o viajante prometeu investigar o culto" }),
+    O("Isso é conversa de medroso.", ["Pode ser. Mas eu vi. Você não.", "Ria enquanto pode."], { trust: -3, mood: -0.1 }),
+    O("Quanto pagam por silêncio?", ["Mais do que eu ganho num mês, e é por isso que me assusta.", "Você tem cara de quem sabe negociar... mas não com eles."], { trust: 1 }, { requires: { cha: 10 }, test: { cha: 11, onSuccess: { reply: "Tudo bem... mas fale baixo. Pagam em moedas pretas, e deixam um símbolo vermelho na porta de quem aceita.", effects: { trust: 3, unlock: { rumor: "Quem aceita dinheiro do culto recebe um símbolo vermelho na porta." } } }, onFail: { reply: "Não confio em quem faz essa pergunta tão sorridente.", effects: { trust: -3 } } } }),
+  ],
+  cultwho: (c) => [
+    O("Quero me juntar a eles.", ["Você... não está falando sério. Sai daqui.", "*recua* Não repita isso perto de mim."], { trust: -8, evil: 3, flag: "askedToJoinCult" }, { requires: { evilAbove: 30 }, test: { cha: 12, onSuccess: { reply: "...Então é assim. Se encontrar alguém de olhos roxos, diga que quem manda é a vizinha do poço. Mas eu nunca disse isso.", effects: { trust: -2, evil: 2, unlock: { rumor: "Há uma ponte entre a vila e os mascarados: uma moradora serve de mensageira." } } }, onFail: { reply: "Fora! Vou avisar a guarda!", effects: { trust: -12, evil: 3, flag: "threatened" } } } }),
+    O("Vou acabar com eles.", ["Deus te ouça, viajante. Mas não subestime quem não mostra o rosto.", "Isso é o que todos dizem antes de sumir."], { trust: 3, good: 1 }),
+    O("Há algum líder?", ["Falam de um Grão-Mestre. Ninguém jura ter visto o rosto.", "Dizem que se chama Morvath. Só ouvi o nome em sussurros."], { trust: 1 }),
+  ],
+  sick: (c) => [
+    O("Tenho uma poção. Tome.", ["Você faria isso? Que a graça de Deus te cubra!", "...Obrigado. Eu não esqueço quem me estende a mão."], { items: { potions: -1 }, event: "cure_sick", good: 5, trust: 10, mood: 0.6, wflag: "curedSomeone", diary: "o viajante curou o doente com uma poção" }, { requires: { potions: 1 } }),
+    O("Vou buscar uma poção.", ["Vá depressa, por favor. Não sei quantos dias ele tem.", "Que Deus te dê pernas rápidas."], { trust: 3, flag: "promisedPotion", diary: "o viajante prometeu trazer remédio ao doente" }),
+    O("Isso não é problema meu.", ["Não... não é. Perdão por ter pedido.", "Gente como você sempre dorme bem. Inveja."], { trust: -5, evil: 1, mood: -0.3 }),
+    O("Mantenham-no longe da vila.", ["Isso é cruel. Mas talvez seja necessário...", "Ele é gente, viajante. Não é peste ambulante."], { trust: -8, evil: 4, wflag: "quarantine", event: { type: "quarantine", text: "Um forasteiro exigiu que o doente fosse afastado da vila.", names: [], mood: -0.2 } }, { requires: { evilAbove: 20 } }),
+  ],
+  shortage: (c) => [
+    O("Tome, dividi o que tenho.", ["Você não precisava... mas obrigado. Hoje alguém janta.", "Deus lhe devolve em dobro."], { items: { hay: -5 }, good: 2, trust: 5, mood: 0.3, wflag: "gaveFood", diary: "o viajante dividiu comida comigo" }, { requires: { hay: 5 } }),
+    O("Aqui, algumas moedas.", ["Moeda também compra pão... quando tem pão. Obrigado.", "Você é bom demais. Aceito, com vergonha."], { coins: -10, good: 1, trust: 4, mood: 0.2, diary: "o viajante me deu moedas na escassez" }, { requires: { coins: 10 } }),
+    O("Que se virem.", ["...É assim que os fortes falam dos fracos.", "Eu sei me virar. Só queria um pouco de piedade."], { trust: -3, evil: 1 }),
+    O("Conheço quem vende grão.", ["Se tiver preço decente, me avise!", "Seria uma bênção, viajante."], { trust: 2, flag: "mentionedGrain" }, { requires: { cha: 9 }, test: { cha: 10, onSuccess: { reply: "Falou com o mercador? Ele me prometeu um desconto por sua causa!", effects: { trust: 3, unlock: { discount: true } } }, onFail: { reply: "Falar é fácil. Ele só vende à vista.", effects: { trust: -1 } } } }),
+  ],
+  fight: (c, d) => [
+    O("Vou denunciar à guarda.", ["Se for pra apaziguar, tudo bem. Mas não use isso contra ninguém.", "Isso só vai piorar. Mas a lei é a lei."], { trust: -3, flag: "denounced", wflag: "denounced", event: { type: "denounce", text: "Um forasteiro denunciou uma briga à guarda e agora ninguém se olha direito.", names: d?.names || [], mood: -0.3 }, diary: "o viajante denunciou a briga à guarda" }),
+    O("Fico fora disso.", ["Sensato. Briga de vizinho só pega fogo se tiver plateia.", "Melhor assim."], {}),
+    O("Posso mediar.", ["Você? ... Pode tentar. Eles te ouvem mais que a mim.", "Se conseguir, é um milagre."], { trust: 1 }, { requires: { cha: 9 }, test: { cha: 11, onSuccess: { reply: "Funcionou! Dizem que fizeram as pazes por sua causa.", effects: { trust: 5, good: 1, wflag: "mediated", event: { type: "peace", text: "Um forasteiro convenceu os briguentos a fazerem as pazes.", names: d?.names || [], mood: 0.3 }, diary: "o viajante apaziguou a briga" } }, onFail: { reply: "Só piorou. Agora estão com raiva de você também.", effects: { trust: -3, mood: -0.2 } } } }),
+  ],
+  traveler: (c) => [
+    O("Ele disse mais alguma coisa?", ["Disse sim, e deixou todo mundo calado."], { trust: 1 }, { next: "traveler_more" }),
+    O("Suspeito dele.", ["Eu também, um pouco. Quem conhece tantas estradas costuma esconder algo.", "Deixa a guarda cuidar disso."], { trust: 1, flag: "suspectsTraveler" }),
+    O("Convide-o à praça, quero falar.", ["Se ele aceitar. Estava na hospedaria, mas parte logo."], { trust: 1 }),
+  ],
+  wolves: (c) => [
+    O("Vou caçar esses lobos.", ["Que alívio! Leve tocha e não vá só.", "Se acabar com eles, vamos te dever uma."], { trust: 3, mood: 0.2, flag: "willHuntWolves", diary: "o viajante prometeu caçar os lobos" }),
+    O("Tranquem tudo.", ["É o que fazemos. Mas lobo dá volta."], { trust: 1 }),
+    O("Lobos têm fome também.", ["...Pode ser, mas é o meu gado que eles comem.", "Piedoso você. Pena que o curral não perdoa."], { trust: -1 }),
+  ],
+  war: (c) => [
+    O("Quem está vencendo?", ["Ninguém. Os dois lados perdem o que já não tinham.", "Quem vence é quem tem mais pão, e não somos nós."], { trust: 1 }),
+    O("Já perdeu alguém?", ["Perdi. Mais de um.", "...Perdi, sim."], { trust: 2 }, { next: "war_loss" }),
+    O("A guerra pode acabar logo.", ["Que Deus te ouça.", "Oxalá. Já cansei de rezar."], { trust: 1, mood: 0.1 }),
+  ],
+  funeral: (c) => [
+    O("Posso rezar com o senhor?", ["Seria uma honra, filho. Ajoelha aqui.", "Venha. A prece compartilhada pesa menos."], { trust: 4, good: 1, mood: 0.3, diary: "o viajante rezou comigo pelo falecido" }),
+    O("Quero doar à capela.", ["Que Deus abençoe sua mão aberta.", "Obrigado, filho. As velas agradecem."], { coins: -5, good: 2, trust: 3, wflag: "charityDone" }, { requires: { coins: 5 } }),
+    O("Funerais não me comovem.", ["Talvez um dia comovam."], { trust: -3, evil: 1 }),
+  ],
+  family: (c) => [
+    O("Posso ajudar sua família?", ["Ajudar... quem dera. Mas obrigado por perguntar.", "Se tiver um pão, é a melhor ajuda."], { trust: 3, mood: 0.1 }),
+    O("Família dá trabalho.", ["Dá. E sustenta."], { trust: 0 }),
+  ],
+  past: (c) => [
+    O("Me conte como foi.", ["Não é história bonita, mas já que pergunta...", "Foram anos duros. Aprende-se muito, e perde-se mais."], { trust: 2, unlock: { layer: true } }),
+    O("Passado é passado.", ["Boa filosofia, se a gente conseguisse seguir."], { trust: 0 }),
+  ],
+  fear: (c) => [
+    O("Fico por perto, se quiser.", ["Faria isso? Obrigado... não vou esquecer.", "É bom ter companhia no escuro."], { trust: 3, mood: 0.2 }),
+    O("Medo é coisa de fraco.", ["Fácil falar quando não se tem o que perder.", "Você não me conhece, viajante."], { trust: -4, mood: -0.2 }),
+  ],
+  desire: (c) => [
+    O("Posso ajudar a realizar isso.", ["Gostaria de acreditar nisso.", "Se puder, eu lembro de você pra sempre."], { trust: 3, flag: "dreamHelp", diary: "o viajante se ofereceu para ajudar meu sonho" }),
+    O("Sonhos custam caro.", ["Custam. Mas sonhar é de graça."], {}),
+  ],
+  rel: (c) => [
+    O("Falo com ele por você.", ["Faria isso? ...Talvez ajude.", "Cuidado. É teimoso."], { trust: 3, event: { type: "peace", text: "Alguém intercedeu em uma velha desavença entre vizinhos.", names: [], mood: 0.2 } }),
+    O("Fique longe dele.", ["É o que tento. Ele não deixa."], { trust: 1 }),
+  ],
+  debt: (c) => {
+    const d = bioOf(c)?.debt;
+    const amt = d ? Math.min(d.amount, 40) : 20;
+    return [
+      O(`Pago a dívida por você (${amt} moedas).`, ["Você... não devia. Mas eu não vou recusar. Obrigado.", "Nunca ninguém fez isso por mim. Nunca."], { coins: -amt, good: 3, trust: 12, mood: 0.6, flag: "debtPaid", diary: "o viajante pagou minha dívida" }, { requires: { coins: amt } }),
+      O("Peça mais prazo a ele.", ["Boa ideia. Ele costuma ouvir quem fala bem."], { trust: 2 }),
+      O("Pague-me com um favor.", ["Combinado. Estou em dívida com você agora."], { trust: 2, flag: "owesFavor", diary: "devo um favor ao viajante" }),
+    ];
+  },
+  regret: (c) => [
+    O("Perdoe-se. Você tentou.", ["Você tem razão... eu preciso ouvir isso mais vezes.", "Talvez eu precisasse de alguém que dissesse."], { trust: 4, mood: 0.3 }),
+    O("Merece o que sente.", ["...Ao menos você é sincero."], { trust: -5, evil: 1, mood: -0.3 }),
+  ],
+  secret: (c) => [
+    O("Seu segredo está seguro.", ["Obrigado. Guardei isso por anos.", "Eu confio em você. Não me decepcione."], { trust: 8, mood: 0.2, flag: "keptSecret", diary: "contei um segredo ao viajante" }),
+    O("Isso vale algo pra mim.", ["...Quanto você quer?", "Então é assim que você é."], { trust: -12, evil: 4, coins: 10, wflag: "extorted", flag: "extorted" }, { requires: { evilAbove: 25 }, test: { cha: 11, onSuccess: { reply: "Tome, e esqueça isso. Não quero te ver de novo.", effects: { coins: 20, evil: 4, trust: -14, wflag: "extorted" } }, onFail: { reply: "Nem um tostão. Vou contar à guarda o que você tentou.", effects: { evil: 2, trust: -20, flag: "threatened", wflag: "extorted" } } } }),
+    O("Preciso contar isso à guarda.", ["Não! Por tudo que é santo, não faça isso.", "Você não faria. Faria?"], { trust: -20, evil: 2, flag: "betrayed", wflag: "denounced", event: { type: "denounce", text: "Um segredo foi levado à guarda por um forasteiro de língua solta.", names: [], mood: -0.4 } }),
+  ],
+  scared: (c) => [
+    O("Fico até amanhecer.", ["Você faria isso? Obrigado, de verdade.", "Eu não conseguiria dormir sozinho hoje."], { trust: 4, mood: 0.3, diary: "o viajante me fez companhia no escuro" }),
+    O("Reze e tranque a porta.", ["É o que farei. E por você também."], { trust: 1 }),
+    O("Sem tempo pra medo alheio.", ["Entendo. Cada um com o seu."], { trust: -2 }),
+  ],
+  suspicious: (c) => [
+    O("Calma, não vim brigar.", ["...Tudo bem. Mas mantenha as mãos onde eu veja.", "Hm. Fale, então."], { trust: 2 }, { requires: { cha: 8 }, test: { cha: 10, onSuccess: { reply: "Você é calmo demais pra ser problema. Pode falar.", effects: { trust: 4 } }, onFail: { reply: "Quem diz 'calma' costuma estar mentindo.", effects: { trust: -2 } } } }),
+    O("Cale-se e responda.", ["*recua* T-tudo bem... o que quer?", "Não precisa gritar..."], { trust: -6, evil: 1, flag: "threatened" }),
+    O("Tenho moedas pra sua discrição.", ["...Quanto?", "Moeda fecha qualquer boca, infelizmente."], { coins: -10, trust: 3, flag: "silenced", diary: "o viajante pagou meu silêncio" }, { requires: { coins: 10 } }),
+    O("Tudo bem. Até logo.", ["Até."], { end: true }),
+  ],
+  selfSick: (c) => [
+    O("Tome esta poção.", ["Santo... Deus lhe pague... eu já achava que...", "Você me salvou. Não vou esquecer."], { items: { potions: -1 }, event: "cure_sick", good: 5, trust: 12, mood: 0.8, wflag: "curedSomeone", diary: "o viajante me curou da peste" }, { requires: { potions: 1 } }),
+    O("Volto com remédio. Aguente.", ["Vou tentar... coff... não demore.", "Eu... aguardo."], { trust: 3, flag: "promisedPotion" }),
+    O("Não posso ajudar.", ["Eu entendo... coff... ninguém pode.", "Vá com Deus."], { trust: -3, mood: -0.3 }),
+  ],
+  templarGreet: (c) => [
+    O("Servir é meu dever.", ["Que bom, cavaleiro. Que Deus lhe dê força.", "É raro ouvir isso hoje."], { trust: 2 }),
+    O("Preciso de informações.", ["Pergunte, senhor. O que souber, é seu."], { trust: 1, unlock: { rumor: "O templário anda recolhendo informação sobre as ruínas e o culto." } }),
+  ],
+  // ---- falas antigas (interactions.js): reconhecidas pelo texto ----
+  charity: (c) => [
+    O("Não foi nada.", ["Pra mim foi tudo. Que Deus lhe pague.", "Humildade rara. Obrigado."], { trust: 2, mood: 0.2 }),
+    O("Reze por mim.", ["Rezarei esta noite, e todas as outras.", "Já está no meu rol de orações, filho."], { good: 1, trust: 2, flag: "blessed", wflag: "charityDone" }),
+    O("Espero algo em troca.", ["...Todo favor tem preço, não é? Não tenho muito.", "A esmola virou negócio, então."], { trust: -3, evil: 1 }),
+  ],
+  confess: (c) => [
+    O("Quero confessar mais.", ["Ouvirei, filho, sem pressa e sem julgamento.", "Diga, e deixe que Deus pese."], { coins: -5, good: 3, trust: 3, diary: "o viajante se confessou" }, { requires: { evilAbove: 10, coins: 5 } }),
+    O("Não me arrependo de nada.", ["Então que Deus tenha misericórdia de quem não se pergunta nada.", "O orgulho é a pior das correntes."], { trust: -1, evil: 1 }),
+    O("Obrigado, padre.", ["Vai em paz."], { trust: 1 }),
+  ],
+  cured: (c) => [
+    O("Cuide-se bem.", ["Cuidarei. E você não me sai da lembrança.", "Vou rezar por você."], { trust: 3, mood: 0.2 }),
+    O("Preciso de informação.", ["Tudo que eu souber. Pergunte."], { trust: 1, unlock: { layer: true } }),
+    O("Quero um favor em troca.", ["...Peça. Eu devo isso.", "Justo. Tenho pouco, mas ofereço."], { trust: 1 }, { test: { cha: 9, onSuccess: { reply: "Tome estas moedas. É o que sobrou das economias.", effects: { coins: 10, trust: -2 } }, onFail: { reply: "Eu só tenho gratidão. Perdoe.", effects: { trust: -1 } } } }),
+  ],
+  debtor: (c) => [
+    O("Calma, não vou te bater.", ["Obrigado... eu juro que vou pagar.", "Deus lhe pague pela paciência."], { trust: 2, mood: 0.2 }),
+    O("Pague logo!", ["Eu... eu não tenho!", "Por favor, só mais um dia!"], { trust: -4, evil: 1, mood: -0.3 }),
+    O("Como foi a geada?", ["Perdi toda a plantação em uma noite..."], { trust: 2 }, { next: "debtor_story" }),
+  ],
+  cultOld: (c) => OPTS.cult(c),
+  monsters: (c) => [
+    O("Como os enfrento?", ["Fogo e aço. E nunca vá sozinho."], { trust: 1 }, { next: "monsters_tip" }),
+    O("Já vi um.", ["Então você sabe do que falo. Eu ainda tenho pesadelos."], { trust: 2 }),
+    O("Não tenho medo.", ["Medo mantém a gente vivo, viajante."], {}),
+  ],
+  eclipse: (c) => [
+    O("O que devo fazer?", ["Fique perto da luz. E reze, se acreditar."], { trust: 1 }, { next: "eclipse_tip" }),
+    O("Isso é só um eclipse.", ["Chame como quiser, mas o ar mudou."], { trust: -1 }),
+  ],
+  smith: (c) => [
+    O("Pode me dar desconto?", ["Hm. Vamos ver.", "Preço é preço."], { trust: 0 }, { requires: { cha: 8 }, test: { cha: 10, onSuccess: { reply: "...Dez por cento. Não conta pra ninguém.", effects: { unlock: { discount: true }, trust: 2 } }, onFail: { reply: "Ferro não negocia.", effects: { trust: -2 } } } }),
+    O("Conte do seu ofício.", ["Ferro é paciência com raiva dentro."], { trust: 2, unlock: { layer: true } }),
+    O("Obrigado.", ["Hm."], { trust: 1 }),
+  ],
+  merchant: (c) => [
+    O("Faz um desconto?", ["Pra um cliente tão simpático... quem sabe!", "Desconto? Meu coração dói!"], { trust: 0 }, { requires: { cha: 8 }, test: { cha: 9, onSuccess: { reply: "Quinze por cento! Mas só porque gostei de você, hehe.", effects: { unlock: { discount: true }, trust: 3 } }, onFail: { reply: "Meu coração dói, mas a bolsa dói mais.", effects: { trust: -1 } } } }),
+    O("Isso é caro demais.", ["Caro? É raro, amigo!"], { trust: -1 }),
+    O("Obrigado!", ["Sempre às ordens!"], { trust: 1 }),
+  ],
+  blessing: (c) => [
+    O("Amém.", ["Vai em paz, filho."], { trust: 2, mood: 0.2 }),
+    O("Não sou muito religioso.", ["Deus não se ofende. Só espera."], { trust: 0 }),
+  ],
+};
+
+// falas encadeadas (next): cada uma pode ter as suas próprias opções
+export const LINES = {
+  dead_detail: (c) => ({ n: "*olha para o chão*", t: c.say(["Ele me ensinou a pescar quando eu era moleque. Não sei se esqueço um dia.", "Tomava conta de mim, mesmo sem ser da família. Faz falta."]), options: [O("Quer um tempo sozinho?", ["Quero. Obrigado."], { trust: 2, end: true }), O("Estou aqui, se quiser falar.", ["Você é boa pessoa."], { trust: 4, mood: 0.2 })] }),
+  war_loss: (c) => ({ n: "*respira fundo*", t: c.say(["Meu irmão. E um primo, antes dele.", "Dois filhos de vizinhos que eu ajudei a criar."]), options: [O("Sinto muito.", ["Obrigado."], { trust: 3 }), O("É a guerra.", ["...Eu sei. Só não precisa lembrar."], { trust: -2 })] }),
+  traveler_more: (c) => ({ n: "", t: "Disse que há uma vila inteira vazia a leste, mesas postas, ninguém dentro. E que os de máscara branca estavam lá.", options: [O("Onde fica?", ["A leste, depois das ruínas. Não vá à noite."], { trust: 1, unlock: { rumor: "Uma vila inteira vazia a leste: mesas postas, ninguém dentro." } }), O("Conversa de viajante.", ["Talvez."], { trust: -1 })] }),
+  debtor_story: (c) => ({ n: "", t: "Foi numa noite só. A lavoura inteira ficou branca, e no dia seguinte, preta. Não colhi nada.", options: [O("Posso ajudar a replantar.", ["Você ajudaria? Que Deus te pague."], { trust: 4, good: 1, flag: "willHelpFarm" }), O("Paciência, vai passar.", ["Obrigado pelas palavras."], { trust: 1 })] }),
+  monsters_tip: (c) => ({ n: "", t: "Fogo afugenta muita coisa. E os Gulurs odeiam barulho de metal. Nunca corra: corrida atrai.", options: [O("Entendi.", ["Boa sorte."], { trust: 1 })] }),
+  eclipse_tip: (c) => ({ n: "", t: "Se for sair, vá cedo, volte antes de escurecer. E se ouvir sinos sozinhos... fuja.", options: [O("Obrigado pelo aviso.", ["Cuide-se."], { trust: 2 })] }),
+};
+
+const TEXT_RULES = [
+  [/febre cessou|Louvado sejais|curado/i, "cured"],
+  [/Piedade|geada estragou|dívida|estalagem/i, "debtor"],
+  [/generosidade|júbilo|caridade|esmola|socorro/i, "charity"],
+  [/absolv|pecados|confiss|virtude/i, "confess"],
+  [/Morvath|Grão-Mestre|Demiurgo|seita|mascarad|Ordem de Rex/i, "cultOld"],
+  [/Gulur|seis olhos|feras|observadores/i, "monsters"],
+  [/eclipse|maligno|sol sangrou/i, "eclipse"],
+  [/Non nobis|Levanta-te|graça de Deus|Louvado/i, "blessing"],
+  [/Aço|forja|Placas|navalha|Minério|lenha|Fio de/i, "smith"],
+  [/mercador|Banquete|Feno fresco|negócio|Placas temperadas/i, "merchant"],
+];
+
+// opções para falas ANTIGAS (texto livre do interactions.js)
+export function optionsForText(ctx, text) {
+  if (!text) return null;
+  for (const [re, key] of TEXT_RULES) if (re.test(text) && OPTS[key]) return OPTS[key](ctx, null);
+  return null;
+}
+
+// ligação tópico -> opções (as falas do compositor)
+function optionsFor(ctx, r, qid) {
+  if (ctx.selfSick) return OPTS.selfSick(ctx);
+  if (r.suspicious) return OPTS.suspicious(ctx);
+  if (r.templarGreet) return OPTS.templarGreet(ctx);
+  const topics = r.topics || [];
+  if (qid === "help") {
+    if (ctx.sickOther) return OPTS.sick(ctx);
+    if (ctx.hungry) return OPTS.shortage(ctx);
+    if (ctx.scared) return OPTS.scared(ctx);
+  }
+  const kind = qid.startsWith("h:") ? qid.slice(2) : topics[0]?.kind;
+  const data = qid.startsWith("h:") ? r.data : topics[0]?.data;
+  if (kind && OPTS[kind]) return OPTS[kind](ctx, data);
+  return null;
+}
+export function lineById(id, ctx) {
+  return LINES[id] ? LINES[id](ctx) : null;
+}
+export const OPTION_COUNT = Object.keys(OPTS).length + Object.keys(LINES).length;
+
+// ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
 export const BASE_QUESTIONS = [
@@ -733,15 +1034,20 @@ export function replyTo(ctx, qid, data) {
       ["A febre não larga. Não consigo comer. Rezo pra amanhecer melhor.", "Tudo dói. Se tiver uma poção de cura, viajante... eu pagaria com o que tenho."],
       ["Eu... não sinto mais as mãos. Diga à minha família que eu... coff... tentei.", "Está escuro, mesmo de dia. Por favor... uma poção."],
     ][stage];
-    return { n: pick(GEST_SICK), t: ctx.say(lines), topics: [] };
+    const sr = { n: pick(GEST_SICK), t: ctx.say(lines), topics: [] };
+    sr.options = OPTS.selfSick(ctx);
+    return sr;
   }
   if (qid === "bye") return { n: "", t: byeLine(ctx), topics: [], bye: true };
-  if (qid.startsWith("h:")) return followup(ctx, qid.slice(2), data);
-  if (qid === "how") return replyHow(ctx);
-  if (qid === "day") return replyDay(ctx);
-  if (qid === "you") return replyYou(ctx);
-  if (qid === "help") return replyHelp(ctx);
-  return { n: "", t: "...", topics: [] };
+  let r;
+  if (qid.startsWith("h:")) { r = followup(ctx, qid.slice(2), data); r.data = data; }
+  else if (qid === "how") r = replyHow(ctx);
+  else if (qid === "day") r = replyDay(ctx);
+  else if (qid === "you") r = replyYou(ctx);
+  else if (qid === "help") r = replyHelp(ctx);
+  else r = { n: "", t: "...", topics: [] };
+  r.options = optionsFor(ctx, r, qid);
+  return r;
 }
 
 export { greeting, makeHooks, timeBucket, evilBand, chaBand, GEST_SICK };

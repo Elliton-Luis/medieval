@@ -2,6 +2,7 @@ import { PlayerStats, PlayerInventory } from "./rpg.js";
 import { CultState } from "./cult.js";
 import { getDemiurgeDiarySpotIndex } from "./demiurgeBook.js";
 import { WorldDecay } from "./decay.js";
+import { getWorldSeed, getWorldChaos, forgetPendingWorld } from "./worldgen.js";
 
 // ============================================================================
 // Sistema de Salvamento & Autosave Periódico do Puris
@@ -25,6 +26,8 @@ export function serializeGameState({ player, weapons, dayNight, candle }) {
     x: player.x,
     z: player.z,
     candles: candle?.count ?? 0,
+    worldSeed: getWorldSeed(),
+    worldChaos: getWorldChaos(),
     demiurgeBookSpotIndex: typeof getDemiurgeDiarySpotIndex === "function" ? getDemiurgeDiarySpotIndex() : 0,
     decay: {
       daysPassed: WorldDecay?.daysPassed ?? 0,
@@ -40,6 +43,14 @@ export function serializeGameState({ player, weapons, dayNight, candle }) {
       spd: PlayerStats.spd,
       morality: PlayerStats.morality ?? 0,
       lastMessengerTier: PlayerStats.lastMessengerTier ?? 0,
+      // armadura e facções: antes NADA disso era salvo e a armadura sumia ao reiniciar o navegador
+      armorLevel: PlayerStats.armorLevel ?? 0,
+      isTemplar: Boolean(PlayerStats.isTemplar),
+      hasBrokenVow: Boolean(PlayerStats.hasBrokenVow),
+      wearingDemiurgeRobe: Boolean(PlayerStats.wearingDemiurgeRobe),
+      hasDemiurgeRobe: Boolean(PlayerInventory.hasDemiurgeRobe),
+      food: { bread: PlayerInventory.food?.bread || 0, apple: PlayerInventory.food?.apple || 0 },
+      lastConfessionDay: PlayerStats.lastConfessionDay ?? null,
       sacrifices: CultState?.sacrifices ?? 0,
       hay: PlayerInventory.hay,
       wood: PlayerInventory.wood,
@@ -81,6 +92,7 @@ export function clearSave() {
   try {
     localStorage.removeItem(KEY);
     localStorage.removeItem(LEGACY_KEY);
+    forgetPendingWorld(); // jogo novo = mundo novo (seed nova no próximo carregamento)
     return true;
   } catch {
     return false;

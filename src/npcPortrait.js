@@ -48,6 +48,7 @@ const IRIS = ["#3d5a80", "#5a7d3a", "#6b4a2a", "#4a4a4a", "#2f6f6a"];
 /** Voz/ofício visual do NPC (guard, smith, merchant, farmer, messenger, commoner, priest, beggar). */
 export function visualKey(npc) {
   if (npc.roleKey === "villager") return /mensageiro/i.test(npc.title || "") ? "messenger" : "commoner";
+  if (npc.roleKey === "baker") return "merchant"; // voz de comerciante (falas); o retrato tem touca própria (veja draw)
   return npc.roleKey;
 }
 
@@ -58,6 +59,7 @@ function draw(npc, expr, age) {
   const c = canvas.getContext("2d");
   const role = npc.role || {};
   const key = visualKey(npc);
+  const baker = npc.roleKey === "baker";
   const r = rng(hash(npc.name || "anon"));
   const skin = role.skin || "#c28e68";
   const hairHex = role.hair || ["#2f2420", "#4a3526", "#7a5a34", "#9a9a96", "#1c1714"][(r() * 5) | 0];
@@ -72,7 +74,7 @@ function draw(npc, expr, age) {
   const cy = 70;
 
   // fundo: gradiente por ofício, com vinheta
-  const bgA = { guard: "#26364a", smith: "#40281c", merchant: "#1d3b3a", farmer: "#3a4222", messenger: "#43202a", commoner: "#2c2f33", priest: "#1d1b22", beggar: "#2a2620" }[key] || "#222";
+  const bgA = { baker: "#4a3a22", guard: "#26364a", smith: "#40281c", merchant: "#1d3b3a", farmer: "#3a4222", messenger: "#43202a", commoner: "#2c2f33", priest: "#1d1b22", beggar: "#2a2620" }[key] || "#222";
   const g = c.createLinearGradient(0, 0, 0, SIZE);
   g.addColorStop(0, shade(bgA, 1.5));
   g.addColorStop(1, shade(bgA, 0.6));
@@ -309,6 +311,14 @@ function draw(npc, expr, age) {
   } else if (key === "smith") {
     c.fillStyle = "#e8b04a";
     c.fillRect(cx - faceW - 2, cy - faceH + 14, (faceW + 2) * 2, 7);
+  } else if (baker) {
+    // touca de padeira: faixa e cúpula branca fofa
+    c.fillStyle = "#f6f1e6";
+    c.beginPath();
+    c.ellipse(cx, cy - faceH - 8, faceW + 4, 24, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#e3dccb";
+    c.fillRect(cx - faceW - 2, cy - faceH + 8, (faceW + 2) * 2, 8);
   } else if (key === "merchant") {
     c.fillStyle = "#1f7f72";
     c.beginPath();

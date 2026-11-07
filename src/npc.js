@@ -1,3 +1,4 @@
+import { getWorldChaos, worldRand, isCanonicalWorld, getInfiltratedVillage } from "./worldgen.js";
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { makeRandom } from "./utils.js";
@@ -7,6 +8,7 @@ import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, T
 import { NPC_TYPES, NPC_STATES, updateNPCRoutine, addEvil, PlayerInventory, PlayerStats } from "./rpg.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
 import { isOccludedByHouses } from "./houses.js";
+import { nearestFreePoint } from "./placement.js";
 
 function getDeterministicFleeTarget(npc) {
   const anchors = npc.root?.userData?.anchors;
@@ -65,6 +67,10 @@ const npcRoles = {
   merchant: {
     name: "Tomas Vell", title: "Mercador", skin: "#c68e69", cloth: "#1f7f72", leather: "#5b402c", metal: "#7f8c83", accent: "#f0c84a", speed: 1.25, wait: 1.2,
     scale: [1.0, 1.02, 1.12], beard: "mustache", hair: "#4a3526",
+  },
+  baker: {
+    name: "Dona Rosália", title: "Padeira", skin: "#d8a47c", cloth: "#e6dccb", leather: "#8a5a2e", metal: "#8a8a85", accent: "#f6f1e6", speed: 1.15, wait: 1.4,
+    scale: [1.06, 0.98, 1.1], beard: null, hair: "#6b3b1f",
   },
   farmer: {
     name: "Bruna do Vale", title: "Agricultora", skin: "#d19a70", cloth: "#7da13a", leather: "#61432d", metal: "#797767", accent: "#e6cb6a", speed: 1.35, wait: 1.55,
@@ -247,6 +253,23 @@ export class NPC {
       addPart(face, new THREE.CylinderGeometry(0.14, 0.14, 0.04, 10), accent, 0, 0.065, 0);
       addPart(this.model, new THREE.BoxGeometry(0.4, 0.14, 0.2), cloth, 0, 1.45, -0.02); // ombros largos
       this._addHammer(this.rightArm, leather, metal);
+    } else if (this.roleKey === "baker") {
+      // Padeira: touca branca fofa, avental comprido, cesto de pães no quadril e rolo de massa na mão
+      addPart(face, new THREE.CylinderGeometry(0.135, 0.15, 0.14, 10), accent, 0, 0.1, 0);
+      const puff = addPart(face, new THREE.SphereGeometry(0.15, 9, 7), accent, 0, 0.2, -0.01);
+      puff.scale.set(1.05, 0.78, 1.0);
+      addPart(this.model, new THREE.BoxGeometry(0.33, 0.78, 0.03), accent, 0, 0.88, 0.165); // avental (frente)
+      addPart(this.model, new THREE.BoxGeometry(0.34, 0.06, 0.2), accent, 0, 1.3, 0.04); // alça do peito
+      const dust = addPart(this.model, new THREE.SphereGeometry(0.05, 6, 5), accent, 0.2, 1.1, 0.12); // farinha nos braços
+      dust.scale.set(1.3, 0.4, 0.8);
+      const basket = addPart(this.model, new THREE.CylinderGeometry(0.17, 0.13, 0.12, 8), leather, -0.3, 0.8, 0.06);
+      basket.scale.z = 0.8;
+      for (const [bx, bz] of [[-0.34, 0.06], [-0.26, 0.1], [-0.3, 0.0]]) {
+        const loaf = addPart(this.model, new THREE.SphereGeometry(0.07, 7, 5), material("#d9a441", 0, 0.9, "fabric"), bx, 0.88, bz);
+        loaf.scale.set(1.5, 0.8, 1.0);
+      }
+      const pin = addPart(this.rightArm, new THREE.CylinderGeometry(0.03, 0.03, 0.34, 6), leather, 0, -0.5, 0.06);
+      pin.rotation.z = Math.PI / 2;
     } else if (this.roleKey === "merchant") {
       addPart(face, new THREE.ConeGeometry(0.14, 0.3, 6), cloth, 0, 0.22, 0);
       addPart(face, new THREE.CylinderGeometry(0.19, 0.19, 0.02, 8), accent, 0, 0.085, 0);
@@ -466,6 +489,12 @@ export class NPC {
       this.rightArm.rotation.x = working ? -0.88 + Math.sin(this.animTime * 4.2) * 0.52 : stride * 0.82;
       if (this.tool) this.tool.rotation.x = working ? Math.sin(this.animTime * 4.2 + 0.7) * 0.32 : 0;
       this.task = this.moving ? "Levando o ferro à forja" : "Martelando o aço";
+    } else if (this.roleKey === "baker") {
+      this.task = this.moving ? "Entregando pães" : "Sovando a massa";
+      if (!this.moving) {
+        this.rightArm.rotation.x = -0.75 + Math.sin(this.animTime * 5.2) * 0.28; // sova a massa com as duas mãos
+        this.leftArm.rotation.x = -0.75 + Math.sin(this.animTime * 5.2 + Math.PI) * 0.28;
+      }
     } else if (this.roleKey === "merchant") {
       this.task = this.moving ? "Repondo mercadorias" : "Negociando no balcão";
       if (!this.moving) this.rightArm.rotation.z = Math.sin(this.animTime * 1.7) * 0.24 - 0.18;
@@ -1264,6 +1293,7 @@ export class NPCSystem {
     const profMap = {
       smith: "blacksmiths",
       merchant: "taverns",
+      baker: "taverns",
       farmer: "farms",
       guard: "gates",
       villager: "houses",
@@ -1329,6 +1359,12 @@ export class NPCSystem {
       title: "Negociante de Grãos",
       cloth: "#5c4033",
     });
+
+    // 3b. Padeira da praça (vende pão e maçã; o ponto passa pelo registro de pegadas: nada de nascer dentro de construção)
+    {
+      const spot = nearestFreePoint(market.x + 4.4, market.z + 3.4, 1.0, 8) || { x: market.x + 4.4, z: market.z + 3.4 };
+      add("baker", around(spot, 1.3), spot, { name: "Dona Rosália", title: "Padeira de Caldera" });
+    }
 
     // 4. Fazendeiro
     add("farmer", [
@@ -1431,6 +1467,8 @@ export class NPCSystem {
       add("smith", around(place.work, 1.6), place.work, { ...look(), title: "Ferreiro" });
     } else if (village.kind === "market") {
       add("merchant", around(place.work, 1.5), place.work, { ...look(), title: "Mercador" });
+      const bs = nearestFreePoint(place.work.x + 3.6, place.work.z + 2.8, 1.0, 8) || { x: place.work.x + 3.6, z: place.work.z + 2.8 };
+      add("baker", around(bs, 1.2), bs, { ...look(), title: "Padeiro", cloth: "#e6dccb" });
     } else if (village.kind === "farm") {
       add("farmer", place.farmPath, place.work, { ...look(), title: "Agricultor" });
     } else {
@@ -1444,6 +1482,13 @@ export class NPCSystem {
     add("villager", ringPath(well.x, well.z, 7.4, random() * 6), well, { ...look(), title: "Aldeão", isBandit: true });
     add("villager", ringPath(well.x, well.z, 8.4, random() * 6), well, { ...look(), title: "Morador" });
     add("villager", ringPath(well.x, well.z, 9.6, random() * 6), well, { ...look(), title: "Camponesa" });
+    // CAOS: vilas mais ou menos povoadas (0..3 moradores extras) e a vila "infiltrada pelo culto" tem um forasteiro calado
+    const chaosPop = getWorldChaos();
+    const extra = Math.round(worldRand(village.seed, 40) * 3 * chaosPop);
+    for (let e = 0; e < extra; e++) add("villager", ringPath(well.x, well.z, 10.6 + e * 0.8, random() * 6), well, { ...look(), title: e % 2 ? "Lenhador" : "Morador" });
+    if (!isCanonicalWorld() && getInfiltratedVillage() === village) {
+      add("villager", ringPath(well.x, well.z, 11.8, random() * 6), well, { ...look(), cloth: "#2a2630", title: "Forasteiro Calado", isBandit: true });
+    }
 
     // Ferreiro auxiliar ou ajudante de forja na vila
     if (village.kind !== "forge") {

@@ -115,10 +115,12 @@ function patternTexture(kind) {
   return texture;
 }
 
+// Personagens SEM textura: a forma (geometria + flatShading) e a cor carregam o visual. A 720p com névoa o grão de
+// couro/pano/pele não aparece, e cada textura a menos é uma troca de bind a menos no desenho de cada NPC.
+// (patternTexture continua disponível acima caso se queira reativar por seletor de qualidade.)
 export function makeSkinnedMaterial(kind, color, metalness = 0, roughness = 0.85) {
   return new THREE.MeshStandardMaterial({
     color,
-    map: patternTexture(kind),
     metalness,
     roughness,
     flatShading: true,

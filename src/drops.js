@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { WEAPONS_BY_ID } from "./weapondata.js";
+import { PlayerInventory, FOOD_CAP } from "./rpg.js";
 
 const COIN_CAPACITY = 96;
 const ITEM_CAPACITY = 10;
@@ -382,15 +383,18 @@ export class DropSystem {
     const name = target.kind === "weapon" ? WEAPONS_BY_ID[drop.weaponId].name : ITEMS[target.kind].name;
     switch (target.kind) {
       case "bread":
-      case "apple":
-        if (player.health < player.maxHealth) {
-          player.health++;
-          this.ui.showToast(`${name} · +1 vitalidade`);
+      case "apple": {
+        // vai para o alforje (inventário de comida: tecla Tab); só vira moedas se o alforje estiver cheio
+        const food = PlayerInventory.food || (PlayerInventory.food = { bread: 0, apple: 0 });
+        if ((food[target.kind] || 0) < FOOD_CAP) {
+          food[target.kind] = (food[target.kind] || 0) + 1;
+          this.ui.showToast(`${name} guardado · ${food[target.kind]} no alforje (Tab)`);
         } else {
           player.coins += 3;
-          this.ui.showToast(`${name} vendido · +3 moedas`);
+          this.ui.showToast(`Alforje cheio · ${name} vendido · +3 moedas`);
         }
         break;
+      }
       case "gem":
         player.coins += 15;
         this.ui.showToast("Joia vendida · +15 moedas");

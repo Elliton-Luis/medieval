@@ -15,6 +15,11 @@ const _baitPos = new THREE.Vector3();
 const _rayOrigin = new THREE.Vector3();
 const _sharedRaycaster = new THREE.Raycaster();
 
+// Comida: comer hoje é só o ATO (animação). EAT_HEAL = vitalidade curada por item; mude para 1 e comer passa a curar.
+export const EAT_HEAL = 0;
+export const FOOD_CAP = 20; // máximo de cada comida no alforje (acima disso o item vira moedas, como antes)
+export const FOOD_NAMES = { bread: "Pão", apple: "Maçã" };
+
 export const NPC_TYPES = { VILLAGER: 0, GUARD: 1, BANDIT: 2 };
 export const NPC_STATES = { IDLE: 0, WORK: 1, SLEEP: 2, STEAL: 3, FLEE: 4 };
 
@@ -375,6 +380,7 @@ export const PlayerInventory = {
   clay: 0,
   hay: 0,
   torches: 0,
+  food: { bread: 0, apple: 0 }, // comida no alforje (pão e maçã), usada em [Comer] e [Doar]
 
   // Equipamentos liberados e itens de missão
   hasAxe: true,

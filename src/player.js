@@ -4,6 +4,7 @@ import { makeSkinnedMaterial } from "./skins.js";
 import { buildPlayerArmor, mailTexture } from "./armorKit.js";
 import { buildHumanoid, bendJoints, addBeard, addVikingHair, addTiredEyes, createPoseState, smoothPose } from "./humanoid.js";
 import { PlayerStats } from "./rpg.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const ROLL_DURATION = 0.55;
 const ROLL_SPEED = 9.5;
@@ -138,6 +139,7 @@ export class Player {
     this.hitHeight = 1.85;
     this.stamina = 100;
     this.inHouse = null;
+    this.eating = null; // { t, kind, mesh }: animação de comer pão/maçã (só o ato)
     this.dead = false;
     this.deathTime = 0;
     this.deathSide = 1;
@@ -460,7 +462,7 @@ export class Player {
     const rmbBlock = Boolean(input.aimHeld) && this.aimStyle === "melee" && this.weaponId !== "spear";
     const guardKey = input.isDown("KeyQ") || rmbBlock;
     if (!guardKey) this.blockLocked = false;
-    this.blocking = guardKey && this.canBlock && !input.modalOpen && !this.blockLocked && !this.rolling && !this.knockedOut && this.attackTimer <= 0;
+    this.blocking = guardKey && this.canBlock && !input.modalOpen && !this.blockLocked && !this.rolling && !this.knockedOut && this.attackTimer <= 0 && !this.eating;
     const aiming = Boolean(aim && aim.active) && !this.knockedOut && !this.blocking;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.attackTimer > 0) this.attackTimer = Math.max(0, this.attackTimer - dt);
@@ -483,6 +485,15 @@ export class Player {
       this.staggerTimer -= dt;
       this.moveX = 0;
       this.moveZ = 0;
+    }
+    // comendo: o personagem para (sem andar, pular, rolar ou atacar) até a animação terminar
+    if (this.eating) {
+      this.moveX = 0;
+      this.moveZ = 0;
+      input.attackPressed = false;
+      input.attackHeld = false;
+      input.jumpPressed = false;
+      input.dodgePressed = false;
     }
     const inputLength = Math.hypot(this.moveX, this.moveZ);
     if (inputLength > 1) { this.moveX /= inputLength; this.moveZ /= inputLength; }
@@ -1078,6 +1089,63 @@ export class Player {
       this.leftArm.rotation.z = 0.4;
       this.rightArm.rotation.z = -0.4;
     }
+
+    if (this.eating) this._applyEating(dt);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Comer (só o ato): o braço direito leva o pão/maçã à boca, segura ~1 s com duas mordidas e o item some.
+  // Aplicado por último (por cima do filtro de pose) com peso w: entra e sai suave, sem estalo no fim.
+  // ---------------------------------------------------------------------------
+  startEating(kind) {
+    if (this.eating || this.dead || this.mounted || this.rolling || this.knockedOut || this.sitting || this.praying || this.blocking) return false;
+    if (kind !== "bread" && kind !== "apple") return false;
+    this._foodMeshes = this._foodMeshes || {};
+    let mesh = this._foodMeshes[kind];
+    if (!mesh) mesh = this._foodMeshes[kind] = buildFoodMesh(kind);
+    mesh.visible = true;
+    mesh.scale.setScalar(1);
+    this.rightForearm.add(mesh);
+    this.crouching = false;
+    this.vx = 0;
+    this.vz = 0;
+    this.eating = { t: 0, kind, mesh, bite1: false, bite2: false };
+    return true;
+  }
+
+  _applyEating(dt) {
+    const E = this.eating;
+    E.t += dt;
+    const t = E.t;
+    const smooth = (x) => { const c = x < 0 ? 0 : x > 1 ? 1 : x; return c * c * (3 - 2 * c); };
+    // peso da pose: sobe (0–0,38 s), segura (até 1,38 s) e desce (0,14 s)
+    const w = t < 1.38 ? smooth(t / 0.38) : 1 - smooth((t - 1.38) / 0.14);
+    const lerp = (a, b) => a + (b - a) * w;
+    // braço até a boca (ligeiramente para dentro), antebraço dobrado, cabeça inclinada para a comida
+    this.rightArm.rotation.set(lerp(this.rightArm.rotation.x, -1.15), lerp(this.rightArm.rotation.y, 0.1), lerp(this.rightArm.rotation.z, -0.28));
+    this.rightForearm.rotation.x = lerp(this.rightForearm.rotation.x, -2.2);
+    // duas mordidas (0,62 s e 1,05 s): a cabeça dá um pequeno "tchum" e o item encolhe
+    const bite = (c) => { const x = (t - c) / 0.2; return x > 0 && x < 1 ? Math.sin(Math.PI * x) : 0; };
+    this.head.rotation.x += 0.26 * w + 0.13 * (bite(0.62) + bite(1.05));
+    if (!E.bite1 && t >= 0.62) { E.bite1 = true; this._biteSound(E.kind); }
+    if (!E.bite2 && t >= 1.05) { E.bite2 = true; this._biteSound(E.kind); }
+    const size = t < 0.62 ? 1 : t < 1.05 ? 1 - 0.38 * smooth((t - 0.62) / 0.18) : 0.62 - 0.4 * smooth((t - 1.05) / 0.2);
+    E.mesh.scale.setScalar(Math.max(0.2, size));
+    E.mesh.visible = t < 1.38; // some depois da segunda mordida
+    // a arma/mão direita livre ficam escondidas enquanto come
+    if (this.handSocket) this.handSocket.visible = false;
+    if (t >= 1.5) {
+      E.mesh.visible = false;
+      if (E.mesh.parent) E.mesh.parent.remove(E.mesh);
+      this.eating = null;
+    }
+  }
+
+  _biteSound(kind) {
+    const a = this.audio;
+    if (!a?._tone) return;
+    if (kind === "apple") a._tone("sawtooth", 320, 90, 0.06, 0.1); // crocante
+    else a._tone("triangle", 190, 95, 0.08, 0.1); // macio
   }
 
   // Inércia barata do cabelo/barba: dois grupos giram devagar para trás ao correr, balançam ao virar e
@@ -1350,4 +1418,46 @@ export class Player {
     this.userData.state = "IDLE";
     if (this.handSocket) this.handSocket.visible = true;
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Mini itens de comida (1 malha cada, cor por vértice): pão dourado com 2 cortes e maçã vermelha com cabo e folha
+// ---------------------------------------------------------------------------
+function _foodPart(geometry, color, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
+  const g = geometry.index ? geometry.toNonIndexed() : geometry;
+  g.scale(sx, sy, sz);
+  g.rotateX(rx);
+  g.rotateZ(rz);
+  g.translate(x, y, z);
+  const c = new THREE.Color(color);
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  g.deleteAttribute("uv");
+  return g;
+}
+
+const _foodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, flatShading: true });
+
+function buildFoodMesh(kind) {
+  const parts = [];
+  if (kind === "bread") {
+    parts.push(_foodPart(new THREE.SphereGeometry(0.06, 8, 6), "#d9a441", 0, 0, 0, 1.55, 0.82, 1)); // pão achatado
+    parts.push(_foodPart(new THREE.SphereGeometry(0.06, 6, 4), "#f0cc78", 0, 0.028, 0, 1.2, 0.35, 0.8)); // topo claro
+    for (const dx of [-0.032, 0.032]) parts.push(_foodPart(new THREE.BoxGeometry(0.008, 0.012, 0.075), "#8a5a1e", dx, 0.045, 0, 1, 1, 1, 0, 0.5)); // cortes
+  } else {
+    parts.push(_foodPart(new THREE.SphereGeometry(0.055, 8, 6), "#b5262c", 0, 0, 0, 1, 0.92, 1)); // maçã
+    parts.push(_foodPart(new THREE.CylinderGeometry(0.004, 0.005, 0.03, 4), "#5a3a1e", 0, 0.058, 0, 1, 1, 1, 0, 0.2)); // cabinho
+    parts.push(_foodPart(new THREE.SphereGeometry(0.02, 5, 4), "#4f8a3a", 0.02, 0.06, 0, 1.6, 0.25, 0.8, 0, 0.4)); // folha
+  }
+  const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  const mesh = new THREE.Mesh(merged, _foodMat);
+  mesh.name = kind === "bread" ? "FoodBread" : "FoodApple";
+  mesh.position.set(0.0, -0.33, 0.06); // na mão (ponta do antebraço), um pouco à frente
+  mesh.castShadow = false;
+  mesh.frustumCulled = false;
+  return mesh;
 }

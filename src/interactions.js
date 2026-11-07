@@ -4,6 +4,7 @@ import {
   PlayerStats,
   PlayerEquipment,
   PlayerInventory,
+  FOOD_CAP,
   BUILD_COSTS,
   MissionState,
   buyUpgrade,
@@ -90,14 +91,15 @@ export class InteractionSystem {
       const npc = this.activeNPC;
       if (!npc || !npc.alive) return;
       const res = NpcLife.ask(npc, id);
-      this.ui.chatReply(res, id === "bye");
+      this.ui.chatReply(res, id === "bye" || res.end);
     };
     this.ui.setVitals(player.health, player.maxHealth, player.coins, player.potions);
     this.ui.setRPGStats?.(PlayerStats, PlayerEquipment);
   }
 
   _price(base) {
-    return Math.max(1, Math.round(base * PlayerStats.getPriceMult()));
+    // desconto conquistado em conversa (opção "unlock: discount") vale por alguns dias com aquele NPC
+    return Math.max(1, Math.round(base * PlayerStats.getPriceMult() * NpcLife.discountMult(this.activeNPC)));
   }
 
   // NPC que o jogador está OLHANDO e ao alcance da conversa: tem prioridade sobre qualquer outra ação do E
@@ -223,6 +225,36 @@ export class InteractionSystem {
     if (this._vitalsTimer >= 0.25) {
       this._vitalsTimer = 0;
       syncPlayerStatsToPlayer(this.player, this.ui);
+    }
+  }
+
+  // Padeiro: compra e venda de pão e maçã (vão para o alforje, tecla Tab: comer ou doar)
+  _bakerAction(action, pLoaf, pApple) {
+    const food = PlayerInventory.food || (PlayerInventory.food = { bread: 0, apple: 0 });
+    const [, verb, kind] = action.split(":");
+    const price = kind === "bread" ? pLoaf : pApple;
+    const label = kind === "bread" ? "pão" : "maçã";
+    if (verb === "buy" || verb === "buy3") {
+      const n = verb === "buy3" ? 3 : 1;
+      if (this.player.coins < price * n || (food[kind] || 0) + n > FOOD_CAP) {
+        this._showNPCDialogue(this.player.coins < price * n ? "Hmm, as moedas não cobrem isso. Volte quando puder." : "Seu alforje já está cheio! Coma ou reparta um pouco.");
+        return;
+      }
+      this.player.coins -= price * n;
+      PlayerInventory.gold = this.player.coins;
+      food[kind] = (food[kind] || 0) + n;
+      this.audio?.coin?.();
+      this.ui.showToast(`+${n} ${label}${n > 1 && kind === "bread" ? "s" : ""} no alforje (Tab) · -${price * n} moedas`, 3500);
+      const lines = ["Quentinho! Aproveite enquanto está macio.", "Bom apetite, forasteiro. Ou reparta com quem tem fome.", "Pode confiar: farinha boa, forno bom."];
+      this._showNPCDialogue(lines[(Math.random() * lines.length) | 0]);
+    } else if (verb === "sell" && (food[kind] || 0) > 0) {
+      const gain = Math.max(1, price - 1);
+      food[kind]--;
+      this.player.coins += gain;
+      PlayerInventory.gold = this.player.coins;
+      this.audio?.coin?.();
+      this.ui.showToast(`Vendeu 1 ${label} · +${gain} moedas`, 3000);
+      this._showNPCDialogue("Fechado. Sempre há quem compre pão.");
     }
   }
 
@@ -512,15 +544,17 @@ export class InteractionSystem {
 
   // Metadados do menu pessoal (retrato de rosto, humor, confiança, perguntas). Hostis/cultistas mantêm o menu antigo.
   _chatMeta(npc, message = "") {
-    if (!npc || npc.isBandit || !["guard", "smith", "merchant", "farmer", "villager", "priest", "beggar"].includes(npc.roleKey)) return null;
+    if (!npc || npc.isBandit || !["guard", "smith", "merchant", "baker", "farmer", "villager", "priest", "beggar"].includes(npc.roleKey)) return null;
     if (!NpcLife.storiesReady) return null;
     const key = `${npc.name}#${this._chatSession || 0}`;
     if (this._chatFresh) {
       this._chatFresh = false;
       return { ...NpcLife.chatMeta(npc), key };
     }
+    // fala antiga (hard-coded): se reconhecida, ganha opções próprias e a aba Conversa vem à frente
+    const optQs = message ? NpcLife.optionsForText(npc, message) : null;
     const st = NpcLife.status(npc);
-    return { ...st, key, say: message || "" };
+    return { ...st, key, say: message || "", questions: optQs || st.questions, focusChat: Boolean(optQs) };
   }
 
   _showNPCDialogue(message = "") {
@@ -686,6 +720,19 @@ export class InteractionSystem {
         { id: "train:cha", label: `Cortesia e Retórica (+1 CAR, atual ${PlayerStats.cha}) · ${pTrainCha} moedas`, disabled: this.player.coins < pTrainCha },
         { id: "rumor:secrets", label: "✦ Segredos dos Viajantes: Mecânicas e boatos dos ermos" },
         { id: "rumor:demiurge_book", label: "✦ Boatos da Taverna: Indagar sobre o Diário dos Demiurgos" },
+        { id: "close", label: "Encerrar conversa" },
+      ];
+    } else if (npc.roleKey === "baker") {
+      body = (message || "Pão quentinho saindo do forno e maçãs da horta! O que vai levar, forasteiro?") + chaNote;
+      const pLoaf = this._price(3);
+      const pApple = this._price(2);
+      const food = PlayerInventory.food || (PlayerInventory.food = { bread: 0, apple: 0 });
+      actions = [
+        { id: "baker:buy:bread", label: `Comprar pão · ${pLoaf} moedas (${food.bread} no alforje)`, disabled: this.player.coins < pLoaf || food.bread >= FOOD_CAP },
+        { id: "baker:buy:apple", label: `Comprar maçã · ${pApple} moedas (${food.apple} no alforje)`, disabled: this.player.coins < pApple || food.apple >= FOOD_CAP },
+        { id: "baker:buy3:bread", label: `Comprar 3 pães · ${pLoaf * 3} moedas`, disabled: this.player.coins < pLoaf * 3 || food.bread > FOOD_CAP - 3 },
+        { id: "baker:sell:bread", label: `Vender 1 pão do alforje · +${Math.max(1, pLoaf - 1)} moedas`, disabled: food.bread <= 0 },
+        { id: "baker:sell:apple", label: `Vender 1 maçã do alforje · +${Math.max(1, pApple - 1)} moedas`, disabled: food.apple <= 0 },
         { id: "close", label: "Encerrar conversa" },
       ];
     } else if (npc.roleKey === "farmer") {
@@ -1453,6 +1500,8 @@ export class InteractionSystem {
     const pPotion = this._price(10);
     const pCandle = this._price(6);
     const pBread = this._price(5);
+    const pLoaf = this._price(3);
+    const pApple = this._price(2);
     const pHay = this._price(4);
     const pBolts = this._price(8);
     const pArrows = this._price(7);
@@ -1600,6 +1649,8 @@ export class InteractionSystem {
       this._showNPCDialogue("Uma poção a mais no alforje. Volte quando precisar.");
     } else if (action === "candle") {
       if (this.candle?.buy(pCandle)) this._showNPCDialogue("Uma boa vela para as noites sem lua.");
+    } else if (action.startsWith("baker:")) {
+      this._bakerAction(action, pLoaf, pApple);
     } else if (action === "bread" && this.player.coins >= pBread && this.player.health < this.player.maxHealth) {
       this.player.coins -= pBread;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + 1);
