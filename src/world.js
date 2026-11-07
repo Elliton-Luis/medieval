@@ -185,7 +185,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=71", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=73", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1009,10 +1009,18 @@ export class World {
 
   // Distância de visibilidade da névoa (m). Chunks além dela só mostrariam a cor da névoa: nem são desenhados.
   // Os limites de LOD encolhem de leve junto (nunca abaixo de 55%): sem pop-in visível, menos triângulos.
+  /** Fatores do governador de desempenho: lod multiplica os limites de LOD; view, a distância de desenho. */
+  setQuality(lod = 1, view = 1) {
+    this._qLod = lod;
+    this._qView = view;
+  }
+
   setFogVisibility(vis) {
-    const view = Math.min(CONFIG.viewDistance, vis + 48); // + meia diagonal do chunk
+    const qv = this._qView ?? 1;
+    const view = Math.min(CONFIG.viewDistance, (vis + 48) * qv); // + meia diagonal do chunk
     this.viewDistanceSq = view * view;
-    const k = Math.max(0.55, Math.min(1, vis / 110));
+    // fator da névoa (mín. 55%) x fator de qualidade do governador
+    const k = Math.max(0.55, Math.min(1, vis / 110)) * (this._qLod ?? 1);
     const base = CONFIG.lodDistances;
     if (!this._lodDistances || this._lodDistances === base) this._lodDistances = base.slice();
     for (let i = 0; i < base.length; i++) this._lodDistances[i] = base[i] * k;

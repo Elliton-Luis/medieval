@@ -60,8 +60,11 @@ const SCRIPTURE_CHAPTERS = [
   },
 ];
 
+const DETAIL_PARTS = ["wood", "ceiling", "dark"]; // partes de detalhe fino das casas (LOD)
+
 export class HouseSystem {
   constructor({ houses, player, ui, effects, audio, npcs, drops, sleep, candle, input = null, wells = [], townBenches = [] }) {
+    this.detailScale = 1; // reduzido pelo governador de desempenho (qualidade)
     this.cullDistSq = 115 * 115; // reduzido em tempo real pela distância de visibilidade da névoa (main.js)
     this.houses = houses;
     this.player = player;
@@ -308,6 +311,16 @@ export class HouseSystem {
       if (house.meshes.glass) {
         const showGlass = distanceSq < 38 * 38;
         if (house.meshes.glass.visible !== showGlass) house.meshes.glass.visible = showGlass;
+      }
+      // LOD de detalhe: além de ~52 m só pedra, reboco e telhado (silhueta); madeira, vigas do teto e partes escuras
+      // são detalhe fino que a névoa já apaga: 3 draw calls a menos por casa distante (HLOD simples).
+      const showDetail = distanceSq < (52 * this.detailScale) * (52 * this.detailScale);
+      if (house._detailShown !== showDetail) {
+        house._detailShown = showDetail;
+        for (const key of DETAIL_PARTS) {
+          const m = house.meshes[key];
+          if (m && m.visible !== showDetail) m.visible = showDetail;
+        }
       }
 
       // 5. Culling do INTERIOR das Casas:

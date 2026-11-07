@@ -116,8 +116,14 @@ class TelemetryProfiler {
       this._bufTriangles[idx] = 0;
     }
 
+    // performance.memory é cara (sincroniza com o heap): lê no máximo 2x por segundo e repete o último valor
     if (typeof performance !== "undefined" && performance.memory) {
-      this._bufHeap[idx] = performance.memory.usedJSHeapSize / 1048576; // MB
+      const nowMs = performance.now();
+      if (nowMs - (this._lastHeapRead || 0) > 500) {
+        this._lastHeapRead = nowMs;
+        this._lastHeapMB = performance.memory.usedJSHeapSize / 1048576;
+      }
+      this._bufHeap[idx] = this._lastHeapMB || 0; // MB
     } else {
       this._bufHeap[idx] = 0;
     }

@@ -1,5 +1,8 @@
 import { initWorld, rememberWorld, isCanonicalWorld, getWorld, getCapital } from "./worldgen.js";
 import { nearestFreePoint } from "./placement.js";
+import "./perfPatches.js"; // patches de desempenho do three (matrizes de nós escondidos; materiais de 2 faces)
+import { fixDoubleSidedTransparent } from "./perfPatches.js";
+import { PerfGovernor } from "./perfGovernor.js";
 import { updateCulling, setFogCull } from "./cullManager.js";
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
@@ -209,14 +212,15 @@ const RENDER_HEIGHT = (() => {
   const v = new URLSearchParams(location.search).get("res");
   return v === null ? 720 : Number(v) || 0;
 })();
+let _renderScale = 1; // fração da altura de render, controlada pelo governador de desempenho
 function _applyRenderSize(nativeRatio) {
   if (RENDER_HEIGHT > 0) {
-    const h = RENDER_HEIGHT;
+    const h = Math.max(240, Math.round(RENDER_HEIGHT * _renderScale));
     const w = Math.max(2, Math.round((h * window.innerWidth) / Math.max(1, window.innerHeight)));
     renderer.setPixelRatio(1);
     renderer.setSize(w, h, false); // CSS (canvas 100% x 100%) amplia para a janela
   } else {
-    renderer.setPixelRatio(nativeRatio);
+    renderer.setPixelRatio(nativeRatio * _renderScale);
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
 }
@@ -649,6 +653,8 @@ export function warmupPipelines(renderer, scene, camera, weapons, world = null) 
     }
   }
 
+  fixDoubleSidedTransparent(scene); // antes do compile: os programas já nascem em passada única
+
   // Tudo o que aparece DEPOIS (monstros e servos da noite, acampamentos, vilas fora de alcance, níveis de LOD
   // distantes): compila os shaders e sobe geometrias/texturas à GPU agora, sob a tela de carregamento. Antes cada
   // primeiro aparecimento (anoitecer, chegar a um acampamento, ver um LOD novo) compilava na hora e travava.
@@ -750,6 +756,32 @@ function resize() {
 window.addEventListener("resize", resize, { passive: true });
 window.addEventListener("contextmenu", (event) => event.preventDefault());
 
+let _singlePassTimer = 1;
+// ----------------------------------------------------------------------------
+// Governador de desempenho: mantém ~60 FPS trocando qualidade por velocidade (resolução, sombras, distâncias, LOD,
+// taxa de animação dos NPCs). Ver perfGovernor.js. ?perf=0..5 trava um nível; ?perf=off desliga.
+// ----------------------------------------------------------------------------
+let _qView = 1;
+let _govShadowEvery = 1;
+let _frameCounter = 0;
+const governor = new PerfGovernor((level, cfg) => {
+  _renderScale = cfg.scale;
+  _applyRenderSize(_dpr);
+  _govShadowEvery = cfg.shadowEvery;
+  if (sun.shadow.mapSize.x !== cfg.shadow) {
+    sun.shadow.mapSize.set(cfg.shadow, cfg.shadow);
+    if (sun.shadow.map) {
+      sun.shadow.map.dispose();
+      sun.shadow.map = null;
+    }
+  }
+  _qView = cfg.view;
+  world.setQuality(cfg.lod, cfg.view);
+  houses.detailScale = cfg.lod;
+  npcs.animLod = cfg.npc;
+});
+governor.init();
+
 const INDOOR_RADIUS = 36; // raio (m) ao redor da porta que continua desenhado quando o jogador está dentro de um prédio
 const _indoorFocus = { x: 0, z: 0, r: INDOOR_RADIUS, rSq: INDOOR_RADIUS * INDOOR_RADIUS, chunkRSq: 0 };
 
@@ -768,6 +800,8 @@ function frame(now) {
   if (delta < FRAME_MIN_MS) return;
   _lastRenderStamp = now - (delta % FRAME_MIN_MS);
   adaptResolution(Math.min(delta, 100));
+  const _frameWorkStart = performance.now();
+  _frameCounter++;
 
   telemetry.beginFrame();
   const elapsed = Math.min((now - lastTime) / 1000, 0.1);
@@ -860,8 +894,8 @@ function frame(now) {
       npcs.indoorFocus = null;
     }
     world.setFogVisibility(vis);
-    houses.cullDistSq = Math.min(115, vis + 28) ** 2;
-    setFogCull(vis);
+    houses.cullDistSq = (Math.min(115, vis + 28) * _qView) ** 2;
+    setFogCull(vis * _qView);
   }
   const canAim = !input.modalOpen && !player.knockedOut && !player.blocking;
   aim.prepare(player, weapons.currentWeapon, canAim);
@@ -897,8 +931,24 @@ function frame(now) {
 
   world.updateVisibility(camera, player.x, player.z, isCutscene);
   updateCulling(player.x, player.z, dt);
+  // novos materiais transparentes de 2 faces (efeitos, spawns) entram em passada única a cada ~3 s
+  _singlePassTimer -= dt;
+  if (_singlePassTimer <= 0) {
+    _singlePassTimer = 3;
+    fixDoubleSidedTransparent(scene);
+  }
+  // cadência das sombras do governador (1 = todo quadro; N = a cada N; 0 = congela). Fora da cutscene (ela as congela).
+  if (!GameState.isIntroPlaying) {
+    if (_govShadowEvery === 1) {
+      sun.shadow.autoUpdate = true;
+    } else {
+      sun.shadow.autoUpdate = false;
+      if (_govShadowEvery > 0 && _frameCounter % _govShadowEvery === 0) sun.shadow.needsUpdate = true;
+    }
+  }
   renderer.render(scene, camera);
   telemetry.mark("render");
+  governor.update(delta, performance.now() - _frameWorkStart, isPaused || isCutscene);
 
   ui.update(dt, clock, world.activeChunks.length, npcs.nearest, player.x, player.z);
   debugScreen.update(dt);

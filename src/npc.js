@@ -1650,6 +1650,27 @@ export class NPCSystem {
 
   // NPC fora de vista (atrás do jogador / atrás de casas): a IA continua, mas a 10 Hz com dt acumulado.
   // Ninguém vê a animação, então o custo de pose/rig por frame some sem alterar o comportamento.
+  // LOD DE IA/ANIMAÇÃO (time slicing): NPC longe do jogador não precisa de 60 atualizações por segundo.
+  // Perto (< 30 m, ou em combate/alerta): todo quadro. 30–55 m: a cada 2 quadros (30 Hz). Além: a cada 4 (15 Hz).
+  // O dt acumulado é entregue de uma vez, então a velocidade de movimento não muda. O governador de desempenho
+  // encurta as distâncias (animLod > 1) quando o jogo não está segurando 60 FPS.
+  _tickLod(npc, dt, playerX, playerZ, distanceSq) {
+    const s = this.animLod || 1;
+    const near = 30 / s;
+    if (distanceSq < near * near || npc.mode !== "work" || npc._hitStun > 0) {
+      if (npc._lodAcc) { dt += npc._lodAcc; npc._lodAcc = 0; }
+      npc.update(dt, playerX, playerZ);
+      return;
+    }
+    const every = distanceSq < (55 / s) * (55 / s) ? 2 : 4;
+    npc._lodAcc = (npc._lodAcc || 0) + dt;
+    npc._lodPhase = npc._lodPhase ?? (npc.walkPhase * 997) % every | 0;
+    if ((this._frameNo + npc._lodPhase) % every !== 0) return;
+    const step = npc._lodAcc;
+    npc._lodAcc = 0;
+    npc.update(step, playerX, playerZ);
+  }
+
   _tickHidden(npc, dt, playerX, playerZ) {
     npc._hiddenAcc = (npc._hiddenAcc || 0) + dt;
     if (npc._hiddenAcc < 0.1) return;
@@ -1659,6 +1680,7 @@ export class NPCSystem {
   }
 
   update(dt, playerX, playerZ, isNight = false, isPlayerLit = true, timeOfDay = 12, isCutscene = false) {
+    this._frameNo = (this._frameNo || 0) + 1;
     const clampedDt = Math.min(dt, 0.05);
     this.playerX = playerX;
     this.playerZ = playerZ;
@@ -1837,7 +1859,7 @@ export class NPCSystem {
         }
       }
       if (npc.alive && !npc.root.userData.isSleeping) npc.root.visible = true;
-      npc.update(clampedDt, playerX, playerZ);
+      this._tickLod(npc, clampedDt, playerX, playerZ, distanceSq);
       if (!npc.alive || npc.root.userData.isSleeping) continue;
       // Também verifica se o guarda com tocha acesa está iluminando o jogador (< 10 m)
       if (isNight && !this.isPlayerLit && npc.root.userData.hasTorch && distanceSq < 10 * 10) {
