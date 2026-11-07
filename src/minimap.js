@@ -36,7 +36,7 @@ export class Minimap {
     this.time += dt;
     this.timer -= dt;
     if (this.timer > 0) return;
-    this.timer = 1 / 14;
+    this.timer = 1 / 10; // minimapa a 10 Hz: o HUD não precisa de 60 quadros
     this._draw(player, cameraYaw, npcs, wanted);
   }
 

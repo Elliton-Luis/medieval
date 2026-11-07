@@ -65,19 +65,21 @@ export class World {
     this._lodDistances = CONFIG.lodDistances;
     this._rockMaterial = new THREE.MeshStandardMaterial({ color: "#777a70", roughness: 1, flatShading: true });
     this._clayMaterial = new THREE.MeshStandardMaterial({ color: "#9c5737", roughness: 1, flatShading: true });
-    // Pedras: 6 níveis (icosaedro 20 faces -> octaedro 8 -> tetraedro 4 -> pirâmide -> 2 triângulos cruzados -> 1 triângulo)
+    // Pedras: o mais simples possível (pouco definidas, bem baratas) para poder ter MUITAS:
+    // octaedro 8 faces -> tetraedro 4 -> tetraedro -> cone de 3 lados -> 2 triângulos cruzados -> 1 triângulo
     const rockFar = "#545650";
+    const rockTetra = new THREE.TetrahedronGeometry(0.85, 0);
     this._rockLods = [
-      { geometry: new THREE.IcosahedronGeometry(0.7, 0), material: this._rockMaterial },
-      { geometry: new THREE.OctahedronGeometry(0.7, 0), material: this._rockMaterial },
-      { geometry: new THREE.TetrahedronGeometry(0.8, 0), material: this._rockMaterial },
-      { geometry: new THREE.ConeGeometry(0.75, 0.8, 4, 1, true), material: this._rockMaterial },
+      { geometry: new THREE.OctahedronGeometry(0.72, 0), material: this._rockMaterial },
+      { geometry: rockTetra, material: this._rockMaterial },
+      { geometry: rockTetra, material: this._rockMaterial },
+      { geometry: new THREE.ConeGeometry(0.78, 0.8, 3, 1, true), material: this._rockMaterial },
       { geometry: createCrossedTriangles(1.5, 0.85, 0.02), material: makeImpostorMaterial(rockFar) },
       { geometry: createIsoscelesTriangleGeometry(1.5, 0.85, 0.02, false), material: makeBillboardMaterial(rockFar) },
     ];
     // Argila: só aparece nos 4 níveis mais próximos (pequena demais para impostor)
-    const clayHi = new THREE.DodecahedronGeometry(0.65, 0);
-    const clayLo = new THREE.OctahedronGeometry(0.65, 0);
+    const clayHi = new THREE.OctahedronGeometry(0.65, 0);
+    const clayLo = new THREE.TetrahedronGeometry(0.75, 0);
     this._clayLods = [
       { geometry: clayHi, material: this._clayMaterial },
       { geometry: clayHi, material: this._clayMaterial },
@@ -181,7 +183,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=45", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=49", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1279,7 +1281,7 @@ export class World {
       }
     }
 
-    const rockCount = 5 + Math.floor(random() * 8);
+    const rockCount = 9 + Math.floor(random() * 11); // ~2x mais pedras (cada uma custa poucos triângulos)
     for (let i = 0; i < rockCount; i++) {
       const x = baseX + 2 + random() * (size - 4);
       const z = baseZ + 2 + random() * (size - 4);
@@ -1309,7 +1311,7 @@ export class World {
       colliders.push(col);
     }
 
-    const grassCount = 36 + Math.floor(random() * 24);
+    const grassCount = 72 + Math.floor(random() * 44); // ~2x mais tufos (cada tufo ficou com 3 lâminas)
     for (let i = 0; i < grassCount; i++) {
       const x = baseX + 1.5 + random() * (size - 3);
       const z = baseZ + 1.5 + random() * (size - 3);

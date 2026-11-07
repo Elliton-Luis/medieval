@@ -302,12 +302,11 @@ function buildLodGeometries(kind) {
 function makeGrass() {
   const random = rng(71);
   const parts = [];
+  // 3 lâminas (antes 5): tufo menos definido e mais barato; o mundo ganha mais tufos no lugar
   const blades = [
-    [0, 0, 0.46, 0.08, 0.08, 0],
-    [0.14, 0.08, 0.38, 0.07, -0.22, 0.18],
-    [-0.13, 0.06, 0.41, 0.07, 0.2, -0.15],
-    [0.07, -0.13, 0.35, 0.065, 0.14, 0.24],
-    [-0.09, -0.11, 0.37, 0.065, -0.18, -0.2],
+    [0, 0, 0.5, 0.1, 0.08, 0],
+    [0.14, 0.08, 0.42, 0.09, -0.24, 0.2],
+    [-0.13, 0.06, 0.44, 0.09, 0.22, -0.18],
   ];
   const baseColor = new THREE.Color("#6b6a30");
   const tipColor = new THREE.Color("#b8ac58");

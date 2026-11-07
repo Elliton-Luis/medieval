@@ -155,7 +155,7 @@ export class DropSystem {
   spawnFor(npc, power = 1) {
     if (npc.roleKey === "horse") return;
     const loot = LOOT[npc.roleKey] || LOOT.villager;
-    const count = roll(loot.coins);
+    const count = loot.coins ? roll(loot.coins) : 0; // saque só de itens (sem moedas) também é válido
     const y = npc.root.position.y + 1.1;
     for (let i = 0; i < count; i++) this._spawn(this.coins, npc.x, y, npc.z, power, 0.04);
     for (const [id, chance] of loot.weapons || []) {
@@ -172,10 +172,10 @@ export class DropSystem {
 
   // Solta um saque arbitrário (baús, potes): { coins: [min, max], items: [[tipo, chance], ...] }
   spawnLoot(x, y, z, loot, power = 0.8) {
-    const count = roll(loot.coins);
+    const count = loot.coins ? roll(loot.coins) : 0; // saque só de itens (sem moedas) também é válido
     for (let i = 0; i < count; i++) this._spawn(this.coins, x, y, z, power, 0.04);
     for (const [kind, chance] of loot.items || []) {
-      if (Math.random() < chance) this._spawn(this.items[kind], x, y, z, power, ITEMS[kind].lift);
+      if (ITEMS[kind] && Math.random() < chance) this._spawn(this.items[kind], x, y, z, power, ITEMS[kind].lift);
     }
     this.effects.play("glint", x, y, z, "#ffe08a", 0.9);
   }

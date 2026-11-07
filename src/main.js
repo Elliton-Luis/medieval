@@ -200,10 +200,10 @@ renderer.domElement.addEventListener("webglcontextrestored", () => {
 }, false);
 // Resolução interna FIXA (visual de PS2/2005): o 3D é renderizado em RENDER_HEIGHT linhas e ampliado pelo CSS
 // sem suavização (image-rendering: pixelated), então o serrilhado fica nítido e o jogo fica muito mais leve.
-//   padrão = 480p | ?res=720 (HD) | ?res=1080 (Full HD) | ?res=0 (resolução nativa adaptativa, como antes)
+//   padrão = 720p (HD) | ?res=480 (visual de PS2) | ?res=1080 (Full HD) | ?res=0 (resolução nativa adaptativa)
 const RENDER_HEIGHT = (() => {
   const v = new URLSearchParams(location.search).get("res");
-  return v === null ? 480 : Number(v) || 0;
+  return v === null ? 720 : Number(v) || 0;
 })();
 function _applyRenderSize(nativeRatio) {
   if (RENDER_HEIGHT > 0) {
