@@ -5,6 +5,7 @@ import { createIrregularBloodGeometry } from "./farmAnimals.js";
 import { addCityBeacon } from "./beacons.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { mergeStaticMeshes } from "./mergeUtils.js";
+import { getGhostTownSpots } from "./worldgen.js";
 import { registerCullable } from "./cullManager.js";
 
 // ============================================================================
@@ -330,6 +331,9 @@ function getDetailMats() {
   _detailMats.glowGold = new THREE.MeshBasicMaterial({ color: 0xffc95a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   _detailMats.glowPale = new THREE.MeshBasicMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   _detailMats.page = new THREE.MeshBasicMaterial({ color: 0xf2e4b2, side: THREE.DoubleSide });
+  // ALMA (fantasma) que marca um item na casa: translúcida, com cor por vértice (corpo claro, olhos/boca escuros),
+  // 1 material compartilhado e a névoa continua valendo (some sozinha ao longe)
+  _detailMats.soul = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d");
@@ -342,7 +346,36 @@ function getDetailMats() {
   const tex = new THREE.CanvasTexture(c);
   _detailMats.spriteGold = new THREE.SpriteMaterial({ map: tex, color: 0xffd070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 });
   _detailMats.spritePale = new THREE.SpriteMaterial({ map: tex, color: 0xa8bce0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 });
+  // brilho tênue da alma (visto só no meio da distância, LOD 1)
+  _detailMats.spriteSoul = new THREE.SpriteMaterial({ map: tex, color: 0x9fd0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22 });
   return _detailMats;
+}
+
+// Alma: cabeça arredondada + corpo em cone (~120 triângulos), olhos e boca escuros. Uma única geometria compartilhada.
+let _soulGeo = null;
+function getSoulGeometry() {
+  if (_soulGeo) return _soulGeo;
+  const parts = [];
+  const add = (geo, x, y, z, sx, sy, sz, r, g, b) => {
+    const gg = geo.index ? geo.toNonIndexed() : geo;
+    gg.scale(sx, sy, sz);
+    gg.translate(x, y, z);
+    const n = gg.attributes.position.count;
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b; }
+    gg.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    gg.deleteAttribute("uv");
+    parts.push(gg);
+  };
+  add(new THREE.ConeGeometry(0.21, 0.62, 7, 1, true), 0, 0.31, 0, 1, 1, 1, 0.78, 0.9, 1.0); // manto/cauda
+  add(new THREE.SphereGeometry(0.15, 7, 6), 0, 0.68, 0, 1, 1.1, 1, 0.9, 0.96, 1.0); // cabeça
+  add(new THREE.SphereGeometry(0.03, 5, 4), -0.055, 0.71, 0.125, 1, 1.5, 0.6, 0.03, 0.04, 0.08); // olho
+  add(new THREE.SphereGeometry(0.03, 5, 4), 0.055, 0.71, 0.125, 1, 1.5, 0.6, 0.03, 0.04, 0.08); // olho
+  add(new THREE.SphereGeometry(0.035, 5, 4), 0, 0.6, 0.13, 1, 1.9, 0.6, 0.03, 0.04, 0.08); // boca (lamento)
+  _soulGeo = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  _soulGeo.computeBoundingSphere();
+  return _soulGeo;
 }
 
 function _ni(geometry, x, y, z, rx = 0, ry = 0, rz = 0) {
@@ -474,24 +507,22 @@ function buildRuinDetails(mats, w, d, h, isDestroyed) {
 function buildPageMarker(hasPage) {
   const dm = getDetailMats();
   const group = new THREE.Group();
-  group.name = "PageMarker";
-  const glow = new THREE.Sprite(hasPage ? dm.spriteGold : dm.spritePale);
-  glow.scale.set(1.5, 1.5, 1);
-  glow.position.y = 0.55;
+  group.name = "SoulMarker";
+  // LOD 1 (distância média): só um brilho tênue, quase imperceptível
+  const glow = new THREE.Sprite(dm.spriteSoul);
+  glow.scale.set(hasPage ? 1.3 : 0.8, hasPage ? 1.3 : 0.8, 1);
+  glow.position.y = 0.7;
   group.add(glow);
-  // feixe de luz que atravessa o telhado e se vê de longe
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.2, hasPage ? 5.4 : 3.2, 8, 1, true), hasPage ? dm.glowGold : dm.glowPale);
-  beam.position.y = (hasPage ? 5.4 : 3.2) / 2;
-  beam.renderOrder = 3;
-  group.add(beam);
-  let page = null;
+  // LOD 0 (perto): a alma. Só as casas com página têm uma; as outras ficam só com o brilho fraco.
+  let soul = null;
   if (hasPage) {
-    page = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.34), dm.page);
-    page.position.y = 0.95;
-    page.rotation.x = -0.25;
-    group.add(page);
+    soul = new THREE.Mesh(getSoulGeometry(), dm.soul);
+    soul.position.y = 0.55;
+    soul.visible = false;
+    group.add(soul);
   }
-  group.userData = { glow, page, beam, hasPage, baseY: 0.95, noMerge: true }; // animado a cada frame: fora da mesclagem estática
+  // `page`/`beam` não existem mais (sem folha flutuante nem feixe visto de longe); `soul` e `glow` são animados
+  group.userData = { glow, soul, page: null, beam: null, hasPage, baseY: 0.55, lod: -1, wx: 0, wz: 0, wReady: false, noMerge: true };
   return group;
 }
 
@@ -1086,9 +1117,11 @@ export function generateGhostTown(townConfig, scene, world) {
 export function initFixedGhostTowns(scene, world) {
   if (!scene || ActiveGhostTowns.length > 0) return ActiveGhostTowns;
 
-  for (let i = 0; i < FIXED_GHOST_TOWNS.length; i++) {
-    const config = FIXED_GHOST_TOWNS[i];
-    generateGhostTown(config, scene, world);
+  // posições, nomes e sementes vêm do worldgen (mundo canônico = a lista fixa acima)
+  const spots = getGhostTownSpots();
+  const list = spots.length ? spots : FIXED_GHOST_TOWNS;
+  for (let i = 0; i < list.length; i++) {
+    generateGhostTown(list[i], scene, world);
   }
 
   return ActiveGhostTowns;
@@ -1106,29 +1139,39 @@ function _animateHouseMarkers(playerPos, dt) {
   if (ActiveGhostHouses.length === 0) return;
   _markerClock += dt;
   const dm = getDetailMats();
-  // pulso único nos materiais compartilhados
-  const pulse = 0.5 + 0.5 * Math.sin(_markerClock * 2.6);
-  dm.glowGold.opacity = 0.18 + pulse * 0.22;
-  dm.glowPale.opacity = 0.1 + pulse * 0.14;
-  dm.spriteGold.opacity = 0.55 + pulse * 0.4;
-  dm.spritePale.opacity = 0.4 + pulse * 0.3;
+  // pulso único nos materiais compartilhados (almas e brilho): lento e fraco, para só ser notado de perto
+  const pulse = 0.5 + 0.5 * Math.sin(_markerClock * 1.6);
+  dm.soul.opacity = 0.4 + pulse * 0.22;
+  dm.spriteSoul.opacity = 0.14 + pulse * 0.12;
   const px = playerPos?.x ?? 0;
   const pz = playerPos?.z ?? 0;
   for (let i = 0; i < ActiveGhostHouses.length; i++) {
     const gh = ActiveGhostHouses[i];
     const m = gh.marker;
     if (!m) continue;
-    m.visible = !gh.looted;
-    if (gh.looted) continue;
+    if (gh.looted) { m.visible = false; continue; }
     const dSq = (px - gh.x) ** 2 + (pz - gh.z) ** 2;
-    if (dSq > 90 * 90) continue; // longe demais: não anima
     const ud = m.userData;
-    if (ud.page) {
-      ud.page.position.y = ud.baseY + Math.sin(_markerClock * 1.8 + i) * 0.07;
-      ud.page.rotation.y = _markerClock * 1.1 + i;
+    // LOD das almas: > 30 m nada (a névoa já esconderia); 14–30 m só um brilho tênue; < 14 m a alma aparece
+    if (dSq > 30 * 30) { m.visible = false; continue; }
+    m.visible = true;
+    const near = dSq < 14 * 14;
+    if (ud.glow) ud.glow.visible = !near || !ud.soul;
+    if (ud.soul) {
+      ud.soul.visible = near;
+      if (near) {
+        if (!ud.wReady) {
+          m.getWorldPosition(_markerWorld);
+          ud.wx = _markerWorld.x;
+          ud.wz = _markerWorld.z;
+          ud.wReady = true;
+        }
+        // flutua, deriva devagar e olha para o jogador
+        ud.soul.position.y = ud.baseY + Math.sin(_markerClock * 1.3 + i) * 0.09;
+        ud.soul.position.x = Math.sin(_markerClock * 0.7 + i * 1.7) * 0.14;
+        ud.soul.rotation.y = Math.atan2(px - ud.wx, pz - ud.wz);
+      }
     }
-    const s = 1.35 + pulse * 0.35;
-    ud.glow.scale.set(s, s, 1);
   }
 }
 
