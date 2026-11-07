@@ -556,13 +556,34 @@ export class FarmAnimalManager {
   spawnBloodPool(x, z) {
     const y = this.world.heightAt(x, z) + 0.03;
     const geo = createIrregularBloodGeometry(0.85 + Math.random() * 0.45, Math.random() * 100);
-    const mesh = new THREE.Mesh(geo, _bloodDecalMat);
+    // material próprio (clone) para a poça poder sumir sozinha, sem afetar as outras
+    const mat = _bloodDecalMat.clone();
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     this.scene.add(mesh);
-    this.bloodPools.push(mesh);
+    this.bloodPools.push({ mesh, mat, age: 0 });
+  }
+
+  // As poças deixam de ser eternas: ficam ~40 s, depois somem devagar (quase imperceptível) até ~110 s.
+  _updateBloodPools(dt) {
+    for (let i = this.bloodPools.length - 1; i >= 0; i--) {
+      const p = this.bloodPools[i];
+      p.age += dt;
+      if (p.age > 40) {
+        const t = Math.min(1, (p.age - 40) / 70);
+        p.mat.opacity = 0.9 * (1 - t * t * (3 - 2 * t));
+        if (t >= 1) {
+          this.scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          p.mat.dispose();
+          this.bloodPools.splice(i, 1);
+        }
+      }
+    }
   }
 
   update(dt) {
+    if (this.bloodPools.length) this._updateBloodPools(dt);
     for (let i = 0; i < this.animals.length; i++) {
       this.animals[i].update(dt);
     }

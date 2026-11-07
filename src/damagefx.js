@@ -71,8 +71,11 @@ export class DamageFx {
 // Tudo em dois InstancedMesh pré-alocados (gotas + manchas): zero alocação por frame.
 // ============================================================================
 const MAX_DROPS = 140;
-const MAX_DECALS = 110;
-const DECAL_LIFE = 34; // s
+const MAX_DECALS = 160;
+// O sangue seca (cor) nos primeiros segundos, fica por um bom tempo e então some DEVAGAR por transparência:
+// a partir de FADE_START a opacidade cai de forma suave até zero em DECAL_LIFE (quase imperceptível, sem encolher).
+const DECAL_LIFE = 100; // s
+const FADE_START = 35; // s
 const GRAVITY = 15;
 const _bc = new THREE.Color();
 const COL_WET = new THREE.Color("#6b0a0e");
@@ -132,7 +135,23 @@ export class BloodFx {
     // --- manchas no chão ---
     const decalMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.22, metalness: 0.0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     decalMat.depthWrite = false;
-    this.decals = new THREE.InstancedMesh(makeBloodSplatGeometry(), decalMat, MAX_DECALS);
+    decalMat.transparent = true;
+    // alpha por instância (aFade): permite o sumiço gradual sem custo por mancha
+    decalMat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nattribute float aFade;\nvarying float vFade;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvFade = aFade;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vFade;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.a *= vFade;");
+    };
+    decalMat.customProgramCacheKey = () => "bloodDecalFade";
+    const splatGeo = makeBloodSplatGeometry();
+    this._fade = new Float32Array(MAX_DECALS).fill(1);
+    this._fadeAttr = new THREE.InstancedBufferAttribute(this._fade, 1);
+    this._fadeAttr.setUsage(THREE.DynamicDrawUsage);
+    splatGeo.setAttribute("aFade", this._fadeAttr);
+    this.decals = new THREE.InstancedMesh(splatGeo, decalMat, MAX_DECALS);
     this.decals.frustumCulled = false;
     this.decals.matrixAutoUpdate = false;
     this.decals.renderOrder = 1;
@@ -196,6 +215,8 @@ export class BloodFx {
     k.sz = 0.8 + Math.random() * 0.45;
     k.grow = spread > 0 ? spread : 0.35 + Math.random() * 0.3;
     k.age = 0;
+    this._fade[i] = 1;
+    this._fadeAttr.needsUpdate = true;
     this._decalsActive++;
     this._writeDecal(i, 0.25);
     this.decals.instanceColor.needsUpdate = true;
@@ -315,15 +336,24 @@ export class BloodFx {
         if (k.age >= DECAL_LIFE) {
           k.on = false;
           this._decalsActive--;
+          this._fade[i] = 0;
+          this._fadeAttr.needsUpdate = true;
           this.decals.setMatrixAt(i, _bM.makeScale(0, 0, 0));
           this.decals.instanceMatrix.needsUpdate = true;
           continue;
         }
         const grow = Math.min(1, k.age / k.grow);
         let s = 0.25 + 0.75 * (1 - (1 - grow) * (1 - grow));
-        const fade = Math.max(0, (k.age - (DECAL_LIFE - 7)) / 7);
-        s *= 1 - fade * fade; // some encolhendo (sem alpha => sem custo de transparência)
         this._writeDecal(i, s);
+        // sumiço gradual: smoothstep da opacidade entre FADE_START e DECAL_LIFE (atualiza só se mudou o bastante)
+        if (k.age > FADE_START) {
+          const t = Math.min(1, (k.age - FADE_START) / (DECAL_LIFE - FADE_START));
+          const a = 1 - t * t * (3 - 2 * t);
+          if (Math.abs(this._fade[i] - a) > 0.004) {
+            this._fade[i] = a;
+            this._fadeAttr.needsUpdate = true;
+          }
+        }
         // úmido -> seco (vermelho vivo escuro -> marrom enegrecido); atualiza ~a cada 0.5 s por mancha
         if (((k.age * 2) | 0) !== (((k.age - dt) * 2) | 0)) {
           _bc.copy(COL_WET).lerp(COL_DRY, Math.min(1, k.age / 14));
