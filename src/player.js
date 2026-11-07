@@ -669,7 +669,7 @@ export class Player {
       this.dustTimer -= dt;
       if (this.dustTimer <= 0) {
         this.dustTimer = 0.2;
-        this.effects?.play("dust", this.x - this.vx * 0.06, ground + 0.12, this.z - this.vz * 0.06, "#cdbb97", 0.5);
+        this.effects?.play("dust", this.x - this.vx * 0.06, finalGround + 0.12, this.z - this.vz * 0.06, "#cdbb97", 0.5);
       }
     }
 
