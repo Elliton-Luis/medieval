@@ -693,7 +693,8 @@ function frame(now) {
 
   if (GameState.isIntroPlaying) {
     updateIntroSequence(dt, player, camera, world, audio, effects, ui);
-    world.updateAround(player.x, player.z);
+    // streaming travado no acampamento: o trajeto inteiro já foi gerado antes da cena (sem criar chunks correndo)
+    world.updateAround(GameState.anchorX ?? player.x, GameState.anchorZ ?? player.z);
     effects.update(dt);
     world.updateVisibility(camera, player.x, player.z, true);
     dayNight.update(dt, player.x, player.z);

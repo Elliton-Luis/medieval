@@ -473,6 +473,14 @@ function _ensureUIElements() {
     document.body.appendChild(_skipPrompt);
   }
 
+  if (!_redVignette) {
+    _redVignette = document.createElement("div");
+    _redVignette.className = "intro-red-vignette";
+    _redVignette.style.cssText =
+      "position:fixed;inset:0;z-index:9000;pointer-events:none;opacity:0;transition:opacity 0.12s linear;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 38%,rgba(120,4,10,0.55) 78%,rgba(60,0,4,0.9) 100%);";
+    document.body.appendChild(_redVignette);
+  }
+
   if (!_caption) {
     _caption = document.createElement("div");
     _caption.className = "intro-caption";
@@ -516,6 +524,153 @@ const T = {
 };
 const ENTITY_DIST = 3.4; // distância entre o ponto final da corrida e a entidade
 const WOLF_X = [-3.0, 0.0, 3.0];
+
+// ============================================================================
+// 5a. Preparação para rodar LISO (gambiarras assumidas)
+//  - o mundo inteiro (casas, NPCs, animais, plantações...) é desligado: a cutscene só desenha chão + o que ela usa
+//  - todos os chunks do trajeto são gerados ANTES, e o streaming fica travado durante a cena
+//  - fogueira (PointLight), cultistas, lobos e entidade são compilados/enviados à GPU sob a tela de loading
+//  - mapa de sombras congelado (a luz do luar é quase zero): menos uma passada de render por frame
+//  - tempo da cena suavizado (média exponencial do dt): hitches isolados não viram trancos na câmera
+// ============================================================================
+let _hiddenForIntro = [];
+let _shadowRestore = null;
+let _dtSmooth = 0;
+let _redVignette = null;
+let _hbTimer = 0;
+let _drone = null;
+const INTRO_SPEED = 1.12; // a cena corre ~12% mais rápida: mais tensa, menos arrastada
+
+function _prepareIntroWorld(env, startX, startZ) {
+  const { scene, world, player, dayNight, renderer, camera } = env;
+  // 1) chunks do trajeto, todos antes (cada chamada constrói no máximo 1)
+  if (world?.updateAround) {
+    for (let i = 0; i < 140; i++) {
+      world.updateAround(startX, startZ);
+      if (!world._pendingChunkQueue || world._pendingChunkQueue.length === 0) break;
+    }
+  }
+  GameState.anchorX = startX;
+  GameState.anchorZ = startZ;
+
+  // 2) esconde o resto do mundo
+  const keep = new Set([player.root, _tallFigure, _fire, ..._introWolves, ..._cultists, dayNight?.fixedAstroGroup]);
+  if (world?.chunks) for (const chunk of world.chunks.values()) keep.add(chunk.group);
+  _hiddenForIntro.length = 0;
+  for (const ch of scene.children) {
+    if (!ch.visible || ch.isLight || ch.isSprite || keep.has(ch)) continue;
+    if (ch.isGroup || ch.isMesh || ch.isPoints || ch.isLine) {
+      ch.visible = false;
+      _hiddenForIntro.push(ch);
+    }
+  }
+
+  // 3) pré-compila e envia à GPU tudo o que a cena usa (com a fogueira já presente => mesma contagem de luzes)
+  const objs = [_tallFigure, _fire, ..._introWolves, ..._cultists];
+  const prev = objs.map((o) => o.visible);
+  const culled = [];
+  for (const o of objs) {
+    o.visible = true;
+    o.traverse((m) => {
+      if (m.isMesh || m.isSprite) {
+        culled.push([m, m.frustumCulled]);
+        m.frustumCulled = false;
+      }
+    });
+  }
+  try {
+    if (_glowTex) renderer.initTexture?.(_glowTex);
+    renderer.compile(scene, camera);
+    const sun = dayNight?.sun;
+    if (sun) {
+      sun.shadow.needsUpdate = true;
+      renderer.render(scene, camera); // uma passada: aloca o mapa de sombras e sobe geometrias/texturas
+      _shadowRestore = sun.shadow.autoUpdate;
+      sun.shadow.autoUpdate = false;
+    } else {
+      renderer.render(scene, camera);
+    }
+  } catch (err) {
+    console.warn("Pré-aquecimento da cutscene falhou:", err);
+  }
+  for (const [m, f] of culled) m.frustumCulled = f;
+  objs.forEach((o, i) => (o.visible = prev[i]));
+}
+
+function _restoreIntroWorld() {
+  for (const o of _hiddenForIntro) o.visible = true;
+  _hiddenForIntro.length = 0;
+  const sun = _introEnv?.dayNight?.sun;
+  if (sun && _shadowRestore !== null) {
+    sun.shadow.autoUpdate = _shadowRestore;
+    sun.shadow.needsUpdate = true;
+    _shadowRestore = null;
+  }
+  _stopDrone();
+  if (_redVignette) _redVignette.style.opacity = "0";
+}
+
+// Drone grave contínuo (3 osciladores graves levemente dessintonizados): mal-estar constante sem música extra
+function _startDrone(audio) {
+  if (_drone || !audio?.context) return;
+  const ctx = audio.context;
+  try {
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 180;
+    out.connect(lp).connect(audio.sfx || audio.master || ctx.destination);
+    const oscs = [[47, "sine"], [50.6, "sine"], [94.5, "triangle"]].map(([f, type]) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      o.connect(out);
+      o.start();
+      return o;
+    });
+    out.gain.linearRampToValueAtTime(0.09, ctx.currentTime + 4);
+    _drone = { out, oscs, ctx };
+  } catch (_) {
+    _drone = null;
+  }
+}
+
+function _stopDrone() {
+  if (!_drone) return;
+  const { out, oscs, ctx } = _drone;
+  try {
+    out.gain.cancelScheduledValues(ctx.currentTime);
+    out.gain.setValueAtTime(out.gain.value, ctx.currentTime);
+    out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+    for (const o of oscs) o.stop(ctx.currentTime + 0.7);
+  } catch (_) {}
+  _drone = null;
+}
+
+// Tensão crescente: batimento cardíaco que acelera, drone, vinheta vermelha pulsando e tremor de câmera
+function _suspense(t, dt, audio, camera) {
+  const tension = _smooth(t / (T.black - 2)); // 0 -> 1 até o fim da fuga
+  if (t > 0.4) _startDrone(audio);
+  if (t >= 3 && t < T.black) {
+    _hbTimer -= dt;
+    if (_hbTimer <= 0) {
+      _hbTimer = 1.05 - 0.68 * tension; // de ~57 bpm a ~160 bpm
+      audio?.heartbeat?.(0.5 + tension * 0.9);
+    }
+  }
+  if (_redVignette) {
+    const chase = t > T.zoom ? Math.min(1, 0.35 + tension) : 0;
+    const pulse = 0.5 + 0.5 * Math.sin(t * (4 + tension * 9));
+    const o = chase * (0.18 + pulse * 0.22 * tension);
+    const text = o.toFixed(2);
+    if (_redVignette.style.opacity !== text) _redVignette.style.opacity = text;
+  }
+  // tremor extra proporcional à tensão (a câmera nunca fica "limpa" demais)
+  const j = 0.004 + tension * 0.02;
+  camera.position.x += Math.sin(t * 41) * j;
+  camera.position.y += Math.cos(t * 37) * j * 0.8;
+}
 
 // ============================================================================
 // 5b. Inicialização
@@ -682,6 +837,11 @@ export function startIntroSequence(env) {
     _fadeOverlay.style.transition = "opacity 0.6s ease-in-out";
     _fadeOverlay.style.opacity = "0";
   }
+
+  _dtSmooth = 0;
+  _hbTimer = 0.5;
+  _prepareIntroWorld(env, startX, startZ);
+  document.body.classList.add("intro-playing");
 }
 
 // ============================================================================
@@ -710,8 +870,13 @@ function _howl(audio, key, t, at, vol, dist) {
   }
 }
 
-export function updateIntroSequence(dt, player, camera, world, audio, effects, ui) {
+export function updateIntroSequence(dtRaw, player, camera, world, audio, effects, ui) {
   if (!GameState.isIntroPlaying) return;
+
+  // dt suavizado (média exponencial) e limitado: picos isolados não viram trancos de câmera
+  const clamped = Math.min(dtRaw, 0.05);
+  _dtSmooth = _dtSmooth === 0 ? clamped : _dtSmooth + (clamped - _dtSmooth) * 0.2;
+  const dt = _dtSmooth * INTRO_SPEED;
 
   GameState.introTimer += dt;
   const t = GameState.introTimer;
@@ -960,6 +1125,28 @@ export function updateIntroSequence(dt, player, camera, world, audio, effects, u
     camera.lookAt(_eyeW.x, _eyeW.y, _eyeW.z);
   }
 
+  // ------------------------------------------------------------------ suspense (áudio, vinheta, tremor)
+  _suspense(t, dt, audio, camera);
+  if (t >= T.cultist && !_introFlags.stCultist) {
+    _introFlags.stCultist = true;
+    audio?._tone?.("sawtooth", 130, 48, 1.1, 0.16);
+    audio?._tone?.("sine", 70, 30, 1.4, 0.4);
+  }
+  if (t >= T.zoom && !_introFlags.stZoom) {
+    _introFlags.stZoom = true;
+    audio?._tone?.("sawtooth", 60, 240, 2.4, 0.07); // riser
+  }
+  if (t >= T.run && !_introFlags.stRun) {
+    _introFlags.stRun = true;
+    audio?._tone?.("sine", 90, 28, 0.9, 0.6); // pancada de saída
+    audio?.pain?.();
+  }
+  if (runTau >= RUN_DURATION + 0.2 && !_introFlags.stEntity) {
+    _introFlags.stEntity = true;
+    audio?._tone?.("sine", 55, 24, 2.2, 0.7);
+    audio?._tone?.("sawtooth", 82, 41, 1.6, 0.12);
+  }
+
   // ------------------------------------------------------------------ legenda, fade e som final
   if (t >= T.caption && !_introFlags.caption) {
     _introFlags.caption = true;
@@ -996,6 +1183,10 @@ export function endIntroSequence(isSkipped = false) {
 
   GameState.isIntroPlaying = false;
   GameState.introPhase = 3;
+  GameState.anchorX = undefined;
+  GameState.anchorZ = undefined;
+  _restoreIntroWorld();
+  document.body.classList.remove("intro-playing");
 
   if (_tallFigure) {
     _tallFigure.visible = false;

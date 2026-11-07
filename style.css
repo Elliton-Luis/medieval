@@ -1321,3 +1321,6 @@ kbd { display: inline-block; padding: 3px 6px; border: 1px solid #e8e1c933; bord
   color: #d4a8ff;
   font-weight: 700;
 }
+
+/* Cutscene de abertura: sem HUD por cima da imagem (cinematográfico). O fundo, a vinheta e o loading seguem visíveis. */
+body.intro-playing #game > *:not(canvas):not(.vignette):not(#loading) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.4s ease; }

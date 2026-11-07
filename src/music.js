@@ -535,13 +535,47 @@ export class MusicDirector {
     this._switchTo(this.context, true);
   }
 
+  // Regra de ouro: UMA música por vez. O som de descoberta é uma música curta, então a trilha atual
+  // fica em pausa enquanto ele toca e volta com fade-in quando termina (ou após um tempo de segurança).
   playDiscovery() {
-    if (!this._discoveryAudio) return;
+    const stinger = this._discoveryAudio;
+    if (!stinger || this._stingerHold) return;
     try {
-      this._discoveryAudio.currentTime = 0;
-      this._discoveryAudio.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
-      this._discoveryAudio.play().catch(() => {});
-    } catch (_) {}
+      this._stingerHold = true;
+      const token = (this._stingerToken = (this._stingerToken || 0) + 1);
+      // pausa tudo que estiver tocando (sem descartar o estado da trilha atual)
+      this._silenceAllExcept(null, null);
+      const finish = () => {
+        if (this._stingerToken !== token || !this._stingerHold) return;
+        this._stingerHold = false;
+        stinger.onended = null;
+        if (this.pausedForDefeat) return;
+        if (!this.current && this.fadingOutTrack) {
+          this.current = this.fadingOutTrack;
+          this.fadingOutTrack = null;
+        }
+        if (this.current) {
+          this._applyTrackVolume(this.current, 0);
+          this._safePlay(this.current);
+          this.fadePhase = "fading_in";
+          this.phaseTimer = 0;
+          this.phaseDuration = FADE_IN_DURATION;
+          this.startVolume = 0;
+        } else {
+          this.currentKey = null;
+          this._switchTo(this.targetKey || this.context || "explore", true);
+        }
+      };
+      stinger.currentTime = 0;
+      stinger.volume = Math.min(1, (this.audio?.settings?.music ?? 0.6) * 1.0);
+      stinger.onended = finish;
+      const started = stinger.play();
+      if (started && started.catch) started.catch(finish);
+      const secs = Number.isFinite(stinger.duration) && stinger.duration > 0 ? stinger.duration : 8;
+      window.setTimeout(finish, Math.min(20, secs) * 1000 + 400);
+    } catch (_) {
+      this._stingerHold = false;
+    }
   }
 
   /**
@@ -849,6 +883,12 @@ export class MusicDirector {
       this._combatCooldown = Math.max(0, this._combatCooldown - dt);
     }
     if (!this.started || !this.audio.context || this.pausedForDefeat) return;
+
+    // Som de descoberta tocando: nenhuma faixa de fundo pode soar (uma música por vez)
+    if (this._stingerHold) {
+      this._silenceAllExcept(null, null);
+      return;
+    }
 
     // -------------------------------------------------------------------------
     // MÁQUINA DE TRANSIÇÃO SUAVE (GARANTIA DE UMA ÚNICA FAIXA POR VEZ)
