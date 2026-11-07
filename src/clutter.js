@@ -1,3 +1,4 @@
+import { registerMoundBale } from "./hay.js";
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
@@ -287,8 +288,10 @@ export class ClutterManager {
     _dummy.scale.set(1, 1, 1);
     _dummy.updateMatrix();
     this.hayMoundsMesh.setMatrixAt(this.hayMoundsCount, _dummy.matrix);
-    this.hayMoundsCount++;
     this.world.addStaticCollider(x, z, 1.4, 2.2);
+    const list = this.world.staticColliders;
+    registerMoundBale(this.hayMoundsMesh, this.hayMoundsCount, x, y, z, ry, list && list.length ? list[list.length - 1] : null);
+    this.hayMoundsCount++;
   }
 
   addWoodPile(x, z, ry = 0) {

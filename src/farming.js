@@ -1,4 +1,5 @@
 import { registerCullable } from "./cullManager.js";
+import { registerGroupBale } from "./hay.js";
 import * as THREE from "three";
 import { PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 import { WorldDecay } from "./decay.js";
@@ -413,13 +414,17 @@ export class FarmFieldManager {
     const bz2 = baleEdgeZ + 1.2;
     if (!this.isInsideOrNearBuilding(baleEdgeX, bz1, 1.8)) {
       const by1 = this.world.heightAt(baleEdgeX, bz1);
-      fieldGroup.add(createHayBaleMesh(baleEdgeX, by1, bz1, 0.15));
+      const bale1 = createHayBaleMesh(baleEdgeX, by1, bz1, 0.15);
+      fieldGroup.add(bale1);
       this.world.addStaticCollider(baleEdgeX, bz1, 0.8, 1.2);
+      registerGroupBale(bale1, baleEdgeX, bz1, this.world);
     }
     if (!this.isInsideOrNearBuilding(baleEdgeX, bz2, 1.8)) {
       const by2 = this.world.heightAt(baleEdgeX, bz2);
-      fieldGroup.add(createHayBaleMesh(baleEdgeX, by2, bz2, -0.22));
+      const bale2 = createHayBaleMesh(baleEdgeX, by2, bz2, -0.22);
+      fieldGroup.add(bale2);
       this.world.addStaticCollider(baleEdgeX, bz2, 0.8, 1.2);
+      registerGroupBale(bale2, baleEdgeX, bz2, this.world);
     }
 
     // 4. Mourões de madeira rústica e cerca nas extremidades

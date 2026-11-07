@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { canPlace as _canPlaceFootprint, reserve as _reserveFootprint, release as _releaseFootprint } from "./placement.js";
 import { triggerCultistMessenger, WorldDecay } from "./decay.js";
 import { CultState } from "./cult.js";
 
@@ -743,6 +744,7 @@ export function handleNPCDeath(npc, npcs, raycaster = _sharedRaycaster) {
 
   const data = obj.userData;
   data.isDead = true;
+  try { window.__game?.npcLife?.onPlayerKilled?.(npcEntity); } catch (_) {}
 
   const deathPos = npcEntity
     ? _crimeVec.set(npcEntity.x, obj.position.y, npcEntity.z)
@@ -1604,7 +1606,23 @@ export function gatherResource(player, toolType, environmentInstancedMeshes) {
 // ============================================================================
 // 11. Modo Construção: Catálogo de 10 Estruturas, Pool e Preview Holográfico
 // ============================================================================
+// Meias-dimensões (largura/2, profundidade/2) das construções grandes do jogador, para a checagem de sobreposição
+const PLAYER_BUILD_FOOTPRINT = {
+  HOUSE: [3.9, 3.4],
+  CABIN: [3.1, 2.8],
+  BARN: [4.4, 3.8],
+  BLACKSMITH_SHED: [2.9, 2.6],
+  CORRAL: [3.4, 3.4],
+};
+
 export const BUILD_COSTS = {
+  HAY_BALE: {
+    hay: 10,
+    label: "Bloco de Feno",
+    desc: "Fardo de feno bruto: custa 10 de feno e rende 50 quando ceifado com a Foice.",
+    category: "VILA",
+    icon: "🌾",
+  },
   CABIN: {
     wood: 12,
     stone: 4,
@@ -2658,8 +2676,32 @@ function _buildClayWallLargeMesh() {
   return group;
 }
 
+// Bloco de feno criado pelo jogador (1 grupo leve: fardo + 2 cordas). Rende 50 de feno com a Foice.
+function _buildHayBaleBlockMesh() {
+  const group = new THREE.Group();
+  const hayMat = new THREE.MeshStandardMaterial({ color: 0xd8ba5a, roughness: 0.9, flatShading: true });
+  const ropeMat = new THREE.MeshStandardMaterial({ color: 0x8a6d41, roughness: 1, flatShading: true });
+  const bale = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.75, 0.82), hayMat);
+  bale.position.y = 0.38;
+  bale.castShadow = true;
+  group.add(bale);
+  for (const bx of [-0.32, 0.32]) {
+    const rope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.77, 0.84), ropeMat);
+    rope.position.set(bx, 0.38, 0);
+    group.add(rope);
+  }
+  group.visible = false;
+  group.userData = { type: "HAY_BALE", collidersRegistered: false, hayLeft: 50 };
+  return group;
+}
+
+export function getPlayerBuildingsPool() {
+  return _playerBuildingsPool;
+}
+
 export function buildStructureMeshByType(type) {
   switch (type) {
+    case "HAY_BALE": return _buildHayBaleBlockMesh();
     case "CABIN": return _buildPlayerCabinMesh();
     case "HOUSE": return _buildPlayerHouseMesh();
     case "CORRAL": return _buildPlayerCorralMesh();
@@ -2720,7 +2762,7 @@ function _getBuildPreviewGroup(scene = _env.scene) {
 export function calculateBuildingTransform(playerPos, playerRot, type = "HOUSE", customAngle = null, pool = _playerBuildingsPool) {
   const isWall = type.startsWith("STONE_WALL_") || type.startsWith("CLAY_WALL_") || type === "WALL_GATE";
   const isHouseType = type === "HOUSE" || type === "CABIN" || type === "BARN";
-  const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL"].includes(type)
+  const fwdDist = ["TORCH_POST", "CAMPFIRE", "WELL", "HAY_BALE"].includes(type)
     ? 2.6
     : ["CABIN", "CORRAL", "BLACKSMITH_SHED", "STONE_WALL_SMALL", "CLAY_WALL_SMALL"].includes(type)
       ? 3.8
@@ -2907,6 +2949,7 @@ export function createPlayerBuildingsPool(scene = _env.scene, world = _env.world
 }
 
 export const BUILDING_BOUNDS = {
+  HAY_BALE: { w: 1.4, d: 1.0, h: 0.8, y: 0.4 },
   CABIN: { w: 3.6, d: 3.0, h: 2.8, y: 1.4 },
   HOUSE: { w: 5.0, d: 4.4, h: 3.8, y: 1.9 },
   CORRAL: { w: 5.2, d: 5.2, h: 1.5, y: 0.75 },
@@ -3075,6 +3118,8 @@ function _registerBuildingColliders(building, world = _env.world) {
     const top = by + 3.4;
     const bottom = by - 1.0;
     addBox(bx, bz, 0.55, 0.55, ry, bottom, top, { move: true, shot: false, cam: false });
+  } else if (type === "HAY_BALE") {
+    addBox(bx, bz, 1.3, 0.9, ry, by - 0.4, by + 0.8, { move: true, shot: false, cam: false });
   } else if (type === "CAMPFIRE") {
     const top = by + 0.9;
     const bottom = by - 0.5;
@@ -3094,6 +3139,10 @@ function _registerBuildingColliders(building, world = _env.world) {
 
 export function destroyBuilding(building, world = _env.world, scene = _env.scene, effects = _env.effects) {
   if (!building) return false;
+  if (building.userData._footprint) {
+    _releaseFootprint(building.userData._footprint);
+    building.userData._footprint = null;
+  }
 
   // 1. Desativa todos os colisores orientados (OBBs) registrados para esta construção
   if (building.userData.registeredBoxes && building.userData.registeredBoxes.length > 0) {
@@ -3197,6 +3246,16 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
         ? playerBuildingsPool
         : createPlayerBuildingsPool(_env.scene, _env.world);
 
+    // Construções grandes não podem nascer dentro de outras (registro global de pegadas)
+    const _fp = PLAYER_BUILD_FOOTPRINT[type];
+    if (_fp) {
+      const _t = calculateBuildingTransform(playerPos, playerRot, type, customAngle, pool);
+      if (!_canPlaceFootprint(_t.bx, _t.bz, _fp[0], _fp[1], _t.rotY, 1.4)) {
+        _env.ui?.showToast?.("Espaço ocupado: afaste-se de outras construções para erguer aqui.");
+        return false;
+      }
+    }
+
     // Pega estrutura do pool ou cria se o pool estiver esgotado
     let building = pool.find((b) => b.userData.type === type && !b.visible);
     if (!building) {
@@ -3219,6 +3278,14 @@ export function buildStructure(playerPos, playerRot, type = "HOUSE", playerBuild
     building.position.set(bx, by, bz);
     building.rotation.y = rotY;
     building.visible = true;
+    if (PLAYER_BUILD_FOOTPRINT[type]) {
+      const fp = PLAYER_BUILD_FOOTPRINT[type];
+      building.userData._footprint = _reserveFootprint(bx, bz, fp[0], fp[1], rotY, "player", `player-${type}`, 1.4);
+    }
+    if (type === "HAY_BALE") {
+      building.userData.hayLeft = 50; // bloco novo: 50 de feno, volta a escala cheia (reuso do pool)
+      building.scale.set(1, 1, 1);
+    }
 
     // Limpa árvores e pedras do terreno dentro da área da construção
     _env.world?.clearObstaclesInRadius?.(bx, bz, 4.8);

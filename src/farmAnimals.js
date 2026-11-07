@@ -295,11 +295,10 @@ export class BaseFarmAnimal {
 
     // Drop de recursos alimentícios
     if (this.manager.drops) {
-      if (this.kind === "chicken") {
-        this.manager.drops._spawn?.("feathers", this.x, this.z, 0, 0, 1);
-      } else {
-        this.manager.drops._spawn?.("pork", this.x, this.z, 0, 0, 1);
-      }
+      // (antes chamava _spawn com a assinatura errada e lançava TypeError a cada sacrifício diário)
+      const y = (this.root?.position?.y ?? 0) + 0.3;
+      const item = this.kind === "chicken" ? "apple" : "bread";
+      this.manager.drops.spawnLoot?.(this.x, y, this.z, { items: [[item, 1]] }, 0.5);
     }
 
     EventBus.emit(GAME_EVENTS.NPC_DIED, { kind: this.kind, x: this.x, z: this.z, sacrifice: isSacrifice });
