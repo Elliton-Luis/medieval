@@ -17,6 +17,17 @@ const _detailMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
+// Material de sombreamento SUAVE (formas redondas: capuzes, mantos, braços). Mesmo custo do outro.
+const _smoothMat = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.85,
+  metalness: 0.06,
+  flatShading: false,
+});
+export function getSmoothDetailMaterial() {
+  return _smoothMat;
+}
+
 const _m4 = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
@@ -53,6 +64,12 @@ function makePrim(def) {
     case "box": g = new THREE.BoxGeometry(def.a[0], def.a[1], def.a[2]); break;
     case "sph": g = new THREE.SphereGeometry(def.a[0], def.a[1] ?? 6, def.a[2] ?? 4); break;
     case "cyl": g = new THREE.CylinderGeometry(def.a[0], def.a[1], def.a[2], def.a[3] ?? 5); break;
+    // cápsula: [raio, comprimento do corpo, segmentos das pontas, segmentos radiais]
+    case "cap": g = new THREE.CapsuleGeometry(def.a[0], def.a[1], def.a[2] ?? 2, def.a[3] ?? 6); break;
+    // toro: [raio, espessura, segmentos do tubo, segmentos do anel, arco opcional]
+    case "tor": g = new THREE.TorusGeometry(def.a[0], def.a[1], def.a[2] ?? 4, def.a[3] ?? 10, def.a[4] ?? Math.PI * 2); break;
+    // torno (manto redondo): [[[raio, y], ...], segmentos radiais]
+    case "lat": g = new THREE.LatheGeometry(def.a[0].map(([r, y]) => new THREE.Vector2(r, y)), def.a[1] ?? 10); break;
     default: g = new THREE.BoxGeometry(0.1, 0.1, 0.1);
   }
   if (g.index) g = g.toNonIndexed();
@@ -68,15 +85,24 @@ function makePrim(def) {
   return g;
 }
 
+/** Funde uma lista de primitivas em UMA geometria (vertex colors), para o chamador criar o mesh que quiser. */
+export function makeMergedGeometry(defs) {
+  const geos = defs.map(makePrim);
+  const merged = mergeGeometries(geos, false);
+  for (const g of geos) g.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 /**
  * Cria uma malha única a partir de uma lista de primitivas.
  * def: { t:"cone|box|sph|cyl", a:[args], p:[x,y,z], r:[rx,ry,rz], s:[sx,sy,sz], c:0xRRGGBB, ao:0..1 }
  */
-export function addDetail(parent, defs, name = "Detail") {
+export function addDetail(parent, defs, name = "Detail", smooth = false) {
   const geos = defs.map(makePrim);
   const merged = mergeGeometries(geos, false);
   for (const g of geos) g.dispose();
-  const mesh = new THREE.Mesh(merged, _detailMat);
+  const mesh = new THREE.Mesh(merged, smooth ? _smoothMat : _detailMat);
   mesh.name = name;
   mesh.castShadow = false;
   mesh.receiveShadow = false;

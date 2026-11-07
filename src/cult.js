@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { igniteTarget, spawnLoot, PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 import { VILLAGES } from "./kingdom.js";
-import { finalizeMonster } from "./monsterParts.js";
+import { finalizeMonster, makeMergedGeometry, getSmoothDetailMaterial } from "./monsterParts.js";
 
 // ============================================================================
 // 1. Materiais e Geometrias Otimizadas do Culto dos Cátaros (Zero-GC)
@@ -568,6 +568,97 @@ export const CULT_CAMPS_PRESETS = [
 /**
  * Espalha os acampamentos pequenos, médios e enorme e seus altares rituais.
  */
+// ----------------------------------------------------------------------------
+// Fogo e adereços animados dos acampamentos do culto (geometrias/materiais compartilhados)
+// ----------------------------------------------------------------------------
+const _campConeUnit = new THREE.ConeGeometry(0.5, 1, 7, 1, true).translate(0, 0.5, 0);
+const _campFireOuterMat = new THREE.MeshBasicMaterial({ color: 0x8b2be2, transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthWrite: false });
+const _campFireMidMat = new THREE.MeshBasicMaterial({ color: 0xd13cff, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false });
+const _campFireCoreMat = new THREE.MeshBasicMaterial({ color: 0xffd9ff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+const _campTorchOuterMat = new THREE.MeshBasicMaterial({ color: 0xff4a12, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false });
+const _campTorchInnerMat = new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+const _campEmberMat = new THREE.PointsMaterial({ color: 0xe0a8ff, size: 0.13, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
+const _campFlagGeo = new THREE.BoxGeometry(0.62, 0.4, 0.015).translate(0.31, 0, 0);
+const _campFlagMat = new THREE.MeshStandardMaterial({ color: 0x6e0d19, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });
+const _cm = new THREE.Matrix4();
+const _cq = new THREE.Quaternion();
+const _cv = new THREE.Vector3();
+const _cs = new THREE.Vector3();
+const _ce = new THREE.Euler();
+
+/** Anima UM acampamento (chamas por senos, brasas subindo, bandeiras e o flicker da luz). Só roda quando o jogador está perto. */
+function animateCampFx(camp, time, dt) {
+  const fx = camp.userData.fx;
+  if (!fx) return;
+  const t = time + fx.phase;
+  const fl = 0.86 + Math.sin(t * 11) * 0.07 + Math.sin(t * 17 + 1.3) * 0.05 + Math.sin(t * 5) * 0.04;
+
+  // fogueira(s): 3 camadas aninhadas, cada uma com escala/rotação própria
+  const layers = [[fx.fireOuter, 1, 1, 1.0], [fx.fireMid, 0.72, 0.84, -1.5], [fx.fireCore, 0.42, 0.62, 2.1]];
+  for (const [mesh, rk, hk, spin] of layers) {
+    for (let i = 0; i < fx.fireSlots.length; i++) {
+      const sl = fx.fireSlots[i];
+      const ph = t + i * 1.7;
+      const w = 1 + Math.sin(ph * 6.1 + hk) * 0.09;
+      const hh = sl.h * hk * (fl + Math.sin(ph * 8.3 + hk * 3) * 0.12);
+      _ce.set(0, ph * spin, Math.sin(ph * 3.1) * 0.06);
+      _cq.setFromEuler(_ce);
+      _cv.set(sl.x + Math.sin(ph * 4 + hk) * 0.02, sl.y, sl.z + Math.cos(ph * 3.4) * 0.02);
+      _cs.set(sl.r * 2 * rk * w, hh, sl.r * 2 * rk * w);
+      _cm.compose(_cv, _cq, _cs);
+      mesh.setMatrixAt(i, _cm);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  // tochas rubras
+  for (let i = 0; i < fx.torchSlots.length; i++) {
+    const sl = fx.torchSlots[i];
+    const ph = t + i * 2.3;
+    const a = Math.sin(ph * 9.0);
+    const b = Math.sin(ph * 6.3 + 1.0);
+    _ce.set(0, ph * 2.4, 0);
+    _cq.setFromEuler(_ce);
+    _cv.set(sl.x, sl.y, sl.z);
+    _cs.set(1.2 + a * 0.15, 1.15 + b * 0.28, 1.2 + a * 0.15);
+    _cm.compose(_cv, _cq, _cs);
+    fx.torchOuter.setMatrixAt(i, _cm);
+    _cs.set(1.15 - a * 0.1, 1.0 + b * 0.2, 1.15 - a * 0.1);
+    _cm.compose(_cv, _cq, _cs);
+    fx.torchInner.setMatrixAt(i, _cm);
+  }
+  fx.torchOuter.instanceMatrix.needsUpdate = true;
+  fx.torchInner.instanceMatrix.needsUpdate = true;
+
+  // halo e luz pulsam junto com a chama
+  fx.fireHalo.material.opacity = 0.55 + fl * 0.3;
+  const light = camp.userData.mainLight;
+  if (light && light.visible) {
+    const base = camp.userData.isHuge ? 6.5 : 4.5;
+    light.intensity = base * (0.82 + (fl - 0.86) * 1.4);
+  }
+
+  // brasas subindo em espiral lenta; reciclam ao passar do topo
+  const pos = fx.emberPos;
+  for (let i = 0; i < fx.emberN; i++) {
+    const ang = fx.emberSeed[i * 3];
+    const speed = fx.emberSeed[i * 3 + 1];
+    const off = fx.emberSeed[i * 3 + 2];
+    const life = (t * 0.22 * speed + off) % 1;
+    const rad = 0.18 + life * 0.5 + off * 0.2;
+    pos[i * 3] = Math.cos(ang + life * 4) * rad;
+    pos[i * 3 + 1] = 0.3 + life * (2.6 + off);
+    pos[i * 3 + 2] = Math.sin(ang + life * 4) * rad;
+  }
+  fx.embers.geometry.attributes.position.needsUpdate = true;
+
+  // bandeiras esfarrapadas balançando devagar
+  for (let i = 0; i < fx.flags.length; i++) {
+    const f = fx.flags[i];
+    f.rotation.y = f.userData.base + Math.sin(t * 0.9 + f.userData.phase) * 0.35;
+    f.rotation.z = Math.sin(t * 1.7 + f.userData.phase) * 0.08;
+  }
+}
+
 export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCenter, scene, world) {
   if (!skullsMesh || !weaponsMesh || !cityCenter) return;
   const random = createSeededRandom(regionSeed || 12345);
@@ -629,49 +720,166 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       const isHuge = preset.tier === "huge";
       const isMedium = preset.tier === "medium";
 
-      // 1. Paliçada Defensiva de Troncos Queimados (Médio e Enorme)
+      // Geometria ESTÁTICA do acampamento fundida em UM mesh (cor por vértice, formas redondas);
+      // fogo, brasas e bandeiras são os únicos elementos animados (poucos draw calls).
+      const defs = [];
+      const PI2 = Math.PI * 2;
+
+      // 1. Paliçada de troncos queimados com crânios (Médio e Enorme)
       if (isHuge || isMedium) {
         const stakeCount = isHuge ? 20 : 10;
         const stakeRadius = isHuge ? 8.5 : 4.8;
-        for (let s = 0; s < stakeCount; s++) {
-          if (s === 0 || s === 1) continue;
-          const sang = (s / stakeCount) * Math.PI * 2;
-          const stake = new THREE.Mesh(new THREE.ConeGeometry(0.12, 2.4, 5), _robeMat);
-          stake.position.set(Math.cos(sang) * stakeRadius, 1.1, Math.sin(sang) * stakeRadius);
-          stake.rotation.x = (random() - 0.5) * 0.15;
-          stake.rotation.z = (random() - 0.5) * 0.15;
-          campGroup.add(stake);
-
-          if (s % 3 === 0) {
-            const stakeSkull = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 1), _boneMat);
-            stakeSkull.position.set(Math.cos(sang) * stakeRadius, 2.2, Math.sin(sang) * stakeRadius);
-            campGroup.add(stakeSkull);
-          }
+        for (let st = 2; st < stakeCount; st++) {
+          const sang = (st / stakeCount) * PI2;
+          const sx = Math.cos(sang) * stakeRadius;
+          const sz = Math.sin(sang) * stakeRadius;
+          defs.push({ t: "cone", a: [0.13, 2.4, 6], p: [sx, 1.1, sz], r: [(random() - 0.5) * 0.15, 0, (random() - 0.5) * 0.15], c: 0x17100d, ao: 0.5 });
+          if (st % 3 === 0) defs.push({ t: "sph", a: [0.16, 6, 4], p: [sx, 2.2, sz], s: [0.9, 1.1, 1], c: 0xd8cfb8, ao: 0.8 });
         }
       }
 
-      // 2. Fogueira Cerimonial Central de Chama Roxa
+      // 2. Fogueira cerimonial: pedras redondas e toras (a chama é animada, mais abaixo)
       const stoneCount = isHuge ? 14 : isMedium ? 10 : 8;
       const stoneDist = isHuge ? 2.2 : isMedium ? 1.7 : 1.35;
-      for (let p = 0; p < stoneCount; p++) {
-        const pang = (p / stoneCount) * Math.PI * 2;
-        const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(isHuge ? 0.35 : 0.24, 0), _altarStoneMat);
-        stone.position.set(Math.cos(pang) * stoneDist, 0.15, Math.sin(pang) * stoneDist);
-        campGroup.add(stone);
+      for (let q = 0; q < stoneCount; q++) {
+        const pang = (q / stoneCount) * PI2;
+        const sr = isHuge ? 0.34 : 0.24;
+        defs.push({ t: "sph", a: [sr, 6, 4], p: [Math.cos(pang) * stoneDist, 0.12, Math.sin(pang) * stoneDist], s: [1, 0.7, 1], c: 0x4b4650, ao: 0.6 });
       }
-
       for (let l = 0; l < (isHuge ? 6 : 4); l++) {
-        const logMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, isHuge ? 1.4 : 0.95, 5), _robeMat);
-        logMesh.position.set(0, 0.1, 0);
-        logMesh.rotation.y = (l / 4) * Math.PI;
-        logMesh.rotation.z = Math.PI / 2;
-        campGroup.add(logMesh);
+        defs.push({ t: "cap", a: [0.07, isHuge ? 1.2 : 0.8, 1, 5], p: [0, 0.14, 0], r: [0, (l / 4) * Math.PI, Math.PI / 2], c: 0x241710, ao: 0.6 });
       }
 
-      const flameH = isHuge ? 1.6 : isMedium ? 1.15 : 0.88;
-      const purpleFlame = new THREE.Mesh(new THREE.ConeGeometry(isHuge ? 0.55 : 0.38, flameH, 6), _purpleFireMat);
-      purpleFlame.position.set(0, flameH * 0.5, 0);
-      campGroup.add(purpleFlame);
+      // 3. Círculo ritual de pedras e ossos ao redor da fogueira
+      const ringR = stoneDist + (isHuge ? 3.4 : isMedium ? 2.6 : 2.2);
+      const boneN = isHuge ? 14 : isMedium ? 10 : 7;
+      for (let q = 0; q < boneN; q++) {
+        const rang = (q / boneN) * PI2 + 0.15;
+        const bx = Math.cos(rang) * ringR;
+        const bz = Math.sin(rang) * ringR;
+        if (q % 2 === 0) defs.push({ t: "cap", a: [0.03, 0.5, 1, 4], p: [bx, 0.05, bz], r: [Math.PI / 2, 0, rang + Math.PI / 2], c: 0xd8cfb8, ao: 0.8 });
+        else defs.push({ t: "sph", a: [0.14, 5, 4], p: [bx, 0.08, bz], s: [1.2, 0.7, 1], c: 0x3c3844, ao: 0.6 });
+      }
+
+      // 4. Tendas arredondadas e remendadas, viradas para a fogueira
+      const tentN = isHuge ? 3 : isMedium ? 2 : 1;
+      const tentDist = ringR + (isHuge ? 3.2 : 2.6);
+      const tentR = (h) => (h < 0.45 ? 1.55 - h * 0.11 : h < 1.05 ? 1.5 - (h - 0.45) * 0.58 : 1.15 - (h - 1.05) * 1.1);
+      for (let tn = 0; tn < tentN; tn++) {
+        const tang = (tn / tentN) * PI2 + 2.1 + c * 0.7;
+        const tx = Math.cos(tang) * tentDist;
+        const tz = Math.sin(tang) * tentDist;
+        defs.push({ t: "lat", a: [[[1.55, 0.0], [1.5, 0.45], [1.15, 1.05], [0.6, 1.55], [0.04, 1.85]], 8], p: [tx, 0, tz], r: [0, -tang, 0], s: [0.9, 1, 0.9], c: 0x2b221d, ao: 0.5 });
+        for (let pt = 0; pt < 4; pt++) {
+          const pa = random() * PI2;
+          const ph = 0.35 + random() * 0.75;
+          const pr = tentR(ph) * 0.9 * 0.96;
+          defs.push({ t: "sph", a: [0.24, 5, 3], p: [tx + Math.cos(pa) * pr, ph, tz + Math.sin(pa) * pr], r: [0, Math.PI / 2 - pa, 0], s: [1.2, 0.95, 0.2], c: pt % 2 ? 0x4a3c2c : 0x3a2a3a, ao: 0.9 });
+        }
+        // estaca de entrada com um osso pendurado
+        defs.push({ t: "cap", a: [0.03, 0.9, 1, 4], p: [tx + Math.cos(tang + Math.PI) * 1.65, 0.5, tz + Math.sin(tang + Math.PI) * 1.65], c: 0x17100d, ao: 0.6 });
+      }
+
+      // 5. Totens com o Olho (Médio e Enorme)
+      if (isHuge || isMedium) {
+        const totemN = isHuge ? 3 : 2;
+        for (let tt = 0; tt < totemN; tt++) {
+          const tang = (tt / totemN) * PI2 + 0.9 + c;
+          const tx = Math.cos(tang) * (ringR + 1.2);
+          const tz = Math.sin(tang) * (ringR + 1.2);
+          const face = Math.PI / 2 - tang + Math.PI; // olho voltado para a fogueira
+          defs.push({ t: "cap", a: [0.1, 2.6, 2, 6], p: [tx, 1.4, tz], c: 0x1d140f, ao: 0.5 });
+          defs.push({ t: "sph", a: [0.2, 6, 4], p: [tx + Math.sin(face) * 0.1, 2.55, tz + Math.cos(face) * 0.1], r: [0, face, 0], s: [1.3, 0.8, 0.45], c: 0xc8982a, ao: 0.9 });
+          defs.push({ t: "sph", a: [0.07, 4, 3], p: [tx + Math.sin(face) * 0.2, 2.55, tz + Math.cos(face) * 0.2], c: 0x8a0f1c, ao: 1 });
+          defs.push({ t: "cone", a: [0.07, 0.4, 4], p: [tx - Math.cos(face) * 0.22, 2.9, tz + Math.sin(face) * 0.22], r: [0, 0, 0.5], c: 0xd8cfb8, ao: 0.8 });
+          defs.push({ t: "cone", a: [0.07, 0.4, 4], p: [tx + Math.cos(face) * 0.22, 2.9, tz - Math.sin(face) * 0.22], r: [0, 0, -0.5], c: 0xd8cfb8, ao: 0.8 });
+        }
+      }
+
+      // 6. Hastes das tochas rubras (as chamas animadas ficam em InstancedMesh)
+      const torchCount = isHuge ? 6 : isMedium ? 4 : 2;
+      const torchDist = isHuge ? 4.5 : isMedium ? 2.8 : 1.6;
+      const torchSlots = [];
+      for (let q = 0; q < torchCount; q++) {
+        const tang = (q / torchCount) * PI2 + 0.3;
+        const tx = Math.cos(tang) * torchDist;
+        const tz = Math.sin(tang) * torchDist;
+        defs.push({ t: "cap", a: [0.04, 1.85, 1, 5], p: [tx, 1.0, tz], c: 0x241a14, ao: 0.6 });
+        defs.push({ t: "cyl", a: [0.07, 0.04, 0.14, 6], p: [tx, 1.97, tz], c: 0x15100d, ao: 0.6 });
+        torchSlots.push({ x: tx, y: 2.04, z: tz });
+      }
+
+      // 7. Braseiros e altar monumental (Enorme)
+      const fireSlots = [{ x: 0, y: 0.18, z: 0, r: isHuge ? 0.55 : isMedium ? 0.4 : 0.34, h: isHuge ? 1.6 : isMedium ? 1.15 : 0.88 }];
+      if (isHuge) {
+        for (const bx of [-3.8, 3.8]) {
+          defs.push({ t: "cyl", a: [0.35, 0.45, 1.2, 8], p: [bx, 0.6, -1.8], c: 0x4b4650, ao: 0.6 });
+          defs.push({ t: "cyl", a: [0.55, 0.32, 0.3, 8], p: [bx, 1.3, -1.8], c: 0x3c3844, ao: 0.6 });
+          fireSlots.push({ x: bx, y: 1.42, z: -1.8, r: 0.32, h: 0.95 });
+        }
+        defs.push({ t: "box", a: [2.8, 0.75, 1.4], p: [0, 0.38, 3.2], c: 0x4b4650, ao: 0.6 });
+        defs.push({ t: "box", a: [3.2, 0.22, 1.6], p: [0, 0.84, 3.2], c: 0x5a545f, ao: 0.6 });
+        defs.push({ t: "cap", a: [0.17, 1.0, 2, 7], p: [0, 1.55, 3.2], c: 0x4b4650, ao: 0.6 });
+        defs.push({ t: "sph", a: [0.22, 6, 4], p: [0, 2.2, 3.28], s: [0.9, 0.8, 1.2], c: 0x4b4650, ao: 0.7 });
+        defs.push({ t: "cone", a: [0.05, 0.18, 4], p: [-0.1, 2.38, 3.3], r: [0, 0, 0.4], c: 0xd8cfb8, ao: 0.8 });
+        defs.push({ t: "cone", a: [0.05, 0.18, 4], p: [0.1, 2.38, 3.3], r: [0, 0, -0.4], c: 0xd8cfb8, ao: 0.8 });
+      }
+      defs.push({ t: "sph", a: [0.18, 6, 4], p: [0.7, 0.14, 0.7], s: [0.9, 1.1, 1], c: 0xd8cfb8, ao: 0.8 });
+
+      // Mastros das bandeiras esfarrapadas (as bandeiras balançam, animadas)
+      const flagN = isHuge ? 4 : isMedium ? 2 : 1;
+      const flags = [];
+      for (let fl = 0; fl < flagN; fl++) {
+        const fang = (fl / flagN) * PI2 + 0.55 + c * 0.4;
+        const fx = Math.cos(fang) * (ringR + 2.2);
+        const fz = Math.sin(fang) * (ringR + 2.2);
+        defs.push({ t: "cap", a: [0.035, 2.9, 1, 5], p: [fx, 1.55, fz], c: 0x1d140f, ao: 0.5 });
+        const flagMesh = new THREE.Mesh(_campFlagGeo, _campFlagMat);
+        flagMesh.position.set(fx, 2.55, fz);
+        flagMesh.rotation.y = fang;
+        flagMesh.userData.phase = random() * 6.28;
+        flagMesh.userData.base = fang;
+        campGroup.add(flagMesh);
+        flags.push(flagMesh);
+      }
+
+      const staticMesh = new THREE.Mesh(makeMergedGeometry(defs), getSmoothDetailMaterial());
+      staticMesh.name = "CultCampStatic";
+      staticMesh.castShadow = false;
+      campGroup.add(staticMesh);
+
+      // Fogo animado: 3 camadas de cone aninhado (violeta -> magenta -> branco-rosado) em InstancedMesh (1 draw call por camada)
+      const fireOuter = new THREE.InstancedMesh(_campConeUnit, _campFireOuterMat, fireSlots.length);
+      const fireMid = new THREE.InstancedMesh(_campConeUnit, _campFireMidMat, fireSlots.length);
+      const fireCore = new THREE.InstancedMesh(_campConeUnit, _campFireCoreMat, fireSlots.length);
+      const torchOuter = new THREE.InstancedMesh(_flameGeoOuter, _campTorchOuterMat, torchSlots.length);
+      const torchInner = new THREE.InstancedMesh(_flameGeoInner, _campTorchInnerMat, torchSlots.length);
+      for (const im of [fireOuter, fireMid, fireCore, torchOuter, torchInner]) {
+        im.frustumCulled = false;
+        im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        campGroup.add(im);
+      }
+
+      // Halo aditivo pulsante e brasas subindo (1 sprite + 1 Points por acampamento)
+      const fireHalo = new THREE.Sprite(_servantHalo().clone());
+      fireHalo.scale.setScalar(isHuge ? 5.2 : isMedium ? 3.8 : 3);
+      fireHalo.position.set(0, fireSlots[0].h * 0.55, 0);
+      campGroup.add(fireHalo);
+      const emberN = isHuge ? 28 : isMedium ? 20 : 14;
+      const emberPos = new Float32Array(emberN * 3);
+      const emberSeed = new Float32Array(emberN * 3);
+      for (let q = 0; q < emberN; q++) {
+        emberSeed[q * 3] = random() * PI2;
+        emberSeed[q * 3 + 1] = 0.5 + random() * 1.1;
+        emberSeed[q * 3 + 2] = random();
+      }
+      const emberGeo = new THREE.BufferGeometry();
+      emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+      const embers = new THREE.Points(emberGeo, _campEmberMat);
+      embers.frustumCulled = false;
+      campGroup.add(embers);
+
+      campGroup.userData.fx = { fireSlots, torchSlots, fireOuter, fireMid, fireCore, torchOuter, torchInner, fireHalo, embers, emberPos, emberSeed, emberN, flags, phase: random() * 6.28, ringR };
 
       // Única luz pontual por acampamento (otimização radical de shaders e draw calls)
       const campfireLight = new THREE.PointLight(0xaa33ff, 0, isHuge ? 32 : isMedium ? 24 : 16, 1.8);
@@ -680,63 +888,6 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       campGroup.add(campfireLight);
       campGroup.userData.mainLight = campfireLight;
       campGroup.userData.isHuge = isHuge;
-
-      // 3. Tochas Rubras Cerimoniais (usando material emissivo de alta performance)
-      const torchCount = isHuge ? 6 : isMedium ? 4 : 2;
-      const torchDist = isHuge ? 4.5 : isMedium ? 2.8 : 1.6;
-      for (let t = 0; t < torchCount; t++) {
-        const tang = (t / torchCount) * Math.PI * 2 + 0.3;
-        const tx = Math.cos(tang) * torchDist;
-        const tz = Math.sin(tang) * torchDist;
-
-        const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.0, 5), _robeMat);
-        stake.position.set(tx, 1.0, tz);
-        campGroup.add(stake);
-
-        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 5), _redTorchMat);
-        flame.position.set(tx, 2.15, tz);
-        campGroup.add(flame);
-      }
-
-      // 4. Braseiros e Altar no Acampamento Enorme
-      if (isHuge) {
-        for (const bx of [-3.8, 3.8]) {
-          const brazierPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 1.2, 6), _altarStoneMat);
-          brazierPillar.position.set(bx, 0.6, -1.8);
-          campGroup.add(brazierPillar);
-
-          const brazierBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.32, 0.3, 6), _altarStoneMat);
-          brazierBowl.position.set(bx, 1.3, -1.8);
-          campGroup.add(brazierBowl);
-
-          const brazierFlame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.95, 6), _purpleFireMat);
-          brazierFlame.position.set(bx, 1.85, -1.8);
-          campGroup.add(brazierFlame);
-        }
-
-        // Altar Monumental de Pedra Esculpida ao fundo
-        const altarBase = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.75, 1.4), _altarStoneMat);
-        altarBase.position.set(0, 0.38, 3.2);
-        campGroup.add(altarBase);
-
-        const altarTable = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.22, 1.6), _altarStoneMat);
-        altarTable.position.set(0, 0.84, 3.2);
-        campGroup.add(altarTable);
-
-        // Estátua de Pedra da Serpente de Rex Mundi sobre o altar
-        const snakeTotem = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.22, 1.3, 6), _altarStoneMat);
-        snakeTotem.position.set(0, 1.55, 3.2);
-        campGroup.add(snakeTotem);
-
-        const snakeHead = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.45), _altarStoneMat);
-        snakeHead.position.set(0, 2.15, 3.25);
-        campGroup.add(snakeHead);
-      }
-
-      // Crânios de aviso decorativos
-      const skullDeco = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 1), _boneMat);
-      skullDeco.position.set(0.7, 0.14, 0.7);
-      campGroup.add(skullDeco);
 
       // Os acampamentos só aparecem à noite
       campGroup.visible = false;
@@ -794,159 +945,156 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
 // ============================================================================
 // 3. Modelo Anatômico 3D do Cultista Cátaro (Estilo Baile Oculto - Eyes Wide Shut)
 // ============================================================================
+// ----------------------------------------------------------------------------
+// Servos do Demiurgo: formas redondas (torno/cápsulas/esferas amassadas) fundidas por cor de vértice.
+// Custo: poucos meshes (manto, cabeça, olhos, 2 braços, tocha) e ~900 triângulos, sem PointLight.
+// Peças que a IA anima continuam separadas e com os mesmos nomes: robe, armL, armR, torchGroup.
+// ----------------------------------------------------------------------------
+const SV = {
+  robe: 0x0c080f, robeLite: 0x1d1424, robeDark: 0x060408, crimson: 0x7a1018, gold: 0xc8982a, goldDark: 0x6b5320,
+  bone: 0xd8cfb8, mask: 0xeee6d8, crack: 0x4a4038, dark: 0x050405, blade: 0x2b2b33,
+};
+const _servantEyeMat = new THREE.MeshBasicMaterial({ color: 0xb53cff });
+const _servantFlameOuter = new THREE.MeshBasicMaterial({ color: 0xaa33ff, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false });
+const _servantFlameInner = new THREE.MeshBasicMaterial({ color: 0xffd6ff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+let _servantHaloMat = null;
+function _servantHalo() {
+  if (!_servantHaloMat) {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(220,140,255,1)");
+    g.addColorStop(0.35, "rgba(170,60,255,0.55)");
+    g.addColorStop(1, "rgba(120,20,200,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    _servantHaloMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  }
+  return _servantHaloMat;
+}
+
+// Geometria de uma chama (2 cones aninhados) reaproveitada pelas tochas dos servos e pelas fogueiras dos acampamentos
+const _flameGeoOuter = new THREE.ConeGeometry(0.085, 0.34, 6, 1, true).translate(0, 0.17, 0);
+const _flameGeoInner = new THREE.ConeGeometry(0.048, 0.24, 5, 1, true).translate(0, 0.12, 0);
+
+function _pivotGeometry(defs, dy) {
+  const g = makeMergedGeometry(defs);
+  g.translate(0, dy, 0);
+  g.computeBoundingSphere();
+  return g;
+}
+
 export function buildCultistMesh() {
   const root = new THREE.Group();
   root.name = "CultistRoot";
 
   const model = new THREE.Group();
   model.name = "CultistModel";
+  model.rotation.x = 0.07; // postura levemente inclinada para a frente: mais ameaçador
   root.add(model);
+  const mat = getSmoothDetailMaterial();
 
-  // Manto preto longo sacerdotal (silhueta austera, reta e sem cantos redondos)
-  const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.44, 1.55, 8), _robeMat);
+  // ---- Manto (animado: escala quando senta/respira). Torno redondo, ombros largos, barra esfarrapada, estola,
+  //      cordão com talismãs e corcunda. Pivô em y=0.8 (mesmo de antes) para a animação de sentar continuar igual.
+  const hem = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.3;
+    hem.push({ t: "cone", a: [0.075, 0.28, 4], p: [Math.cos(a) * 0.5, 0.1, Math.sin(a) * 0.5], r: [Math.PI, a, 0], c: SV.robeDark, ao: 0.7 });
+  }
+  const robeGeo = _pivotGeometry([
+    { t: "lat", a: [[[0.52, 0.02], [0.49, 0.28], [0.4, 0.72], [0.31, 1.12], [0.37, 1.4], [0.27, 1.56], [0.12, 1.63]], 9], c: SV.robe, ao: 0.5 },
+    ...hem,
+    { t: "cap", a: [0.05, 0.9, 2, 5], p: [0, 0.82, 0.37], r: [-0.1, 0, 0], s: [1, 1, 0.45], c: SV.crimson, ao: 0.7 },
+    { t: "sph", a: [0.045, 5, 3], p: [0, 1.4, 0.32], c: SV.gold, ao: 0.9 },
+    { t: "sph", a: [0.05, 5, 3], p: [0, 1.06, 0.395], s: [1.2, 0.6, 0.3], c: SV.gold, ao: 0.9 },
+    { t: "tor", a: [0.36, 0.018, 3, 9], p: [0, 0.88, 0], r: [Math.PI / 2, 0, 0], c: SV.goldDark, ao: 0.9 },
+    { t: "cone", a: [0.03, 0.17, 4], p: [-0.12, 0.76, 0.375], r: [Math.PI, 0, 0], c: SV.bone, ao: 0.9 },
+    { t: "sph", a: [0.032, 4, 3], p: [0.14, 0.79, 0.37], c: SV.gold, ao: 0.9 },
+    { t: "sph", a: [0.2, 6, 4], p: [0, 1.42, -0.14], s: [1.1, 0.8, 0.9], c: SV.robeLite, ao: 0.6 },
+  ], -0.8);
+  const robe = new THREE.Mesh(robeGeo, mat);
+  robe.name = "CultistRobe";
   robe.position.set(0, 0.8, 0);
   robe.castShadow = true;
   model.add(robe);
 
-  // Faixa/Estola cerimonial carmesim descendo pelo centro do peito
-  const stola = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.35, 0.03), _crimsonRibbonMat);
-  stola.position.set(0, 0.75, 0.23);
-  stola.rotation.x = -0.04;
-  model.add(stola);
+  // ---- Cabeça estática: capuz profundo e alto, aro do capuz, máscara de porcelana com rachaduras, órbitas escuras
+  const headGeo = makeMergedGeometry([
+    { t: "sph", a: [0.2, 8, 5], p: [0, 1.78, -0.01], s: [0.95, 1.3, 1.1], c: SV.robe, ao: 0.55 },
+    { t: "cone", a: [0.12, 0.36, 5], p: [0, 2.03, -0.1], r: [-0.5, 0, 0], c: SV.robe, ao: 0.6 },
+    { t: "tor", a: [0.145, 0.04, 3, 8], p: [0, 1.7, 0.11], r: [-0.1, 0, 0], s: [1, 1.15, 1], c: SV.robeLite, ao: 0.8 },
+    { t: "sph", a: [0.125, 7, 4], p: [0, 1.68, 0.115], s: [0.85, 1.2, 0.5], c: SV.mask, ao: 0.75 },
+    { t: "box", a: [0.012, 0.14, 0.02], p: [0.02, 1.73, 0.172], r: [0, 0, 0.35], c: SV.crack, ao: 1 },
+    { t: "box", a: [0.01, 0.09, 0.02], p: [-0.045, 1.63, 0.17], r: [0, 0, -0.5], c: SV.crack, ao: 1 },
+    { t: "sph", a: [0.028, 5, 3], p: [-0.05, 1.7, 0.165], s: [1.5, 0.8, 0.5], c: SV.dark, ao: 1 },
+    { t: "sph", a: [0.028, 5, 3], p: [0.05, 1.7, 0.165], s: [1.5, 0.8, 0.5], c: SV.dark, ao: 1 },
+    { t: "box", a: [0.07, 0.012, 0.02], p: [0, 1.6, 0.17], c: SV.dark, ao: 1 },
+  ]);
+  const head = new THREE.Mesh(headGeo, mat);
+  head.name = "CultistHead";
+  model.add(head);
 
-  const stolaClasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.04), _goldMat);
-  stolaClasp.position.set(0, 1.38, 0.22);
-  model.add(stolaClasp);
+  // Olhos roxos emissivos (MeshBasic, não são afetados pela luz) + halo aditivo pequeno
+  const eyesGeo = makeMergedGeometry([
+    { t: "sph", a: [0.016, 5, 3], p: [-0.05, 1.7, 0.18], c: 0xffffff, ao: 1 },
+    { t: "sph", a: [0.016, 5, 3], p: [0.05, 1.7, 0.18], c: 0xffffff, ao: 1 },
+  ]);
+  const eyes = new THREE.Mesh(eyesGeo, _servantEyeMat);
+  eyes.name = "CultistEyes";
+  model.add(eyes);
+  const halo = new THREE.Sprite(_servantHalo());
+  halo.scale.set(0.34, 0.16, 1);
+  halo.position.set(0, 1.7, 0.2);
+  model.add(halo);
 
-  // Ombreiras angulares de corte reto (ombros largos e imponentes de cerimônia oculta)
-  for (const side of [-1, 1]) {
-    const epaulet = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.32), _robeMat);
-    epaulet.position.set(side * 0.28, 1.48, 0);
-    epaulet.rotation.z = -side * 0.12;
-    model.add(epaulet);
-
-    const epauletGold = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.10, 0.325), _goldMat);
-    epauletGold.position.set(side * 0.36, 1.48, 0);
-    epauletGold.rotation.z = -side * 0.12;
-    model.add(epauletGold);
-  }
-
-  // Gola alta rígida cerimonial
-  const collarBack = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.03), _robeMat);
-  collarBack.position.set(0, 1.62, -0.12);
-  collarBack.rotation.x = 0.12;
-  model.add(collarBack);
-
-  // Capuz facetado gótico rígido (sem esferas redondas)
-  const hoodRoof = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.32), _robeMat);
-  hoodRoof.position.set(0, 1.84, 0.02);
-  model.add(hoodRoof);
-
-  const hoodPeak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.32, 4), _robeMat);
-  hoodPeak.position.set(0, 1.94, -0.05);
-  hoodPeak.rotation.x = -0.32;
-  model.add(hoodPeak);
-
-  for (const side of [-1, 1]) {
-    const hoodSide = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.28), _robeMat);
-    hoodSide.position.set(side * 0.15, 1.68, 0.02);
-    model.add(hoodSide);
-  }
-
-  // Máscara Veneziana de Porcelana Oculta (Estilo Baile Eyes Wide Shut - Bauta / Volto)
-  const maskGroup = new THREE.Group();
-  maskGroup.position.set(0, 1.65, 0.10);
-
-  const maskFace = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.23, 0.05), _maskMat);
-  maskGroup.add(maskFace);
-
-  // Queixo afiado geométrico característico da Bauta
-  const maskChin = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.20, 4), _maskMat);
-  maskChin.position.set(0, -0.13, 0.035);
-  maskChin.rotation.x = Math.PI * 0.95;
-  maskGroup.add(maskChin);
-
-  // Filigrana e detalhes dourados nas têmporas
-  const maskBrowGold = new THREE.Mesh(new THREE.BoxGeometry(0.205, 0.03, 0.055), _goldMat);
-  maskBrowGold.position.set(0, 0.09, 0.002);
-  maskGroup.add(maskBrowGold);
-
-  // Órbitas oculares vazadas e profundas com ponto de luz penetrante
-  for (const side of [-1, 1]) {
-    const eyeSocket = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.022, 0.035), _lensMat);
-    eyeSocket.position.set(side * 0.055, 0.035, 0.032);
-    maskGroup.add(eyeSocket);
-
-    const eyeDot = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.018), _glintMat);
-    eyeDot.position.set(side * 0.055, 0.035, 0.046);
-    maskGroup.add(eyeDot);
-  }
-  model.add(maskGroup);
-
-  // Mangas pretas estruturadas com conexão física
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.13), _robeMat);
-  armL.position.set(-0.3, 1.25, 0);
-  armL.rotation.z = 0.22;
+  // ---- Braços longos (animados) com pivô no ombro: capsula, mão grande; a adaga ritual acompanha o braço direito
+  const armDefs = (extra = []) => [
+    { t: "cap", a: [0.058, 0.55, 1, 5], p: [0, -0.3, 0.12], r: [0.4, 0, 0], c: SV.robe, ao: 0.6 },
+    { t: "sph", a: [0.075, 5, 4], p: [0, -0.66, 0.28], s: [1, 1.35, 1], c: SV.robeLite, ao: 0.8 },
+    ...extra,
+  ];
+  const armL = new THREE.Mesh(makeMergedGeometry(armDefs()), mat);
+  armL.name = "CultistArmL";
+  armL.position.set(-0.3, 1.45, 0);
+  armL.rotation.z = -0.1;
   model.add(armL);
 
-  const handL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), _robeMat);
-  handL.position.set(-0.34, 0.94, 0.10);
-  model.add(handL);
-
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.13), _robeMat);
-  armR.position.set(0.3, 1.25, 0.05);
-  armR.rotation.z = -0.22;
+  const armR = new THREE.Mesh(makeMergedGeometry(armDefs([
+    { t: "cyl", a: [0.018, 0.018, 0.14, 5], p: [0, -0.7, 0.28], c: SV.blade, ao: 0.9 },
+    { t: "box", a: [0.1, 0.025, 0.035], p: [0, -0.77, 0.28], c: SV.gold, ao: 0.9 },
+    { t: "cone", a: [0.04, 0.34, 4], p: [0, -0.96, 0.28], r: [Math.PI, 0, 0], c: SV.blade, ao: 0.9 },
+    { t: "sph", a: [0.03, 4, 3], p: [0, -0.62, 0.28], c: SV.gold, ao: 0.9 },
+  ])), mat);
+  armR.name = "CultistArmR";
+  armR.position.set(0.3, 1.45, 0);
+  armR.rotation.z = 0.1;
   model.add(armR);
 
-  const handR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), _robeMat);
-  handR.position.set(0.34, 0.94, 0.12);
-  model.add(handR);
-
-  // Tocha Cerimonial de Ferro Forjado na mão esquerda (os servos que vigiam além dos muros)
+  // ---- Tocha cerimonial na mão esquerda: haste+gaiola fundidas e chama de 2 cones aninhados (animada)
   const torchGroup = new THREE.Group();
   torchGroup.name = "CultistRedTorch";
-  torchGroup.position.set(-0.32, 1.05, 0.16);
-
-  const torchStick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.48, 6), _bladeMat);
-  torchStick.position.set(0, 0, 0);
-  torchGroup.add(torchStick);
-
-  const torchCage = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), _bladeMat);
-  torchCage.position.set(0, 0.22, 0);
-  torchGroup.add(torchCage);
-
-  const torchFlame = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.22, 5), _redTorchMat);
-  torchFlame.position.set(0, 0.28, 0);
-  torchGroup.add(torchFlame);
-
+  torchGroup.position.set(-0.37, 0.98, 0.28);
+  const torchBody = new THREE.Mesh(makeMergedGeometry([
+    { t: "cyl", a: [0.02, 0.024, 0.48, 6], c: SV.blade, ao: 0.8 },
+    { t: "box", a: [0.08, 0.08, 0.08], p: [0, 0.22, 0], c: SV.blade, ao: 0.8 },
+  ]), mat);
+  torchGroup.add(torchBody);
+  const flameOuter = new THREE.Mesh(_flameGeoOuter, _servantFlameOuter);
+  const flameInner = new THREE.Mesh(_flameGeoInner, _servantFlameInner);
+  flameOuter.position.y = 0.25;
+  flameInner.position.y = 0.25;
+  flameOuter.frustumCulled = false;
+  flameInner.frustumCulled = false;
+  torchGroup.add(flameOuter, flameInner);
   model.add(torchGroup);
 
-  // Adaga ritual cerimonial na mão direita (obsidiana com guarda e pomo de ouro)
-  const daggerGroup = new THREE.Group();
-  daggerGroup.position.set(0.34, 0.92, 0.12);
-
-  const daggerGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 5), _bladeMat);
-  daggerGrip.position.set(0, 0, 0);
-  daggerGroup.add(daggerGrip);
-
-  const daggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.025, 0.035), _goldMat);
-  daggerGuard.position.set(0, -0.07, 0);
-  daggerGroup.add(daggerGuard);
-
-  const daggerBlade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.34, 4), _bladeMat);
-  daggerBlade.position.set(0, -0.24, 0);
-  daggerBlade.rotation.x = Math.PI;
-  daggerGroup.add(daggerBlade);
-
-  const daggerPommel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.035), _goldMat);
-  daggerPommel.position.set(0, 0.08, 0);
-  daggerGroup.add(daggerPommel);
-
-  model.add(daggerGroup);
-
   root.visible = false;
-  const _parts = { root, model, robe, armL, armR, torchGroup, torchLight: null };
-  finalizeMonster(root, _parts); // funde peças estáticas do manto/ombreiras (menos draw calls)
+  const _parts = { root, model, robe, head, armL, armR, torchGroup, torchLight: null, flameOuter, flameInner };
+  finalizeMonster(root, _parts);
   return _parts;
 }
 
@@ -963,10 +1111,13 @@ export class Cultist {
     this.effects = effects;
     this.combat = combat;
 
-    const { root, model, robe, armL, armR, torchGroup, torchLight } = buildCultistMesh();
+    const { root, model, robe, head, armL, armR, torchGroup, torchLight, flameOuter, flameInner } = buildCultistMesh();
     this.root = root;
     this.model = model;
     this.robe = robe;
+    this.head = head;
+    this.flameOuter = flameOuter;
+    this.flameInner = flameInner;
     this.armL = armL;
     this.armR = armR;
     this.torchGroup = torchGroup;
@@ -1003,7 +1154,8 @@ export class Cultist {
 
     this.flashMaterials = [];
     this.model.traverse((child) => {
-      if (child.isMesh && child.material) {
+      // olhos/chama são MeshBasic (sem emissive, compartilhados): ficam de fora do flash de dano
+      if (child.isMesh && child.material && child.material.emissive) {
         if (!child._origMaterial) {
           child.material = child.material.clone();
           child._origMaterial = true;
@@ -1039,14 +1191,40 @@ export class Cultist {
     this.isSeated = Boolean(isSeated);
     if (this.isSeated) {
       this.model.position.y = -0.42;
-      if (this.robe) this.robe.scale.set(1.24, 0.62, 1.24);
-      if (this.armL) this.armL.rotation.set(-0.62, 0, 0.28);
-      if (this.torchGroup) this.torchGroup.position.set(-0.28, 0.62, 0.22);
+      if (this.robe) this.robe.scale.set(1.22, 0.78, 1.22);
+      if (this.head) this.head.position.y = -0.2; // a cabeça acompanha o manto que encolhe ao sentar
+      if (this.armL) { this.armL.position.y = 1.25; this.armL.rotation.set(-0.62, 0, 0.12); }
+      if (this.armR) { this.armR.position.y = 1.25; this.armR.rotation.set(-0.3, 0, 0.1); }
+      if (this.torchGroup) this.torchGroup.position.set(-0.33, 1.08, 0.56);
     } else {
       this.model.position.y = 0;
       if (this.robe) this.robe.scale.set(1, 1, 1);
-      if (this.armL) this.armL.rotation.set(0, 0, 0.22);
-      if (this.torchGroup) this.torchGroup.position.set(-0.32, 1.05, 0.16);
+      if (this.head) this.head.position.y = 0;
+      if (this.armL) { this.armL.position.y = 1.45; this.armL.rotation.set(0, 0, -0.1); }
+      if (this.armR) { this.armR.position.y = 1.45; this.armR.rotation.set(0, 0, 0.1); }
+      if (this.torchGroup) this.torchGroup.position.set(-0.37, 0.98, 0.28);
+    }
+  }
+
+  // Vida barata: respiração, barra do manto balançando devagar e a chama da tocha dançando (só senos, sem alocação)
+  _animateServant() {
+    const t = this.floatPhase;
+    if (this.robe) {
+      const breathe = Math.sin(t * 0.6);
+      if (!this.isSeated) this.robe.scale.set(1 + breathe * 0.008, 1 + breathe * 0.014, 1 + breathe * 0.008);
+      this.robe.rotation.z = Math.sin(t * 0.45) * 0.014;
+      this.robe.rotation.x = Math.sin(t * 0.37 + 1.3) * 0.01;
+    }
+    const fo = this.flameOuter;
+    if (fo) {
+      const a = Math.sin(t * 5.3);
+      const b = Math.sin(t * 3.7 + 1.0);
+      const c = Math.sin(t * 9.1);
+      fo.scale.set(1 + a * 0.12, 1 + b * 0.25 + c * 0.08, 1 + a * 0.12);
+      fo.rotation.y = t * 1.2;
+      const fi = this.flameInner;
+      fi.scale.set(1 - a * 0.1, 0.9 + c * 0.2 + b * 0.1, 1 - a * 0.1);
+      fi.rotation.y = -t * 1.6;
     }
   }
 
@@ -1234,6 +1412,7 @@ export class Cultist {
     }
 
     this.floatPhase += dt * 3.2;
+    this._animateServant();
     const px = player?.x ?? player?.position?.x ?? 0;
     const pz = player?.z ?? player?.position?.z ?? 0;
 
@@ -1411,6 +1590,16 @@ export class Cultist {
 // ============================================================================
 // 4.5 Modelo Anatômico 3D e Classe do Líder da Seita Cátara (Morvath)
 // ============================================================================
+let _leaderHaloMat = null;
+function _leaderHalo() {
+  if (!_leaderHaloMat) {
+    _leaderHaloMat = _servantHalo().clone();
+    _leaderHaloMat.color.setHex(0xff5070); // multiplica o halo roxo: halo vermelho para o Grão-Mestre
+  }
+  return _leaderHaloMat;
+}
+const _leaderEyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a3a });
+
 export function buildCultLeaderMesh() {
   const root = new THREE.Group();
   root.name = "CultLeaderRoot";
@@ -1418,129 +1607,105 @@ export function buildCultLeaderMesh() {
   const model = new THREE.Group();
   model.name = "CultLeaderModel";
   model.scale.set(1.22, 1.22, 1.22);
+  model.rotation.x = 0.06;
   root.add(model);
+  const mat = getSmoothDetailMaterial();
 
-  // Manto sacerdotal longo imponente com bordado de ouro
-  const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.48, 1.65, 8), _robeMat);
+  // Manto sacerdotal imponente: torno redondo, ombros em manto largo, barra dourada e esfarrapada, estola larga,
+  // emblema do Olho no peito e corcunda. Tudo fundido por cor de vértice em UM mesh.
+  const hem = [];
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 + 0.2;
+    hem.push({ t: "cone", a: [0.085, 0.3, 4], p: [Math.cos(ang) * 0.58, 0.1, Math.sin(ang) * 0.58], r: [Math.PI, ang, 0], c: SV.robeDark, ao: 0.7 });
+  }
+  const robeGeo = _pivotGeometry([
+    { t: "lat", a: [[[0.6, 0.02], [0.56, 0.3], [0.45, 0.78], [0.34, 1.18], [0.44, 1.46], [0.31, 1.64], [0.14, 1.72]], 10], c: SV.robe, ao: 0.5 },
+    ...hem,
+    { t: "tor", a: [0.585, 0.03, 3, 12], p: [0, 0.07, 0], r: [Math.PI / 2, 0, 0], c: SV.gold, ao: 0.9 },
+    { t: "cap", a: [0.075, 1.0, 2, 6], p: [0, 0.86, 0.43], r: [-0.1, 0, 0], s: [1, 1, 0.42], c: SV.crimson, ao: 0.7 },
+    { t: "sph", a: [0.062, 6, 4], p: [0, 1.5, 0.36], c: SV.gold, ao: 0.9 },
+    { t: "sph", a: [0.085, 6, 4], p: [0, 1.1, 0.455], s: [1.3, 0.65, 0.3], c: SV.gold, ao: 0.9 },
+    { t: "sph", a: [0.03, 4, 3], p: [0, 1.1, 0.475], s: [1, 1, 0.5], c: 0x8a0f1c, ao: 1 },
+    { t: "tor", a: [0.4, 0.022, 3, 10], p: [0, 0.9, 0], r: [Math.PI / 2, 0, 0], c: SV.goldDark, ao: 0.9 },
+    { t: "cone", a: [0.034, 0.2, 4], p: [-0.14, 0.76, 0.43], r: [Math.PI, 0, 0], c: SV.bone, ao: 0.9 },
+    { t: "cone", a: [0.034, 0.2, 4], p: [0.16, 0.76, 0.43], r: [Math.PI, 0, 0], c: SV.bone, ao: 0.9 },
+    { t: "sph", a: [0.26, 7, 4], p: [0, 1.5, -0.16], s: [1.15, 0.8, 0.9], c: SV.robeLite, ao: 0.6 },
+  ], -0.85);
+  const robe = new THREE.Mesh(robeGeo, mat);
+  robe.name = "CultLeaderRobe";
   robe.position.set(0, 0.85, 0);
   robe.castShadow = true;
   model.add(robe);
 
-  const robeGoldHem = new THREE.Mesh(new THREE.CylinderGeometry(0.482, 0.49, 0.08, 8), _goldMat);
-  robeGoldHem.position.set(0, 0.08, 0);
-  model.add(robeGoldHem);
-
-  // Faixa/Estola cerimonial carmesim mais larga
-  const stola = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.45, 0.035), _crimsonRibbonMat);
-  stola.position.set(0, 0.82, 0.25);
-  stola.rotation.x = -0.04;
-  model.add(stola);
-
-  const stolaClasp = new THREE.Mesh(new THREE.DodecahedronGeometry(0.065, 1), _goldMat);
-  stolaClasp.position.set(0, 1.46, 0.24);
-  model.add(stolaClasp);
-
-  // Ombreiras angulares clericais pontiagudas
+  // Cabeça: capuz alto com aro, chifres curvos de ébano com pontas de ouro, máscara rachada, testeira dourada
+  const horns = [];
   for (const side of [-1, 1]) {
-    const epaulet = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.11, 0.36), _robeMat);
-    epaulet.position.set(side * 0.32, 1.55, 0);
-    epaulet.rotation.z = -side * 0.16;
-    model.add(epaulet);
-
-    const epauletGold = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.365), _goldMat);
-    epauletGold.position.set(side * 0.41, 1.55, 0);
-    epauletGold.rotation.z = -side * 0.16;
-    model.add(epauletGold);
+    horns.push({ t: "cone", a: [0.05, 0.34, 5], p: [side * 0.2, 2.0, 0.0], r: [-0.2, 0, side * 0.9], c: 0x1a1210, ao: 0.6 });
+    horns.push({ t: "cone", a: [0.032, 0.28, 4], p: [side * 0.36, 2.2, -0.05], r: [-0.25, 0, side * 1.45], c: 0x1a1210, ao: 0.6 });
+    horns.push({ t: "sph", a: [0.03, 4, 3], p: [side * 0.5, 2.28, -0.08], c: SV.gold, ao: 0.9 });
   }
+  const headGeo = makeMergedGeometry([
+    { t: "sph", a: [0.225, 8, 5], p: [0, 1.9, -0.01], s: [0.95, 1.4, 1.1], c: SV.robe, ao: 0.55 },
+    { t: "cone", a: [0.14, 0.42, 5], p: [0, 2.2, -0.12], r: [-0.5, 0, 0], c: SV.robe, ao: 0.6 },
+    { t: "tor", a: [0.165, 0.045, 3, 8], p: [0, 1.82, 0.12], r: [-0.1, 0, 0], s: [1, 1.15, 1], c: SV.robeLite, ao: 0.8 },
+    { t: "sph", a: [0.14, 7, 4], p: [0, 1.8, 0.13], s: [0.85, 1.2, 0.5], c: SV.mask, ao: 0.75 },
+    { t: "box", a: [0.245, 0.034, 0.05], p: [0, 1.92, 0.17], r: [0.15, 0, 0], c: SV.gold, ao: 0.9 },
+    { t: "box", a: [0.012, 0.16, 0.02], p: [0.03, 1.83, 0.192], r: [0, 0, 0.35], c: SV.crack, ao: 1 },
+    { t: "box", a: [0.01, 0.1, 0.02], p: [-0.05, 1.72, 0.19], r: [0, 0, -0.5], c: SV.crack, ao: 1 },
+    { t: "sph", a: [0.032, 5, 3], p: [-0.058, 1.82, 0.182], s: [1.5, 0.8, 0.5], c: SV.dark, ao: 1 },
+    { t: "sph", a: [0.032, 5, 3], p: [0.058, 1.82, 0.182], s: [1.5, 0.8, 0.5], c: SV.dark, ao: 1 },
+    { t: "box", a: [0.08, 0.012, 0.02], p: [0, 1.7, 0.19], c: SV.dark, ao: 1 },
+    ...horns,
+  ]);
+  const head = new THREE.Mesh(headGeo, mat);
+  head.name = "CultLeaderHead";
+  model.add(head);
 
-  // Gola alta gótica
-  const collarBack = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.32, 0.04), _robeMat);
-  collarBack.position.set(0, 1.70, -0.14);
-  collarBack.rotation.x = 0.14;
-  model.add(collarBack);
+  const eyes = new THREE.Mesh(makeMergedGeometry([
+    { t: "sph", a: [0.018, 5, 3], p: [-0.058, 1.82, 0.2], c: 0xffffff, ao: 1 },
+    { t: "sph", a: [0.018, 5, 3], p: [0.058, 1.82, 0.2], c: 0xffffff, ao: 1 },
+  ]), _leaderEyeMat);
+  eyes.name = "CultLeaderEyes";
+  model.add(eyes);
+  const halo = new THREE.Sprite(_leaderHalo());
+  halo.scale.set(0.42, 0.2, 1);
+  halo.position.set(0, 1.82, 0.22);
+  model.add(halo);
 
-  // Capuz pontiagudo
-  const hoodRoof = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, 0.36), _robeMat);
-  hoodRoof.position.set(0, 1.94, 0.02);
-  model.add(hoodRoof);
-
-  const hoodPeak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 4), _robeMat);
-  hoodPeak.position.set(0, 2.06, -0.06);
-  hoodPeak.rotation.x = -0.32;
-  model.add(hoodPeak);
-
-  for (const side of [-1, 1]) {
-    const hoodSide = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.36, 0.32), _robeMat);
-    hoodSide.position.set(side * 0.17, 1.76, 0.02);
-    model.add(hoodSide);
-
-    // Chifres retorcidos de ébano e bronze saindo do capuz
-    const hornBase = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.35, 5), _ebonyHornMat);
-    hornBase.position.set(side * 0.22, 1.96, 0.02);
-    hornBase.rotation.z = side * 0.85;
-    hornBase.rotation.x = -0.25;
-    model.add(hornBase);
-
-    const hornTip = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.25, 4), _goldMat);
-    hornTip.position.set(side * 0.36, 2.15, -0.04);
-    hornTip.rotation.z = side * 1.25;
-    model.add(hornTip);
-  }
-
-  // Máscara Veneziana de Porcelana Oculta de Grande Nobreza
-  const maskGroup = new THREE.Group();
-  maskGroup.position.set(0, 1.74, 0.11);
-
-  const maskFace = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 0.05), _maskMat);
-  maskGroup.add(maskFace);
-
-  const maskChin = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 4), _maskMat);
-  maskChin.position.set(0, -0.15, 0.04);
-  maskChin.rotation.x = Math.PI * 0.95;
-  maskGroup.add(maskChin);
-
-  const maskGoldBrow = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.035, 0.055), _goldMat);
-  maskGoldBrow.position.set(0, 0.10, 0.005);
-  maskGroup.add(maskGoldBrow);
-
-  for (const side of [-1, 1]) {
-    const eyeSocket = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.026, 0.04), _lensMat);
-    eyeSocket.position.set(side * 0.06, 0.04, 0.035);
-    maskGroup.add(eyeSocket);
-
-    const eyeFlame = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.02), _redTorchMat);
-    eyeFlame.position.set(side * 0.06, 0.04, 0.048);
-    maskGroup.add(eyeFlame);
-  }
-
-  model.add(maskGroup);
-
-  // Braços
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.75, 0.14), _robeMat);
-  armL.position.set(-0.34, 1.30, 0.05);
-  armL.rotation.z = 0.2;
+  // Braços longos com pivô no ombro, mãos grandes e braçadeiras de ouro
+  const armDefs = (extra = []) => [
+    { t: "cap", a: [0.066, 0.6, 1, 5], p: [0, -0.33, 0.13], r: [0.4, 0, 0], c: SV.robe, ao: 0.6 },
+    { t: "tor", a: [0.062, 0.016, 3, 7], p: [0, -0.62, 0.24], r: [0.4 + Math.PI / 2, 0, 0], c: SV.gold, ao: 0.9 },
+    { t: "sph", a: [0.085, 5, 4], p: [0, -0.73, 0.31], s: [1, 1.35, 1], c: SV.robeLite, ao: 0.8 },
+    ...extra,
+  ];
+  const armL = new THREE.Mesh(makeMergedGeometry(armDefs()), mat);
+  armL.name = "CultLeaderArmL";
+  armL.position.set(-0.36, 1.52, 0);
+  armL.rotation.z = -0.1;
   model.add(armL);
 
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.75, 0.14), _robeMat);
-  armR.position.set(0.34, 1.30, 0.05);
-  armR.rotation.z = -0.2;
+  const armR = new THREE.Mesh(makeMergedGeometry(armDefs([
+    { t: "cyl", a: [0.02, 0.02, 0.15, 5], p: [0, -0.77, 0.31], c: SV.blade, ao: 0.9 },
+    { t: "box", a: [0.12, 0.03, 0.04], p: [0, -0.85, 0.31], c: SV.gold, ao: 0.9 },
+    { t: "cone", a: [0.045, 0.38, 4], p: [0, -1.06, 0.31], r: [Math.PI, 0, 0], c: SV.blade, ao: 0.9 },
+  ])), mat);
+  armR.name = "CultLeaderArmR";
+  armR.position.set(0.36, 1.52, 0);
+  armR.rotation.z = 0.1;
   model.add(armR);
 
-  // Cajado Cerimonial do Demiurgo na mão esquerda
+  // Cajado do Demiurgo na mão esquerda: haste, serpente de ouro e a gema de ametista (o "olho") que gira devagar
   const staffGroup = new THREE.Group();
   staffGroup.name = "DemiurgeStaff";
-  staffGroup.position.set(-0.42, 0.95, 0.22);
+  staffGroup.position.set(-0.43, 0.9, 0.31);
+  const staffBody = new THREE.Mesh(makeMergedGeometry([
+    { t: "cyl", a: [0.022, 0.03, 2.35, 7], p: [0, 0.15, 0], c: SV.robe, ao: 0.8 },
+    { t: "tor", a: [0.09, 0.025, 3, 12, Math.PI * 1.8], p: [0, 1.25, 0], r: [Math.PI / 2, 0, 0], c: SV.gold, ao: 0.9 },
+    { t: "tor", a: [0.17, 0.02, 3, 12], p: [0, 1.35, 0], r: [0, 0, 0], c: SV.gold, ao: 0.9 },
+  ]), mat);
+  staffGroup.add(staffBody);
 
-  const staffPole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 2.35, 6), _robeMat);
-  staffPole.position.set(0, 0.15, 0);
-  staffGroup.add(staffPole);
-
-  const staffSnake = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.025, 6, 12, Math.PI * 1.8), _goldMat);
-  staffSnake.position.set(0, 1.25, 0);
-  staffSnake.rotation.x = Math.PI / 2;
-  staffGroup.add(staffSnake);
-
-  // Gema mística de Ametista no topo do cajado
   const staffGem = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), _amethystMat);
   staffGem.position.set(0, 1.35, 0);
   staffGroup.add(staffGem);
@@ -1548,29 +1713,10 @@ export function buildCultLeaderMesh() {
   const staffLight = new THREE.PointLight(0xaa22ff, 4.5, 18, 1.8);
   staffLight.position.set(0, 1.45, 0);
   staffGroup.add(staffLight);
-
   model.add(staffGroup);
 
-  // Adaga de obsidiana na mão direita
-  const daggerGroup = new THREE.Group();
-  daggerGroup.position.set(0.38, 0.95, 0.14);
-
-  const daggerGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 5), _bladeMat);
-  daggerGroup.add(daggerGrip);
-
-  const daggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.04), _goldMat);
-  daggerGuard.position.set(0, -0.07, 0);
-  daggerGroup.add(daggerGuard);
-
-  const daggerBlade = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.38, 4), _bladeMat);
-  daggerBlade.position.set(0, -0.26, 0);
-  daggerBlade.rotation.x = Math.PI;
-  daggerGroup.add(daggerBlade);
-
-  model.add(daggerGroup);
-
   root.visible = false;
-  const _leaderParts = { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight: null };
+  const _leaderParts = { root, model, robe, head, armL, armR, staffGroup, staffGem, staffLight, eyeLight: null };
   finalizeMonster(root, _leaderParts);
   return _leaderParts;
 }
@@ -1585,9 +1731,10 @@ export class CultLeader {
     this.npcs = npcs || window.__game?.npcs || null;
     this._inGrid = false;
 
-    const { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight } = buildCultLeaderMesh();
+    const { root, model, robe, armL, armR, staffGroup, staffGem, staffLight, eyeLight } = buildCultLeaderMesh();
     this.root = root;
     this.model = model;
+    this.robe = robe;
     this.armL = armL;
     this.armR = armR;
     this.staffGroup = staffGroup;
@@ -1617,7 +1764,7 @@ export class CultLeader {
 
     this.flashMaterials = [];
     this.model.traverse((child) => {
-      if (child.isMesh && child.material) {
+      if (child.isMesh && child.material && child.material.emissive) {
         if (!child._origMaterial) {
           child.material = child.material.clone();
           child._origMaterial = true;
@@ -1821,6 +1968,13 @@ export class CultLeader {
     if (this.staffLight) {
       this.staffLight.intensity = 3.6 + Math.sin(performance.now() * 0.005) * 1.2;
     }
+    // vida barata: a gema gira devagar e a barra do manto balança
+    if (this.staffGem) this.staffGem.rotation.y += dt * 0.9;
+    if (this.robe) {
+      const lt = performance.now() * 0.001;
+      this.robe.rotation.z = Math.sin(lt * 0.7) * 0.012;
+      this.robe.scale.y = 1 + Math.sin(lt * 1.1) * 0.01;
+    }
 
     if (!this.alive) return;
 
@@ -1915,8 +2069,17 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
   for (let c = 0; c < CULT_CAMP_GROUPS.length; c++) {
     const camp = CULT_CAMP_GROUPS[c];
     if (!camp) continue;
-    if (camp.visible !== isNightBool) {
-      camp.visible = isNightBool;
+    // só desenha o acampamento à noite e quando está ao alcance da névoa (nem entra no render quando longe)
+    const cdx0 = camp.position.x - px;
+    const cdz0 = camp.position.z - pz;
+    const cd0 = cdx0 * cdx0 + cdz0 * cdz0;
+    const wantVisible = isNightBool && cd0 < 260 * 260;
+    if (camp.visible !== wantVisible) {
+      camp.visible = wantVisible;
+    }
+    // anima o fogo só quando o jogador está perto (< 60 m)
+    if (wantVisible && cd0 < 60 * 60) {
+      animateCampFx(camp, performance.now() * 0.001, dt);
     }
     const light = camp.userData.mainLight;
     if (light) {
