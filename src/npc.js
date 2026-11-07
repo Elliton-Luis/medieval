@@ -1713,6 +1713,18 @@ export class NPCSystem {
         continue;
       }
 
+      // 0. Culling INTERNO: com o jogador dentro de um prédio, só quem está perto da porta é desenhado
+      const inFocus = this.indoorFocus;
+      if (inFocus) {
+        const fdx = npc.x - inFocus.x;
+        const fdz = npc.z - inFocus.z;
+        if (fdx * fdx + fdz * fdz > inFocus.rSq) {
+          if (npc.root.visible) npc.root.visible = false;
+          if (npc.alive && !npc.temporary) this._tickHidden(npc, clampedDt, playerX, playerZ);
+          continue;
+        }
+      }
+
       // 1. Culling ATRÁS DO PLAYER:
       // O usuário: "renderize só imediatamente atrás do player, o longe não"
       const toNpcX = npc.x - playerX;

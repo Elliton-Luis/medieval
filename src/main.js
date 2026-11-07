@@ -667,6 +667,9 @@ function resize() {
 window.addEventListener("resize", resize, { passive: true });
 window.addEventListener("contextmenu", (event) => event.preventDefault());
 
+const INDOOR_RADIUS = 36; // raio (m) ao redor da porta que continua desenhado quando o jogador está dentro de um prédio
+const _indoorFocus = { x: 0, z: 0, r: INDOOR_RADIUS, rSq: INDOOR_RADIUS * INDOOR_RADIUS, chunkRSq: 0 };
+
 const TARGET_FPS = 60;
 const FRAME_MIN_MS = 1000 / (TARGET_FPS + 2); // ~16.1ms
 let _lastRenderStamp = 0;
@@ -756,7 +759,23 @@ function frame(now) {
   // Névoa como orçamento de render: o que está além da distância de visibilidade é só cor de névoa, então
   // chunks, casas e campos nem são desenhados lá (zero diferença visual, menos draw calls com névoa densa).
   {
-    const vis = dayNight.visibleDistance;
+    // Dentro de casa/igreja o lado de fora não aparece: só a porta e o entorno (36 m) são desenhados.
+    const ih = player.inHouse;
+    let vis = dayNight.visibleDistance;
+    if (ih && !isCutscene) {
+      const f = _indoorFocus;
+      f.x = ih.door?.x ?? ih.x;
+      f.z = ih.door?.z ?? ih.z;
+      f.r = INDOOR_RADIUS;
+      f.rSq = INDOOR_RADIUS * INDOOR_RADIUS;
+      f.chunkRSq = (INDOOR_RADIUS + 48) * (INDOOR_RADIUS + 48);
+      world.setIndoorFocus(f);
+      npcs.indoorFocus = f;
+      vis = Math.min(vis, INDOOR_RADIUS);
+    } else {
+      world.setIndoorFocus(null);
+      npcs.indoorFocus = null;
+    }
     world.setFogVisibility(vis);
     houses.cullDistSq = Math.min(115, vis + 28) ** 2;
     setFogCull(vis);

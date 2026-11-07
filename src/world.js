@@ -181,7 +181,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=39", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=40", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -998,6 +998,11 @@ export class World {
     return false;
   }
 
+  /** Foco do culling interno: null = ao ar livre; {x,z,r} = jogador dentro de um prédio (porta em x,z). */
+  setIndoorFocus(focus) {
+    this.indoorFocus = focus;
+  }
+
   // Distância de visibilidade da névoa (m). Chunks além dela só mostrariam a cor da névoa: nem são desenhados.
   // Os limites de LOD encolhem de leve junto (nunca abaixo de 55%): sem pop-in visível, menos triângulos.
   setFogVisibility(vis) {
@@ -1056,6 +1061,19 @@ export class World {
         chunk.group.visible = true;
         this._setChunkLod(chunk, this._lodForDistance(Math.sqrt(distanceSq), chunk.lodLevel));
         continue;
+      }
+
+      // Dentro de casa/igreja o lado de fora não é visível: só o entorno da porta é desenhado
+      // (onde ainda podem estar inimigos e guardas). O resto do mundo nem entra no render.
+      const focus = this.indoorFocus;
+      if (focus) {
+        const fx = chunk.centerX - focus.x;
+        const fz = chunk.centerZ - focus.z;
+        if (fx * fx + fz * fz > focus.chunkRSq) {
+          chunk.group.visible = false;
+          this._setChunkLod(chunk, -1);
+          continue;
+        }
       }
 
       // Além da distância de visão total, desativa
