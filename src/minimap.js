@@ -17,7 +17,8 @@ const CAPITAL_ROADS = [
 ];
 
 const RINGS = [0.33, 0.66];
-const PLACES = [{ ...CAPITAL, capital: true }, ...VILLAGES];
+// lazy: VILLAGES é preenchido por worldgen.initWorld (depende da seed)
+const getPlaces = () => [{ ...CAPITAL, capital: true }, ...VILLAGES];
 const _ptA = [0, 0];
 const _ptB = [0, 0];
 
@@ -94,6 +95,7 @@ export class Minimap {
     // vilas e capital
     ctx.font = "bold 12px Georgia, serif";
     ctx.textAlign = "center";
+    const PLACES = getPlaces();
     for (let i = 0; i < PLACES.length; i++) {
       const place = PLACES[i];
       this._project(place.x, place.z, px, pz, cos, sin, _ptA);

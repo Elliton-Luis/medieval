@@ -1,5 +1,7 @@
 // Layout do Reino de Caldera: vilas satélites e estradas que as ligam à capital.
-// Dados puros, importados pelo mundo (terreno/decoração) e pelo assentamento.
+// Fachada: VILLAGES e ROADS continuam sendo os mesmos arrays exportados (todos os importadores seguem
+// funcionando), mas o conteúdo é preenchido por worldgen.js a partir da seed do mundo (setKingdomLayout).
+// Os valores abaixo são o mundo CANÔNICO (seed 731942, caos 0) e servem de padrão até o worldgen rodar.
 
 export const KINGDOM_NAME = "Reino de Caldera";
 export const VILLAGE_RADIUS = 36;
@@ -27,6 +29,15 @@ export const ROADS = [
 ];
 
 const CAPITAL = { name: "Caldera", x: -2, z: -20, rx: 44, rz: 38 };
+
+/** Substitui, no lugar, as vilas e estradas do reino (chamado por worldgen.initWorld antes de criar o mundo). */
+export function setKingdomLayout(villages, roads) {
+  VILLAGES.length = 0;
+  for (const v of villages) VILLAGES.push(v);
+  ROADS.length = 0;
+  for (const r of roads) ROADS.push(r);
+  baseHeights = null;
+}
 
 let baseHeights = null;
 

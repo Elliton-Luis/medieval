@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { noise2 } from "./utils.js";
 import { VILLAGES } from "./kingdom.js";
+import { getWorldChaos, worldRand } from "./worldgen.js";
 
 // ============================================================================
 // Biomas por gradiente: 3 campos de ruído de baixíssima frequência (centenas de metros) misturam
@@ -20,7 +21,17 @@ export const BIOME_COLORS = {
 };
 
 const _tmp = new THREE.Color();
-const SETTLEMENTS = [{ x: -2, z: -20, r: 62 }, ...VILLAGES.map((v) => ({ x: v.x, z: v.z, r: 34 }))];
+// lazy: VILLAGES depende da seed do mundo (worldgen). Recalcula quando o nº de vilas mudar.
+let SETTLEMENTS = null;
+let _settleKey = "";
+function settlements() {
+  const key = VILLAGES.map((v) => v.x + "," + v.z).join("|");
+  if (!SETTLEMENTS || key !== _settleKey) {
+    _settleKey = key;
+    SETTLEMENTS = [{ x: -2, z: -20, r: 62 }, ...VILLAGES.map((v) => ({ x: v.x, z: v.z, r: 34 }))];
+  }
+  return SETTLEMENTS;
+}
 
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -30,6 +41,7 @@ const smooth = (a, b, x) => {
 /** 0 = dentro de uma povoação (bioma quase apagado) ... 1 = ermo aberto (bioma pleno). */
 function wildness(x, z) {
   let best = Infinity;
+  const SETTLEMENTS = settlements();
   for (let i = 0; i < SETTLEMENTS.length; i++) {
     const s = SETTLEMENTS[i];
     const d = Math.hypot(x - s.x, z - s.z) - s.r;
@@ -42,12 +54,30 @@ function wildness(x, z) {
  * Mistura a cor-base do chão (in/out em `color`) com o bioma da posição.
  * @param {THREE.Color} color cor base (modificada no lugar)
  */
-export function applyBiome(color, x, z, height, seed) {
-  const wet = noise2(x * 0.0042, z * 0.0042, seed + 11);
-  const dry = noise2(x * 0.0031 + 50, z * 0.0031, seed + 23);
-  const cold = noise2(x * 0.0023, z * 0.0023 + 90, seed + 37);
+// CAOS: os campos de bioma giram, mudam de escala e de limiar por seed (mais caos = mais diferença entre mundos).
+// Com caos 0: rot=0, escala=1, limiar=0 (idêntico ao mundo canônico).
+let _bioKey = "";
+let _bio = { cos: 1, sin: 0, f: 1, thr: 0 };
+function biomeParams(seed) {
+  const c = getWorldChaos();
+  const key = seed + ":" + c;
+  if (key !== _bioKey) {
+    _bioKey = key;
+    const rot = (worldRand(31) - 0.5) * Math.PI * c;
+    _bio = { cos: Math.cos(rot), sin: Math.sin(rot), f: 1 + (worldRand(32) - 0.5) * 1.0 * c, thr: (worldRand(33) - 0.5) * 0.16 * c };
+  }
+  return _bio;
+}
+
+export function applyBiome(color, x0, z0, height, seed) {
+  const bp = biomeParams(seed);
+  const x = (x0 * bp.cos - z0 * bp.sin) * bp.f;
+  const z = (x0 * bp.sin + z0 * bp.cos) * bp.f;
+  const wet = noise2(x * 0.0042, z * 0.0042, seed + 11) + bp.thr;
+  const dry = noise2(x * 0.0031 + 50, z * 0.0031, seed + 23) + bp.thr;
+  const cold = noise2(x * 0.0023, z * 0.0023 + 90, seed + 37) + bp.thr;
   const shade = noise2(x * 0.012, z * 0.012, seed + 61); // variação interna do bioma
-  const k = wildness(x, z);
+  const k = wildness(x0, z0); // distância às povoações usa as coordenadas reais, não as giradas
 
   const wSwamp = smooth(0.5, 0.64, wet) * k;
   const wArid = smooth(0.5, 0.64, dry) * (1 - wSwamp * 0.8) * k;

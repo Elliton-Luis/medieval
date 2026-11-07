@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG } from "./config.js";
-import { hash2, makeRandom, terrainHeight } from "./utils.js";
+import { hash2, makeRandom, terrainHeight, noise2 } from "./utils.js";
 import { TreeKit, LOD_LEVELS, createCrossedTriangles, createIsoscelesTriangleGeometry, makeBillboardMaterial, makeImpostorMaterial } from "./trees.js";
 import { VILLAGES, PLATEAU_INNER, PLATEAU_OUTER, isKingdomClear, setVillageBaseHeights, villageBaseHeight } from "./kingdom.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
 import { applyBiome } from "./biomes.js";
 import { pointBlocked } from "./placement.js";
+import { getWorldSeed, anchorNear, getWorldChaos, getWorldTint } from "./worldgen.js";
 
 const COLORS = {
   // Paleta "apodrecida": capim seco e amarelado, manchas de mato morto e terra escura
@@ -50,7 +51,7 @@ export class World {
     this.floors = [];
     this.centerX = Number.NaN;
     this.centerZ = Number.NaN;
-    this.seed = CONFIG.seed;
+    this.seed = getWorldSeed(); // seed do mundo (worldgen), não mais a constante congelada de config.js
     this.chunkSize = CONFIG.chunkSize;
     this.radius = CONFIG.activeChunkRadius;
     this.loadRadiusSq = (this.radius + 0.35) * (this.radius + 0.35);
@@ -92,7 +93,7 @@ export class World {
       { geometry: this.treeKit.grass.geometry, material: this.treeKit.grass.material },
       { geometry: this.treeKit.grass.geometry, material: this.treeKit.grass.material },
     ];
-    setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, CONFIG.seed)));
+    setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, this.seed)));
     this._spawnX = CONFIG.player.startX;
     this._spawnZ = CONFIG.player.startZ;
     this._pendingChunkQueue = [];
@@ -184,7 +185,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=52", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=71", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1110,6 +1111,8 @@ export class World {
   _isSettlementClear(x, z) {
     // nada nasce dentro ou colado em construções (casas, igrejas, torres, ferrarias, campos...): registro de pegadas
     if (pointBlocked(x, z, 1.4)) return true;
+    // nem sobre ruínas, acampamentos do culto e o ponto da cutscene (âncoras de lore do worldgen)
+    if (anchorNear(x, z, 4)) return true;
     if (isKingdomClear(x, z)) return true;
     if ((x + 14) ** 2 + (z + 8) ** 2 < 12 * 12) return true;
     if (Math.abs(x) < 2.6 && z > -52 && z < 5) return true;
@@ -1190,6 +1193,7 @@ export class World {
     const colors = new Float32Array(row * row * 3);
     const normals = new Float32Array(row * row * 3);
     const heights = new Float32Array(row * row);
+    const worldTint = getWorldTint();
     let vertex = 0;
 
     for (let z = 0; z <= segments; z++) {
@@ -1213,9 +1217,10 @@ export class World {
         if (height > 5.5) color.lerp(COLORS.dirt, Math.min(1, (height - 5.5) * 0.6));
         if (height > 9) color.lerp(COLORS.stone, Math.min(1, (height - 9) * 0.6));
         const tint = 0.92 + variation * 0.12;
-        colors[p] = color.r * tint;
-        colors[p + 1] = color.g * tint;
-        colors[p + 2] = color.b * tint;
+        // CAOS: tinta global do mundo por seed (matiz leve, faixa que preserva o clima sinistro; neutra no canônico)
+        colors[p] = color.r * tint * worldTint.r;
+        colors[p + 1] = color.g * tint * worldTint.g;
+        colors[p + 2] = color.b * tint * worldTint.b;
         vertex++;
       }
     }
@@ -1263,7 +1268,10 @@ export class World {
     const size = this.chunkSize;
     const baseX = cx * size;
     const baseZ = cz * size;
-    const treeCount = 12 + Math.floor(random() * 9);
+    // CAOS: densidade de floresta por região (ruído de baixa frequência): clareiras abertas e matas fechadas
+    const chaosK = getWorldChaos();
+    const forestDensity = chaosK > 0 ? Math.max(0.25, Math.min(1.9, 1 + noise2(cx * 0.28, cz * 0.28, this.seed + 313) * 0.9 * chaosK)) : 1;
+    const treeCount = Math.max(1, Math.round((12 + Math.floor(random() * 9)) * forestDensity));
 
     for (let i = 0; i < treeCount; i++) {
       const x = baseX + 3 + random() * (size - 6);
@@ -1297,6 +1305,27 @@ export class World {
       const col = { x, z, radius: scale * 0.58, top: y + scale * 0.9, kind: "rock" };
       rockData.push({ x, y, z, scale, rotation, collider: col });
       colliders.push(col);
+    }
+
+    // CAOS: marcos únicos raros por seed (rochedo gigante ou círculo de pedras). Só com caos > 0,3; RNG próprio
+    // (não consome o sorteio do chunk) e cada pedra passa pela validação "existe algo perto?" (_isSettlementClear).
+    if (chaosK > 0.3 && hash2(cx, cz, this.seed + 4242) < 0.05 * chaosK) {
+      const lmr = makeRandom(hash2(cx, cz, this.seed + 4243) * 4294967295);
+      const giant = lmr() < 0.5;
+      const lx = baseX + 16 + lmr() * (size - 32);
+      const lz = baseZ + 16 + lmr() * (size - 32);
+      const addRock = (x, z, scale) => {
+        const ddx = x - this._spawnX;
+        const ddz = z - this._spawnZ;
+        if (ddx * ddx + ddz * ddz < 24 * 24 || this._isSettlementClear(x, z)) return false;
+        const y = heights ? this.chunkGroundHeight(cx, cz, heights, x, z) : this.heightAt(x, z);
+        const col = { x, z, radius: scale * 0.58, top: y + scale * 0.9, kind: "rock" };
+        rockData.push({ x, y, z, scale, rotation: lmr() * Math.PI * 2, collider: col });
+        colliders.push(col);
+        return true;
+      };
+      if (giant) addRock(lx, lz, 3.4 + lmr() * 1.4);
+      else for (let k = 0; k < 7; k++) addRock(lx + Math.cos((k / 7) * Math.PI * 2) * 3.8, lz + Math.sin((k / 7) * Math.PI * 2) * 3.8, 1.0 + lmr() * 0.4);
     }
 
     const clayCount = 3 + Math.floor(random() * 5);

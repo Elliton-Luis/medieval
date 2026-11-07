@@ -327,13 +327,16 @@ function getDetailMats() {
   _detailMats.weed = new THREE.MeshStandardMaterial({ color: 0x59532a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
   _detailMats.wax = new THREE.MeshStandardMaterial({ color: 0xb8ab8a, roughness: 0.9, flatShading: true });
   _detailMats.cloth = new THREE.MeshStandardMaterial({ color: 0x4a2a2a, roughness: 1, flatShading: true });
-  // marcador: material compartilhado entre todas as casas (animado uma vez por frame)
-  _detailMats.glowGold = new THREE.MeshBasicMaterial({ color: 0xffc95a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  _detailMats.glowPale = new THREE.MeshBasicMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  // marcador: material compartilhado entre todas as casas (animado uma vez por frame).
+  // A LUZ (feixe + brilho) usa fog:false como as tochas e os faróis: a névoa e a noite não podem apagá-la à distância.
+  _detailMats.glowGold = new THREE.MeshBasicMaterial({ color: 0xffc95a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  _detailMats.glowPale = new THREE.MeshBasicMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
   _detailMats.page = new THREE.MeshBasicMaterial({ color: 0xf2e4b2, side: THREE.DoubleSide });
   // ALMA (fantasma) que marca um item na casa: translúcida, com cor por vértice (corpo claro, olhos/boca escuros),
   // 1 material compartilhado e a névoa continua valendo (some sozinha ao longe)
   _detailMats.soul = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+  // alma de um item comum (sem página): mais azulada e tênue
+  _detailMats.soulPale = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0x9fb4e0, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d");
@@ -344,8 +347,8 @@ function getDetailMats() {
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   const tex = new THREE.CanvasTexture(c);
-  _detailMats.spriteGold = new THREE.SpriteMaterial({ map: tex, color: 0xffd070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 });
-  _detailMats.spritePale = new THREE.SpriteMaterial({ map: tex, color: 0xa8bce0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 });
+  _detailMats.spriteGold = new THREE.SpriteMaterial({ map: tex, color: 0xffd070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85, fog: false });
+  _detailMats.spritePale = new THREE.SpriteMaterial({ map: tex, color: 0xa8bce0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6, fog: false });
   // brilho tênue da alma (visto só no meio da distância, LOD 1)
   _detailMats.spriteSoul = new THREE.SpriteMaterial({ map: tex, color: 0x9fd0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22 });
   return _detailMats;
@@ -508,21 +511,23 @@ function buildPageMarker(hasPage) {
   const dm = getDetailMats();
   const group = new THREE.Group();
   group.name = "SoulMarker";
-  // LOD 1 (distância média): só um brilho tênue, quase imperceptível
-  const glow = new THREE.Sprite(dm.spriteSoul);
-  glow.scale.set(hasPage ? 1.3 : 0.8, hasPage ? 1.3 : 0.8, 1);
-  glow.position.y = 0.7;
+  // A LUZ da alma é vista de LONGE (como antes): brilho + feixe fino que atravessa o telhado.
+  // Só a alma em si (o fantasma) é um detalhe de PERTO (LOD 0).
+  const glow = new THREE.Sprite(hasPage ? dm.spriteGold : dm.spritePale);
+  glow.scale.set(1.5, 1.5, 1);
+  glow.position.y = 0.55;
   group.add(glow);
-  // LOD 0 (perto): a alma. Só as casas com página têm uma; as outras ficam só com o brilho fraco.
-  let soul = null;
-  if (hasPage) {
-    soul = new THREE.Mesh(getSoulGeometry(), dm.soul);
-    soul.position.y = 0.55;
-    soul.visible = false;
-    group.add(soul);
-  }
-  // `page`/`beam` não existem mais (sem folha flutuante nem feixe visto de longe); `soul` e `glow` são animados
-  group.userData = { glow, soul, page: null, beam: null, hasPage, baseY: 0.55, lod: -1, wx: 0, wz: 0, wReady: false, noMerge: true };
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.2, hasPage ? 5.4 : 3.2, 8, 1, true), hasPage ? dm.glowGold : dm.glowPale);
+  beam.position.y = (hasPage ? 5.4 : 3.2) / 2;
+  beam.renderOrder = 3;
+  group.add(beam);
+  // TODOS os itens da casa são mostrados por uma alma (a das casas com página é maior e mais clara)
+  const soul = new THREE.Mesh(getSoulGeometry(), hasPage ? dm.soul : dm.soulPale);
+  soul.position.y = 0.55;
+  if (!hasPage) soul.scale.setScalar(0.8);
+  soul.visible = false;
+  group.add(soul);
+  group.userData = { glow, beam, soul, page: null, hasPage, baseY: 0.55, wx: 0, wz: 0, wReady: false, noMerge: true };
   return group;
 }
 
@@ -1139,10 +1144,14 @@ function _animateHouseMarkers(playerPos, dt) {
   if (ActiveGhostHouses.length === 0) return;
   _markerClock += dt;
   const dm = getDetailMats();
-  // pulso único nos materiais compartilhados (almas e brilho): lento e fraco, para só ser notado de perto
-  const pulse = 0.5 + 0.5 * Math.sin(_markerClock * 1.6);
+  // pulso único nos materiais compartilhados: a luz pulsa (visível de longe), a alma só aparece de perto
+  const pulse = 0.5 + 0.5 * Math.sin(_markerClock * 2.0);
+  dm.glowGold.opacity = 0.18 + pulse * 0.22;
+  dm.glowPale.opacity = 0.1 + pulse * 0.14;
+  dm.spriteGold.opacity = 0.55 + pulse * 0.4;
+  dm.spritePale.opacity = 0.4 + pulse * 0.3;
   dm.soul.opacity = 0.4 + pulse * 0.22;
-  dm.spriteSoul.opacity = 0.14 + pulse * 0.12;
+  dm.soulPale.opacity = 0.32 + pulse * 0.2;
   const px = playerPos?.x ?? 0;
   const pz = playerPos?.z ?? 0;
   for (let i = 0; i < ActiveGhostHouses.length; i++) {
@@ -1152,11 +1161,11 @@ function _animateHouseMarkers(playerPos, dt) {
     if (gh.looted) { m.visible = false; continue; }
     const dSq = (px - gh.x) ** 2 + (pz - gh.z) ** 2;
     const ud = m.userData;
-    // LOD das almas: > 30 m nada (a névoa já esconderia); 14–30 m só um brilho tênue; < 14 m a alma aparece
-    if (dSq > 30 * 30) { m.visible = false; continue; }
+    // LUZ (brilho + feixe): vista de longe, até onde a névoa/desenho alcança (~150 m); além disso nem entra no render
+    if (dSq > 150 * 150) { m.visible = false; continue; }
     m.visible = true;
+    // ALMA (fantasma): detalhe de PERTO, só a menos de 14 m
     const near = dSq < 14 * 14;
-    if (ud.glow) ud.glow.visible = !near || !ud.soul;
     if (ud.soul) {
       ud.soul.visible = near;
       if (near) {
@@ -1171,6 +1180,11 @@ function _animateHouseMarkers(playerPos, dt) {
         ud.soul.position.x = Math.sin(_markerClock * 0.7 + i * 1.7) * 0.14;
         ud.soul.rotation.y = Math.atan2(px - ud.wx, pz - ud.wz);
       }
+    }
+    // o brilho cresce um pouco com o pulso (como antes)
+    if (ud.glow) {
+      const sc = 1.35 + pulse * 0.35;
+      ud.glow.scale.set(sc, sc, 1);
     }
   }
 }

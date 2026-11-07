@@ -1,7 +1,10 @@
+import { isCanonicalWorld, worldRand, getWorldChaos } from "./worldgen.js";
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+let _villageScale = 1; // CAOS: escala de largura/profundidade das casas da vila corrente
 import * as THREE from "three";
 import { ROADS, VILLAGES } from "./kingdom.js";
 import { makeRandom } from "./utils.js";
-import { createHouse, createChurchBuilding } from "./house.js";
+import { createHouse, createChurchBuilding, setHouseStyle } from "./house.js";
 import { createHay } from "./fire.js";
 import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js";
 import { addCityBeacon } from "./beacons.js";
@@ -614,7 +617,7 @@ const snapYaw = (r) => (((Math.round(r / (Math.PI / 2)) % 4) + 4) % 4) * (Math.P
 
 function houseDims(seed) {
   const r = makeRandom(seed * 40503 + 7);
-  return { width: 5.4 + r() * 2.4, depth: 4.8 + r() * 2.0 };
+  return { width: (5.4 + r() * 2.4) * _villageScale, depth: (4.8 + r() * 2.0) * _villageScale };
 }
 
 // Cria a casa no ponto livre mais próximo de base.x/z. center = (cx, cz) para manter a porta voltada ao centro.
@@ -664,12 +667,27 @@ function createVillage(scene, world, village, houses) {
   const faceCenter = (x, z) => Math.atan2(cx - x, cz - z);
 
   // Chalés em anel, com a porta voltada para o poço.
-  const count = village.kind === "watch" ? 2 : 5;
+  // CAOS: nº de casas do anel varia (4..7), o anel pode ser mais largo/solto e cada vila ganha um estilo próprio.
+  // worldRand (e não `random`) mantém o sorteio do mundo canônico intacto quando o caos é 0.
+  const chaos = getWorldChaos();
+  const count = village.kind === "watch" ? 2 : clamp(5 + Math.round((worldRand(village.seed, 31) - 0.5) * 3.2 * chaos), 4, 7);
+  setHouseStyle(
+    chaos > 0
+      ? {
+          r: 1 + (worldRand(village.seed, 20) - 0.5) * 0.34 * chaos,
+          g: 1 + (worldRand(village.seed, 21) - 0.5) * 0.3 * chaos,
+          b: 1 + (worldRand(village.seed, 22) - 0.5) * 0.34 * chaos,
+          h: 1 + (worldRand(village.seed, 23) - 0.5) * 0.5 * chaos,
+          pitch: 1 + (worldRand(village.seed, 24) - 0.5) * 0.8 * chaos,
+        }
+      : null,
+  );
+  _villageScale = 1 + (worldRand(village.seed, 25) - 0.5) * 0.4 * chaos;
   const startAngle = random() * Math.PI * 2;
   const slots = [];
   for (let i = 0; i < count; i++) {
     const angle = startAngle + (i / count) * Math.PI * 2 + (random() - 0.5) * 0.25;
-    const radius = 15 + random() * 3.5;
+    const radius = 15 + random() * 3.5 + worldRand(village.seed, 50 + i) * 4.5 * chaos;
     slots.push({ angle, x: cx + Math.cos(angle) * radius, z: cz + Math.sin(angle) * radius });
   }
 
@@ -761,6 +779,8 @@ function createVillage(scene, world, village, houses) {
 
   points.church = createChurch(scene, world, churchX, churchZ, churchRy, `Igreja de ${village.name}`, houses);
 
+  setHouseStyle(null); // o estilo é da vila: não vaza para as demais construções
+  _villageScale = 1;
   return { village, ...points };
 }
 
@@ -812,7 +832,11 @@ const CAPITAL_FIELDS = [
 
 export function createSettlement(scene, world) {
   resetPlacement();
-  for (const [fx, fz, rows, cols] of CAPITAL_FIELDS) {
+  for (let i = 0; i < CAPITAL_FIELDS.length; i++) {
+    // só os 2 primeiros campos existem em qualquer mundo; os outros 3 só no mundo canônico (main.js). Reservar os
+    // inexistentes deixava pegadas "fantasma" no meio do caminho de vilas/igrejas geradas por seed.
+    if (i >= 2 && !isCanonicalWorld()) continue;
+    const [fx, fz, rows, cols] = CAPITAL_FIELDS[i];
     reserve(fx, fz, (rows * 1.8) / 2 + 1.8, (cols * 1.5) / 2 + 1.8, 0, "field", `field-${fx}-${fz}`);
   }
   createRoad(scene, world);
@@ -852,6 +876,8 @@ export function createSettlement(scene, world) {
     const free = nearestFreePoint(x0, z0, 0.9, 8);
     if (!free) return;
     const { x, z } = free;
+    // reserva a pegada do poste: construções criadas DEPOIS (cidade procedural, vilas) passam a evitá-lo
+    reserve(x, z, 0.3, 0.3, 0, "prop", `post-${Math.round(x * 10)}-${Math.round(z * 10)}`);
     world.addStaticCollider(x, z, 0.2, 2.4);
     torchSpots.push({ x, y: world.heightAt(x, z) + 2.3, z, nx: 0, nz: 0, post: true });
   };
@@ -898,7 +924,7 @@ export function createSettlement(scene, world) {
   });
   const stands = churches.map((c) => c.stand);
   const settlementData = { blacksmith, market, gate, well, wells, townBenches, villages, churches, houses, hay, torchSpots, stands };
-  settlementData.cityData = generateCity(104729, scene, sharedHouseMat, world, settlementData);
+  settlementData.cityData = generateCity(isCanonicalWorld() ? 104729 : Math.floor(worldRand(104729) * 900000) + 1000, scene, sharedHouseMat, world, settlementData);
 
   return settlementData;
 }

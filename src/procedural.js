@@ -62,8 +62,10 @@ export function createSharedHouseMaterial() {
   if (_sharedHouseMaterial) return _sharedHouseMaterial;
 
   // Reboco/barro envelhecido (textura cacheada 128px com fissuras, manchas e lama no pé da parede)
-  const texture = weatheredWallTexture();
-  texture.repeat.set(2, 2);
+  // clone com repeat próprio: a textura base é compartilhada com house.js e NÃO pode ter o repeat alterado
+  const texture = weatheredWallTexture().clone();
+  texture.needsUpdate = true;
+  texture.repeat.set(2, 1); // 2 telhas na largura, UMA na altura (antes 2x2 repetia a textura duas vezes por altura)
 
   _sharedHouseMaterial = new THREE.MeshStandardMaterial({
     map: texture,
@@ -91,14 +93,14 @@ export function createWallMaterial() {
  * Reescala os UVs de uma BoxGeometry para a textura repetir a cada `tile` metros em vez de esticar
  * uma única cópia por face (ordem das faces do BoxGeometry: +x, -x, +y, -y, +z, -z).
  */
-function tileBoxUVs(geo, w, h, d, tile = 3.5) {
+function tileBoxUVs(geo, w, h, d, tile = 3.5, tileV = tile) {
   const uv = geo.attributes.uv;
   const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
   for (let f = 0; f < 6; f++) {
     const [fu, fv] = dims[f];
     for (let v = 0; v < 4; v++) {
       const i = f * 4 + v;
-      uv.setXY(i, uv.getX(i) * (fu / tile), uv.getY(i) * (fv / tile));
+      uv.setXY(i, uv.getX(i) * (fu / tile), uv.getY(i) * (fv / tileV));
     }
   }
   uv.needsUpdate = true;
@@ -338,7 +340,7 @@ export function generateCity(
     const bHeight = 3.8;
     const bFound = 3.2;
     const bGeo = new THREE.BoxGeometry(bWidth, bHeight + bFound, bDepth);
-    tileBoxUVs(bGeo, bWidth, bHeight + bFound, bDepth, 7); // x repeat(2) do material = reboco a cada ~3,5 m
+    tileBoxUVs(bGeo, bWidth, bHeight + bFound, bDepth, 7, bHeight); // largura: reboco a cada ~3,5 m; altura: UMA textura por parede visível (3,8 m)
     const roofGeo = new THREE.ConeGeometry(4.1, 2.1, 4);
 
     const geometriesToMerge = [];

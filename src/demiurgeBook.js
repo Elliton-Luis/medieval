@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { PlayerStats, PlayerInventory, syncPlayerStatsToPlayer } from "./rpg.js";
+import { isCanonicalWorld, getBookSpotsFull, worldRand } from "./worldgen.js";
 
 // ============================================================================
 // Tractatus de Carcere · O Livro do Barro
@@ -549,6 +550,15 @@ export function initDemiurgeDiary({ scene, world, savedSpotIndex = null, isColle
   _preloadFirstPage();
   _isCollected = Boolean(isCollected || PlayerInventory.hasCollectedGroundBook);
 
+  // Mundo procedural: os 5 candidatos (e as dicas de texto) vêm das âncoras da seed; o mundo canônico mantém os originais.
+  if (!isCanonicalWorld()) {
+    const gen = getBookSpotsFull();
+    if (gen.length) {
+      DEMIURGE_BOOK_SPOTS.length = 0;
+      for (const g of gen) DEMIURGE_BOOK_SPOTS.push(g);
+    }
+  }
+
   if (
     savedSpotIndex !== null &&
     savedSpotIndex !== undefined &&
@@ -558,7 +568,7 @@ export function initDemiurgeDiary({ scene, world, savedSpotIndex = null, isColle
   ) {
     _currentSpotIndex = savedSpotIndex;
   } else {
-    _currentSpotIndex = Math.floor(Math.random() * DEMIURGE_BOOK_SPOTS.length);
+    _currentSpotIndex = Math.floor(worldRand(9001) * DEMIURGE_BOOK_SPOTS.length); // sorteio por seed (cada mundo esconde o livro num lugar)
   }
 
   const spot = DEMIURGE_BOOK_SPOTS[_currentSpotIndex];

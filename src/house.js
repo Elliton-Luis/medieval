@@ -50,6 +50,17 @@ const _pos = new THREE.Vector3();
 const _one = new THREE.Vector3(1, 1, 1);
 
 // Caixa com UV proporcional ao tamanho, cor de vértice e AO leve na base.
+// CAOS: estilo da vila corrente (definido por settlement.createVillage). Multiplica a cor de TODAS as peças das
+// casas e altera altura/inclinação do telhado: cada vila ganha uma "cara" própria. Padrão neutro = mundo canônico.
+let _styleTint = [1, 1, 1];
+let _styleH = 1;
+let _stylePitch = 1;
+export function setHouseStyle(style) {
+  _styleTint = style ? [style.r, style.g, style.b] : [1, 1, 1];
+  _styleH = style?.h ?? 1;
+  _stylePitch = style?.pitch ?? 1;
+}
+
 function boxGeometry(w, h, d, x, y, z, color, random, rot = null, ao = 0.34) {
   const g = new THREE.BoxGeometry(w, h, d);
   const uv = g.attributes.uv;
@@ -57,7 +68,9 @@ function boxGeometry(w, h, d, x, y, z, color, random, rot = null, ao = 0.34) {
   for (let face = 0; face < 6; face++) {
     for (let v = 0; v < 4; v++) {
       const i = face * 4 + v;
-      uv.setXY(i, uv.getX(i) * sizes[face][0] * 0.5, uv.getY(i) * sizes[face][1] * 0.5);
+      // paredes (faces laterais): UMA repetição da textura por ~3,85 m de altura (antes 0.5 => ~2 alturas por parede)
+      const vScale = face < 2 || face > 3 ? 0.26 : 0.5;
+      uv.setXY(i, uv.getX(i) * sizes[face][0] * 0.5, uv.getY(i) * sizes[face][1] * vScale);
     }
   }
   if (rot) _euler.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
@@ -73,9 +86,9 @@ function boxGeometry(w, h, d, x, y, z, color, random, rot = null, ao = 0.34) {
   for (let i = 0; i < positions.count; i++) {
     const height = positions.getY(i);
     const f = tone * (1 - ao * Math.max(0, 1 - Math.max(0, height) / 1.1));
-    colors[i * 3] = _color.r * f;
-    colors[i * 3 + 1] = _color.g * f;
-    colors[i * 3 + 2] = _color.b * f;
+    colors[i * 3] = _color.r * f * _styleTint[0];
+    colors[i * 3 + 1] = _color.g * f * _styleTint[1];
+    colors[i * 3 + 2] = _color.b * f * _styleTint[2];
   }
   g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   return g;
@@ -131,8 +144,8 @@ export function createHouse(scene, world, opts) {
   const W = opts.width ?? 5.4 + random() * 2.4;
   const D = opts.depth ?? 4.8 + random() * 2.0;
   const t = 0.28;
-  const H = 2.85 + random() * 0.45;
-  const pitch = 1.5 + random() * 0.9;
+  const H = (2.85 + random() * 0.45) * _styleH;
+  const pitch = (1.5 + random() * 0.9) * _stylePitch;
   const thatch = random() < 0.5;
   const plasterColor = PLASTER[Math.floor(random() * PLASTER.length)];
   const timberColor = TIMBER[Math.floor(random() * TIMBER.length)];

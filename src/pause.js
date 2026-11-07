@@ -41,6 +41,7 @@ export class PauseMenu {
       <div class="pause-card" role="dialog" aria-modal="true" aria-label="Jogo pausado">
         <h2>PAUSADO</h2>
         <p>o reino aguarda o seu retorno</p>
+        <p id="pause-world" style="font-size:13px;opacity:.75;margin:-6px 0 10px"></p>
         <div class="pause-row">
           <label for="vol-music"><span>Música</span><span id="vol-music-n"></span></label>
           <div class="pause-vol-wrap">
@@ -177,6 +178,8 @@ export class PauseMenu {
   _open() {
     this.open = true;
     this.layer.classList.add("on");
+    const worldLine = this.layer.querySelector("#pause-world");
+    if (worldLine && window.__worldgen) worldLine.textContent = `mundo · seed ${window.__worldgen.getWorldSeed()} · caos ${window.__worldgen.getWorldChaos().toFixed(2)}`;
     const music = this.layer.querySelector("#vol-music");
     const sfx = this.layer.querySelector("#vol-sfx");
     const musicN = this.layer.querySelector("#vol-music-n");

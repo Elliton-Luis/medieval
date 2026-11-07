@@ -1,3 +1,4 @@
+import { getCutscenePoint, getSpawnPoint } from "./worldgen.js";
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeGlowTexture } from "./torches.js";
@@ -768,8 +769,9 @@ export function startIntroSequence(env) {
   if (cameraRig) cameraRig.frozen = true;
 
   // Acampamento na mata fechada a ~270m dos muros da cidade
-  const startX = 0;
-  const startZ = -270;
+  const cutPoint = getCutscenePoint(); // mata fechada sorteada pela seed (mundo canônico: (0,-270))
+  const startX = cutPoint.x;
+  const startZ = cutPoint.z;
   _originX = startX;
   _originZ = startZ;
   const startY = world.heightAt(startX, startZ);
@@ -1216,8 +1218,9 @@ export function endIntroSequence(isSkipped = false) {
       }
 
       // SPAWN NA ESTRADA PRINCIPAL DO LADO DE FORA DO PORTÃO
-      const safeSpawnX = 0;
-      const safeSpawnZ = -62;
+      const spawnPt = getSpawnPoint(); // logo depois do Portão Norte da capital
+      const safeSpawnX = spawnPt.x;
+      const safeSpawnZ = spawnPt.z;
       const safeGroundY = world ? world.heightAt(safeSpawnX, safeSpawnZ) : 0;
 
       player.x = safeSpawnX;

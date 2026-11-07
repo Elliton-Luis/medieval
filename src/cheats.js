@@ -284,6 +284,9 @@ function _updateStatusDisplays() {
     clockEl.textContent = `${hours}:${minutes} (${prof}${w})`;
   }
 
+  const worldEl = _cheatModalEl.querySelector("#cs-world");
+  if (worldEl && window.__worldgen) worldEl.textContent = `seed ${window.__worldgen.getWorldSeed()} · caos ${window.__worldgen.getWorldChaos().toFixed(2)}`;
+
   const fogEl = _cheatModalEl.querySelector("#cs-fog");
   if (fogEl && dn?.getFogName) fogEl.textContent = "· " + dn.getFogName();
 
@@ -342,6 +345,7 @@ export function openCheatModal(env) {
         <div class="cheat-status-item">⏰ Horário: <span class="cheat-status-val" id="cs-clock">--:--</span></div>
         <div class="cheat-status-item">📅 Dia: <span class="cheat-status-val" id="cs-day">Dia 1</span></div>
         <div class="cheat-status-item">⚖️ Maldade: <span class="cheat-status-val" id="cs-evil">0%</span></div>
+        <div class="cheat-status-item">🌍 Mundo: <span class="cheat-status-val" id="cs-world">seed ? · caos ?</span></div>
         <div class="cheat-status-item">🪵 Mad: <span class="cheat-status-val" id="cs-wood">0</span></div>
         <div class="cheat-status-item">🪨 Ped: <span class="cheat-status-val" id="cs-stone">0</span></div>
         <div class="cheat-status-item">🏺 Barro: <span class="cheat-status-val" id="cs-clay">0</span></div>
@@ -407,6 +411,13 @@ export function openCheatModal(env) {
             <button class="cheat-btn" data-cheat="time_witching">🌑 Madrugada dos Ermos (03:00)</button>
             <button class="cheat-btn" data-cheat="time_set_day">☀️ Fazer Dia Imediato (10:00)</button>
             <button class="cheat-btn" data-cheat="time_set_night">🌙 Fazer Noite Imediata (22:00)</button>
+          </div>
+
+          <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 14px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">🌍 Mundo procedural (seed + caos)</div>
+          <div class="cheat-grid" style="grid-template-columns: 1.4fr 1fr 1fr; margin-bottom: 12px; align-items: stretch;">
+            <input id="cheat-seed-input" type="text" inputmode="numeric" placeholder="seed (vazio = aleatória)" style="padding:8px; border-radius:6px; border:1px solid #6b4fa0; background:#1a1326; color:#fff;">
+            <input id="cheat-chaos-input" type="text" inputmode="decimal" placeholder="caos 0–1" style="padding:8px; border-radius:6px; border:1px solid #6b4fa0; background:#1a1326; color:#fff;">
+            <button class="cheat-btn highlight" data-cheat="world_new">🌍 Novo mundo</button>
           </div>
 
           <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 14px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">🌫️ Níveis de Neblina <span id="cs-fog" style="color:#bba8d8; text-transform:none; letter-spacing:0;"></span></div>
@@ -726,6 +737,12 @@ function _handleCheatAction(type) {
     case "fog_0": case "fog_1": case "fog_2": case "fog_3": case "fog_4": case "fog_5":
       window.CheatMenu.setFog(Number(type.slice(4)));
       break;
+    case "world_new": {
+      const seedTxt = _cheatModalEl?.querySelector("#cheat-seed-input")?.value.trim();
+      const chaosTxt = _cheatModalEl?.querySelector("#cheat-chaos-input")?.value.trim();
+      window.CheatMenu.newWorld(seedTxt, chaosTxt);
+      break;
+    }
     case "fog_auto":
       window.CheatMenu.setFog("auto");
       break;
@@ -1144,6 +1161,21 @@ export function initCheatMenu(env = {}) {
 
     setNight() {
       return this.setTime(22, 0);
+    },
+
+    // Novo mundo: apaga o save e recarrega com ?seed=&chaos= (seed vazia = aleatória; caos vazio = o atual)
+    newWorld(seed, chaos) {
+      try {
+        localStorage.removeItem("rex-mundi-save-v1");
+        localStorage.removeItem("gta-medieval-save-v1");
+        localStorage.removeItem("rex-mundi-world-v1");
+      } catch (_) {}
+      const q = new URLSearchParams();
+      if (seed !== undefined && seed !== null && String(seed) !== "") q.set("seed", String(Math.floor(Number(seed)) || 1));
+      const ch = chaos !== undefined && chaos !== null && String(chaos) !== "" ? Number(chaos) : window.__worldgen?.getWorldChaos();
+      if (Number.isFinite(ch)) q.set("chaos", String(Math.max(0, Math.min(1, ch))));
+      window.location.href = `${window.location.pathname}${q.toString() ? "?" + q.toString() : ""}`;
+      return "Novo mundo...";
     },
 
     setFog(level) {
