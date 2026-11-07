@@ -77,10 +77,11 @@ export function reserve(x, z, hw, hd, ry = 0, kind = "building", id = "", margin
 // Todo objeto solto (poste de tocha, banco, feno, árvore, pedra, grama...) deve passar por aqui antes de nascer.
 // ---------------------------------------------------------------------------
 /** Primeira pegada que contém (x,z) com folga `margin` (m); ignora a pegada do grupo `ignoreGroup`. */
-export function pointBlockedBy(x, z, margin = 0.8, ignoreGroup = null) {
+export function pointBlockedBy(x, z, margin = 0.8, ignoreGroup = null, skipPrefix = null) {
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     if (ignoreGroup && e.group === ignoreGroup) continue;
+    if (skipPrefix && typeof e.id === "string" && e.id.startsWith(skipPrefix)) continue; // ex.: pegadas dos próprios postes
     const dx = x - e.x;
     const dz = z - e.z;
     const c = Math.cos(e.ry);
@@ -180,7 +181,7 @@ export function auditBuildings() {
 export function auditPoints(points, margin = -0.25) {
   const bad = [];
   for (const p of points) {
-    const e = pointBlockedBy(p.x, p.z, margin);
+    const e = pointBlockedBy(p.x, p.z, margin, null, "post-");
     if (e) bad.push(`${p.kind || "ponto"} (${p.x.toFixed(1)},${p.z.toFixed(1)}) dentro de ${e.kind}:${e.id}`);
   }
   return { checked: points.length, inside: bad.length, bad };
