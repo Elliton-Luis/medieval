@@ -5,6 +5,7 @@ import { buildHumanoid, bendJoints } from "./humanoid.js";
 import { makeSkinnedMaterial } from "./skins.js";
 import { meleeThink, separation, pruneTokens, requestToken, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js";
+import { createArrowGeometry, createArrowBundleGeometry, getArrowMaterial, createBowGeometry, createStringGeometry, setStringNock, getBowMaterial, getStringMaterial, BOW_TIP_Z } from "./arrowKit.js";
 
 const _playerPosVec = new THREE.Vector3();
 
@@ -29,6 +30,7 @@ const MAX_ACTIVE = 10;
 const FLASH_COLOR = new THREE.Color("#85764a");
 const ZERO_COLOR = new THREE.Color("#000000");
 const _lookTarget = new THREE.Vector3();
+const _bowHand = new THREE.Vector3();
 
 function addPart(parent, geometry, material, x, y, z, castShadow = false) {
   const mesh = new THREE.Mesh(geometry, material);
@@ -106,8 +108,17 @@ export class Soldier extends NPC {
       addPart(this.model, new THREE.BoxGeometry(0.36, 0.3, 0.08), metal, 0, 1.28, 0.1);
       addPart(this.model, new THREE.BoxGeometry(0.36, 0.3, 0.08), metal, 0, 1.28, -0.1);
       for (const arm of [this.leftArm, this.rightArm]) addPart(arm, G.pauldron, metal, 0, 0.02, 0);
-      addPart(this.leftForearm, new THREE.BoxGeometry(0.3, 0.42, 0.04), cloth, 0, -0.14, 0.095);
-      addPart(this.leftForearm, new THREE.SphereGeometry(0.05, 6, 5), accent, 0, -0.14, 0.13);
+      // escudo redondo no antebraço (face para fora), com aro e botão; a mão fica atrás dele
+      const shield = new THREE.Group();
+      shield.position.set(-0.085, -0.15, 0);
+      shield.rotation.y = -Math.PI / 2;
+      this.leftForearm.add(shield);
+      const sBody = addPart(shield, new THREE.CylinderGeometry(0.2, 0.19, 0.04, 12), cloth, 0, 0, 0);
+      sBody.rotation.x = Math.PI / 2;
+      sBody.scale.set(0.9, 1, 1.18);
+      const sRim = addPart(shield, new THREE.TorusGeometry(0.195, 0.014, 5, 14), metal, 0, 0, 0.02);
+      sRim.scale.set(0.9, 1.18, 1);
+      addPart(shield, new THREE.SphereGeometry(0.05, 7, 5), accent, 0, 0, 0.045);
     }
     if (this.roleKey === "footman") {
       addPart(face, G.helmet, metal, 0, 0.035, 0);
@@ -124,12 +135,37 @@ export class Soldier extends NPC {
       addPart(this.weapon, new THREE.ConeGeometry(0.055, 0.34, 5), metal, 0, 2.3, 0);
       addPart(this.weapon, new THREE.BoxGeometry(0.02, 0.2, 0.22), cloth, 0, 1.9, 0);
     } else if (this.roleKey === "archer") {
+      // capuz arredondado com aba curta e pena, gibão de couro por cima do pano, bracelete e aljava com flechas
       addPart(face, G.cap, leather, 0, 0.04, 0);
-      addPart(face, new THREE.CylinderGeometry(0.15, 0.15, 0.018, 8), leather, 0, 0.065, 0.02);
-      addPart(this.model, new THREE.CylinderGeometry(0.07, 0.06, 0.55, 7), leather, 0.12, 1.2, -0.2).rotation.z = -0.25;
-      for (let i = 0; i < 4; i++) addPart(this.model, new THREE.BoxGeometry(0.015, 0.14, 0.015), accent, 0.17 + i * 0.012, 1.5, -0.2);
-      addPart(this.weapon, new THREE.TorusGeometry(0.42, 0.03, 5, 12, Math.PI), leather, 0, 0, 0).rotation.z = -Math.PI / 2;
-      addPart(this.weapon, new THREE.BoxGeometry(0.01, 0.84, 0.01), accent, 0, 0, 0);
+      addPart(face, new THREE.SphereGeometry(0.146, 10, 7, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.32), leather, 0, 0.0, -0.012); // capuz caindo na nuca
+      addPart(face, new THREE.CylinderGeometry(0.15, 0.15, 0.018, 9), leather, 0, 0.065, 0.02);
+      const feather = addPart(face, new THREE.ConeGeometry(0.018, 0.16, 5), accent, 0.1, 0.13, -0.03);
+      feather.rotation.z = -0.9;
+      const vest = addPart(this.model, new THREE.CylinderGeometry(0.205, 0.225, 0.46, 10), leather, 0, 1.13, 0);
+      vest.scale.z = 0.78;
+      addPart(this.leftForearm, new THREE.CylinderGeometry(0.056, 0.05, 0.16, 8), leather, 0, -0.17, 0); // bracelete do braço do arco
+      // aljava nas costas, inclinada, com as flechas saindo pelo topo (uma malha só para o feixe)
+      const quiver = new THREE.Group();
+      quiver.position.set(0.13, 1.2, -0.22);
+      quiver.rotation.z = -0.28;
+      this.model.add(quiver);
+      addPart(quiver, new THREE.CylinderGeometry(0.075, 0.06, 0.56, 8), leather, 0, 0, 0);
+      const bundle = new THREE.Mesh(createArrowBundleGeometry(), getArrowMaterial());
+      bundle.position.y = 0.21;
+      quiver.add(bundle);
+      addPart(this.model, new THREE.BoxGeometry(0.05, 0.7, 0.02), dark, -0.04, 1.18, -0.01).rotation.z = 0.7; // correia
+      // ARCO na mão ESQUERDA: no plano Y/Z, barriga para a frente; a orientação é travada no mundo (ver _bowPose)
+      const bowHolder = new THREE.Group();
+      bowHolder.position.set(0, -0.3, 0.0);
+      this.leftForearm.add(bowHolder);
+      this.bowHolder = bowHolder;
+      bowHolder.add(new THREE.Mesh(createBowGeometry(), getBowMaterial()));
+      this.bowStringGeo = createStringGeometry();
+      bowHolder.add(new THREE.Mesh(this.bowStringGeo, getStringMaterial()));
+      this.bowArrow = new THREE.Mesh(createArrowGeometry(), getArrowMaterial());
+      this.bowArrow.visible = false;
+      bowHolder.add(this.bowArrow);
+      this.bowDraw = 0;
     } else if (this.roleKey === "crossbow") {
       addPart(face, G.helmet, metal, 0, 0.035, 0);
       addPart(face, new THREE.CylinderGeometry(0.19, 0.19, 0.02, 9), metal, 0, 0.07, 0);
@@ -240,6 +276,26 @@ export class Soldier extends NPC {
     const target = Math.atan2(dirX, dirZ);
     const difference = Math.atan2(Math.sin(target - this.model.rotation.y), Math.cos(target - this.model.rotation.y));
     this.model.rotation.y += difference * (1 - Math.exp(-rate * dt));
+  }
+
+  // Arco do arqueiro: sempre na vertical e de frente no MUNDO (compensa o pitch do braço esquerdo), com a barriga para
+  // o alvo e o plano da corda perpendicular ao olhar. Ao mirar, o encaixe da corda acompanha a mão que puxa e
+  // a flecha fica encaixada; ao soltar, o aimBlend cai e a corda volta sozinha.
+  _bowPose(ab) {
+    const holder = this.bowHolder;
+    if (!holder) return;
+    holder.rotation.x = -(this.leftArm.rotation.x + this.leftForearm.rotation.x);
+    holder.rotation.z = -this.leftArm.rotation.z;
+    let nockZ = BOW_TIP_Z;
+    const drawn = ab > 0.15;
+    if (drawn) {
+      this.rightForearm.localToWorld(_bowHand.set(0, -0.3, 0));
+      holder.worldToLocal(_bowHand);
+      nockZ = Math.max(-0.62, Math.min(BOW_TIP_Z, _bowHand.z));
+    }
+    setStringNock(this.bowStringGeo, nockZ);
+    if (this.bowArrow.visible !== drawn) this.bowArrow.visible = drawn;
+    if (drawn) this.bowArrow.position.z = nockZ + 0.42;
   }
 
   _weaponPose(alpha, free = false) {
@@ -458,7 +514,15 @@ export class Soldier extends NPC {
       this.rightForearm.rotation.x = -0.25 - 0.3 * strikeArc;
       weaponFree = true;
     }
-    if (this.behavior === "archer" || this.behavior === "crossbow") {
+    if (this.behavior === "archer") {
+      // braço do arco (esquerdo) estendido para o alvo; braço de puxar (direito) leva a corda até a face
+      this.leftArm.rotation.x += (-1.5 - this.leftArm.rotation.x) * ab;
+      this.leftArm.rotation.z += 0.1 * ab;
+      this.leftForearm.rotation.x *= 1 - ab;
+      this.rightArm.rotation.x += (-1.3 - this.rightArm.rotation.x) * ab;
+      this.rightArm.rotation.z += (-0.5 - this.rightArm.rotation.z) * ab;
+      this.rightForearm.rotation.x += (-2.05 - this.rightForearm.rotation.x) * ab;
+    } else if (this.behavior === "crossbow") {
       this.rightArm.rotation.x += (-1.5 - this.rightArm.rotation.x) * ab;
       this.leftArm.rotation.x += (-1.4 - this.leftArm.rotation.x) * ab;
       this.leftArm.rotation.z += 0.4 * ab;
@@ -470,7 +534,7 @@ export class Soldier extends NPC {
     if (weaponFree) {
       this._weaponPose(this.meleeWind > 0 ? 0.3 + 0.4 * this.meleeWind : 1.2, true);
     } else if (this.behavior === "archer") {
-      this._weaponPose(0.05);
+      this._bowPose(ab);
     } else if (this.behavior === "crossbow") {
       this._weaponPose(Math.PI / 2 + 0.4 - 0.4 * ab);
     } else {
@@ -491,19 +555,19 @@ class EnemyFire {
     this.world = world;
     this.director = director;
     this.items = [];
-    const arrowMat = new THREE.MeshStandardMaterial({ color: "#a98a4a", flatShading: true });
-    const boltMat = new THREE.MeshStandardMaterial({ color: "#6b5a46", flatShading: true });
+    const arrowMat = getArrowMaterial();
     const ballMat = new THREE.MeshStandardMaterial({ color: "#1c1c1e", metalness: 0.5, roughness: 0.5, flatShading: true });
-    const arrow = new THREE.BoxGeometry(0.035, 0.035, 0.8);
-    const bolt = new THREE.BoxGeometry(0.05, 0.05, 0.5);
+    const arrow = createArrowGeometry(); // haste + ponta de aço + 3 penas, uma malha (~44 triângulos), +Z para frente
     const ball = new THREE.SphereGeometry(0.2, 8, 6);
     for (let i = 0; i < 36; i++) {
       const root = new THREE.Group();
       const variants = {
         arrow: new THREE.Mesh(arrow, arrowMat),
-        bolt: new THREE.Mesh(bolt, boltMat),
+        bolt: new THREE.Mesh(arrow, arrowMat), // virote: a mesma malha, mais curta e grossa
         ball: new THREE.Mesh(ball, ballMat),
       };
+      variants.arrow.scale.set(1.25, 1.25, 1.15); // legível a 720p
+      variants.bolt.scale.set(1.5, 1.5, 0.62);
       for (const mesh of Object.values(variants)) {
         mesh.visible = false;
         root.add(mesh);
@@ -527,6 +591,8 @@ class EnemyFire {
     }
     if (!item) return;
     item.active = true;
+    item.stuck = 0;
+    item.root.scale.setScalar(1);
     item.type = type;
     item.x = x; item.y = y; item.z = z;
     item.vx = vx; item.vy = vy; item.vz = vz;
@@ -542,7 +608,9 @@ class EnemyFire {
   clear() {
     for (const item of this.items) {
       item.active = false;
+      item.stuck = 0;
       item.root.visible = false;
+      item.root.scale.setScalar(1);
     }
   }
 
@@ -550,12 +618,25 @@ class EnemyFire {
     const d = this.director;
     for (let i = 0; i < this.items.length; i++) {
       const p = this.items[i];
-      if (!p.active) continue;
+      if (!p.active) {
+        // flecha/virote cravado: fica parado alguns segundos e some encolhendo (último segundo)
+        if (p.stuck > 0) {
+          p.stuck -= dt;
+          if (p.stuck <= 0) {
+            p.root.visible = false;
+            p.root.scale.setScalar(1);
+          } else if (p.stuck < 1) {
+            p.root.scale.setScalar(Math.max(0.01, p.stuck));
+          }
+        }
+        continue;
+      }
       p.life -= dt;
       const speed = Math.hypot(p.vx, p.vy, p.vz);
       const steps = Math.max(1, Math.ceil((speed * dt) / 0.45));
       const sub = dt / steps;
       let ended = p.life <= 0;
+      let stick = false;
       for (let s = 0; s < steps && !ended; s++) {
         p.vy -= p.g * sub;
         p.x += p.vx * sub;
@@ -571,14 +652,23 @@ class EnemyFire {
           ended = true;
         } else if (hitPlayer || p.y <= ground + 0.1 || this.world.isBlockedAtHeight(p.x, p.y, p.z, 0.1)) {
           if (p.type === "ball") d.explodeBall(p);
-          else d.effects.play("star", p.x, Math.max(p.y, ground + 0.3), p.z, "#d6b57a", 0.45);
+          else {
+            d.effects.play("star", p.x, Math.max(p.y, ground + 0.3), p.z, "#d6b57a", 0.45);
+            stick = true;
+            p.y = Math.max(p.y, ground + 0.05); // a ponta fica cravada rente ao chão
+          }
           ended = true;
         }
       }
       if (ended) {
         if (p.life <= 0 && p.type === "ball") d.explodeBall(p);
         p.active = false;
-        p.root.visible = false;
+        if (stick) {
+          p.stuck = 6; // cravada: continua visível, parada, com a mesma orientação do voo
+          p.root.position.set(p.x, p.y, p.z);
+        } else {
+          p.root.visible = false;
+        }
         continue;
       }
       if (p.type === "ball") {

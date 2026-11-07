@@ -223,8 +223,17 @@ export class NPC {
       this.flashMaterials.push(plumeMat);
       addPart(face, new THREE.ConeGeometry(0.05, 0.3, 5), plumeMat, 0, 0.22, -0.03);
       addPart(face, new THREE.BoxGeometry(0.02, 0.1, 0.13), plumeMat, 0, 0.12, -0.1);
-      addPart(this.leftForearm, new THREE.BoxGeometry(0.3, 0.42, 0.04), cloth, 0, -0.14, 0.095);
-      addPart(this.leftForearm, new THREE.SphereGeometry(0.05, 6, 5), accent, 0, -0.14, 0.13);
+      // escudo redondo preso na face externa do antebraço (a mão fica atrás dele), com aro e botão
+      const shield = new THREE.Group();
+      shield.position.set(-0.085, -0.15, 0);
+      shield.rotation.y = -Math.PI / 2;
+      this.leftForearm.add(shield);
+      const sBody = addPart(shield, new THREE.CylinderGeometry(0.2, 0.19, 0.04, 12), cloth, 0, 0, 0);
+      sBody.rotation.x = Math.PI / 2;
+      sBody.scale.set(0.9, 1, 1.18);
+      const sRim = addPart(shield, new THREE.TorusGeometry(0.195, 0.014, 5, 14), metal, 0, 0, 0.02);
+      sRim.scale.set(0.9, 1.18, 1);
+      addPart(shield, new THREE.SphereGeometry(0.05, 7, 5), accent, 0, 0, 0.045);
       addPart(this.model, new THREE.BoxGeometry(0.3, 0.46, 0.03), accent, 0, 0.62, 0.17);
       addPart(this.model, new THREE.BoxGeometry(0.34, 0.8, 0.03), cloth, 0, 1.08, -0.17);
       const spear = new THREE.Group();

@@ -1,3 +1,4 @@
+import { createArrowGeometry, getArrowMaterial } from "./arrowKit.js";
 import { scytheSweep, updateHay } from "./hay.js";
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
@@ -245,13 +246,11 @@ export class WeaponSystem {
       boltShaft.rotation.x = Math.PI / 2;
       const boltTip = addMesh(bolt, arrowTipGeometry, steel, 0, 0, 0.38);
       boltTip.rotation.x = Math.PI / 2;
+      // flecha de verdade: haste + ponta de aço + 3 penas numa malha só (arrowKit), +Z para frente
       const arrow = new THREE.Group();
-      const arrowShaft = addMesh(arrow, shaftGeometry, arrowWood, 0, 0, 0);
-      arrowShaft.rotation.x = Math.PI / 2;
-      const arrowTip = addMesh(arrow, arrowTipGeometry, brass, 0, 0, 0.48);
-      arrowTip.rotation.x = Math.PI / 2;
-      const feathers = addMesh(arrow, featherGeometry, cloth, 0, 0, -0.34);
-      feathers.rotation.z = 0.28;
+      const arrowMesh = new THREE.Mesh(createArrowGeometry(), getArrowMaterial());
+      arrowMesh.scale.setScalar(1.2);
+      arrow.add(arrowMesh);
       const bomb = new THREE.Group();
       addMesh(bomb, bombGeometry, bombMat, 0, 0, 0);
       addMesh(bomb, fuseGeometry, cloth, 0, 0.22, 0);
