@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeSkinnedMaterial } from "./skins.js";
-import { buildHumanoid, bendJoints } from "./humanoid.js";
+import { buildHumanoid, bendJoints, addBeard, addVikingHair, addTiredEyes, createPoseState, smoothPose } from "./humanoid.js";
 import { PlayerStats } from "./rpg.js";
 
 const ROLL_DURATION = 0.55;
@@ -11,6 +11,10 @@ const LAND_TIME = 0.24;
 // Vetores e estruturas auxiliares pré-alocados no escopo do módulo (Zero-GC no loop de jogo)
 const _v1 = new THREE.Vector3();
 const _moveResult = { x: 0, z: 0, hitX: false, hitZ: false };
+const _qChain = new THREE.Quaternion();
+const _qGuard = new THREE.Quaternion();
+// Escudo em repouso: a face aponta para fora do antebraço (-X), como um escudo preso no braço esquerdo
+const _qShieldRest = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
 
 function makePart(geometry, material, parent, x, y, z, castShadow = true) {
   const mesh = new THREE.Mesh(geometry, material);
@@ -20,6 +24,49 @@ function makePart(geometry, material, parent, x, y, z, castShadow = true) {
   parent.add(mesh);
   return mesh;
 }
+
+// Reflexo "pre-baked" da armadura templária: faixas diagonais de brilho + pontos especulares pintados num canvas e
+// usados como emissiveMap. Não depende de luz nem de env map: a placa sempre "brilha" sem custo extra de render.
+let _templarSheen = null;
+function templarSheenTexture() {
+  if (_templarSheen) return _templarSheen;
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, 128, 128);
+  const streaks = [[-20, 26, 0.55], [30, 12, 0.35], [70, 20, 0.5], [108, 8, 0.28]];
+  for (const [x, w, a] of streaks) {
+    const grad = g.createLinearGradient(x, 0, x + w, 0);
+    grad.addColorStop(0, "rgba(255,255,255,0)");
+    grad.addColorStop(0.5, `rgba(255,235,230,${a})`);
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.save();
+    g.translate(64, 64);
+    g.rotate(-0.5);
+    g.translate(-64, -64);
+    g.fillStyle = grad;
+    g.fillRect(x, -40, w, 210);
+    g.restore();
+  }
+  g.fillStyle = "rgba(255,240,235,0.9)";
+  for (const [x, y] of [[22, 30], [90, 44], [58, 96], [104, 110]]) {
+    g.beginPath();
+    g.arc(x, y, 2.2, 0, Math.PI * 2);
+    g.fill();
+  }
+  _templarSheen = new THREE.CanvasTexture(c);
+  _templarSheen.colorSpace = THREE.SRGBColorSpace;
+  _templarSheen.wrapS = THREE.RepeatWrapping;
+  _templarSheen.wrapT = THREE.RepeatWrapping;
+  return _templarSheen;
+}
+
+function templarMaterial(color, emissive, glow, metalness = 0.8, roughness = 0.3) {
+  return new THREE.MeshStandardMaterial({ color, metalness, roughness, flatShading: true, emissive, emissiveMap: templarSheen(), emissiveIntensity: glow });
+}
+const templarSheen = templarSheenTexture;
 
 export class Player {
   constructor(scene, world) {
@@ -109,6 +156,14 @@ export class Player {
     const skin = makeSkinnedMaterial("skin", "#c28e68", 0, 1);
     const hair = makeSkinnedMaterial("leather", "#3a281c", 0, 1);
     const gold = makeSkinnedMaterial("metal", "#b99352", 0.55, 0.5);
+    // Paleta Templária: quase preto puxado para o vermelho-sangue, com brilho pre-baked e cruz vermelha de borda branca
+    const tplPlate = templarMaterial("#1c080b", "#4a1016", 0.6);
+    const tplDark = templarMaterial("#120507", "#2e0a0f", 0.45);
+    const tplTrim = templarMaterial("#3b0f15", "#6a1a22", 0.75, 0.88, 0.24);
+    const tplRed = new THREE.MeshStandardMaterial({ color: "#b3111b", roughness: 0.5, metalness: 0.2, flatShading: true, emissive: "#46040b", emissiveIntensity: 0.55 });
+    const tplWhite = new THREE.MeshStandardMaterial({ color: "#f3eee4", roughness: 0.55, metalness: 0.1, flatShading: true, emissive: "#3a3836", emissiveIntensity: 0.3 });
+    const tplCloth = new THREE.MeshStandardMaterial({ color: "#17060a", roughness: 0.85, metalness: 0.05, flatShading: true });
+    this._tplMats = { heraldry, tplCloth };
 
     const body = buildHumanoid(this.model, {
       skin,
@@ -120,16 +175,24 @@ export class Player {
       forearm: darkSteel,
     });
     Object.assign(this, body);
+    this._pose = createPoseState();
+    // Barba cheia (escura, igual ao cabelo)
+    addBeard(this.head, hair, "viking");
+    addVikingHair(this.head, hair);
+    addTiredEyes(this.head, skin, hair);
 
     // Armadura do Jogador: Peitoral detalhado, espaldar, cinto com fivela, grevas e túnica
     const plate = new THREE.LatheGeometry(
       [[0.01, 0.12], [0.16, 0.14], [0.18, 0.3], [0.22, 0.46], [0.225, 0.54], [0.16, 0.62], [0.01, 0.62]].map(([r, y]) => new THREE.Vector2(r, y)),
       12,
     ).scale(1.04, 1.0, 0.76);
-    this.chestArmor = makePart(plate, steel, this.model, 0, 0.82, 0.015);
+    this.chestArmor = makePart(plate, tplPlate, this.model, 0, 0.82, 0.015);
     this.chestArmor.name = "PlateArmor";
-    const chestCross1 = makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), gold, this.model, 0, 1.3, 0.175, false);
-    const chestCross2 = makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), gold, this.model, 0, 1.38, 0.17, false);
+    // Cruz vermelha com bordas brancas (bordas um pouco maiores e atrás da cruz)
+    const chestBorder1 = makePart(new THREE.BoxGeometry(0.125, 0.38, 0.02), tplWhite, this.model, 0, 1.3, 0.168, false);
+    const chestBorder2 = makePart(new THREE.BoxGeometry(0.29, 0.125, 0.02), tplWhite, this.model, 0, 1.38, 0.163, false);
+    const chestCross1 = makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), tplRed, this.model, 0, 1.3, 0.175, false);
+    const chestCross2 = makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), tplRed, this.model, 0, 1.38, 0.17, false);
 
     // Colete de Couro rústico (Nível 1)
     const leatherJerkin = makePart(new THREE.CylinderGeometry(0.21, 0.23, 0.44, 12), leather, this.model, 0, 1.15, 0);
@@ -139,9 +202,9 @@ export class Player {
     // Ombreiras sólidas anatômicas
     const pauldronsList = [];
     for (const arm of [this.leftArm, this.rightArm]) {
-      const pauldron = makePart(new THREE.SphereGeometry(0.1, 10, 8), darkSteel, arm, 0, 0.02, 0);
+      const pauldron = makePart(new THREE.SphereGeometry(0.1, 10, 8), tplDark, arm, 0, 0.02, 0);
       pauldron.scale.set(1.22, 0.9, 1.1);
-      const pauldronEdge = makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), steel, arm, 0, -0.04, 0);
+      const pauldronEdge = makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), tplTrim, arm, 0, -0.04, 0);
       pauldronsList.push(pauldron, pauldronEdge);
     }
     const belt = makePart(new THREE.CylinderGeometry(0.21, 0.21, 0.07, 12), leather, this.model, 0, 0.84, 0);
@@ -152,13 +215,17 @@ export class Player {
     const skirt = makePart(new THREE.CylinderGeometry(0.2, 0.28, 0.32, 12), cloth, this.model, 0, 0.66, 0);
     skirt.scale.z = 0.76;
     skirt.name = "Tunic";
-    const heraldicTabard = makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), heraldry, this.model, 0, 0.6, 0.19, false);
+    const heraldicTabard = makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), tplCloth, this.model, 0, 0.6, 0.19, false);
+    const tabardBorderV = makePart(new THREE.BoxGeometry(0.085, 0.27, 0.012), tplWhite, this.model, 0, 0.62, 0.208, false);
+    const tabardBorderH = makePart(new THREE.BoxGeometry(0.17, 0.085, 0.012), tplWhite, this.model, 0, 0.7, 0.208, false);
+    const tabardCrossV = makePart(new THREE.BoxGeometry(0.05, 0.25, 0.016), tplRed, this.model, 0, 0.62, 0.212, false);
+    const tabardCrossH = makePart(new THREE.BoxGeometry(0.15, 0.05, 0.016), tplRed, this.model, 0, 0.7, 0.212, false);
 
     // Placas de perna / grevas
     const greavesList = [];
     for (const knee of [this.leftKnee, this.rightKnee]) {
-      const greave = makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), steel, knee, 0, -0.19, 0.06, false);
-      const kneecap = makePart(new THREE.SphereGeometry(0.068, 8, 6), darkSteel, knee, 0, 0, 0.035);
+      const greave = makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), tplPlate, knee, 0, -0.19, 0.06, false);
+      const kneecap = makePart(new THREE.SphereGeometry(0.068, 8, 6), tplTrim, knee, 0, 0, 0.035);
       greavesList.push(greave, kneecap);
     }
     // Braçadeiras protetoras / cota de malha nos antebraços
@@ -172,10 +239,10 @@ export class Player {
     const head = this.head;
     const camail = makePart(new THREE.CylinderGeometry(0.12, 0.15, 0.18, 10), darkSteel, head, 0, -0.1, 0); // Camal de malha
     camail.name = "Chainmail";
-    const helmDome = makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), steel, head, 0, 0.035, -0.005);
-    const helmRim = makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), darkSteel, head, 0, 0.075, 0);
-    const nasalBar = makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), steel, head, 0, -0.01, 0.132, false);
-    const plume = makePart(new THREE.ConeGeometry(0.035, 0.22, 4), heraldry, head, 0, 0.2, -0.06, false);
+    const helmDome = makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), tplPlate, head, 0, 0.035, -0.005);
+    const helmRim = makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), tplTrim, head, 0, 0.075, 0);
+    const nasalBar = makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), tplTrim, head, 0, -0.01, 0.132, false);
+    const plume = makePart(new THREE.ConeGeometry(0.035, 0.22, 4), tplRed, head, 0, 0.2, -0.06, false);
 
     // Estrutura modular de armaduras (Zero-GC: apenas altera visible = true/false)
     this.armorPieces = {
@@ -184,8 +251,14 @@ export class Player {
       chainmail: [camail, ...vambracesList],
       plate: [
         this.chestArmor,
+        chestBorder1,
+        chestBorder2,
         chestCross1,
         chestCross2,
+        tabardBorderV,
+        tabardBorderH,
+        tabardCrossV,
+        tabardCrossH,
         ...pauldronsList,
         ...greavesList,
         helmDome,
@@ -197,18 +270,40 @@ export class Player {
     };
     this.setArmorVisuals(0); // Inicia como Camponês (apenas túnica)
 
-    // Escudo no antebraço esquerdo: o grupo contra-gira o braço para a face ficar sempre para a frente.
+    // Escudo preso ao antebraço esquerdo. `shieldAnchor` fica no meio do antebraço e a face do escudo
+    // é deslocada ao longo da própria normal (+Z local), então o braço/mão ficam ATRÁS do escudo
+    // (alça) e nunca o atravessam. Em repouso a face aponta para fora; na guarda, `_updateShield`
+    // gira o conjunto para a face ficar voltada para a frente.
     this.shield = new THREE.Group();
-    this.shield.position.set(0, -0.13, 0.06);
+    this.shield.position.set(0, -0.15, 0);
+    this.shield.quaternion.copy(_qShieldRest);
     this.leftForearm.add(this.shield);
-    const shieldBody = makePart(new THREE.CylinderGeometry(0.24, 0.22, 0.05, 12), leather, this.shield, 0, 0, 0.04);
+    const SHIELD_OFFSET = 0.085; // distância da face ao eixo do antebraço (> raio do antebraço + metade da espessura)
+    const shieldBody = makePart(new THREE.CylinderGeometry(0.22, 0.2, 0.045, 14), leather, this.shield, 0, 0, SHIELD_OFFSET);
     shieldBody.rotation.x = Math.PI / 2;
-    shieldBody.scale.set(0.82, 1, 1.2);
-    const shieldFace = makePart(new THREE.CylinderGeometry(0.21, 0.19, 0.02, 12), heraldry, this.shield, 0, 0, 0.075, false);
+    shieldBody.scale.set(0.9, 1, 1.2);
+    const shieldFace = makePart(new THREE.CylinderGeometry(0.19, 0.17, 0.02, 14), heraldry, this.shield, 0, 0, SHIELD_OFFSET + 0.03, false);
+    this._shieldFace = shieldFace;
     shieldFace.rotation.x = Math.PI / 2;
-    shieldFace.scale.set(0.82, 1, 1.2);
-    makePart(new THREE.SphereGeometry(0.05, 7, 5), gold, this.shield, 0, 0, 0.1, false);
-    makePart(new THREE.BoxGeometry(0.03, 0.4, 0.01), gold, this.shield, 0, 0, 0.088, false);
+    shieldFace.scale.set(0.9, 1, 1.2);
+    const shieldRim = makePart(new THREE.TorusGeometry(0.2, 0.012, 5, 18), darkSteel, this.shield, 0, 0, SHIELD_OFFSET + 0.02, false);
+    shieldRim.scale.set(0.9, 1.2, 1);
+    makePart(new THREE.SphereGeometry(0.045, 8, 6), gold, this.shield, 0, 0, SHIELD_OFFSET + 0.05, false);
+    const shieldGoldBar = makePart(new THREE.BoxGeometry(0.028, 0.4, 0.01), gold, this.shield, 0, 0, SHIELD_OFFSET + 0.042, false);
+    // Escudo templário: cruz vermelha com bordas brancas sobre campo quase preto (só com armadura de placas)
+    this._shieldPlain = [shieldGoldBar];
+    this._shieldTemplar = [
+      makePart(new THREE.BoxGeometry(0.12, 0.44, 0.012), tplWhite, this.shield, 0, 0, SHIELD_OFFSET + 0.043, false),
+      makePart(new THREE.BoxGeometry(0.34, 0.12, 0.012), tplWhite, this.shield, 0, 0.04, SHIELD_OFFSET + 0.043, false),
+      makePart(new THREE.BoxGeometry(0.07, 0.4, 0.016), tplRed, this.shield, 0, 0, SHIELD_OFFSET + 0.048, false),
+      makePart(new THREE.BoxGeometry(0.3, 0.07, 0.016), tplRed, this.shield, 0, 0.04, SHIELD_OFFSET + 0.048, false),
+    ];
+    this._shieldRim = shieldRim;
+    this._shieldRimMats = [darkSteel, tplTrim];
+    for (const m of this._shieldTemplar) m.visible = false;
+    // Alças atrás do escudo, abraçando o antebraço
+    makePart(new THREE.BoxGeometry(0.02, 0.025, 0.07), leather, this.shield, 0, 0.1, SHIELD_OFFSET - 0.05, false);
+    makePart(new THREE.BoxGeometry(0.02, 0.025, 0.07), leather, this.shield, 0, -0.08, SHIELD_OFFSET - 0.05, false);
     this.blocking = false;
     this.blockLocked = false;
     this.blockPose = 0;
@@ -547,7 +642,7 @@ export class Player {
     if (landed) {
       this.audio?.land();
       this.landTimer = LAND_TIME;
-      this.effects?.play("dust", this.x, ground + 0.15, this.z, "#cdbb97", 0.85);
+      this.effects?.play("dust", this.x, finalGround + 0.15, this.z, "#cdbb97", 0.85);
     }
 
     const horizontalSpeed = Math.hypot(this.vx, this.vz);
@@ -597,7 +692,8 @@ export class Player {
 
     // Amplitude de passada anatômica e proporcional: elimina o efeito espacate
     const targetStride = Math.sin(this.walkPhase) * s * (running ? 0.68 : 0.42);
-    const targetArmSwing = Math.sin(this.walkPhase) * s * (running ? 0.62 : 0.35);
+    // os braços seguem as pernas com ~0,4 rad de atraso (follow-through): balanço mais orgânico
+    const targetArmSwing = Math.sin(this.walkPhase - 0.4) * s * (running ? 0.62 : 0.35);
     const idle = 1 - Math.min(1, s * 4);
     const breath = Math.sin(this.idleTime * 1.9);
     const sway = Math.sin(this.idleTime * 0.7);
@@ -616,14 +712,18 @@ export class Player {
       this.leftForearm.rotation.x = -0.75 - Math.max(0, -targetArmSwing) * 0.35;
       this.rightForearm.rotation.x = -0.75 - Math.max(0, targetArmSwing) * 0.35;
     } else {
-      this.leftArm.rotation.set(-targetStride * 0.7, 0, -0.04 * idle + Math.sin(this.walkPhase) * 0.02 * s);
-      this.rightArm.rotation.set(targetStride * 0.7, 0, 0.04 * idle - Math.sin(this.walkPhase) * 0.02 * s);
-      this.leftForearm.rotation.x = -0.18 - Math.abs(targetStride) * 0.22;
-      this.rightForearm.rotation.x = -0.18 - Math.abs(targetStride) * 0.22;
+      // Braços naturalmente caídos ao lado do corpo, com balanço oposto às pernas e leve respiração
+      const armBreath = breath * 0.012 * idle;
+      const walkSwing = targetArmSwing * 1.7;
+      this.leftArm.rotation.set(-walkSwing + armBreath, 0, -0.085 - Math.sin(this.walkPhase) * 0.02 * s);
+      this.rightArm.rotation.set(walkSwing - armBreath, 0, 0.085 + Math.sin(this.walkPhase) * 0.02 * s);
+      // o cotovelo dobra mais quando o braço vem para a frente
+      this.leftForearm.rotation.x = -0.14 - Math.max(0, walkSwing) * 0.9;
+      this.rightForearm.rotation.x = -0.14 - Math.max(0, -walkSwing) * 0.9;
     }
 
     // Postura corporal: inclinação elegante para a frente e transferência de peso lateral
-    let lean = s * (running ? 0.24 : 0.08);
+    let lean = s * (running ? 0.24 : 0.08) + 0.035 * idle; // parado: ombros levemente caídos, postura cansada
     let bank = Math.max(-0.18, Math.min(0.18, -turnRate * 0.014 * s));
     let squash = 1;
     let drop = -0.22 * cp;
@@ -652,14 +752,17 @@ export class Player {
     this.blockPose += ((this.blocking ? 1 : 0) - this.blockPose) * (1 - Math.exp(-18 * dt));
     if (this.blockPose > 0.015) {
       const bp = this.blockPose;
-      this.leftArm.rotation.x += (-0.85 - this.leftArm.rotation.x) * bp;
-      this.leftArm.rotation.z += (0.62 - this.leftArm.rotation.z) * bp;
+      this.leftArm.rotation.x += (-0.55 - this.leftArm.rotation.x) * bp;
+      this.leftArm.rotation.z += (-0.12 - this.leftArm.rotation.z) * bp;
       lean += 0.06 * bp;
     }
 
     // Respiração e troca suave de apoio quando parado
-    this.head.position.y = 1.66 + breath * 0.012 * idle + Math.abs(Math.sin(this.walkPhase * 2)) * 0.018 * s;
-    this.head.rotation.x = -lean * 0.6;
+    // corpo mais alto quando as pernas se cruzam (cos²) e mais baixo no apoio duplo
+    const stepBob = (1 + Math.cos(this.walkPhase * 2)) * 0.5;
+    this.head.position.y = 1.66 + breath * 0.012 * idle + stepBob * 0.016 * s;
+    this.head.rotation.z = -Math.sin(this.walkPhase) * 0.02 * s; // cabeça compensa o balanço do quadril
+    this.head.rotation.x = -lean * 0.6 + 0.05 * idle; // cabeça um pouco baixa quando parado
     bank += sway * 0.016 * idle;
 
     this.cape.rotation.x = -0.08 - s * 0.32 - (air ? 0.22 : 0) - Math.sin(this.idleTime * 7.5) * 0.04 * s;
@@ -701,9 +804,10 @@ export class Player {
 
     // Postura de descanso: arma descansando elegantemente em prontidão à frente do tronco
     if (carrying) {
-      this.rightArm.rotation.x += melee ? -0.48 : -0.42;
-      this.rightArm.rotation.z += 0.06;
-      this.rightForearm.rotation.x += melee ? -0.55 : -0.42;
+      // Braço relaxado ao lado do corpo; a arma fica junto ao quadril, apontada para a frente
+      this.rightArm.rotation.x += melee ? -0.1 : -0.12;
+      this.rightArm.rotation.z += 0.02;
+      this.rightForearm.rotation.x += melee ? -0.22 : -0.2;
     } else if (posing && this.aimStyle === "long") {
       this.rightForearm.rotation.x *= 1 - this.aimPose;
       this.leftForearm.rotation.x *= 1 - this.aimPose;
@@ -740,13 +844,7 @@ export class Player {
     }
 
     // Punhos: guarda clássica de combate corporal
-    if (this.weaponGrip === "none" && carrying) {
-      this.rightArm.rotation.x = -0.65 + targetStride * 0.15;
-      this.rightForearm.rotation.x = -1.25;
-      this.leftArm.rotation.x = -0.75;
-      this.leftArm.rotation.z = 0.18;
-      this.leftForearm.rotation.x = -1.3;
-    }
+    // (sem armas: os braços seguem naturais ao lado do corpo; a guarda só sobe ao bloquear/atacar)
 
     // =========================================================================
     // Sistema Cinematográfico de Golpes (Combate Suave com Wind-up, Corte e Follow-through)
@@ -863,9 +961,14 @@ export class Player {
     }
 
     if (this.blockPose > 0.015) {
-      this.leftForearm.rotation.x += (-1.05 - this.leftForearm.rotation.x) * this.blockPose;
+      // antebraço quase vertical: o escudo cobre peito e rosto e a mão fica atrás dele
+      this.leftForearm.rotation.x += (-2.4 - this.leftForearm.rotation.x) * this.blockPose;
     }
-    this.shield.rotation.x = -(this.leftArm.rotation.x + this.leftForearm.rotation.x);
+
+    // Suavização final da pose (só nas juntas): rápida em combate/rolamento, macia no resto
+    const poseRate = this.rolling ? 0 : this.attackTimer > 0 || this.chargePose > 0.01 ? 42 : 17;
+    smoothPose(this._pose, this, dt, poseRate);
+    this._updateShield();
 
     // Orientação suave da arma na mão (sem quebras angulares abruptas)
     let targetSocket;
@@ -894,8 +997,8 @@ export class Player {
     this.handSocket.rotation.x += (targetSocket - this.handSocket.rotation.x) * (1 - Math.exp(-24 * dt));
 
     // Bobbing vertical e balanço dinâmico natural do corpo
-    const runBob = (running ? 0.042 : 0.022) * Math.abs(Math.sin(this.walkPhase)) * s;
-    const bodySway = Math.sin(this.walkPhase) * (running ? 0.026 : 0.015) * s;
+    const runBob = (running ? 0.05 : 0.03) * stepBob * s;
+    const bodySway = Math.sin(this.walkPhase) * (running ? 0.03 : 0.022) * s;
 
     this.model.rotation.x = lean;
     this.model.rotation.z = bank + bodySway;
@@ -981,6 +1084,18 @@ export class Player {
     }
   }
 
+  // Orientação do escudo: em repouso segue o antebraço (face para fora); ao bloquear, a face vira para a frente.
+  _updateShield() {
+    const bp = this.blockPose;
+    if (bp < 0.015) {
+      this.shield.quaternion.copy(_qShieldRest);
+      return;
+    }
+    _qChain.copy(this.leftArm.quaternion).multiply(this.leftForearm.quaternion);
+    _qGuard.copy(_qChain).invert(); // face para a frente do modelo, sem herdar a inclinação do braço
+    this.shield.quaternion.slerpQuaternions(_qShieldRest, _qGuard, bp);
+  }
+
   // Montado: a posição vem do sistema de montaria; aqui só a pose e o combate da sela.
   _updateMounted(dt, input, aim) {
     if (this.attackTimer > 0) this.attackTimer = Math.max(0, this.attackTimer - dt);
@@ -1023,6 +1138,7 @@ export class Player {
     this.model.scale.y = 1;
     this.leftArm.rotation.set(0, 0, 0);
     this.rightArm.rotation.set(0, 0, 0);
+    this._pose.ready = false;
     this.leftLeg.rotation.set(0, 0, 0);
     this.rightLeg.rotation.set(0, 0, 0);
     this.head.rotation.set(0, 0, 0);
@@ -1058,7 +1174,7 @@ export class Player {
     this.rightKnee.rotation.x = 0.3 * p;
     this.head.rotation.x = -0.35 * p;
     this.cape.rotation.x = -0.9 * p;
-    this.shield.rotation.x = -(this.leftArm.rotation.x + this.leftForearm.rotation.x);
+    this.shield.quaternion.copy(_qShieldRest);
   }
 
   // Repulsão ao levar um golpe: empurra 1 a 2 m na direção oposta.
@@ -1105,6 +1221,13 @@ export class Player {
       if (this.armorPieces.plate) {
         for (const p of this.armorPieces.plate) if (p) p.visible = showPlate;
       }
+    }
+    // Escudo: com placas vira o escudo templário (campo escuro + cruz vermelha de borda branca)
+    if (this._shieldFace && this._tplMats) {
+      this._shieldFace.material = showPlate ? this._tplMats.tplCloth : this._tplMats.heraldry;
+      if (this._shieldRim) this._shieldRim.material = showPlate ? this._shieldRimMats[1] : this._shieldRimMats[0];
+      for (const m of this._shieldTemplar) m.visible = showPlate;
+      for (const m of this._shieldPlain) m.visible = !showPlate;
     }
   }
 
