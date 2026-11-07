@@ -445,7 +445,10 @@ export class InteractionSystem {
     this._chatFresh = true;
     this.input.setModalOpen(true);
     if (document.pointerLockElement) document.exitPointerLock();
-    this._showNPCDialogue();
+    // o conteúdo das conversas (npcStories.js) carrega sob demanda na 1ª vez; depois é instantâneo
+    NpcLife.loadStories().then(() => {
+      if (this.activeNPC === target) this._showNPCDialogue();
+    }).catch(() => this._showNPCDialogue());
   }
 
   _nextArmorTier() {
@@ -459,6 +462,7 @@ export class InteractionSystem {
   // Metadados do menu pessoal (retrato de rosto, humor, confiança, perguntas). Hostis/cultistas mantêm o menu antigo.
   _chatMeta(npc, message = "") {
     if (!npc || npc.isBandit || !["guard", "smith", "merchant", "farmer", "villager", "priest", "beggar"].includes(npc.roleKey)) return null;
+    if (!NpcLife.storiesReady) return null;
     const key = `${npc.name}#${this._chatSession || 0}`;
     if (this._chatFresh) {
       this._chatFresh = false;

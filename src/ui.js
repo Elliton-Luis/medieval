@@ -849,7 +849,7 @@ export class GameUI {
         b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
         b.textContent = q.label;
         b.addEventListener("click", () => {
-          if (this._chatBusy) { this._finishTyping(); return; }
+          this._finishTyping(); // clicar durante a digitação conclui a fala e já faz a pergunta
           this.addChatLine("you", q.label);
           this.onChatAsk?.(q.id, q.label);
         });
@@ -920,7 +920,7 @@ export class GameUI {
         b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
         b.textContent = q.label;
         b.addEventListener("click", () => {
-          if (this._chatBusy) { this._finishTyping(); return; }
+          this._finishTyping(); // clicar durante a digitação conclui a fala e já faz a pergunta
           this.addChatLine("you", q.label);
           this.onChatAsk?.(q.id, q.label);
         });
