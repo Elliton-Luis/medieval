@@ -351,9 +351,16 @@ export class GameUI {
     this.stealthTag.hidden = !on;
   }
 
+  /** Prompt prioritário (ex.: "E · falar com X"): enquanto definido, sobrepõe qualquer outro aviso de interação. */
+  setForcedPrompt(text) {
+    this._forcedPrompt = text || "";
+    this.setPrompt(this._lastPromptText || "");
+  }
+
   setPrompt(text) {
     if (!this.prompt) return;
-    const finalText = text || this._missionBannerText || "";
+    this._lastPromptText = text;
+    const finalText = this._forcedPrompt || text || this._missionBannerText || "";
     this.prompt.hidden = !finalText;
     if (finalText) this.prompt.textContent = finalText;
   }

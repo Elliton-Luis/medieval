@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { hayPrompt } from "./hay.js";
 import {
   PlayerStats,
@@ -64,6 +65,10 @@ export const OBSCURE_TUTORIAL_HINTS = [
   "«Os cristais brilhantes nos ermos guardam essências antigas. Quando recolhes um prisma colorido no solo [E], tua tocha absorve a cor dele na hora (azul, verde, rosa, vermelho, roxo), iluminando a noite com propriedades místicas.»",
 ];
 
+const _focusDir = new THREE.Vector3(0, 0, 1);
+// papéis que NÃO conversam (monstros e servos hostis): o E nunca vira "falar" com eles
+const NON_TALKERS = new Set(["blind_biter", "tall_walker", "gulur", "necron", "hexoculus", "polyphonia", "cult_leader", "cultist"]);
+
 export class InteractionSystem {
   constructor(player, npcs, input, ui, weapons) {
     this.player = player;
@@ -93,6 +98,39 @@ export class InteractionSystem {
 
   _price(base) {
     return Math.max(1, Math.round(base * PlayerStats.getPriceMult()));
+  }
+
+  // NPC que o jogador está OLHANDO e ao alcance da conversa: tem prioridade sobre qualquer outra ação do E
+  // (comprar vela, tocar sino, sentar, pegar item...). Cone de ~65° na direção da câmera, ou colado nele (< 1,4 m).
+  _npcInFocus() {
+    const cam = window.__game?.camera;
+    let fx = 0;
+    let fz = 1;
+    if (cam) {
+      cam.getWorldDirection(_focusDir);
+      const l = Math.hypot(_focusDir.x, _focusDir.z) || 1;
+      fx = _focusDir.x / l;
+      fz = _focusDir.z / l;
+    }
+    const list = this.npcs?.npcs;
+    if (!list) return null;
+    let best = null;
+    let bestScore = Infinity;
+    for (let i = 0; i < list.length; i++) {
+      const npc = list[i];
+      if (!npc.alive || npc.temporary || npc.hostile || npc.root?.userData?.isSleeping || !npc.root?.visible) continue;
+      if (NON_TALKERS.has(npc.roleKey)) continue;
+      const dx = npc.x - this.player.x;
+      const dz = npc.z - this.player.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > 3.8 * 3.8) continue;
+      const d = Math.sqrt(d2) || 0.001;
+      const facing = (dx * fx + dz * fz) / d;
+      if (d > 1.4 && facing < 0.42) continue;
+      const score = d * (2.2 - facing); // mais perto e mais de frente = melhor
+      if (score < bestScore) { bestScore = score; best = npc; }
+    }
+    return best;
   }
 
   update(dt) {
@@ -139,8 +177,21 @@ export class InteractionSystem {
       this._tryDropHayBait();
     }
 
+    // aviso prioritário: olhando para um NPC, o E é SEMPRE "falar com ele" (checado a ~12 Hz)
+    this._focusTimer = (this._focusTimer || 0) - dt;
+    if (this._focusTimer <= 0) {
+      this._focusTimer = 0.08;
+      const npc = this.ui.dialoguePanel.hidden ? this._npcInFocus() : null;
+      const text = npc ? `E · falar com ${npc.name}` : "";
+      if (text !== this._focusText) {
+        this._focusText = text;
+        this.ui.setForcedPrompt(text);
+      }
+    }
+
     if (this.input.consumeInteractPressed()) {
       if (!this.ui.dialoguePanel.hidden) this.ui.closeDialogue();
+      else if (this._npcInFocus()) this._interactNearby(this._npcInFocus());
       else if (
         !this.weapons?.tryPickupSpear?.() &&
         !this.weapons?.tryPickupPlacedItem?.() &&
@@ -425,10 +476,10 @@ export class InteractionSystem {
     return false;
   }
 
-  _interactNearby() {
-    let target = null;
+  _interactNearby(forced = null) {
+    let target = forced;
     let best = 3.8 * 3.8;
-    for (let i = 0; i < this.npcs.npcs.length; i++) {
+    for (let i = 0; !target && i < this.npcs.npcs.length; i++) {
       const npc = this.npcs.npcs[i];
       if (!npc.alive || npc.temporary || npc.root?.userData?.isSleeping) continue;
       const dx = npc.x - this.player.x;
