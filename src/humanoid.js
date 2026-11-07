@@ -9,6 +9,18 @@ const torsoProfile = [
   [0.215, 0.56], [0.155, 0.65], [0.07, 0.68], [0.01, 0.68],
 ].map(([r, y]) => new THREE.Vector2(r, y));
 
+// Bota: pé + cano baixo que cobre a base da calça (1 malha; o cano fica rente à canela, em z = -0.05 do pé)
+function makeBootGeometry() {
+  const foot = new THREE.BoxGeometry(0.112, 0.07, 0.27);
+  foot.translate(0, -0.006, 0.012);
+  const collar = new THREE.CylinderGeometry(0.066, 0.071, 0.12, 8);
+  collar.translate(0, 0.066, -0.05);
+  const merged = mergeGeometries([foot, collar], false);
+  foot.dispose();
+  collar.dispose();
+  return merged;
+}
+
 export const BODY = {
   torso: new THREE.LatheGeometry(torsoProfile, 12).scale(1.05, 1.0, 0.72),
   pelvis: new THREE.SphereGeometry(0.165, 12, 10).scale(1.22, 0.85, 0.95),
@@ -21,10 +33,10 @@ export const BODY = {
   upperArm: new THREE.CapsuleGeometry(0.054, 0.22, 4, 8),
   foreArm: new THREE.CapsuleGeometry(0.046, 0.2, 4, 10),
   hand: new THREE.SphereGeometry(0.05, 8, 8).scale(0.85, 1.15, 0.7),
-  thigh: new THREE.CapsuleGeometry(0.078, 0.28, 4, 10),
-  kneeJoint: new THREE.SphereGeometry(0.065, 8, 6),
-  shin: new THREE.CapsuleGeometry(0.062, 0.3, 4, 10),
-  boot: new THREE.BoxGeometry(0.118, 0.095, 0.28),
+  thigh: new THREE.CapsuleGeometry(0.073, 0.3, 4, 10), // coxa e canela quase da mesma largura: perna rente, sem "funil"
+  kneeJoint: new THREE.SphereGeometry(0.06, 8, 6),
+  shin: new THREE.CapsuleGeometry(0.059, 0.3, 4, 10),
+  boot: makeBootGeometry(),
 };
 
 // ---------------------------------------------------------------------------
@@ -32,6 +44,20 @@ export const BODY = {
 // Origem no centro da cabeça (mesmo referencial de `face`), rosto para +Z.
 // ---------------------------------------------------------------------------
 const _beardCache = new Map();
+
+// Cor por vértice (multiplicador do material): raiz mais escura, pontas mais claras. Só para malhas com material vertexColors.
+function paintGradient(geometry, fn) {
+  const p = geometry.attributes.position;
+  const c = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const m = fn(p.getX(i), p.getY(i), p.getZ(i));
+    c[i * 3] = m;
+    c[i * 3 + 1] = m;
+    c[i * 3 + 2] = m;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(c, 3));
+  return geometry;
+}
 
 function beardPiece(geometry, x, y, z, rx = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
   const g = geometry.index ? geometry.toNonIndexed() : geometry;
@@ -66,20 +92,20 @@ function makeBeardGeometry(style) {
     parts.push(beardPiece(new THREE.ConeGeometry(0.085, 0.3, 6), 0, -0.27, 0.08, Math.PI, 0, 1, 1, 0.8));
     mustache();
   } else if (style === "viking") {
-    // Barba viking cheia e bem aparada: bochechas fartas, queixo largo, bigode caído e uma trança curta na ponta
+    // Barba viking cheia e macia: massa contínua e arredondada (sem pontas), bigode curto e trança de pontas redondas
+    const ell = (r, px, py, pz, sx, sy, sz, w = 5, h = 3) => parts.push(beardPiece(new THREE.SphereGeometry(r, w, h), px, py, pz, 0, 0, sx, sy, sz));
     parts.push(shell(Math.PI * 0.58, Math.PI * 0.36, 0.14, 0.99, 1.24, 1.07, 0));
     for (const side of [-1, 1]) {
-      parts.push(beardPiece(new THREE.BoxGeometry(0.03, 0.11, 0.065), side * 0.118, -0.008, 0.03)); // costeletas
-      parts.push(beardPiece(new THREE.BoxGeometry(0.036, 0.095, 0.075), side * 0.113, -0.076, 0.06)); // bochechas
-      // bigode caído nas pontas
-      parts.push(beardPiece(new THREE.CapsuleGeometry(0.017, 0.062, 2, 5), side * 0.036, -0.048, 0.125, 0, Math.PI / 2 + side * 0.32));
-      parts.push(beardPiece(new THREE.CapsuleGeometry(0.012, 0.05, 2, 5), side * 0.086, -0.078, 0.113, 0, side * 0.28));
+      ell(0.042, side * 0.112, -0.045, 0.05, 0.8, 1.3, 1.1); // bochecha
+      ell(0.03, side * 0.118, -0.002, 0.03, 0.7, 1.5, 1.0); // costeleta
+      parts.push(beardPiece(new THREE.CapsuleGeometry(0.017, 0.055, 1, 5), side * 0.036, -0.05, 0.125, 0, Math.PI / 2 + side * 0.3)); // bigode curto e macio
     }
-    parts.push(beardPiece(new THREE.SphereGeometry(0.045, 8, 6), 0, -0.165, 0.092, 0, 0, 1.15, 1, 0.9)); // queixo cheio
-    // trança curta: segmentos que se afinam, levemente alternados
-    const braid = [[-0.205, 0.03, 0.006], [-0.248, 0.026, -0.006], [-0.288, 0.022, 0.006], [-0.322, 0.018, -0.004]];
-    for (const [y, r, dx] of braid) parts.push(beardPiece(new THREE.SphereGeometry(r, 7, 5), dx, y, 0.094, 0, 0, 1, 1.35, 1));
-    parts.push(beardPiece(new THREE.ConeGeometry(0.014, 0.05, 5), 0, -0.36, 0.094, Math.PI, 0, 1, 1, 1));
+    ell(0.048, 0, -0.165, 0.092, 1.2, 1.0, 0.9, 6, 4); // queixo cheio
+    // trança curta de segmentos redondos, afinando até uma ponta arredondada
+    ell(0.03, 0, -0.215, 0.094, 1, 1.3, 1);
+    ell(0.026, 0.005, -0.262, 0.094, 1, 1.3, 1);
+    ell(0.021, -0.004, -0.304, 0.094, 1, 1.3, 1);
+    ell(0.016, 0, -0.335, 0.094, 1, 1.2, 1);
   } else {
     // "full": barba cheia — costeletas, bochechas, queixo e ponta
     parts.push(shell(Math.PI * 0.6, Math.PI * 0.34, 0.139, 0.98, 1.22, 1.06, 0));
@@ -92,6 +118,7 @@ function makeBeardGeometry(style) {
   }
   const merged = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
+  if (style === "viking") paintGradient(merged, (x, y) => 0.72 + 0.28 * Math.min(1, Math.max(0, (-y - 0.02) / 0.3)));
   return merged;
 }
 
@@ -148,56 +175,40 @@ let _vikingHairGeo = null;
 
 function makeVikingHairGeometry() {
   const parts = [];
-  let seed = 90210;
-  const rnd = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
-    return (seed >>> 0) / 4294967296;
-  };
-  const tuft = (len, r, px, py, pz, rx, rz) => {
-    const g = new THREE.ConeGeometry(r, len, 5).toNonIndexed();
-    g.translate(0, len / 2, 0); // base na origem, ponta para +Y
+  const ell = (r, px, py, pz, sx, sy, sz, rx = 0, rz = 0, w = 5, h = 3) => {
+    const g = new THREE.SphereGeometry(r, w, h).toNonIndexed();
+    g.scale(sx, sy, sz);
     g.rotateX(rx);
     g.rotateZ(rz);
     g.translate(px, py, pz);
     parts.push(g);
   };
-  // Mechas saindo do crânio, em direções variadas (raio ~0,13 em torno da cabeça)
-  const dirs = [
-    [0.0, 0.14, 0.02, -0.25, 0.1], [0.07, 0.13, -0.03, 0.15, -0.4], [-0.07, 0.13, -0.03, 0.15, 0.45],
-    [0.1, 0.1, 0.05, -0.3, -0.7], [-0.1, 0.1, 0.05, -0.3, 0.75], [0.0, 0.12, -0.09, 0.5, 0.08],
-    [0.11, 0.06, -0.06, 0.2, -1.0], [-0.11, 0.06, -0.06, 0.2, 1.05], [0.04, 0.135, 0.07, -0.6, -0.18],
-  ];
-  for (const [px, py, pz, rx, rz] of dirs) tuft(0.07 + rnd() * 0.05, 0.026 + rnd() * 0.012, px, py, pz, rx + (rnd() - 0.5) * 0.3, rz + (rnd() - 0.5) * 0.3);
-  // Franja irregular caindo na testa
-  for (let i = 0; i < 5; i++) {
-    const x = -0.09 + i * 0.045 + (rnd() - 0.5) * 0.015;
-    const g = new THREE.ConeGeometry(0.02 + rnd() * 0.01, 0.07 + rnd() * 0.04, 4).toNonIndexed();
-    g.rotateX(Math.PI); // ponta para baixo
-    g.rotateZ((rnd() - 0.5) * 0.5);
-    g.translate(x, 0.098 - Math.abs(x) * 0.25, 0.1 + rnd() * 0.012);
+  // Cúpula achatada sobre o crânio (sem pontas)
+  const dome = new THREE.SphereGeometry(0.142, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.52).toNonIndexed();
+  dome.scale(0.98, 0.86, 1.04);
+  dome.translate(0, 0.012, -0.012);
+  parts.push(dome);
+  // Franja: 3 mechas largas e arredondadas caindo de lado sobre a testa
+  ell(0.032, -0.05, 0.088, 0.105, 1.6, 0.6, 0.8, 0.35, 0.12);
+  ell(0.032, 0.0, 0.094, 0.11, 1.6, 0.6, 0.8, 0.35, 0);
+  ell(0.032, 0.05, 0.088, 0.105, 1.6, 0.6, 0.8, 0.35, -0.12);
+  // Mechas grossas caindo para trás (cápsulas: pontas redondas)
+  for (const [x, len, rz] of [[-0.065, 0.17, 0.1], [0, 0.21, 0], [0.065, 0.18, -0.1]]) {
+    const g = new THREE.CapsuleGeometry(0.034, len, 1, 5).toNonIndexed();
+    g.rotateX(-0.12);
+    g.rotateZ(rz);
+    g.translate(x, -0.085 - len / 2, -0.1);
     parts.push(g);
   }
-  // Cabelo comprido caído atrás da nuca e nos ombros, em camadas irregulares
-  for (let i = 0; i < 7; i++) {
-    const x = -0.105 + i * 0.035;
-    const len = 0.16 + rnd() * 0.1;
-    const g = new THREE.CapsuleGeometry(0.026, len, 2, 5).toNonIndexed();
-    g.rotateX((rnd() - 0.5) * 0.25);
-    g.rotateZ((rnd() - 0.5) * 0.3);
-    g.translate(x, -0.09 - len / 2 + rnd() * 0.02, -0.095 - rnd() * 0.02);
-    parts.push(g);
-  }
-  // Duas tranças finas nas têmporas (3 segmentos cada)
+  // Duas tranças nas têmporas (2 segmentos redondos cada)
   for (const side of [-1, 1]) {
-    for (let k = 0; k < 4; k++) {
-      const g = new THREE.SphereGeometry(0.019 - k * 0.002, 6, 5).toNonIndexed();
-      g.scale(1, 1.3, 1);
-      g.translate(side * (0.128 + k * 0.003), 0.02 - k * 0.04, 0.045 - k * 0.006 + (k % 2 ? 0.006 : -0.006));
-      parts.push(g);
-    }
+    ell(0.021, side * 0.13, 0.015, 0.045, 1, 1.35, 1);
+    ell(0.018, side * 0.133, -0.03, 0.04, 1, 1.35, 1);
   }
   const merged = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
+  // gradiente: perto do couro cabeludo mais escuro, pontas mais claras
+  paintGradient(merged, (x, y, z) => 0.7 + 0.3 * Math.min(1, Math.max(0, (Math.hypot(x, y * 0.9, z) - 0.11) / 0.2)));
   return merged;
 }
 
@@ -287,8 +298,17 @@ function part(geometry, material, parent, x, y, z, castShadow = false) {
 // m: { skin, shirt, sleeve, pants, boots, hair }
 export function buildHumanoid(model, m) {
   const body = {};
+  // Roupa base marcada por região (userData.baseCloth): o jogador esconde essas peças onde a armadura cobre,
+  // para a roupa nunca vazar pela armadura. Mãos, pescoço, rosto e botas nunca são escondidos.
+  const baseCloth = { torso: [], arms: [], legs: [] };
+  body.baseCloth = baseCloth;
+  const tag = (mesh, region) => {
+    mesh.userData.baseCloth = region;
+    baseCloth[region].push(mesh);
+    return mesh;
+  };
   part(BODY.pelvis, m.pants, model, 0, 0.84, 0, true);
-  body.torso = part(BODY.torso, m.shirt, model, 0, 0.82, 0, true);
+  body.torso = tag(part(BODY.torso, m.shirt, model, 0, 0.82, 0, true), "torso");
   part(BODY.neck, m.skin, model, 0, 1.48, 0);
 
   const face = new THREE.Group();
@@ -306,13 +326,13 @@ export function buildHumanoid(model, m) {
     // Encaixe anatômico perfeito no ombro do tronco
     arm.position.set(side * 0.22, 1.42, 0);
     model.add(arm);
-    part(BODY.shoulder, m.sleeve, arm, 0, 0, 0);
-    part(BODY.upperArm, m.sleeve, arm, 0, -0.15, 0, true);
+    tag(part(BODY.shoulder, m.sleeve, arm, 0, 0, 0), "arms");
+    tag(part(BODY.upperArm, m.sleeve, arm, 0, -0.15, 0, true), "arms");
     const fore = new THREE.Group();
     fore.position.set(0, -0.32, 0);
     fore.rotation.x = -0.12;
     arm.add(fore);
-    part(BODY.shoulder, m.sleeve, fore, 0, 0, 0); // Cotoveleira / junta contínua
+    tag(part(BODY.shoulder, m.sleeve, fore, 0, 0, 0), "arms"); // Cotoveleira / junta contínua
     part(BODY.foreArm, m.forearm || m.skin, fore, 0, -0.15, 0, true);
     part(BODY.hand, m.skin, fore, 0, -0.30, 0);
     body[side < 0 ? "leftArm" : "rightArm"] = arm;
@@ -324,13 +344,13 @@ export function buildHumanoid(model, m) {
     // Encaixe anatômico perfeito na bacia
     leg.position.set(side * 0.11, 0.82, 0);
     model.add(leg);
-    part(BODY.thigh, m.pants, leg, 0, -0.19, 0, true);
+    tag(part(BODY.thigh, m.pants, leg, 0, -0.19, 0, true), "legs");
     const knee = new THREE.Group();
     knee.name = side < 0 ? "KneeL" : "KneeR";
     knee.position.set(0, -0.38, 0);
     leg.add(knee);
-    part(BODY.kneeJoint, m.pants, knee, 0, 0, 0); // Joelheira / junta contínua sem quebras
-    part(BODY.shin, m.pants, knee, 0, -0.19, 0, true);
+    tag(part(BODY.kneeJoint, m.pants, knee, 0, 0, 0), "legs"); // Joelheira / junta contínua sem quebras
+    tag(part(BODY.shin, m.pants, knee, 0, -0.19, 0, true), "legs");
     body[side < 0 ? "leftBoot" : "rightBoot"] = part(BODY.boot, m.boots, knee, 0, -0.39, 0.05);
     body[side < 0 ? "leftLeg" : "rightLeg"] = leg;
     body[side < 0 ? "leftKnee" : "rightKnee"] = knee;

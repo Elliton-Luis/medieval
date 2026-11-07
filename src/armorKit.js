@@ -124,12 +124,12 @@ export function buildPlayerArmor(m, body) {
   const chestB = new ArmorBuilder();
 
   // ------------------------------------------------------------------ TÚNICA (sempre visível)
-  B.add("tunic", model, m.cloth, cyl(0.2, 0.28, 0.34, 12), { p: [0, 0.66, 0], s: [1, 1, 0.78], c: "#ffffff", ao: 0.4, shine: 0.03 });
+  B.add("tunic", model, m.cloth, cyl(0.222, 0.2, 0.2, 12), { p: [0, 0.72, 0], s: [1, 1, 0.78], c: "#ffffff", ao: 0.4, shine: 0.03 }); // curta e quase reta: rente à perna, sem "funil"
   // barra e pregas da saia
-  B.add("tunic", model, m.cloth, cyl(0.28, 0.285, 0.03, 12), { p: [0, 0.495, 0], s: [1, 1, 0.78], c: "#b7bdb0", ao: 0.1, shine: 0 });
+  B.add("tunic", model, m.cloth, cyl(0.222, 0.226, 0.025, 12), { p: [0, 0.62, 0], s: [1, 1, 0.78], c: "#b7bdb0", ao: 0.1, shine: 0 });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + 0.3;
-    B.add("tunic", model, m.cloth, box(0.012, 0.3, 0.02), { p: [Math.cos(a) * 0.235, 0.66, Math.sin(a) * 0.235 * 0.78], r: [0, -a, 0], c: "#9aa090", ao: 0.1, shine: 0 });
+    B.add("tunic", model, m.cloth, box(0.012, 0.17, 0.02), { p: [Math.cos(a) * 0.218, 0.72, Math.sin(a) * 0.218 * 0.78], r: [0, -a, 0], c: "#9aa090", ao: 0.1, shine: 0 });
   }
   // cinto largo com fivela de latão e bolsa
   B.add("tunic", model, m.leather, cyl(0.215, 0.215, 0.075, 12), { p: [0, 0.84, 0], s: [1, 1, 0.78], c: "#6b4a34", ao: 0.15, shine: 0.05 });
@@ -138,7 +138,8 @@ export function buildPlayerArmor(m, body) {
   B.add("tunic", model, m.leather, box(0.09, 0.1, 0.06), { p: [-0.2, 0.76, 0.07], r: [0, 0.3, 0.06], c: "#5a4030", ao: 0.25 });
 
   // ------------------------------------------------------------------ COURO (nível 1)
-  B.add("leather", model, m.leather, cyl(0.21, 0.23, 0.46, 12), { p: [0, 1.14, 0], s: [1, 1, 0.78], c: "#8a6a4e", ao: 0.35, shine: 0.06 });
+  B.add("leather", model, m.leather, cyl(0.205, 0.226, 0.58, 12), { p: [0, 1.1, 0], s: [1.02, 1, 0.78], c: "#8a6a4e", ao: 0.35, shine: 0.06 }); // tronco (cobre a camisa base)
+  B.add("leather", model, m.leather, sph(0.222, 12, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), { p: [0, 1.38, 0], s: [1.04, 0.5, 0.8], c: "#8a6a4e", ao: 0.2, shine: 0.06 }); // peito/ombros até o pescoço
   B.add("leather", model, m.leather, cyl(0.232, 0.232, 0.03, 12), { p: [0, 0.92, 0], s: [1, 1, 0.78], c: "#3b2a1f", ao: 0.1 }); // bainha
   // cordões do peitilho em X + costuras
   for (let i = 0; i < 4; i++) {
@@ -150,14 +151,29 @@ export function buildPlayerArmor(m, body) {
     B.add("leather", model, m.leather, box(0.075, 0.05, 0.3), { p: [sx * 0.15, 1.45, 0], r: [0, 0, sx * -0.12], c: "#6a4c36", ao: 0.2 }); // alças de ombro
     for (let i = 0; i < 3; i++) B.add("leather", model, m.gold, sph(0.012, 5, 4), { p: [sx * 0.15, 1.475, -0.08 + i * 0.08], c: "#b99a58", ao: 0 });
   }
-  for (const [fore] of forearms) B.add("leather", fore, m.leather, cyl(0.056, 0.05, 0.19, 8), { p: [0, -0.15, 0], c: "#6a4c36", ao: 0.25 }); // braçais de couro
+  for (const [fore] of forearms) {
+    B.add("leather", fore, m.leather, cyl(0.05, 0.056, 0.19, 8), { p: [0, -0.15, 0], c: "#6a4c36", ao: 0.25 }); // braçais de couro
+    B.add("leather", fore, m.leather, sph(0.056, 8, 6), { p: [0, 0, 0.004], s: [1, 0.95, 1.02], c: "#6a4c36", ao: 0.2 }); // cotovelo coberto
+  }
+  for (const [arm] of arms) { // manga de couro: braço inteiro coberto (a manga de pano some)
+    B.add("leather", arm, m.leather, cyl(0.056, 0.064, 0.36, 8), { p: [0, -0.17, 0], c: "#7a5a40", ao: 0.25 });
+    B.add("leather", arm, m.leather, sph(0.082, 8, 6), { p: [0, 0.0, 0], s: [1.08, 0.95, 1.05], c: "#7a5a40", ao: 0.2 }); // ombro
+  }
 
   // ------------------------------------------------------------------ MALHA (nível 2+)
   B.add("chainmail", head, m.mail, cyl(0.12, 0.17, 0.2, 10, true), { p: [0, -0.115, 0], c: "#d6dcd8", ao: 0.3 });
-  B.add("chainmail", model, m.mail, cyl(0.205, 0.255, 0.3, 12, true), { p: [0, 0.66, 0], s: [1, 1, 0.8], c: "#c8cec9", ao: 0.35 }); // cota até a coxa
+  B.add("chainmail", model, m.mail, cyl(0.226, 0.205, 0.24, 12, true), { p: [0, 0.7, 0], s: [1, 1, 0.8], c: "#c8cec9", ao: 0.35 }); // cota até o meio da coxa, rente
+  B.add("chainmail", model, m.mail, cyl(0.205, 0.226, 0.58, 12, true), { p: [0, 1.1, 0], s: [1.02, 1, 0.8], c: "#c8cec9", ao: 0.35 }); // tronco de malha (cobre a camisa base)
+  B.add("chainmail", model, m.mail, sph(0.222, 12, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), { p: [0, 1.38, 0], s: [1.04, 0.5, 0.82], c: "#cfd5d0", ao: 0.2 }); // peito/ombros até o pescoço
   B.add("chainmail", model, m.mail, cyl(0.17, 0.2, 0.12, 12), { p: [0, 1.46, 0], s: [1, 1, 0.78], c: "#cfd5d0", ao: 0.25 }); // gola de malha
-  for (const [arm] of arms) B.add("chainmail", arm, m.mail, cyl(0.068, 0.06, 0.34, 8), { p: [0, -0.17, 0], c: "#c8cec9", ao: 0.25 });
-  for (const [fore] of forearms) B.add("chainmail", fore, m.mail, cyl(0.06, 0.054, 0.26, 8), { p: [0, -0.14, 0], c: "#c0c6c1", ao: 0.25 });
+  for (const [arm] of arms) {
+    B.add("chainmail", arm, m.mail, cyl(0.06, 0.068, 0.36, 8), { p: [0, -0.17, 0], c: "#c8cec9", ao: 0.25 });
+    B.add("chainmail", arm, m.mail, sph(0.082, 8, 6), { p: [0, 0.0, 0], s: [1.08, 0.95, 1.05], c: "#c8cec9", ao: 0.2 }); // ombro de malha
+  }
+  for (const [fore] of forearms) {
+    B.add("chainmail", fore, m.mail, cyl(0.054, 0.06, 0.26, 8), { p: [0, -0.14, 0], c: "#c0c6c1", ao: 0.25 });
+    B.add("chainmail", fore, m.mail, sph(0.058, 8, 6), { p: [0, 0, 0.004], s: [1, 0.95, 1.02], c: "#c0c6c1", ao: 0.2 }); // cotovelo de malha
+  }
 
   // ------------------------------------------------------------------ PLACAS TEMPLÁRIAS (nível 3)
   // Couraça (mesh próprio: chestArmor, para o traje do Demiurgo poder escondê-la inteira)
@@ -187,8 +203,8 @@ export function buildPlayerArmor(m, body) {
   B.add("plate", model, m.tplRed, box(0.24, 0.07, 0.02), { p: [0, 1.37, 0.178], r: [0.1, 0, 0], ao: 0, shine: 0.1 });
 
   // Tabardo (frente e costas) com cruz de borda branca, barra com friso
-  B.add("plate", model, m.tplCloth, cyl(0.155, 0.19, 0.44, 4).rotateY(Math.PI / 4), { p: [0, 0.62, 0.188], s: [1, 1, 0.1], ao: 0.4, shine: 0 });
-  B.add("plate", model, m.tplCloth, cyl(0.155, 0.19, 0.44, 4).rotateY(Math.PI / 4), { p: [0, 0.62, -0.17], s: [1, 1, 0.1], ao: 0.4, shine: 0 });
+  B.add("plate", model, m.tplCloth, cyl(0.19, 0.155, 0.44, 4).rotateY(Math.PI / 4), { p: [0, 0.62, 0.188], s: [1, 1, 0.1], ao: 0.4, shine: 0 });
+  B.add("plate", model, m.tplCloth, cyl(0.19, 0.155, 0.44, 4).rotateY(Math.PI / 4), { p: [0, 0.62, -0.17], s: [1, 1, 0.1], ao: 0.4, shine: 0 });
   B.add("plate", model, m.tplTrim, box(0.27, 0.02, 0.02), { p: [0, 0.405, 0.195], ao: 0, shine: 0.1 });
   B.add("plate", model, m.tplWhite, box(0.085, 0.27, 0.01), { p: [0, 0.62, 0.208], ao: 0, shine: 0 });
   B.add("plate", model, m.tplWhite, box(0.17, 0.085, 0.01), { p: [0, 0.7, 0.208], ao: 0, shine: 0 });
@@ -202,7 +218,8 @@ export function buildPlayerArmor(m, body) {
       B.add("plate", leg, m.tplTrim, box(0.152 - i * 0.012, 0.011, 0.034), { p: [sx * 0.012, -0.112 - i * 0.07, 0.096 + i * 0.006], r: [-0.12 - i * 0.04, 0, 0], ao: 0, shine: 0.1 });
     }
     // coxote (cuisse): meia-calha frontal
-    B.add("plate", leg, m.tplDark, cyl(0.087, 0.082, 0.26, 8, true, -Math.PI / 2, Math.PI), { p: [0, -0.22, 0.0], ao: 0.3, shine: 0.14 });
+    B.add("plate", leg, m.tplDark, cyl(0.082, 0.087, 0.34, 8, true, -Math.PI / 2, Math.PI), { p: [0, -0.19, 0.0], ao: 0.3, shine: 0.14 });
+    B.add("plate", leg, m.tplDark, cyl(0.08, 0.084, 0.34, 8, true, Math.PI / 2, Math.PI), { p: [0, -0.19, 0.0], ao: 0.3, shine: 0.1 }); // coxa de trás: perna inteira coberta
   }
 
   // Ombreiras sobrepostas: cúpula + 2 lâminas + aro; cotoveleiras e braçais; manoplas
@@ -211,7 +228,7 @@ export function buildPlayerArmor(m, body) {
     B.add("plate", arm, m.tplDark, cyl(0.118, 0.13, 0.045, 10), { p: [sx * 0.014, -0.012, 0], s: [1.25, 1, 1.12], ao: 0.25, shine: 0.14 });
     B.add("plate", arm, m.tplPlate, cyl(0.108, 0.12, 0.045, 10), { p: [sx * 0.02, -0.055, 0], s: [1.2, 1, 1.08], ao: 0.25, shine: 0.14 });
     B.add("plate", arm, m.tplTrim, tor(0.118, 0.01, 10), { p: [sx * 0.01, 0.0, 0], r: [Math.PI / 2, 0, 0], s: [1.28, 1.18, 1], ao: 0 });
-    B.add("plate", arm, m.tplDark, cyl(0.064, 0.058, 0.2, 8), { p: [0, -0.2, 0], ao: 0.3, shine: 0.14 }); // braçal
+    B.add("plate", arm, m.tplDark, cyl(0.058, 0.066, 0.3, 8), { p: [0, -0.17, 0], ao: 0.3, shine: 0.14 }); // braçal (braço inteiro)
   }
   for (const [fore, sx] of forearms) {
     B.add("plate", fore, m.tplPlate, sph(0.064, 8, 6), { p: [0, 0, 0.012], s: [1, 0.9, 1.05], ao: 0.25, shine: 0.2 }); // cotoveleira
@@ -224,29 +241,37 @@ export function buildPlayerArmor(m, body) {
 
   // Grevas, joelheiras, sabatões
   for (const [knee, sx] of knees) {
-    B.add("plate", knee, m.tplPlate, cyl(0.076, 0.066, 0.31, 8, true, -Math.PI / 2, Math.PI), { p: [0, -0.2, 0.0], ao: 0.3, shine: 0.18 }); // greva frontal
-    B.add("plate", knee, m.tplDark, cyl(0.074, 0.064, 0.24, 8, true, Math.PI / 2, Math.PI), { p: [0, -0.2, 0.0], ao: 0.3 }); // panturrilha
+    B.add("plate", knee, m.tplPlate, cyl(0.066, 0.076, 0.31, 8, true, -Math.PI / 2, Math.PI), { p: [0, -0.2, 0.0], ao: 0.3, shine: 0.18 }); // greva frontal (afina para o tornozelo)
+    B.add("plate", knee, m.tplDark, cyl(0.064, 0.074, 0.3, 8, true, Math.PI / 2, Math.PI), { p: [0, -0.2, 0.0], ao: 0.3 }); // panturrilha (canela inteira)
     B.add("plate", knee, m.tplPlate, sph(0.074, 8, 6), { p: [0, 0.0, 0.034], s: [1, 0.9, 1.08], ao: 0.25, shine: 0.22 }); // joelheira
     B.add("plate", knee, m.tplTrim, cone(0.034, 0.09, 4), { p: [sx * 0.07, 0, 0.0], r: [0, 0, -sx * Math.PI / 2], ao: 0.1 }); // aba lateral
     B.add("plate", knee, m.tplDark, box(0.128, 0.04, 0.19), { p: [0, -0.37, 0.102], ao: 0.3, shine: 0.14 }); // sabatão
     B.add("plate", knee, m.tplPlate, cone(0.062, 0.1, 4), { p: [0, -0.385, 0.235], r: [Math.PI / 2, Math.PI / 4, 0], s: [1, 1, 0.55], ao: 0.15, shine: 0.14 }); // biqueira
   }
 
-  // Elmo: calota, aro, protetores de bochecha e nuca, nasal, crista e plumas
-  B.add("plate", head, m.tplPlate, sph(0.15, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.58), { p: [0, 0.03, -0.008], s: [1, 1.06, 1.1], ao: 0.3, shine: 0.22 });
-  B.add("plate", head, m.tplTrim, cyl(0.152, 0.152, 0.038, 14), { p: [0, 0.052, -0.004], s: [1, 1, 1.08], ao: 0, shine: 0.1 });
-  for (const sx of [-1, 1]) {
-    B.add("plate", head, m.tplDark, box(0.022, 0.13, 0.15), { p: [sx * 0.13, -0.045, 0.01], r: [0, 0, sx * 0.1], ao: 0.3, shine: 0.14 }); // bochechas
-    B.add("plate", head, m.tplTrim, box(0.024, 0.014, 0.16), { p: [sx * 0.133, -0.112, 0.012], ao: 0 });
-  }
-  B.add("plate", head, m.tplTrim, box(0.03, 0.15, 0.03), { p: [0, -0.03, 0.147], r: [0.08, 0, 0], ao: 0.1, shine: 0.2 }); // nasal
-  B.add("plate", head, m.tplDark, cyl(0.145, 0.165, 0.1, 10, true, Math.PI / 2, Math.PI), { p: [0, -0.07, -0.01], ao: 0.3 }); // guarda de nuca
-  B.add("plate", head, m.tplPlate, box(0.12, 0.1, 0.03), { p: [0, -0.04, -0.158], r: [0.5, 0, 0], ao: 0.25 }); // cauda do elmo
-  B.add("plate", head, m.tplTrim, box(0.026, 0.045, 0.3), { p: [0, 0.19, -0.005], r: [-0.08, 0, 0], ao: 0.1, shine: 0.2 }); // crista de metal
-  B.add("plate", head, m.tplRed, cone(0.04, 0.2, 4), { p: [0, 0.28, -0.12], r: [-0.5, Math.PI / 4, 0], s: [1, 1, 0.6], ao: 0.2, shine: 0.1 }); // pluma
-  B.add("plate", head, m.tplRed, cone(0.03, 0.16, 4), { p: [0, 0.25, -0.2], r: [-0.95, Math.PI / 4, 0], s: [1, 1, 0.6], ao: 0.2, shine: 0.1 });
+  // Grande elmo templário (fechado e alto, sem rosto visível): casco torneado + fenda de visão em T + ventilação,
+  // cruz vermelha de borda branca na face, crista central e penacho carmesim arredondado.
+  // 1 casco + 3 materiais pequenos (4 meshes na cabeça, como antes), ~330 triângulos no total.
+  const helmProfile = [[0.122, -0.14], [0.152, -0.1], [0.16, -0.02], [0.16, 0.06], [0.147, 0.12], [0.104, 0.172], [0.045, 0.198], [0.0, 0.205]];
+  B.add("plate", head, m.tplPlate, new THREE.LatheGeometry(helmProfile.map(([r, y]) => new THREE.Vector2(r, y)), 10), { p: [0, 0.0, -0.004], s: [1, 1, 1.12], ao: 0.3, shine: 0.24 });
+  // fenda em T (horizontal + vertical curta) e ventilação lateral, em quase preto
+  B.add("plate", head, m.tplDark, box(0.15, 0.02, 0.02), { p: [0, 0.04, 0.178], c: "#030102", ao: 0, shine: 0 });
+  B.add("plate", head, m.tplDark, box(0.022, 0.07, 0.02), { p: [0, 0.0, 0.178], c: "#030102", ao: 0, shine: 0 });
+  for (const sx of [-1, 1]) B.add("plate", head, m.tplDark, box(0.012, 0.05, 0.04), { p: [sx * 0.158, -0.05, 0.05], c: "#030102", ao: 0, shine: 0 });
+  // cruz vermelha de borda branca na face (abaixo da fenda)
+  B.add("plate", head, m.tplWhite, box(0.04, 0.1, 0.012), { p: [0, -0.075, 0.176], ao: 0, shine: 0 });
+  B.add("plate", head, m.tplWhite, box(0.1, 0.04, 0.012), { p: [0, -0.06, 0.176], ao: 0, shine: 0 });
+  B.add("plate", head, m.tplRed, box(0.022, 0.085, 0.016), { p: [0, -0.075, 0.18], ao: 0, shine: 0.1 });
+  B.add("plate", head, m.tplRed, box(0.085, 0.022, 0.016), { p: [0, -0.06, 0.18], ao: 0, shine: 0.1 });
+  // crista central arredondada e penacho carmesim em 3 massas redondas caindo para trás
+  B.add("plate", head, m.tplPlate, sph(0.05, 6, 4), { p: [0, 0.195, 0.0], s: [0.5, 0.7, 3.4], ao: 0.15, shine: 0.3 });
+  B.add("plate", head, m.tplRed, sph(0.05, 5, 3), { p: [0, 0.225, -0.09], s: [0.75, 0.95, 1.8], ao: 0.15, shine: 0.1 });
+  B.add("plate", head, m.tplRed, sph(0.045, 5, 3), { p: [0, 0.235, -0.18], s: [0.7, 1.0, 1.7], ao: 0.15, shine: 0.1 });
+  B.add("plate", head, m.tplRed, sph(0.036, 5, 3), { p: [0, 0.205, -0.25], s: [0.65, 1.0, 1.6], ao: 0.15, shine: 0.1 });
 
   const built = B.build((e) => e.parent === model);
+  // a saia de pano da túnica (mesh de material 'cloth') é roupa base: some sob a cota de malha/faldão de placas
+  for (const mesh of built.tunic || []) if (mesh.material === m.cloth) mesh.userData.baseCloth = "tunic";
   const armorPieces = { tunic: built.tunic || [], leather: built.leather || [], chainmail: built.chainmail || [], plate: [chestArmor, ...(built.plate || [])] };
   // marca o que fica no tronco, para o traje do Demiurgo poder esconder
   for (const mesh of armorPieces.plate) mesh.userData.bodyPlate = mesh.parent === model;

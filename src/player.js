@@ -177,9 +177,12 @@ export class Player {
     });
     Object.assign(this, body);
     this._pose = createPoseState();
-    // Barba cheia (escura, igual ao cabelo)
-    addBeard(this.head, hair, "viking");
-    addVikingHair(this.head, hair);
+    // Barba e cabelo viking: massas arredondadas com cor por vértice (raiz mais escura): material próprio com vertexColors
+    const hairVC = hair.clone();
+    hairVC.vertexColors = true;
+    this._beardMesh = addBeard(this.head, hairVC, "viking");
+    this._hairMesh = addVikingHair(this.head, hairVC);
+    this._hairLag = { x: 0, z: 0, y: 0 };
     addTiredEyes(this.head, skin, hair);
 
     // Armadura do Jogador: peças detalhadas e mescladas (armorKit.js). Materiais do kit: com cor por vértice (oclusão falsa)
@@ -920,8 +923,16 @@ export class Player {
     }
 
     // Suavização final da pose (só nas juntas): rápida em combate/rolamento, macia no resto
-    const poseRate = this.rolling ? 0 : this.attackTimer > 0 || this.chargePose > 0.01 ? 42 : 17;
-    smoothPose(this._pose, this, dt, poseRate);
+    // Taxa do filtro com easing: andar/parado macios (14), guarda (22), golpes rápidos (42); a própria taxa também
+    // é suavizada, então trocar de estado não cria um "tranco" de resposta.
+    const wantRate = this.rolling ? 0 : this.attackTimer > 0 || this.chargePose > 0.01 ? 42 : this.blockPose > 0.2 ? 22 : s > 0.05 ? 15 : 12;
+    if (wantRate === 0) {
+      this._poseRateS = 0;
+    } else {
+      this._poseRateS = this._poseRateS > 0 ? this._poseRateS + (wantRate - this._poseRateS) * (1 - Math.exp(-14 * dt)) : wantRate;
+    }
+    smoothPose(this._pose, this, dt, this._poseRateS);
+    this._hairInertia(dt, s, turnRate, air);
     this._updateShield();
 
     // Orientação suave da arma na mão (sem quebras angulares abruptas)
@@ -1069,6 +1080,24 @@ export class Player {
     }
   }
 
+  // Inércia barata do cabelo/barba: dois grupos giram devagar para trás ao correr, balançam ao virar e
+  // dão um pulinho ao saltar/pousar. Sem física: só 3 valores suavizados e rotações de 2 malhas.
+  _hairInertia(dt, s, turnRate, air) {
+    if (!this._hairMesh || !this._hairLag) return;
+    const lag = this._hairLag;
+    const k = 1 - Math.exp(-7 * dt);
+    const back = -0.05 - s * 0.1 - (air ? 0.06 : 0); // para trás com a velocidade
+    const side = Math.max(-0.12, Math.min(0.12, -turnRate * 0.006)); // arrasto ao virar
+    lag.x += (back - lag.x) * k;
+    lag.z += (side - lag.z) * k;
+    this._hairMesh.rotation.x = lag.x * 0.6;
+    this._hairMesh.rotation.z = lag.z;
+    if (this._beardMesh) {
+      this._beardMesh.rotation.x = -lag.x * 0.35; // a barba vai para a frente quando a cabeça "recua"
+      this._beardMesh.rotation.z = lag.z * 0.6;
+    }
+  }
+
   // Orientação do escudo: em repouso segue o antebraço (face para fora); ao bloquear, a face vira para a frente.
   _updateShield() {
     const bp = this.blockPose;
@@ -1193,9 +1222,19 @@ export class Player {
     const showChain = this.armorLevel >= 2;
     const showPlate = this.armorLevel >= 3;
 
+    // Roupa base some onde a armadura cobre (nunca vaza): torso e mangas a partir do couro; saia de pano sob malha/placas;
+    // calça de pano sob as placas (grevas/coxotes cobrem a perna inteira). Mãos, pescoço, rosto e botas continuam.
+    const lvl = this.armorLevel;
+    const bc = this.baseCloth;
+    if (bc) {
+      for (const p of bc.torso) p.visible = lvl < 1;
+      for (const p of bc.arms) p.visible = lvl < 1;
+      for (const p of bc.legs) p.visible = lvl < 3;
+    }
+
     if (this.armorPieces) {
       if (this.armorPieces.tunic) {
-        for (const p of this.armorPieces.tunic) if (p) p.visible = true;
+        for (const p of this.armorPieces.tunic) if (p) p.visible = !(p.userData.baseCloth === "tunic" && lvl >= 2);
       }
       if (this.armorPieces.leather) {
         for (const p of this.armorPieces.leather) if (p) p.visible = showLeather;
@@ -1207,6 +1246,8 @@ export class Player {
         for (const p of this.armorPieces.plate) if (p) p.visible = showPlate;
       }
     }
+    // Elmo fechado (templário): cabelo, barba e feições não podem vazar pela malha
+    this._applyHeadgear();
     // traje do Demiurgo esconde as placas do tronco (couraça, cruz, tabardo)
     if (this.wearingDemiurgeAttire && this.armorPieces?.plate) {
       for (const pc of this.armorPieces.plate) if (pc.userData.bodyPlate) pc.visible = false;
@@ -1218,6 +1259,14 @@ export class Player {
       for (const m of this._shieldTemplar) m.visible = showPlate;
       for (const m of this._shieldPlain) m.visible = !showPlate;
     }
+  }
+
+  // Com o grande elmo (nível 3) o cabelo e a barba somem; nos outros níveis ficam visíveis (versões suavizadas).
+  _applyHeadgear() {
+    if (this.wearingDemiurgeAttire) return; // o traje do Demiurgo controla a cabeça por conta própria
+    const closed = this.armorLevel >= 3;
+    if (this._hairMesh) this._hairMesh.visible = !closed;
+    if (this._beardMesh) this._beardMesh.visible = !closed;
   }
 
   reinforceArmor() {
@@ -1241,6 +1290,7 @@ export class Player {
         }
       }
     }
+    if (!this.wearingDemiurgeAttire) this.setArmorVisuals(this.armorLevel); // reaplica a visibilidade correta de elmo/cabelo/roupa
     if (this.effects && this.wearingDemiurgeAttire) {
       this.effects.play("dust", this.x, this.root.position.y + 1.0, this.z, "#1c0b2c", 2.2);
       this.effects.play("star", this.x, this.root.position.y + 1.4, this.z, "#a822ee", 1.8);

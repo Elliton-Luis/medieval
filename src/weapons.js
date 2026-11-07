@@ -154,6 +154,9 @@ export class WeaponSystem {
       const model = buildWeaponModel(def.id);
       if (!model) continue;
       if (def.id === "oilpot") model.position.set(0, -0.1, 0);
+      // Ferramentas com cabeça no plano XY (gume em +X): giram -90° em Y (como os arcos) para o gume apontar
+      // SEMPRE para a frente do personagem, em repouso, andando e nos arcos de golpe.
+      if (def.id === "axe" || def.id === "pickaxe" || def.id === "scythe") model.rotation.y = -Math.PI / 2;
       if (def.weaponType) {
         model.userData.type = def.weaponType;
         model.userData.isThrown = false;
