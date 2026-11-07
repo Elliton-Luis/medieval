@@ -198,8 +198,25 @@ renderer.domElement.addEventListener("webglcontextrestored", () => {
   console.info("Contexto WebGL recuperado!");
   window.location.reload();
 }, false);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.setSize(window.innerWidth, window.innerHeight, false);
+// Resolução interna FIXA (visual de PS2/2005): o 3D é renderizado em RENDER_HEIGHT linhas e ampliado pelo CSS
+// sem suavização (image-rendering: pixelated), então o serrilhado fica nítido e o jogo fica muito mais leve.
+//   padrão = 480p | ?res=720 (HD) | ?res=1080 (Full HD) | ?res=0 (resolução nativa adaptativa, como antes)
+const RENDER_HEIGHT = (() => {
+  const v = new URLSearchParams(location.search).get("res");
+  return v === null ? 480 : Number(v) || 0;
+})();
+function _applyRenderSize(nativeRatio) {
+  if (RENDER_HEIGHT > 0) {
+    const h = RENDER_HEIGHT;
+    const w = Math.max(2, Math.round((h * window.innerWidth) / Math.max(1, window.innerHeight)));
+    renderer.setPixelRatio(1);
+    renderer.setSize(w, h, false); // CSS (canvas 100% x 100%) amplia para a janela
+  } else {
+    renderer.setPixelRatio(nativeRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
+}
+_applyRenderSize(Math.min(window.devicePixelRatio, 1.5));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(INITIAL_FOG_COLOR);
 setupAtmosphere(scene, renderer);
@@ -217,7 +234,7 @@ scene.add(hemisphere);
 const sun = new THREE.DirectionalLight("#ffe1ae", 1.5);
 sun.position.set(35, 65, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.mapSize.set(RENDER_HEIGHT > 0 && RENDER_HEIGHT <= 480 ? 512 : 1024, RENDER_HEIGHT > 0 && RENDER_HEIGHT <= 480 ? 512 : 1024);
 const SHADOW_BOUNDS = 34; // ~0,07m por texel; só LOD 0 e 1 projetam sombra, então o custo de geometria continua baixo
 sun.shadow.camera.left = -SHADOW_BOUNDS;
 sun.shadow.camera.right = SHADOW_BOUNDS;
@@ -629,8 +646,7 @@ let _dprUpWait = 6;
 
 function applyPixelRatio(ratio) {
   _dpr = ratio;
-  renderer.setPixelRatio(_dpr);
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  _applyRenderSize(_dpr);
   // GPU apertada: o mapa de sombras também cai de 1024 para 512 (1/4 do fillrate da passada de sombra)
   const wantShadow = _dpr < 1.0 ? 512 : 1024;
   if (sun.shadow.mapSize.x !== wantShadow) {
@@ -643,6 +659,7 @@ function applyPixelRatio(ratio) {
 }
 
 function adaptResolution(frameMs) {
+  if (RENDER_HEIGHT > 0) return; // resolução fixa: nada de adaptação
   if (_dprHold > 0) { _dprHold -= frameMs / 1000; return; }
   if (frameMs > 21) { _slowTime += frameMs / 1000; _fastTime = 0; }
   else if (frameMs < 17.8) { _fastTime += frameMs / 1000; _slowTime = Math.max(0, _slowTime - frameMs / 1000); }
@@ -660,8 +677,7 @@ function resize() {
   const height = window.innerHeight;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(_dpr);
-  renderer.setSize(width, height, false);
+  _applyRenderSize(_dpr);
 }
 
 window.addEventListener("resize", resize, { passive: true });

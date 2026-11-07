@@ -515,11 +515,10 @@ export function spawnLoot(pos, goldAmount = 50) {
   const x = pos.x ?? 0;
   const z = pos.z ?? 0;
   if (_env.drops) {
+    // (antes chamava _spawn com a assinatura errada e lançava TypeError a cada morte de monstro)
     const burst = Math.min(6, Math.max(2, Math.ceil(goldAmount / 12)));
-    for (let i = 0; i < burst; i++) {
-      const angle = (i / burst) * Math.PI * 2;
-      _env.drops._spawn("coins", x, z, Math.cos(angle) * 2.1, Math.sin(angle) * 2.1, 1);
-    }
+    const y = (pos.y ?? _env.world?.heightAt?.(x, z) ?? 0) + 0.4;
+    _env.drops.spawnLoot?.(x, y, z, { coins: [burst, burst] }, 1.0);
   }
   if (_env.player) {
     _env.player.coins += goldAmount;
