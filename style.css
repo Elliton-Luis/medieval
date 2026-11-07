@@ -1324,3 +1324,67 @@ kbd { display: inline-block; padding: 3px 6px; border: 1px solid #e8e1c933; bord
 
 /* Cutscene de abertura: sem HUD por cima da imagem (cinematográfico). O fundo, a vinheta e o loading seguem visíveis. */
 body.intro-playing #game > *:not(canvas):not(.vignette):not(#loading) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.4s ease; }
+
+/* ============================================================================
+   MENU PESSOAL DE NPC (estilo plano): abas Conversa (primária) / Ações, rosto discreto, humor e confiança.
+   Fundo sólido, fonte simples, contraste alto, sem gradientes/sombras/animações (só a digitação rápida).
+   ============================================================================ */
+.dialogue-panel.chat-mode {
+  background: #12151a;
+  border: 1px solid #5a5f68;
+  border-radius: 4px;
+  box-shadow: none;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+.dialogue-panel.chat-mode .dialogue-lore-section { background: #12151a; border-bottom: 1px solid #3a3f47; box-shadow: none; padding: 18px 24px 14px; }
+.dialogue-panel.chat-mode h2 { font: 700 26px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #ffffff; text-shadow: none; letter-spacing: 0; }
+.dialogue-panel.chat-mode .dialogue-role { background: none; border: none; padding: 0; color: #c9ced6; font: 600 15px system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
+.dialogue-panel.chat-mode .dialogue-lore-badge { background: none; border: none; padding: 0; color: #9aa1ab; font: 600 12px system-ui, sans-serif; letter-spacing: .04em; }
+.dialogue-panel.chat-mode .dialogue-lore-box { background: #191d23; border: 1px solid #3a3f47; border-radius: 3px; box-shadow: none; }
+.dialogue-panel.chat-mode .dialogue-lore-box p { font: 400 18px/1.55 system-ui, sans-serif; color: #f2f4f7; text-shadow: none; }
+.dialogue-panel.chat-mode .dialogue-quote-symbol { display: none; }
+.dialogue-panel.chat-mode .dialogue-close { background: #222730; border: 1px solid #5a5f68; color: #fff; box-shadow: none; }
+.dialogue-panel.chat-mode .dialogue-actions-section { background: #12151a; }
+.dialogue-panel.chat-mode .dialogue-subbar { background: #12151a; border-bottom: 1px solid #3a3f47; }
+.dialogue-panel.chat-mode .dialogue-tab { font: 600 14px system-ui, sans-serif; letter-spacing: 0; border-radius: 0; color: #c9ced6; }
+.dialogue-panel.chat-mode .dialogue-tab.active { background: #2a3039; color: #fff; border: 1px solid #5a5f68; border-bottom: none; }
+.dialogue-panel.chat-mode .dialogue-card-btn { background: #1b2027; border: 1px solid #4a4f58; border-radius: 3px; box-shadow: none; transition: none; }
+.dialogue-panel.chat-mode .dialogue-card-btn:hover:not(:disabled) { background: #272d36; border-color: #aab1bd; transform: none; box-shadow: none; }
+.dialogue-panel.chat-mode .dialogue-card-title { font: 600 16px system-ui, sans-serif; color: #fff; }
+.dialogue-panel.chat-mode .dialogue-card-sub { font: 400 14px system-ui, sans-serif; color: #c9ced6; }
+
+/* retrato plano e discreto */
+.dialogue-portrait.face {
+  flex: 0 0 84px; width: 84px; height: 84px; transform: none; margin: 0 16px 0 0;
+  image-rendering: auto; background-size: cover; background-position: center; background-repeat: no-repeat;
+  border: 1px solid #5a5f68; border-radius: 3px; box-shadow: none;
+}
+.dialogue-persona { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 6px; }
+.persona-chip { padding: 0; border: none; border-radius: 0; background: none; color: #c9ced6; font: 600 14px system-ui, sans-serif; }
+.persona-chip.mood { color: #f2f4f7; }
+.persona-trust { display: inline-flex; align-items: center; gap: 8px; color: #c9ced6; font: 600 14px system-ui, sans-serif; }
+.persona-trust i { display: block; width: 90px; height: 6px; background: #2a3039; overflow: hidden; }
+.persona-trust i b { display: block; height: 100%; width: 0; background: #b9c0cb; }
+
+/* abas principais: botões retos */
+.dialogue-maintabs { display: flex; gap: 0; padding: 0 24px; background: #12151a; border-bottom: 1px solid #3a3f47; }
+.dialogue-maintabs[hidden] { display: none; }
+.dialogue-maintab { padding: 12px 26px; border: 1px solid #3a3f47; border-bottom: none; border-radius: 0; background: #191d23; color: #c9ced6; font: 600 16px system-ui, sans-serif; letter-spacing: 0; cursor: pointer; margin-right: -1px; }
+.dialogue-maintab:hover { color: #fff; background: #222730; }
+.dialogue-maintab.active { color: #fff; background: #2a3039; border-color: #7a808b; }
+
+/* conversa: linhas simples + lista de perguntas */
+.dialogue-chat { display: flex; flex-direction: column; gap: 12px; padding: 16px 24px 18px; background: #12151a; min-height: 0; flex: 1; overflow: hidden; }
+.dialogue-chat[hidden] { display: none; }
+.chat-log { flex: 1; min-height: 120px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 8px; }
+.chat-line { max-width: 90%; padding: 10px 14px; border-radius: 3px; font: 400 18px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #f2f4f7; background: #1d222a; border: 1px solid #3a3f47; }
+.chat-line.npc { align-self: flex-start; }
+.chat-line.you { align-self: flex-end; background: #2a3039; border-color: #5a5f68; color: #ffffff; }
+.chat-line .gesture { display: block; margin-bottom: 4px; color: #aab1bd; font-size: 15px; font-style: italic; }
+.chat-questions { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.chat-q { padding: 12px 14px; text-align: left; border: 1px solid #4a4f58; border-radius: 3px; background: #1b2027; color: #f2f4f7; font: 600 16px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; cursor: pointer; transition: none; }
+.chat-q:hover { background: #272d36; border-color: #aab1bd; }
+.chat-q.bye { color: #c9ced6; }
+.chat-q:disabled { opacity: .5; cursor: default; }
+.dialogue-panel.chat-mode .dialogue-lore-box { display: none; }
+.dialogue-panel.chat-mode.tab-actions .dialogue-lore-box { display: block; }

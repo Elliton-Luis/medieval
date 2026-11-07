@@ -217,8 +217,20 @@ export class GameUI {
       this.nearbyRole.textContent = nearestNPC.title;
       this.nearbyHealth.hidden = nearestNPC.health >= nearestNPC.maxHealth;
       this.nearbyHealthFill.style.width = `${Math.max(0, nearestNPC.health / nearestNPC.maxHealth) * 100}%`;
-      const frame = PORTRAIT_FRAMES[nearestNPC.roleKey] || PORTRAIT_FRAMES.villager;
-      this.nearbyPortrait.style.backgroundPosition = `${-frame.x * 34}px ${-frame.y * 34}px`;
+      const face = window.__game?.npcLife?.portrait?.(nearestNPC);
+      if (face) {
+        // mesmo rosto do menu de conversa (cacheado: não redesenha a cada atualização)
+        if (this._nearFace !== face) {
+          this._nearFace = face;
+          this.nearbyPortrait.style.backgroundImage = `url("${face}")`;
+          this.nearbyPortrait.style.backgroundSize = "cover";
+          this.nearbyPortrait.style.backgroundPosition = "center";
+          this.nearbyPortrait.style.imageRendering = "auto";
+        }
+      } else {
+        const frame = PORTRAIT_FRAMES[nearestNPC.roleKey] || PORTRAIT_FRAMES.villager;
+        this.nearbyPortrait.style.backgroundPosition = `${-frame.x * 34}px ${-frame.y * 34}px`;
+      }
     } else {
       this.nearbyCard.hidden = true;
     }
@@ -661,7 +673,19 @@ export class GameUI {
     if (this.dialogueRole) this.dialogueRole.textContent = meta.role || "Cidadão";
     if (this.dialogueEyebrow) this.dialogueEyebrow.textContent = meta.eyebrow || "CALDERA · CONVERSA";
 
-    if (this.dialoguePortrait) {
+    const chat = meta.chat || null;
+    this._applyChatMode(chat, actions, title, body);
+
+    if (this.dialoguePortrait && chat && chat.portrait) {
+      // rosto humano procedural (canvas -> dataURL), reconhecível por pessoa
+      this.dialoguePortrait.classList.add("face");
+      this.dialoguePortrait.style.backgroundImage = `url("${chat.portrait}")`;
+      this.dialoguePortrait.style.backgroundSize = "cover";
+      this.dialoguePortrait.style.backgroundPosition = "center";
+      this.dialoguePortrait.style.backgroundColor = "#0a0f0c";
+      this.dialoguePortrait.style.borderColor = "#d2a969";
+    } else if (this.dialoguePortrait) {
+      this.dialoguePortrait.classList.remove("face");
       if (meta.customPortrait) {
         this.dialoguePortrait.style.backgroundImage = `url("${meta.customPortrait}")`;
         this.dialoguePortrait.style.backgroundPosition = "center";
@@ -723,6 +747,187 @@ export class GameUI {
 
     this._renderDialogueActionsGrid(actions);
     this.dialoguePanel.hidden = false;
+  }
+
+  // ----- Menu pessoal de NPC: abas Conversa (primária) / Ações -----
+  _ensureChatDom() {
+    if (this._chatDom) return this._chatDom;
+    const panel = this.dialoguePanel;
+    const actionsSection = panel.querySelector(".dialogue-actions-section");
+    const speakerInfo = panel.querySelector(".dialogue-speaker-info");
+    const tabs = document.createElement("nav");
+    tabs.className = "dialogue-maintabs";
+    tabs.hidden = true;
+    const mk = (id, label) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "dialogue-maintab";
+      b.textContent = label;
+      b.dataset.tab = id;
+      b.addEventListener("click", () => this._setMainTab(id));
+      tabs.append(b);
+      return b;
+    };
+    const chatTab = mk("chat", "💬 Conversa");
+    const actTab = mk("actions", "⚙ Ações");
+    const chat = document.createElement("section");
+    chat.className = "dialogue-chat";
+    chat.hidden = true;
+    const log = document.createElement("div");
+    log.className = "chat-log";
+    log.addEventListener("click", () => this._finishTyping());
+    const qs = document.createElement("div");
+    qs.className = "chat-questions";
+    chat.append(log, qs);
+    const persona = document.createElement("div");
+    persona.className = "dialogue-persona";
+    persona.hidden = true;
+    const age = document.createElement("span");
+    age.className = "persona-chip";
+    const mood = document.createElement("span");
+    mood.className = "persona-chip mood";
+    const trust = document.createElement("span");
+    trust.className = "persona-trust";
+    trust.innerHTML = '<span class="tl"></span><i><b></b></i>';
+    persona.append(age, mood, trust);
+    speakerInfo?.append(persona);
+    panel.insertBefore(tabs, actionsSection);
+    panel.insertBefore(chat, actionsSection);
+    this._chatDom = { tabs, chatTab, actTab, chat, log, qs, persona, age, mood, trust, actionsSection };
+    return this._chatDom;
+  }
+
+  _setMainTab(tab) {
+    const d = this._ensureChatDom();
+    this._npcTab = tab;
+    this.dialoguePanel.classList.toggle("tab-actions", tab === "actions");
+    d.chat.hidden = tab !== "chat";
+    d.actionsSection.style.display = tab === "actions" ? "" : "none";
+    d.chatTab.classList.toggle("active", tab === "chat");
+    d.actTab.classList.toggle("active", tab === "actions");
+  }
+
+  _updatePersona(chat) {
+    const d = this._chatDom;
+    if (!d || !chat) return;
+    d.persona.hidden = false;
+    if (chat.age) d.age.textContent = `${chat.age} anos`;
+    if (chat.mood) d.mood.textContent = `Humor: ${chat.mood}`;
+    d.trust.querySelector(".tl").textContent = `Confiança: ${chat.trustLabel || ""}`;
+    d.trust.querySelector("b").style.width = `${Math.max(2, Math.min(100, chat.trust ?? 0))}%`;
+  }
+
+  _applyChatMode(chat, actions, title, body) {
+    const panel = this.dialoguePanel;
+    if (!chat) {
+      panel.classList.remove("chat-mode", "tab-actions");
+      if (this._chatDom) {
+        this._chatDom.tabs.hidden = true;
+        this._chatDom.chat.hidden = true;
+        this._chatDom.persona.hidden = true;
+        this._chatDom.actionsSection.style.display = "";
+      }
+      this._chatKey = null;
+      return;
+    }
+    const d = this._ensureChatDom();
+    panel.classList.add("chat-mode");
+    d.tabs.hidden = false;
+    this._updatePersona(chat);
+    const fresh = this._chatKey !== chat.key;
+    if (fresh) {
+      this._chatKey = chat.key;
+      d.log.replaceChildren();
+      this._finishTyping();
+    }
+    // perguntas prontas (sempre atualizadas: podem surgir novas, como "Alguém está doente?")
+    if (chat.questions) {
+      d.qs.replaceChildren();
+      for (const q of chat.questions) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
+        b.textContent = q.label;
+        b.addEventListener("click", () => {
+          if (this._chatBusy) { this._finishTyping(); return; }
+          this.addChatLine("you", q.label);
+          this.onChatAsk?.(q.id, q.label);
+        });
+        d.qs.append(b);
+      }
+    }
+    if (fresh) {
+      if (chat.greeting) this.addChatLine("npc", chat.greeting.t, chat.greeting.n);
+      this._setMainTab("chat"); // a Conversa é a aba principal
+    } else {
+      if (chat.say) this.addChatLine("npc", chat.say, "");
+      this._setMainTab(this._npcTab || "chat");
+    }
+  }
+
+  addChatLine(who, text, gesture = "") {
+    const d = this._ensureChatDom();
+    this._finishTyping();
+    const line = document.createElement("div");
+    line.className = `chat-line ${who}`;
+    if (gesture) {
+      const g = document.createElement("span");
+      g.className = "gesture";
+      g.textContent = gesture;
+      line.append(g);
+    }
+    const span = document.createElement("span");
+    line.append(span);
+    d.log.append(line);
+    if (who === "you") {
+      span.textContent = text;
+    } else {
+      // efeito de digitação rápido (clique para pular)
+      let i = 0;
+      this._chatBusy = true;
+      this._typing = { span, text, finish: () => { span.textContent = text; } };
+      const step = () => {
+        i = Math.min(text.length, i + 2);
+        span.textContent = text.slice(0, i);
+        d.log.scrollTop = d.log.scrollHeight;
+        if (i >= text.length) this._finishTyping();
+      };
+      this._typingTimer = window.setInterval(step, 16);
+    }
+    d.log.scrollTop = d.log.scrollHeight;
+  }
+
+  _finishTyping() {
+    if (this._typingTimer) { window.clearInterval(this._typingTimer); this._typingTimer = null; }
+    if (this._typing) { this._typing.finish(); this._typing = null; }
+    this._chatBusy = false;
+    if (this._chatDom) this._chatDom.log.scrollTop = this._chatDom.log.scrollHeight;
+  }
+
+  /** Resposta do NPC a uma pergunta: atualiza humor/confiança/retrato e mostra a fala. */
+  chatReply(res, closeAfter = false) {
+    if (!this._chatDom) return;
+    this._updatePersona(res);
+    if (res.portrait && this.dialoguePortrait) this.dialoguePortrait.style.backgroundImage = `url("${res.portrait}")`;
+    this.addChatLine("npc", res.t, res.n || "");
+    if (res.questions) {
+      // reconstrói perguntas sem trocar a conversa
+      const d = this._chatDom;
+      d.qs.replaceChildren();
+      for (const q of res.questions) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
+        b.textContent = q.label;
+        b.addEventListener("click", () => {
+          if (this._chatBusy) { this._finishTyping(); return; }
+          this.addChatLine("you", q.label);
+          this.onChatAsk?.(q.id, q.label);
+        });
+        d.qs.append(b);
+      }
+    }
+    if (closeAfter) window.setTimeout(() => this.closeDialogue(), 1700);
   }
 
   _renderDialogueActionsGrid(actions) {
@@ -849,6 +1054,8 @@ export class GameUI {
 
   closeDialogue() {
     if (this.dialoguePanel.hidden) return;
+    this._finishTyping();
+    this._chatKey = null;
     this.dialoguePanel.hidden = true;
     this.onDialogClose?.();
   }

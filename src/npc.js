@@ -325,6 +325,7 @@ export class NPC {
   // que trocas de estado (andar -> trabalhar -> alerta) não "estalem" de um frame para o outro.
   update(dt, playerX = 0, playerZ = 0) {
     this._updateLogic(dt, playerX, playerZ);
+    if (this.sick && this._sickTask) this.task = this._sickTask;
     if (this.alive && !this.removed && this._pose) {
       smoothPose(this._pose, this, dt, this._hitStun > 0 ? 40 : 14);
     }
@@ -1080,6 +1081,7 @@ export class NPC {
     if (this.health > 0) return false;
     this.alive = false;
     this.root.userData.isDead = true;
+    try { window.__game?.npcLife?.onNPCKilled?.(this); } catch (_) {}
     if (this.npcSystem?.spatialGrid) this.npcSystem.spatialGrid.remove(this);
     releaseToken(this);
     releaseGuardTorch(this.root);
@@ -1125,6 +1127,7 @@ export class NPC {
       this.root.visible = false;
       this.respawnTimer = RESPAWN_DELAY;
     }
+    if (this.noRespawn) return; // morte de história (peste, guerra...): essa pessoa não volta
     this.respawnTimer -= dt;
     if (this.respawnTimer > 0) return;
     const dx = playerX - this.spawnX;

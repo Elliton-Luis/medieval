@@ -1,3 +1,4 @@
+import { hayPrompt } from "./hay.js";
 import {
   PlayerStats,
   PlayerEquipment,
@@ -22,6 +23,7 @@ import {
   payDebtorMission,
   syncPlayerStatsToPlayer,
 } from "./rpg.js";
+import { NpcLife } from "./npcLife.js";
 import { checkAltarInteraction, investigateCultCamp, CULT_LEADER_PORTRAIT } from "./cult.js";
 import {
   checkDemiurgeDiaryNearby,
@@ -78,6 +80,13 @@ export class InteractionSystem {
     this._vitalsTimer = 0;
     this.ui.onDialogAction = (action) => this._choose(action);
     this.ui.onDialogClose = () => this._close();
+    // perguntas prontas do menu de conversa: a resposta vem do motor de diálogo/diário (npcLife.js)
+    this.ui.onChatAsk = (id) => {
+      const npc = this.activeNPC;
+      if (!npc || !npc.alive) return;
+      const res = NpcLife.ask(npc, id);
+      this.ui.chatReply(res, id === "bye");
+    };
     this.ui.setVitals(player.health, player.maxHealth, player.coins, player.potions);
     this.ui.setRPGStats?.(PlayerStats, PlayerEquipment);
   }
@@ -151,7 +160,7 @@ export class InteractionSystem {
     }
     const diaryPrompted = this._checkDemiurgeDiaryNearby();
     if (!diaryPrompted) {
-      const cropPrompted = this.farming?.checkPrompt(this.player.x, this.player.z, this.ui);
+      const cropPrompted = this.farming?.checkPrompt(this.player.x, this.player.z, this.ui) || hayPrompt(this.player, this.ui, this.weapons?.currentId);
       if (!cropPrompted) {
         this._checkAltarNearby();
         this._checkCrystalNearby();
@@ -432,6 +441,8 @@ export class InteractionSystem {
       return;
     }
     this.activeNPC = target;
+    this._chatSession = (this._chatSession || 0) + 1;
+    this._chatFresh = true;
     this.input.setModalOpen(true);
     if (document.pointerLockElement) document.exitPointerLock();
     this._showNPCDialogue();
@@ -443,6 +454,18 @@ export class InteractionSystem {
     if (cur < 0.5) return { chance: 0.5, cost: this._price(45), label: " couraça Real (50% chance de anular dano)" };
     if (cur < 0.7) return { chance: 0.7, cost: this._price(75), label: "Armadura Completa (70% máx anulação)" };
     return null;
+  }
+
+  // Metadados do menu pessoal (retrato de rosto, humor, confiança, perguntas). Hostis/cultistas mantêm o menu antigo.
+  _chatMeta(npc, message = "") {
+    if (!npc || npc.isBandit || !["guard", "smith", "merchant", "farmer", "villager", "priest", "beggar"].includes(npc.roleKey)) return null;
+    const key = `${npc.name}#${this._chatSession || 0}`;
+    if (this._chatFresh) {
+      this._chatFresh = false;
+      return { ...NpcLife.chatMeta(npc), key };
+    }
+    const st = NpcLife.status(npc);
+    return { ...st, key, say: message || "" };
   }
 
   _showNPCDialogue(message = "") {
@@ -486,6 +509,7 @@ export class InteractionSystem {
       this.ui.showDialogue(npc.name, body, actions, {
         role: "Enfermo da Peste",
         roleKey: npc.roleKey,
+        chat: this._chatMeta(npc, message),
         funds: {
           coins: this.player.coins,
           wood: PlayerInventory.wood,
@@ -515,6 +539,7 @@ export class InteractionSystem {
       this.ui.showDialogue(npc.name, body, actions, {
         role: npc.title || "Aldeão",
         roleKey: npc.roleKey,
+        chat: this._chatMeta(npc, message),
         funds: {
           coins: this.player.coins,
           wood: PlayerInventory.wood,
@@ -928,6 +953,7 @@ export class InteractionSystem {
     this.ui.showDialogue(npc.name, finalBody, actions, {
       role: npc.title || "Habitante de Caldera",
       roleKey: npc.roleKey,
+      chat: this._chatMeta(npc, message),
       customPortrait: npc.portrait || (npc.roleKey === "cult_leader" ? CULT_LEADER_PORTRAIT : null),
       eyebrow: (WorldDecay && WorldDecay.isEclipse)
         ? "🌑 DIA DE ECLIPSE · O MALIGNO MOSTRA SUA FACE"
@@ -962,6 +988,7 @@ export class InteractionSystem {
       this.effects.play("glint", pos.x, pos.y + 1.4, pos.z, "#ffd700", 2.0);
     }
 
+    NpcLife.onPlayerHelped();
     this.ui.showToast(successToast);
     if (dialogueText) {
       this._showNPCDialogue(dialogueText);
@@ -1413,6 +1440,7 @@ export class InteractionSystem {
     } else if (action === "cure_plague" && this.player.potions > 0 && this.activeNPC?.sick) {
       this.player.potions -= 1;
       this.activeNPC.sick = false;
+      NpcLife.onCured(this.activeNPC);
       this.activeNPC.task = "Curado da peste negra!";
       PlayerStats.cha = Math.min(20, PlayerStats.cha + 3);
       addGood(12, "Curou aldeão da peste negra");
