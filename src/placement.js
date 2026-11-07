@@ -72,6 +72,45 @@ export function reserve(x, z, hw, hd, ry = 0, kind = "building", id = "", margin
   return e;
 }
 
+// ---------------------------------------------------------------------------
+// Validação de PONTO: "existe alguma construção perto/em cima deste ponto?"
+// Todo objeto solto (poste de tocha, banco, feno, árvore, pedra, grama...) deve passar por aqui antes de nascer.
+// ---------------------------------------------------------------------------
+/** Primeira pegada que contém (x,z) com folga `margin` (m); ignora a pegada do grupo `ignoreGroup`. */
+export function pointBlockedBy(x, z, margin = 0.8, ignoreGroup = null) {
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (ignoreGroup && e.group === ignoreGroup) continue;
+    const dx = x - e.x;
+    const dz = z - e.z;
+    const c = Math.cos(e.ry);
+    const s = Math.sin(e.ry);
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    if (Math.abs(lx) < e.hw + margin && Math.abs(lz) < e.hd + margin) return e;
+  }
+  return null;
+}
+
+export function pointBlocked(x, z, margin = 0.8, ignoreGroup = null) {
+  return pointBlockedBy(x, z, margin, ignoreGroup) !== null;
+}
+
+/** Ponto livre mais próximo de (x,z) (espiral de anéis); null se não houver até maxR metros. */
+export function nearestFreePoint(x, z, margin = 0.8, maxR = 8) {
+  if (!pointBlocked(x, z, margin)) return { x, z };
+  for (let r = 1; r <= maxR; r += 1) {
+    const steps = Math.max(8, Math.round(r * 6));
+    for (let k = 0; k < steps; k++) {
+      const a = (k / steps) * Math.PI * 2;
+      const px = x + Math.cos(a) * r;
+      const pz = z + Math.sin(a) * r;
+      if (!pointBlocked(px, pz, margin)) return { x: px, z: pz };
+    }
+  }
+  return null;
+}
+
 /** Inclinação: diferença máxima de altura sob a pegada. */
 export function slopeSpan(world, x, z, hw, hd, ry) {
   const c = Math.cos(ry), s = Math.sin(ry);
@@ -137,6 +176,16 @@ export function auditBuildings() {
   return { total: entries.length, byKind, overlaps };
 }
 
+/** Auditor de pontos: tochas (ou qualquer lista {x,z,kind}) que estão DENTRO de uma pegada (além da parede). */
+export function auditPoints(points, margin = -0.25) {
+  const bad = [];
+  for (const p of points) {
+    const e = pointBlockedBy(p.x, p.z, margin);
+    if (e) bad.push(`${p.kind || "ponto"} (${p.x.toFixed(1)},${p.z.toFixed(1)}) dentro de ${e.kind}:${e.id}`);
+  }
+  return { checked: points.length, inside: bad.length, bad };
+}
+
 if (typeof window !== "undefined") {
-  window.__placement = { auditBuildings, getPlacements, canPlace, findSpot, reserve };
+  window.__placement = { auditBuildings, auditPoints, getPlacements, canPlace, findSpot, reserve, pointBlocked, nearestFreePoint };
 }

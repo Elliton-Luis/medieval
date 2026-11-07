@@ -6,6 +6,7 @@ import { TreeKit, LOD_LEVELS, createCrossedTriangles, createIsoscelesTriangleGeo
 import { VILLAGES, PLATEAU_INNER, PLATEAU_OUTER, isKingdomClear, setVillageBaseHeights, villageBaseHeight } from "./kingdom.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
 import { applyBiome } from "./biomes.js";
+import { pointBlocked } from "./placement.js";
 
 const COLORS = {
   // Paleta "apodrecida": capim seco e amarelado, manchas de mato morto e terra escura
@@ -183,7 +184,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=51", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=52", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1107,6 +1108,8 @@ export class World {
   }
 
   _isSettlementClear(x, z) {
+    // nada nasce dentro ou colado em construções (casas, igrejas, torres, ferrarias, campos...): registro de pegadas
+    if (pointBlocked(x, z, 1.4)) return true;
     if (isKingdomClear(x, z)) return true;
     if ((x + 14) ** 2 + (z + 8) ** 2 < 12 * 12) return true;
     if (Math.abs(x) < 2.6 && z > -52 && z < 5) return true;

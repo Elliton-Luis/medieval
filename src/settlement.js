@@ -6,7 +6,7 @@ import { createHay } from "./fire.js";
 import { createSeededRandom, createSharedHouseMaterial, generateCity } from "./procedural.js";
 import { addCityBeacon } from "./beacons.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { resetPlacement, reserve, findSpot, canPlace, BUILDING_GAP } from "./placement.js";
+import { resetPlacement, reserve, findSpot, canPlace, BUILDING_GAP, nearestFreePoint } from "./placement.js";
 import { weatheredStoneTexture, weatheredWallTexture, tileTexture, woodTexture } from "./textures.js";
 
 const sharedHouseMat = createSharedHouseMaterial();
@@ -846,7 +846,12 @@ export function createSettlement(scene, world) {
 
   const hay = [];
   const torchSpots = [];
-  const post = (x, z) => {
+  const post = (x0, z0) => {
+    // validação "existe algo perto?": o poste nunca nasce dentro/colado em uma construção; se cair em uma,
+    // vai para o ponto livre mais próximo (até 8 m) ou é descartado
+    const free = nearestFreePoint(x0, z0, 0.9, 8);
+    if (!free) return;
+    const { x, z } = free;
     world.addStaticCollider(x, z, 0.2, 2.4);
     torchSpots.push({ x, y: world.heightAt(x, z) + 2.3, z, nx: 0, nz: 0, post: true });
   };
