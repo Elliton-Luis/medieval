@@ -142,3 +142,115 @@ export function tileTexture() {
     }
   });
 }
+
+// Pedra de muralha envelhecida: blocos irregulares, argamassa escura, rachaduras, musgo na base,
+// manchas de umidade e sujeira. Tons claros (a cor final vem do material/vértice).
+export function weatheredStoneTexture() {
+  return make("wallStone", 128, (ctx, size, random) => {
+    ctx.fillStyle = grey(176);
+    ctx.fillRect(0, 0, size, size);
+    let y = 0;
+    const rows = [];
+    while (y < size) {
+      const h = 18 + random() * 10;
+      let x = -random() * 24;
+      while (x < size) {
+        const w = 22 + random() * 24;
+        const tone = 150 + random() * 80;
+        ctx.fillStyle = grey(tone);
+        ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+        // luz no topo e sombra embaixo de cada bloco
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.fillRect(x + 1, y + 1, w - 2, 2);
+        ctx.fillStyle = "rgba(0,0,0,0.16)";
+        ctx.fillRect(x + 1, y + h - 3, w - 2, 2);
+        ctx.strokeStyle = "rgba(48,44,40,0.7)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+        rows.push([x, y, w, h]);
+        x += w;
+      }
+      y += h;
+    }
+    // rachaduras
+    ctx.strokeStyle = "rgba(34,30,26,0.55)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      let cx = random() * size;
+      let cy = random() * size;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 0; k < 5; k++) {
+        cx += (random() - 0.5) * 14;
+        cy += 4 + random() * 9;
+        ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+    }
+    // manchas de umidade escorrendo
+    for (let i = 0; i < 9; i++) {
+      const sx = random() * size;
+      const g = ctx.createLinearGradient(0, 0, 0, size * 0.6);
+      g.addColorStop(0, "rgba(40,36,32,0.22)");
+      g.addColorStop(1, "rgba(40,36,32,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(sx, 0, 3 + random() * 6, size * 0.6);
+    }
+    // musgo esverdeado acumulando na base (parte de baixo da textura = pé da parede)
+    for (let i = 0; i < 160; i++) {
+      const px = random() * size;
+      const py = size - Math.pow(random(), 2.2) * size * 0.45;
+      ctx.fillStyle = `rgba(${70 + random() * 30},${96 + random() * 40},${48 + random() * 20},${0.18 + random() * 0.25})`;
+      ctx.fillRect(px, py, 2 + random() * 4, 2 + random() * 3);
+    }
+    // sujeira fina
+    for (let i = 0; i < 260; i++) {
+      ctx.fillStyle = `rgba(50,44,38,${random() * 0.16})`;
+      ctx.fillRect(random() * size, random() * size, 2, 2);
+    }
+  });
+}
+
+// Reboco/barro de parede de casa: emboço irregular, tábuas desbotadas, manchas e fissuras finas.
+export function weatheredWallTexture() {
+  return make("wallHouse", 128, (ctx, size, random) => {
+    ctx.fillStyle = grey(196);
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 38; i++) {
+      ctx.fillStyle = `rgba(${random() > 0.5 ? "255,255,255" : "70,60,50"},${0.04 + random() * 0.08})`;
+      ctx.beginPath();
+      ctx.arc(random() * size, random() * size, 6 + random() * 18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // tábuas verticais desbotadas (parte inferior de madeira)
+    for (let x = 0; x < size; x += 16) {
+      ctx.fillStyle = `rgba(40,30,22,${0.1 + random() * 0.1})`;
+      ctx.fillRect(x, size * 0.55, 1.5, size * 0.45);
+      ctx.fillStyle = `rgba(0,0,0,${0.04 + random() * 0.08})`;
+      ctx.fillRect(x + 2, size * 0.55, 13, size * 0.45);
+    }
+    ctx.strokeStyle = "rgba(40,32,26,0.5)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      let cx = random() * size;
+      let cy = random() * size * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 0; k < 4; k++) {
+        cx += (random() - 0.5) * 10;
+        cy += 3 + random() * 8;
+        ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+    }
+    // lama/respingos no pé da parede
+    for (let i = 0; i < 120; i++) {
+      ctx.fillStyle = `rgba(52,42,32,${0.08 + random() * 0.2})`;
+      ctx.fillRect(random() * size, size - Math.pow(random(), 2) * size * 0.3, 2 + random() * 4, 2 + random() * 2);
+    }
+    for (let i = 0; i < 220; i++) {
+      ctx.fillStyle = `rgba(50,44,38,${random() * 0.12})`;
+      ctx.fillRect(random() * size, random() * size, 2, 2);
+    }
+  });
+}

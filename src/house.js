@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { plasterTexture, stoneTexture, thatchTexture, tileTexture, woodTexture } from "./textures.js";
+import { plasterTexture, stoneTexture, thatchTexture, tileTexture, woodTexture, weatheredStoneTexture, weatheredWallTexture } from "./textures.js";
 import { makeRandom } from "./utils.js";
 
 // Casas medievais com colisores por parede, vãos reais (porta e janelas), enxaimel,
@@ -12,9 +12,9 @@ function materials() {
   const std = (map, extra = {}) => new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 1, metalness: 0, flatShading: true, ...extra });
   const ghost = (map) => new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 1, flatShading: true, transparent: true, opacity: 0.16, depthWrite: false });
   shared = {
-    stone: std(stoneTexture()),
+    stone: std(weatheredStoneTexture()), // pedra com musgo e rachaduras
     wood: std(woodTexture()),
-    plaster: std(plasterTexture()),
+    plaster: std(weatheredWallTexture()), // reboco manchado, fissurado e com lama no pé
     thatch: std(thatchTexture()),
     tile: std(tileTexture()),
     dark: new THREE.MeshStandardMaterial({ color: "#2b2724", roughness: 0.7, metalness: 0.5, flatShading: true }),
@@ -665,6 +665,24 @@ export function createChurchBuilding(scene, world, opts) {
   add("stone", W + 0.55, foundationDepth + 0.04, D + 0.55, 0, -foundationDepth / 2 + 0.02, 0, "#969084", null, 0.25);
   add("stone", 2.4, foundationDepth + 0.14, 0.85, 0, -foundationDepth / 2 + 0.07, D / 2 + 0.45, "#b4aea0", null, 0.12);
   add("stone", 2.7, foundationDepth - 0.04, 0.65, 0, -foundationDepth / 2 - 0.02, D / 2 + 0.95, "#9c9689", null, 0.18);
+
+  // Escadaria de acesso até o chão: o terreno diante da porta pode cair vários metros abaixo do piso.
+  // Degraus de 0,3 m (o jogador sobe até 0,65 m) vão descendo da porta até encontrar o terreno.
+  {
+    const STEP_H = 0.3;
+    const STEP_D = 0.55;
+    const firstLz = D / 2 + 0.9 + STEP_D / 2; // encosta no patamar da porta (sem fresta)
+    for (let i = 1; i <= 16; i++) {
+      const lz = firstLz + (i - 1) * STEP_D;
+      const topY = -0.04 - i * STEP_H; // relativo ao piso da igreja
+      const g = toWorld(0, lz);
+      const ground = world.heightAt(g.x, g.z) - floorY;
+      if (topY <= ground + 0.12) break; // terreno alcançado
+      add("stone", 2.7, foundationDepth + 0.1, STEP_D + 0.02, 0, topY - (foundationDepth + 0.1) / 2, lz, i % 2 ? "#a9a395" : "#9c9689", null, 0.15);
+      const r = worldRect(-1.35, 1.35, lz - STEP_D / 2, lz + STEP_D / 2);
+      world.floors.push({ ...r, y: floorY + topY });
+    }
+  }
 
   // Piso de pedra polida e vigas do teto
   add("stone", W - 2 * t, 0.12, D - 2 * t, 0, 0.0, 0, "#b8b1a3", null, 0.05);

@@ -9,6 +9,7 @@ import { PlayerInventory, PlayerStats } from "./rpg.js";
 import { mergeBufferGeometries } from "./mergeUtils.js";
 import { generateGhostTown } from "./ghostTowns.js";
 import { addCityBeacon } from "./beacons.js";
+import { weatheredStoneTexture, weatheredWallTexture } from "./textures.js";
 
 // ============================================================================
 // 1. Sistema de Seed (PRNG Mulberry32) e Texturas Procedurais de Baixo Custo
@@ -59,35 +60,47 @@ export function createSeededRandom(seed) {
 export function createSharedHouseMaterial() {
   if (_sharedHouseMaterial) return _sharedHouseMaterial;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-  const rand = createSeededRandom(1337);
-
-  // Fundo base e ruído procedural simples
-  ctx.fillStyle = "#8b7355"; // Cor de madeira/barro
-  ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 2000; i++) {
-    ctx.fillStyle = rand() > 0.5 ? "#735b3e" : "#a08665";
-    ctx.fillRect(rand() * 256, rand() * 256, 4, 4);
-  }
-  // Faixas sutis de vigas/tábuas para enriquecer o relevo visual sem adicionar polígonos
-  ctx.fillStyle = "rgba(58, 42, 28, 0.28)";
-  for (let y = 0; y < 256; y += 32) {
-    ctx.fillRect(0, y, 256, 3);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.NearestFilter; // Estilo low-poly/pixel art
-  texture.magFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
+  // Reboco/barro envelhecido (textura cacheada 128px com fissuras, manchas e lama no pé da parede)
+  const texture = weatheredWallTexture();
+  texture.repeat.set(2, 2);
 
   _sharedHouseMaterial = new THREE.MeshStandardMaterial({
     map: texture,
-    roughness: 0.9,
+    color: "#b59a72",
+    roughness: 0.95,
     flatShading: true,
   });
   return _sharedHouseMaterial;
+}
+
+let _wallMaterial = null;
+/** Material compartilhado das muralhas: pedra envelhecida com musgo e rachaduras. */
+export function createWallMaterial() {
+  if (_wallMaterial) return _wallMaterial;
+  _wallMaterial = new THREE.MeshStandardMaterial({
+    map: weatheredStoneTexture(),
+    color: "#b4aea0",
+    roughness: 1,
+    flatShading: true,
+  });
+  return _wallMaterial;
+}
+
+/**
+ * Reescala os UVs de uma BoxGeometry para a textura repetir a cada `tile` metros em vez de esticar
+ * uma única cópia por face (ordem das faces do BoxGeometry: +x, -x, +y, -y, +z, -z).
+ */
+function tileBoxUVs(geo, w, h, d, tile = 3.5) {
+  const uv = geo.attributes.uv;
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) {
+    const [fu, fv] = dims[f];
+    for (let v = 0; v < 4; v++) {
+      const i = f * 4 + v;
+      uv.setXY(i, uv.getX(i) * (fu / tile), uv.getY(i) * (fv / tile));
+    }
+  }
+  uv.needsUpdate = true;
 }
 
 // ============================================================================
@@ -226,7 +239,8 @@ export function generateCity(
     const wallHeight = 6.2;
     const foundationDepth = 4.0;
     const wallGeo = new THREE.BoxGeometry(1.8, wallHeight + foundationDepth, segLen);
-    const wallMesh = new THREE.InstancedMesh(wallGeo, houseMaterial, wallSegments.length);
+    tileBoxUVs(wallGeo, 1.8, wallHeight + foundationDepth, segLen, 3.5); // pedra repete a cada ~3,5 m
+    const wallMesh = new THREE.InstancedMesh(wallGeo, createWallMaterial(), wallSegments.length);
     wallMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
@@ -319,6 +333,7 @@ export function generateCity(
     const bHeight = 3.8;
     const bFound = 3.2;
     const bGeo = new THREE.BoxGeometry(bWidth, bHeight + bFound, bDepth);
+    tileBoxUVs(bGeo, bWidth, bHeight + bFound, bDepth, 7); // x repeat(2) do material = reboco a cada ~3,5 m
     const roofGeo = new THREE.ConeGeometry(4.1, 2.1, 4);
 
     const geometriesToMerge = [];

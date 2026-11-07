@@ -395,10 +395,15 @@ function createVillage(scene, world, village, houses) {
   }
 
   // capela entre dois chalés, com a porta voltada para o poço
-  const churchAngle = startAngle + Math.PI / count;
-  const churchX = cx + Math.cos(churchAngle) * 27;
-  const churchZ = cz + Math.sin(churchAngle) * 27;
-  points.church = createChurch(scene, world, churchX, churchZ, faceCenter(churchX, churchZ), `Igreja de ${village.name}`, houses);
+  // A igreja só gira em passos de 90° (colisores alinhados aos eixos). Para a porta ficar EXATAMENTE
+  // voltada para o poço, a capela é posta sobre o eixo cardeal mais próximo do ângulo sorteado.
+  const rawChurchAngle = startAngle + Math.PI / count;
+  const cardinal = Math.round(rawChurchAngle / (Math.PI / 2)) * (Math.PI / 2);
+  const dirX = Math.round(Math.cos(cardinal));
+  const dirZ = Math.round(Math.sin(cardinal));
+  const churchX = cx + dirX * 28;
+  const churchZ = cz + dirZ * 28;
+  points.church = createChurch(scene, world, churchX, churchZ, Math.atan2(-dirX, -dirZ), `Igreja de ${village.name}`, houses);
 
   return { village, ...points };
 }

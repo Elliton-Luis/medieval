@@ -7,6 +7,8 @@ export const CONFIG = Object.freeze({
   renderDistance: 200,
   viewDistance: 200,
   lodDistance: 54,
+  // Limite (m, distância ao centro do chunk) de cada nível de LOD: 0 |54| 1 |84| 2 |114| 3 |146| 4 |176| 5
+  lodDistances: Object.freeze([54, 84, 114, 146, 176]),
   fogDensity: 0.021,
   maxDelta: 0.05,
   player: {

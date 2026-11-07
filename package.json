@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 4173",
-    "start": "python3 -m http.server 4173",
-    "preview": "python3 -m http.server 4173"
+    "dev": "node scripts/serve.mjs 4173",
+    "start": "node scripts/serve.mjs 4173",
+    "preview": "node scripts/serve.mjs 4173",
+    "bump": "node scripts/bump-cache.mjs"
   }
 }

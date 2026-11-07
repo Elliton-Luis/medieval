@@ -4,100 +4,93 @@ import { clamp } from "./utils.js";
 import { updateAtmosphereDecay } from "./decay.js";
 
 // ============================================================================
-// Perfis de Iluminação Pré-Assados (Pre-Baked Lighting Profiles)
-// Horários Chave do Mundo: DIA, TARDE (Entardecer / Golden Hour) e NOITE
-// Todas as luzes ambientais operam sobre estes perfis com overlap suave.
-// Apenas as tochas permanecem dinâmicas com PointLights e flicker físico.
+// Perfis de Iluminação Pré-Assados (Pre-Baked Lighting Keyframes)
+// 9 horários-chave cobrem o ciclo inteiro; entre dois keyframes vizinhos a luz é
+// interpolada com smoothstep (sem saltos). Só as tochas continuam dinâmicas.
+// `at` = progresso do dia (0 = 00:00, 0.5 = 12:00).
 // ============================================================================
 
+const C = (hex) => new THREE.Color(hex);
+const V = (x, y, z) => new THREE.Vector3(x, y, z).normalize();
+
 export const BAKED_LIGHTING = {
-  day: {
-    key: "day",
-    label: "Pleno Dia",
-    sun: {
-      color: new THREE.Color("#fff4db"),
-      intensity: 1.65,
-      dir: new THREE.Vector3(0.38, 0.88, 0.28).normalize(),
-    },
-    hemisphere: {
-      skyColor: new THREE.Color("#e8f2df"),
-      groundColor: new THREE.Color("#5e5847"),
-      intensity: 1.25,
-    },
-    sky: {
-      color: new THREE.Color("#8fa596"),
-    },
-    fog: {
-      color: new THREE.Color("#8fa596"),
-      density: 0.0165,
-    },
-    astro: {
-      color: new THREE.Color("#fff2c4"),
-      haloColor: new THREE.Color("#ffe088"),
-      haloOpacity: 0.35,
-      scale: 1.0,
-    },
-    daylight: 1.0,
+  // Noite BREU: quase sem luz ambiente. Só tochas, fogueiras, vela e janelas iluminam.
+  midnight: {
+    key: "midnight", label: "Meia-Noite", at: 0.0, daylight: 0.0,
+    sun: { color: C("#2a3a58"), intensity: 0.05, dir: V(-0.22, 0.76, -0.62) },
+    hemisphere: { skyColor: C("#07090f"), groundColor: C("#020305"), intensity: 0.1 },
+    sky: { color: C("#010203") },
+    fog: { color: C("#010203"), density: 0.034 },
+    astro: { color: C("#8a9ab8"), haloColor: C("#4a5a78"), haloOpacity: 0.1, scale: 0.85 },
   },
-
+  predawn: {
+    key: "predawn", label: "Madrugada Escura", at: 0.17, daylight: 0.04,
+    sun: { color: C("#344060"), intensity: 0.1, dir: V(0.3, 0.62, -0.55) },
+    hemisphere: { skyColor: C("#0c1019"), groundColor: C("#040508"), intensity: 0.16 },
+    sky: { color: C("#04060a") },
+    fog: { color: C("#05070b"), density: 0.032 },
+    astro: { color: C("#aab8d4"), haloColor: C("#5a6a88"), haloOpacity: 0.14, scale: 0.9 },
+  },
+  dawn: {
+    key: "dawn", label: "Amanhecer Pálido", at: 0.25, daylight: 0.45,
+    sun: { color: C("#c89070"), intensity: 0.8, dir: V(0.82, 0.3, 0.25) },
+    hemisphere: { skyColor: C("#9a8074"), groundColor: C("#2e2828"), intensity: 0.6 },
+    sky: { color: C("#6c6058") },
+    fog: { color: C("#756a60"), density: 0.0235 },
+    astro: { color: C("#d8a070"), haloColor: C("#b0643a"), haloOpacity: 0.4, scale: 1.15 },
+  },
+  morning: {
+    key: "morning", label: "Manhã Doentia", at: 0.375, daylight: 0.85,
+    sun: { color: C("#f0dcb0"), intensity: 1.2, dir: V(0.62, 0.62, 0.3) },
+    hemisphere: { skyColor: C("#d0d4ae"), groundColor: C("#4a4634"), intensity: 0.95 },
+    sky: { color: C("#868c6e") },
+    fog: { color: C("#8a9070"), density: 0.0195 },
+    astro: { color: C("#f0e4b0"), haloColor: C("#d8c880"), haloOpacity: 0.3, scale: 1.05 },
+  },
+  noon: {
+    key: "noon", label: "Dia Apodrecido", at: 0.5, daylight: 1.0,
+    sun: { color: C("#f4e8c4"), intensity: 1.35, dir: V(0.38, 0.88, 0.28) },
+    hemisphere: { skyColor: C("#d6dcb8"), groundColor: C("#4e4a36"), intensity: 1.0 },
+    sky: { color: C("#8c9370") },
+    fog: { color: C("#8c9370"), density: 0.0185 },
+    astro: { color: C("#f0e6b0"), haloColor: C("#d4c47c"), haloOpacity: 0.28, scale: 1.0 },
+  },
   afternoon: {
-    key: "afternoon",
-    label: "Tarde / Pôr do Sol",
-    sun: {
-      color: new THREE.Color("#ff9e3b"),
-      intensity: 1.45,
-      dir: new THREE.Vector3(-0.72, 0.36, 0.58).normalize(),
-    },
-    hemisphere: {
-      skyColor: new THREE.Color("#ffb47c"),
-      groundColor: new THREE.Color("#4a2e1d"),
-      intensity: 1.05,
-    },
-    sky: {
-      color: new THREE.Color("#b56c42"),
-    },
-    fog: {
-      color: new THREE.Color("#9c5c36"),
-      density: 0.0195,
-    },
-    astro: {
-      color: new THREE.Color("#ff8833"),
-      haloColor: new THREE.Color("#ff6611"),
-      haloOpacity: 0.55,
-      scale: 1.22,
-    },
-    daylight: 0.72,
+    key: "afternoon", label: "Tarde Pesada", at: 0.625, daylight: 0.82,
+    sun: { color: C("#e8c890"), intensity: 1.25, dir: V(-0.45, 0.62, 0.45) },
+    hemisphere: { skyColor: C("#d8caa0"), groundColor: C("#4a4030"), intensity: 0.95 },
+    sky: { color: C("#8c8566") },
+    fog: { color: C("#908868"), density: 0.02 },
+    astro: { color: C("#e8c88a"), haloColor: C("#c8a460"), haloOpacity: 0.34, scale: 1.08 },
   },
-
+  sunset: {
+    key: "sunset", label: "Pôr do Sol Ferrugem", at: 0.75, daylight: 0.55,
+    sun: { color: C("#c8702a"), intensity: 1.15, dir: V(-0.72, 0.36, 0.58) },
+    hemisphere: { skyColor: C("#a87850"), groundColor: C("#2e1e14"), intensity: 0.8 },
+    sky: { color: C("#7a4a30") },
+    fog: { color: C("#6a4430"), density: 0.022 },
+    astro: { color: C("#d8662a"), haloColor: C("#a83e12"), haloOpacity: 0.5, scale: 1.2 },
+  },
+  dusk: {
+    key: "dusk", label: "Crepúsculo Sombrio", at: 0.81, daylight: 0.18,
+    sun: { color: C("#7a4a78"), intensity: 0.4, dir: V(-0.8, 0.2, 0.4) },
+    hemisphere: { skyColor: C("#5a4468"), groundColor: C("#1a1220"), intensity: 0.4 },
+    sky: { color: C("#2e2338") },
+    fog: { color: C("#30263c"), density: 0.026 },
+    astro: { color: C("#c88a6a"), haloColor: C("#802e4a"), haloOpacity: 0.35, scale: 1.1 },
+  },
   night: {
-    key: "night",
-    label: "Noite dos Ermos",
-    sun: {
-      color: new THREE.Color("#688fbe"),
-      intensity: 0.22,
-      dir: new THREE.Vector3(-0.22, 0.76, -0.62).normalize(),
-    },
-    hemisphere: {
-      skyColor: new THREE.Color("#111827"),
-      groundColor: new THREE.Color("#070a10"),
-      intensity: 0.35,
-    },
-    sky: {
-      color: new THREE.Color("#080b12"),
-    },
-    fog: {
-      color: new THREE.Color("#080b12"),
-      density: 0.0265,
-    },
-    astro: {
-      color: new THREE.Color("#dbe8ff"),
-      haloColor: new THREE.Color("#7f9ec4"),
-      haloOpacity: 0.28,
-      scale: 0.90,
-    },
-    daylight: 0.05,
+    key: "night", label: "Noite Breu", at: 0.9, daylight: 0.01,
+    sun: { color: C("#2a3a58"), intensity: 0.05, dir: V(-0.22, 0.76, -0.62) },
+    hemisphere: { skyColor: C("#07090f"), groundColor: C("#020305"), intensity: 0.1 },
+    sky: { color: C("#010203") },
+    fog: { color: C("#010203"), density: 0.034 },
+    astro: { color: C("#8a9ab8"), haloColor: C("#4a5a78"), haloOpacity: 0.1, scale: 0.85 },
   },
 };
+
+// Ordem cronológica dos keyframes (o último volta ao primeiro, em at = 1.0)
+const KEYFRAMES = Object.values(BAKED_LIGHTING).sort((a, b) => a.at - b.at);
 
 // Função Hermite cúbica para transições ultra-suaves (Zero descontinuidades)
 function smoothstep(edge0, edge1, x) {
@@ -105,53 +98,68 @@ function smoothstep(edge0, edge1, x) {
   return t * t * (3.0 - 2.0 * t);
 }
 
-// Calcula os pesos de overlap contínuos entre Dia, Tarde e Noite
-export function computeLightingWeights(prog) {
-  let wDay = 0;
-  let wAfternoon = 0;
-  let wNight = 0;
+// ---------------------------------------------------------------------------
+// Níveis de neblina: multiplicam a densidade do keyframe e empurram a cor da neblina (e do horizonte)
+// para um cinza-esverdeado frio. Mesmo de dia o mundo fica com ar de suspense.
+// ---------------------------------------------------------------------------
+export const FOG_LEVELS = [
+  { name: "Limpo", mul: 0.6, tint: 0.0 },
+  { name: "Bruma leve", mul: 1.0, tint: 0.12 },
+  { name: "Névoa", mul: 1.55, tint: 0.28 },
+  { name: "Neblina densa", mul: 2.25, tint: 0.45 },
+  { name: "Cerração", mul: 3.3, tint: 0.6 },
+  { name: "Breu branco", mul: 4.8, tint: 0.75 },
+];
+const FOG_TINT = new THREE.Color("#a3a888");
+const _fogMixed = new THREE.Color();
+// pesos do sorteio automático (favorece névoa média; extremos são raros)
+const FOG_AUTO_WEIGHTS = [0.03, 0.14, 0.3, 0.3, 0.16, 0.07];
 
-  if (prog < 0.20) {
-    // 00h00 às 04h48: Plena Noite
-    wNight = 1.0;
-  } else if (prog < 0.32) {
-    // 04h48 às 07h40: Amanhecer (Overlap suave Noite -> Dia)
-    const t = smoothstep(0.20, 0.32, prog);
-    wNight = 1.0 - t;
-    wDay = t;
-  } else if (prog < 0.64) {
-    // 07h40 às 15h20: Pleno Dia Solar
-    wDay = 1.0;
-  } else if (prog < 0.76) {
-    // 15h20 às 18h15: Transição da Tarde (Overlap suave Dia -> Tarde)
-    const t = smoothstep(0.64, 0.76, prog);
-    wDay = 1.0 - t;
-    wAfternoon = t;
-  } else if (prog < 0.82) {
-    // 18h15 às 19h40: Plena Tarde / Pôr do Sol Dourado (Golden Hour)
-    wAfternoon = 1.0;
-  } else if (prog < 0.92) {
-    // 19h40 às 22h05: Anoitecer / Crepúsculo (Overlap suave Tarde -> Noite)
-    const t = smoothstep(0.82, 0.92, prog);
-    wAfternoon = 1.0 - t;
-    wNight = t;
-  } else {
-    // 22h05 às 24h00: Plena Noite
-    wNight = 1.0;
+const _blend = { a: KEYFRAMES[0], b: KEYFRAMES[0], t: 0 };
+
+/** Descobre os dois keyframes vizinhos e o fator de mistura (sem alocação). */
+function findKeyframes(prog, out = _blend) {
+  const n = KEYFRAMES.length;
+  let i = n - 1;
+  for (let k = 0; k < n; k++) {
+    if (KEYFRAMES[k].at > prog) break;
+    i = k;
   }
+  const a = KEYFRAMES[i];
+  const b = KEYFRAMES[(i + 1) % n];
+  const aAt = a.at;
+  let bAt = b.at;
+  if (bAt <= aAt) bAt += 1.0;
+  const p = prog < aAt ? prog + 1.0 : prog;
+  out.a = a;
+  out.b = b;
+  out.t = smoothstep(aAt, bAt, p);
+  return out;
+}
 
-  return { wDay, wAfternoon, wNight };
+// Compatibilidade: pesos agregados Dia / Tarde / Noite (HUD de cheats)
+const _legacyBlend = { a: KEYFRAMES[0], b: KEYFRAMES[0], t: 0 };
+const _legacyWeights = { wDay: 0, wAfternoon: 0, wNight: 0 };
+export function computeLightingWeights(prog) {
+  const { a, b, t } = findKeyframes(prog, _legacyBlend);
+  const w = _legacyWeights;
+  w.wDay = 0;
+  w.wAfternoon = 0;
+  w.wNight = 0;
+  const add = (frame, amount) => {
+    switch (frame.key) {
+      case "morning": case "noon": w.wDay += amount; break;
+      case "dawn": case "afternoon": case "sunset": w.wAfternoon += amount; break;
+      default: w.wNight += amount;
+    }
+  };
+  add(a, 1 - t);
+  add(b, t);
+  return w;
 }
 
 // Variáveis temporárias estáticas pré-alocadas para interpolação Zero-GC
-const _tempSunColor = new THREE.Color();
 const _tempSunDir = new THREE.Vector3();
-const _tempHemiSky = new THREE.Color();
-const _tempHemiGround = new THREE.Color();
-const _tempSkyColor = new THREE.Color();
-const _tempFogColor = new THREE.Color();
-const _tempAstroColor = new THREE.Color();
-const _tempAstroHaloColor = new THREE.Color();
 
 export class DayNightCycle {
   constructor(scene, sun, hemisphere) {
@@ -168,9 +176,19 @@ export class DayNightCycle {
     this._prevProgress = 0.45;
     this.onNewDay = null;
 
+    // Neblina: nível alvo (0..5), nível suavizado (float) e modo automático
+    this.fogLevel = 3;
+    this._fogLevelF = 3;
+    this.fogAuto = true;
+    this._fogAutoTimer = 40;
+
     // Estado da Iluminação Pré-Assada
     this.weights = { day: 1.0, afternoon: 0.0, night: 0.0 };
-    this.currentProfile = "dia";
+    this.currentProfile = "Pleno Dia";
+    this.currentProfileKey = "noon";
+    this._kfA = KEYFRAMES[0];
+    this._kfB = KEYFRAMES[0];
+    this._kfT = 0;
 
     // Astro Celeste Fixo no Firmamento (Sol/Lua Primordial com overlap de horário)
     this.fixedAstroGroup = new THREE.Group();
@@ -234,111 +252,122 @@ export class DayNightCycle {
     this.progress = ((prog % 1) + 1) % 1;
     this._prevProgress = this.progress;
 
-    const { wDay, wAfternoon, wNight } = computeLightingWeights(this.progress);
-    this.weights.day = wDay;
-    this.weights.afternoon = wAfternoon;
-    this.weights.night = wNight;
-
-    if (wAfternoon > wDay && wAfternoon > wNight) {
-      this.currentProfile = "tarde";
-    } else if (wNight > wDay) {
-      this.currentProfile = "noite";
-    } else {
-      this.currentProfile = "dia";
-    }
-
-    this.daylight = wDay * 1.0 + wAfternoon * 0.72 + wNight * 0.05;
-    this.isNight = wNight > 0.55;
-    this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
+    this._updateState();
 
     if (immediate) {
       this.applyLighting(playerX, playerZ, renderer);
     }
   }
 
+  /** Define o nível de neblina (0 = limpo ... 5 = breu branco). auto=true devolve o controle ao clima. */
+  setFogLevel(level, immediate = false) {
+    this.fogLevel = clamp(Math.round(level), 0, FOG_LEVELS.length - 1);
+    this.fogAuto = false;
+    if (immediate) this._fogLevelF = this.fogLevel;
+    return FOG_LEVELS[this.fogLevel].name;
+  }
+
+  setFogAuto(on = true) {
+    this.fogAuto = on;
+    this._fogAutoTimer = 20;
+  }
+
+  getFogName() {
+    return FOG_LEVELS[this.fogLevel].name + (this.fogAuto ? " (auto)" : "");
+  }
+
+  _updateFog(dt) {
+    if (this.fogAuto) {
+      this._fogAutoTimer -= dt;
+      if (this._fogAutoTimer <= 0) {
+        this._fogAutoTimer = 70 + Math.random() * 110; // segundos reais até o próximo sorteio
+        let r = Math.random();
+        let pick = 0;
+        for (let i = 0; i < FOG_AUTO_WEIGHTS.length; i++) {
+          r -= FOG_AUTO_WEIGHTS[i];
+          if (r <= 0) { pick = i; break; }
+        }
+        // anda no máximo 2 níveis por vez: o clima muda devagar
+        this.fogLevel = clamp(pick, this.fogLevel - 2, this.fogLevel + 2);
+      }
+    }
+    // aproximação lenta (~4s) do nível atual para o alvo
+    this._fogLevelF += (this.fogLevel - this._fogLevelF) * (1 - Math.exp(-dt * 0.5));
+  }
+
+  /** Recalcula pesos, perfil dominante, daylight e isNight a partir do progresso. */
+  _updateState() {
+    const { a, b, t } = findKeyframes(this.progress);
+    this._kfA = a;
+    this._kfB = b;
+    this._kfT = t;
+    const legacy = computeLightingWeights(this.progress);
+    this.weights.day = legacy.wDay;
+    this.weights.afternoon = legacy.wAfternoon;
+    this.weights.night = legacy.wNight;
+    const dominant = t < 0.5 ? a : b;
+    this.currentProfile = dominant.label;
+    this.currentProfileKey = dominant.key;
+    this.daylight = a.daylight + (b.daylight - a.daylight) * t;
+    this.isNight = this.daylight < 0.45;
+    this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
+  }
+
   /**
    * Interpolação e envio para materiais e Three.js das luzes pré-assadas (Zero-GC).
    */
   applyLighting(playerX = 0, playerZ = 0, renderer = null) {
-    const { day: wDay, afternoon: wAfternoon, night: wNight } = this.weights;
-    const P_D = BAKED_LIGHTING.day;
-    const P_A = BAKED_LIGHTING.afternoon;
-    const P_N = BAKED_LIGHTING.night;
+    const A = this._kfA;
+    const B = this._kfB;
+    const t = this._kfT;
+    const lerp = (x, y) => x + (y - x) * t;
+    const mix = (out, ca, cb) => out.copy(ca).lerp(cb, t);
 
-    // A) Sol / Luz Direcional Pré-Assada
-    _tempSunColor.setRGB(
-      P_D.sun.color.r * wDay + P_A.sun.color.r * wAfternoon + P_N.sun.color.r * wNight,
-      P_D.sun.color.g * wDay + P_A.sun.color.g * wAfternoon + P_N.sun.color.g * wNight,
-      P_D.sun.color.b * wDay + P_A.sun.color.b * wAfternoon + P_N.sun.color.b * wNight
-    );
+    // A) Sol / Luz Direcional
     if (this.sun) {
-      this.sun.color.copy(_tempSunColor);
-      this.sun.intensity = P_D.sun.intensity * wDay + P_A.sun.intensity * wAfternoon + P_N.sun.intensity * wNight;
+      mix(this.sun.color, A.sun.color, B.sun.color);
+      this.sun.intensity = lerp(A.sun.intensity, B.sun.intensity);
     }
+    _tempSunDir.copy(A.sun.dir).lerp(B.sun.dir, t).normalize();
 
-    // Vetor Direcional do Sol/Luar interpolado suavemente
-    _tempSunDir.set(
-      P_D.sun.dir.x * wDay + P_A.sun.dir.x * wAfternoon + P_N.sun.dir.x * wNight,
-      P_D.sun.dir.y * wDay + P_A.sun.dir.y * wAfternoon + P_N.sun.dir.y * wNight,
-      P_D.sun.dir.z * wDay + P_A.sun.dir.z * wAfternoon + P_N.sun.dir.z * wNight
-    ).normalize();
-
-    // B) Luz Hemisférica Pré-Assada (Céu e Solo)
-    _tempHemiSky.setRGB(
-      P_D.hemisphere.skyColor.r * wDay + P_A.hemisphere.skyColor.r * wAfternoon + P_N.hemisphere.skyColor.r * wNight,
-      P_D.hemisphere.skyColor.g * wDay + P_A.hemisphere.skyColor.g * wAfternoon + P_N.hemisphere.skyColor.g * wNight,
-      P_D.hemisphere.skyColor.b * wDay + P_A.hemisphere.skyColor.b * wAfternoon + P_N.hemisphere.skyColor.b * wNight
-    );
-    _tempHemiGround.setRGB(
-      P_D.hemisphere.groundColor.r * wDay + P_A.hemisphere.groundColor.r * wAfternoon + P_N.hemisphere.groundColor.r * wNight,
-      P_D.hemisphere.groundColor.g * wDay + P_A.hemisphere.groundColor.g * wAfternoon + P_N.hemisphere.groundColor.g * wNight,
-      P_D.hemisphere.groundColor.b * wDay + P_A.hemisphere.groundColor.b * wAfternoon + P_N.hemisphere.groundColor.b * wNight
-    );
+    // B) Luz Hemisférica (Céu e Solo)
     if (this.hemisphere) {
-      this.hemisphere.color.copy(_tempHemiSky);
-      this.hemisphere.groundColor.copy(_tempHemiGround);
-      this.hemisphere.intensity = P_D.hemisphere.intensity * wDay + P_A.hemisphere.intensity * wAfternoon + P_N.hemisphere.intensity * wNight;
+      mix(this.hemisphere.color, A.hemisphere.skyColor, B.hemisphere.skyColor);
+      mix(this.hemisphere.groundColor, A.hemisphere.groundColor, B.hemisphere.groundColor);
+      this.hemisphere.intensity = lerp(A.hemisphere.intensity, B.hemisphere.intensity);
     }
 
     // C) Céu / Fundo / Limpeza do Canvas
-    _tempSkyColor.setRGB(
-      P_D.sky.color.r * wDay + P_A.sky.color.r * wAfternoon + P_N.sky.color.r * wNight,
-      P_D.sky.color.g * wDay + P_A.sky.color.g * wAfternoon + P_N.sky.color.g * wNight,
-      P_D.sky.color.b * wDay + P_A.sky.color.b * wAfternoon + P_N.sky.color.b * wNight
-    );
-    this.currentColor.copy(_tempSkyColor);
-    if (this.scene && this.scene.background) {
-      this.scene.background.copy(_tempSkyColor);
-    }
-    if (renderer) renderer.setClearColor(_tempSkyColor);
+    mix(this.currentColor, A.sky.color, B.sky.color);
+    if (this.scene && this.scene.background) this.scene.background.copy(this.currentColor);
+    if (renderer) renderer.setClearColor(this.currentColor);
 
-    // D) Neblina Pré-Assada (Fog)
+    // D) Neblina
+    // nível de neblina interpolado entre as duas entradas vizinhas da tabela
+    const fi = clamp(this._fogLevelF, 0, FOG_LEVELS.length - 1);
+    const f0 = Math.floor(fi);
+    const f1 = Math.min(FOG_LEVELS.length - 1, f0 + 1);
+    const ft = fi - f0;
+    const fogMul = FOG_LEVELS[f0].mul + (FOG_LEVELS[f1].mul - FOG_LEVELS[f0].mul) * ft;
+    const fogTint = FOG_LEVELS[f0].tint + (FOG_LEVELS[f1].tint - FOG_LEVELS[f0].tint) * ft;
     if (this.scene && this.scene.fog) {
-      _tempFogColor.setRGB(
-        P_D.fog.color.r * wDay + P_A.fog.color.r * wAfternoon + P_N.fog.color.r * wNight,
-        P_D.fog.color.g * wDay + P_A.fog.color.g * wAfternoon + P_N.fog.color.g * wNight,
-        P_D.fog.color.b * wDay + P_A.fog.color.b * wAfternoon + P_N.fog.color.b * wNight
-      );
-      this.scene.fog.color.copy(_tempFogColor);
-      this.scene.fog.density = P_D.fog.density * wDay + P_A.fog.density * wAfternoon + P_N.fog.density * wNight;
+      mix(this.scene.fog.color, A.fog.color, B.fog.color);
+      // a neblina de dia fica pálida e fria; à noite escurece junto com a luz
+      _fogMixed.copy(FOG_TINT).multiplyScalar(0.015 + 0.985 * this.daylight * this.daylight); // à noite a neblina é preta
+      this.scene.fog.color.lerp(_fogMixed, fogTint);
+      this.scene.fog.density = lerp(A.fog.density, B.fog.density) * fogMul;
+      // o horizonte acompanha a neblina, sem "faixa" de céu limpo atrás dela
+      this.currentColor.lerp(this.scene.fog.color, Math.min(1, fogTint * 1.25));
+      if (this.scene.background) this.scene.background.copy(this.currentColor);
+      if (renderer) renderer.setClearColor(this.currentColor);
     }
 
     // E) Astro Celeste Fixo (Sol poente, Sol diurno e Lua mística)
     if (this.astroMesh && this.astroHaloMesh) {
-      _tempAstroColor.setRGB(
-        P_D.astro.color.r * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight,
-        P_D.astro.color.g * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight,
-        P_D.astro.color.b * wDay + P_A.astro.color.r * wAfternoon + P_N.astro.color.r * wNight
-      );
-      _tempAstroHaloColor.setRGB(
-        P_D.astro.haloColor.r * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight,
-        P_D.astro.haloColor.g * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight,
-        P_D.astro.haloColor.b * wDay + P_A.astro.haloColor.r * wAfternoon + P_N.astro.haloColor.r * wNight
-      );
-      this.astroMesh.material.color.copy(_tempAstroColor);
-      this.astroHaloMesh.material.color.copy(_tempAstroHaloColor);
-      this.astroHaloMesh.material.opacity = P_D.astro.haloOpacity * wDay + P_A.astro.haloOpacity * wAfternoon + P_N.astro.haloOpacity * wNight;
-      const astroScale = P_D.astro.scale * wDay + P_A.astro.scale * wAfternoon + P_N.astro.scale * wNight;
+      mix(this.astroMesh.material.color, A.astro.color, B.astro.color);
+      mix(this.astroHaloMesh.material.color, A.astro.haloColor, B.astro.haloColor);
+      this.astroHaloMesh.material.opacity = lerp(A.astro.haloOpacity, B.astro.haloOpacity);
+      const astroScale = lerp(A.astro.scale, B.astro.scale);
       this.fixedAstroGroup.scale.set(astroScale, astroScale, astroScale);
     }
 
@@ -379,26 +408,9 @@ export class DayNightCycle {
     }
     this._prevProgress = this.progress;
 
-    // 1. Pesos de Overlap Pré-Assados (Dia, Tarde, Noite)
-    const { wDay, wAfternoon, wNight } = computeLightingWeights(this.progress);
-    this.weights.day = wDay;
-    this.weights.afternoon = wAfternoon;
-    this.weights.night = wNight;
-
-    if (wAfternoon > wDay && wAfternoon > wNight) {
-      this.currentProfile = "tarde";
-    } else if (wNight > wDay) {
-      this.currentProfile = "noite";
-    } else {
-      this.currentProfile = "dia";
-    }
-
-    // Daylight e Noite computados a partir dos perfis assados
-    this.daylight = wDay * 1.0 + wAfternoon * 0.72 + wNight * 0.05;
-    this.isNight = wNight > 0.55;
-
-    // Ângulo solar mantido para compatibilidade
-    this.solarAngle = (this.progress - 0.25) * Math.PI * 2;
+    // 1. Estado de iluminação (keyframes, daylight, isNight) e neblina
+    this._updateFog(dt);
+    this._updateState();
 
     // 2. Aplica interpolação das luzes pré-assadas
     this.applyLighting(playerX, playerZ, renderer);

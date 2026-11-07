@@ -284,6 +284,9 @@ function _updateStatusDisplays() {
     clockEl.textContent = `${hours}:${minutes} (${prof}${w})`;
   }
 
+  const fogEl = _cheatModalEl.querySelector("#cs-fog");
+  if (fogEl && dn?.getFogName) fogEl.textContent = "· " + dn.getFogName();
+
   const dayEl = _cheatModalEl.querySelector("#cs-day");
   const curDay = WorldDecay?.daysPassed ?? 1;
   if (dayEl) dayEl.textContent = `Dia ${curDay}${WorldDecay?.isEclipse ? " (🌑 Eclipse)" : ""}`;
@@ -404,6 +407,17 @@ export function openCheatModal(env) {
             <button class="cheat-btn" data-cheat="time_witching">🌑 Madrugada dos Ermos (03:00)</button>
             <button class="cheat-btn" data-cheat="time_set_day">☀️ Fazer Dia Imediato (10:00)</button>
             <button class="cheat-btn" data-cheat="time_set_night">🌙 Fazer Noite Imediata (22:00)</button>
+          </div>
+
+          <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 14px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">🌫️ Níveis de Neblina <span id="cs-fog" style="color:#bba8d8; text-transform:none; letter-spacing:0;"></span></div>
+          <div class="cheat-grid" style="margin-bottom: 12px;">
+            <button class="cheat-btn" data-cheat="fog_0">☀️ 0 · Limpo</button>
+            <button class="cheat-btn" data-cheat="fog_1">🌤️ 1 · Bruma leve</button>
+            <button class="cheat-btn" data-cheat="fog_2">🌫️ 2 · Névoa</button>
+            <button class="cheat-btn" data-cheat="fog_3">🌫️ 3 · Neblina densa</button>
+            <button class="cheat-btn" data-cheat="fog_4">☁️ 4 · Cerração</button>
+            <button class="cheat-btn" data-cheat="fog_5">⬜ 5 · Breu branco</button>
+            <button class="cheat-btn highlight full-width" data-cheat="fog_auto">🎲 Clima automático (varia sozinho)</button>
           </div>
 
           <div style="font-size: 12px; color: #bba8d8; font-weight: 700; margin: 14px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">Avançar & Retroceder o Relógio</div>
@@ -698,6 +712,12 @@ function _handleCheatAction(type) {
   if (!window.CheatMenu) return;
   switch (type) {
     // Horário & Ciclo Dia/Noite
+    case "fog_0": case "fog_1": case "fog_2": case "fog_3": case "fog_4": case "fog_5":
+      window.CheatMenu.setFog(Number(type.slice(4)));
+      break;
+    case "fog_auto":
+      window.CheatMenu.setFog("auto");
+      break;
     case "lighting_day":
       window.CheatMenu.setBakedDay();
       break;
@@ -1103,6 +1123,20 @@ export function initCheatMenu(env = {}) {
 
     setNight() {
       return this.setTime(22, 0);
+    },
+
+    setFog(level) {
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (!dn) return "DayNight não disponível";
+      let name;
+      if (level === "auto") {
+        dn.setFogAuto(true);
+        name = "Clima automático";
+      } else {
+        name = dn.setFogLevel(Number(level));
+      }
+      env.ui?.showToast?.("🌫️ Neblina: " + name);
+      return name;
     },
 
     setBakedDay() {

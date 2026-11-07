@@ -2,61 +2,104 @@ import * as THREE from "three";
 
 const cache = new Map();
 
+const TEX = 128; // resolução das texturas (cache: 4 canvas no total)
+
 function patternTexture(kind) {
   if (cache.has(kind)) return cache.get(kind);
   const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 64;
+  canvas.width = TEX;
+  canvas.height = TEX;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#c8c8c8";
-  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillRect(0, 0, TEX, TEX);
   let state = kind.length * 94831;
   const random = () => {
     state = (Math.imul(state, 1664525) + 1013904223) | 0;
     return (state >>> 0) / 4294967296;
   };
+  const speck = (n, a, dark, light, wMax = 2) => {
+    ctx.globalAlpha = a;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = random() > 0.5 ? dark : light;
+      ctx.fillRect(Math.floor(random() * TEX), Math.floor(random() * TEX), 1 + Math.floor(random() * wMax), 1 + Math.floor(random() * wMax));
+    }
+  };
 
   if (kind === "fabric") {
-    ctx.strokeStyle = "#777777";
-    ctx.globalAlpha = 0.24;
-    ctx.lineWidth = 1;
-    for (let i = 2; i < 64; i += 4) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 64); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(64, i); ctx.stroke();
+    // trama de sarja: fios cruzados com variação de tom e fios soltos
+    for (let i = 0; i < TEX; i += 3) {
+      ctx.globalAlpha = 0.16 + random() * 0.1;
+      ctx.fillStyle = "#6e6e6e";
+      ctx.fillRect(i, 0, 1, TEX);
+      ctx.globalAlpha = 0.12 + random() * 0.1;
+      ctx.fillRect(0, i, TEX, 1);
     }
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = "#eeeeee";
-    for (let y = 0; y < 64; y += 4) {
-      for (let x = (y / 4) % 2 ? 0 : 2; x < 64; x += 4) ctx.fillRect(x, y, 1, 1);
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = "#f2f2f2";
+    for (let y = 0; y < TEX; y += 3) {
+      for (let x = ((y / 3) % 2) * 1.5; x < TEX; x += 3) ctx.fillRect(x, y, 1, 1);
     }
+    speck(60, 0.18, "#555555", "#ffffff", 1);
+    // remendos / dobras suaves
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = "#444";
+    for (let i = 0; i < 5; i++) ctx.fillRect(random() * TEX, random() * TEX, 14 + random() * 22, 2);
   } else if (kind === "leather") {
-    ctx.globalAlpha = 0.22;
-    for (let i = 0; i < 150; i++) {
-      ctx.fillStyle = random() > 0.5 ? "#666666" : "#eeeeee";
-      ctx.fillRect(Math.floor(random() * 64), Math.floor(random() * 64), 1 + Math.floor(random() * 2), 1);
+    // poros e rugas do couro + costura tracejada
+    speck(420, 0.2, "#5a5a5a", "#f0f0f0", 2);
+    ctx.globalAlpha = 0.14;
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 22; i++) {
+      const x = random() * TEX, y = random() * TEX;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + random() * 14 - 7, y + random() * 14 - 7, x + random() * 20 - 10, y + random() * 20 - 10);
+      ctx.stroke();
     }
-    ctx.globalAlpha = 0.32;
-    ctx.strokeStyle = "#555555";
-    ctx.setLineDash([2, 3]);
-    ctx.strokeRect(3.5, 3.5, 57, 57);
+    ctx.globalAlpha = 0.34;
+    ctx.strokeStyle = "#4a4a4a";
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(6.5, 6.5, TEX - 13, TEX - 13);
     ctx.setLineDash([]);
   } else if (kind === "metal") {
-    ctx.globalAlpha = 0.32;
-    ctx.strokeStyle = "#777777";
-    ctx.lineWidth = 1;
-    for (let y = 2; y < 64; y += 5) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(64, y); ctx.stroke();
+    // aço escovado: veios horizontais, rebites, riscos e pontos de oxidação
+    for (let y = 0; y < TEX; y += 2) {
+      ctx.globalAlpha = 0.06 + random() * 0.16;
+      ctx.fillStyle = random() > 0.5 ? "#6a6a6a" : "#ffffff";
+      ctx.fillRect(0, y, TEX, 1);
     }
-    ctx.globalAlpha = 0.38;
-    ctx.fillStyle = "#f4f4f4";
-    for (let y = 8; y < 64; y += 16) {
-      for (let x = 8; x < 64; x += 16) ctx.fillRect(x, y, 2, 2);
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = "#fafafa";
+    for (let y = 12; y < TEX; y += 32) {
+      for (let x = 12; x < TEX; x += 32) {
+        ctx.fillRect(x, y, 3, 3);
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x + 2, y + 2, 2, 2);
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = "#fafafa";
+      }
     }
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "#444";
+    for (let i = 0; i < 9; i++) {
+      const x = random() * TEX, y = random() * TEX;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + random() * 30 - 15, y + random() * 10 - 5);
+      ctx.stroke();
+    }
+    speck(40, 0.14, "#7a5a3a", "#9a7a5a", 2);
   } else {
-    ctx.globalAlpha = 0.2;
-    for (let i = 0; i < 90; i++) {
-      ctx.fillStyle = random() > 0.55 ? "#888888" : "#eeeeee";
-      ctx.fillRect(Math.floor(random() * 64), Math.floor(random() * 64), 1, 1);
+    // pele: poros, manchas suaves e leve vermelhidão
+    speck(300, 0.14, "#888888", "#f4f4f4", 1);
+    ctx.globalAlpha = 0.07;
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = random() > 0.5 ? "#7a7a7a" : "#ffffff";
+      ctx.beginPath();
+      ctx.arc(random() * TEX, random() * TEX, 6 + random() * 12, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   ctx.globalAlpha = 1;
@@ -67,6 +110,7 @@ function patternTexture(kind) {
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
+  texture.anisotropy = 4;
   cache.set(kind, texture);
   return texture;
 }

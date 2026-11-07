@@ -2,18 +2,22 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG } from "./config.js";
 import { hash2, makeRandom, terrainHeight } from "./utils.js";
-import { TreeKit } from "./trees.js";
+import { TreeKit, LOD_LEVELS, createCrossedTriangles, createIsoscelesTriangleGeometry, makeBillboardMaterial, makeImpostorMaterial } from "./trees.js";
 import { VILLAGES, PLATEAU_INNER, PLATEAU_OUTER, isKingdomClear, setVillageBaseHeights, villageBaseHeight } from "./kingdom.js";
 import { SpatialHashGrid } from "./spatialGrid.js";
+import { applyBiome } from "./biomes.js";
 
 const COLORS = {
-  grassA: new THREE.Color("#526c43"),
-  grassB: new THREE.Color("#78905a"),
-  dirt: new THREE.Color("#8d7957"),
-  stone: new THREE.Color("#77796e"),
+  // Paleta "apodrecida": capim seco e amarelado, manchas de mato morto e terra escura
+  grassA: new THREE.Color("#7a7538"),
+  grassB: new THREE.Color("#a39c47"),
+  rot: new THREE.Color("#5d4b2f"),
+  dirt: new THREE.Color("#6f5d42"),
+  stone: new THREE.Color("#686961"),
 };
 
 const _tintColor = new THREE.Color();
+const _terrainColor = new THREE.Color();
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -21,122 +25,6 @@ const _rayOrigin = new THREE.Vector3();
 const _rayDown = new THREE.Vector3(0, -1, 0);
 const _hitPoint = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
-
-/**
- * Cria uma BufferGeometry de Triângulo Isósceles 2D com faces frontal e traseira.
- * Vértice pontiagudo no topo e base horizontal larga em baixo.
- * Substitui os antigos retângulos chapados que se confundiam com casas e vilas distantes.
- * @param {number} baseWidth - Largura da base do triângulo
- * @param {number} height - Altura do triângulo isósceles
- * @param {number} [yBottom=0] - Altura da base no eixo Y
- */
-function createIsoscelesTriangleGeometry(baseWidth, height, yBottom = 0) {
-  const hw = baseWidth / 2;
-  const yTop = yBottom + height;
-
-  const positions = new Float32Array([
-    // Face Frontal
-    -hw, yBottom, 0,
-     hw, yBottom, 0,
-      0, yTop,    0,
-
-    // Face Traseira
-     hw, yBottom, 0,
-    -hw, yBottom, 0,
-      0, yTop,    0,
-  ]);
-
-  const normals = new Float32Array([
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
-
-    0, 0, -1,
-    0, 0, -1,
-    0, 0, -1,
-  ]);
-
-  const uvs = new Float32Array([
-    0, 0,
-    1, 0,
-    0.5, 1,
-
-    1, 0,
-    0, 0,
-    0.5, 1,
-  ]);
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-  geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1));
-  return geo;
-}
-
-/**
- * Impostor 2D de Árvore Distante em Triângulos Isósceles Cruzados (Pinheiro / Copa Natural):
- * Silhueta cônica pontuda e sombra no solo, eliminando qualquer formato retangular.
- */
-function createFarTreeImpostorGeometry() {
-  const geos = [];
-  const t1 = createIsoscelesTriangleGeometry(3.0, 7.2, 0.45);
-  geos.push(t1);
-
-  const t2 = createIsoscelesTriangleGeometry(3.0, 7.2, 0.45);
-  t2.rotateY(Math.PI / 2);
-  geos.push(t2);
-
-  // Tronco fino na base
-  const trunk1 = new THREE.PlaneGeometry(0.36, 0.9);
-  trunk1.translate(0, 0.45, 0);
-  geos.push(trunk1);
-
-  const trunk2 = new THREE.PlaneGeometry(0.36, 0.9);
-  trunk2.rotateY(Math.PI / 2);
-  trunk2.translate(0, 0.45, 0);
-  geos.push(trunk2);
-
-  // Sombra chapada escura no solo
-  const shadow = new THREE.CircleGeometry(1.5, 8);
-  shadow.rotateX(-Math.PI / 2);
-  shadow.translate(0, 0.04, 0);
-  geos.push(shadow);
-
-  const nonIndexed = geos.map((g) => (g.index ? g.toNonIndexed() : g));
-  const merged = mergeGeometries(nonIndexed, false);
-  for (const g of geos) g.dispose();
-  for (const g of nonIndexed) {
-    if (g !== merged) g.dispose();
-  }
-  return merged;
-}
-
-/**
- * Impostor 2D de Rocha Distante em formato triangular baixo e achatado.
- */
-function createFarRockImpostorGeometry() {
-  const geos = [];
-  const t1 = createIsoscelesTriangleGeometry(1.5, 0.85, 0.02);
-  geos.push(t1);
-
-  const t2 = createIsoscelesTriangleGeometry(1.5, 0.85, 0.02);
-  t2.rotateY(Math.PI / 2);
-  geos.push(t2);
-
-  const shadow = new THREE.CircleGeometry(0.85, 8);
-  shadow.rotateX(-Math.PI / 2);
-  shadow.translate(0, 0.03, 0);
-  geos.push(shadow);
-
-  const nonIndexed = geos.map((g) => (g.index ? g.toNonIndexed() : g));
-  const merged = mergeGeometries(nonIndexed, false);
-  for (const g of geos) g.dispose();
-  for (const g of nonIndexed) {
-    if (g !== merged) g.dispose();
-  }
-  return merged;
-}
 
 // Só o que está perto do jogador entra no mapa de sombras (frustum curto ~30m em volta do jogador).
 export const SHADOW_RADIUS = 30;
@@ -167,22 +55,40 @@ export class World {
     this.loadRadiusSq = (this.radius + 0.35) * (this.radius + 0.35);
     this.unloadRadiusSq = CONFIG.chunkUnloadRadius * CONFIG.chunkUnloadRadius;
     this.viewDistanceSq = CONFIG.viewDistance * CONFIG.viewDistance;
-    this.lodDistance = CONFIG.lodDistance;
-    this.lodDistanceSq = CONFIG.lodDistance * CONFIG.lodDistance;
     this._dummy = new THREE.Object3D();
     this._frustum = new THREE.Frustum();
     this._projectionView = new THREE.Matrix4();
     this._camDir = new THREE.Vector3();
     this._terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true });
     this.treeKit = new TreeKit();
-    this._farTreeGeometry = createFarTreeImpostorGeometry();
-    this._farRockGeometry = createFarRockImpostorGeometry();
-    this._rockGeometry = new THREE.IcosahedronGeometry(0.7, 0);
-    this._clayGeometry = new THREE.DodecahedronGeometry(0.65, 0);
-    this._farTreeMaterial = new THREE.MeshStandardMaterial({ color: "#3c5039", roughness: 1, flatShading: true });
-    this._farRockMaterial = new THREE.MeshStandardMaterial({ color: "#545650", roughness: 1, flatShading: true });
+    this.lodLevels = LOD_LEVELS;
+    this._lodDistances = CONFIG.lodDistances;
     this._rockMaterial = new THREE.MeshStandardMaterial({ color: "#777a70", roughness: 1, flatShading: true });
     this._clayMaterial = new THREE.MeshStandardMaterial({ color: "#9c5737", roughness: 1, flatShading: true });
+    // Pedras: 6 níveis (icosaedro 20 faces -> octaedro 8 -> tetraedro 4 -> pirâmide -> 2 triângulos cruzados -> 1 triângulo)
+    const rockFar = "#545650";
+    this._rockLods = [
+      { geometry: new THREE.IcosahedronGeometry(0.7, 0), material: this._rockMaterial },
+      { geometry: new THREE.OctahedronGeometry(0.7, 0), material: this._rockMaterial },
+      { geometry: new THREE.TetrahedronGeometry(0.8, 0), material: this._rockMaterial },
+      { geometry: new THREE.ConeGeometry(0.75, 0.8, 4, 1, true), material: this._rockMaterial },
+      { geometry: createCrossedTriangles(1.5, 0.85, 0.02), material: makeImpostorMaterial(rockFar) },
+      { geometry: createIsoscelesTriangleGeometry(1.5, 0.85, 0.02, false), material: makeBillboardMaterial(rockFar) },
+    ];
+    // Argila: só aparece nos 4 níveis mais próximos (pequena demais para impostor)
+    const clayHi = new THREE.DodecahedronGeometry(0.65, 0);
+    const clayLo = new THREE.OctahedronGeometry(0.65, 0);
+    this._clayLods = [
+      { geometry: clayHi, material: this._clayMaterial },
+      { geometry: clayHi, material: this._clayMaterial },
+      { geometry: clayLo, material: this._clayMaterial },
+      { geometry: clayLo, material: this._clayMaterial },
+    ];
+    // Grama: só nos 2 níveis mais próximos
+    this._grassLods = [
+      { geometry: this.treeKit.grass.geometry, material: this.treeKit.grass.material },
+      { geometry: this.treeKit.grass.geometry, material: this.treeKit.grass.material },
+    ];
     setVillageBaseHeights(VILLAGES.map((v) => terrainHeight(v.x, v.z, CONFIG.seed)));
     this._spawnX = CONFIG.player.startX;
     this._spawnZ = CONFIG.player.startZ;
@@ -275,7 +181,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=26", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1092,6 +998,29 @@ export class World {
     return false;
   }
 
+  _setChunkLod(chunk, level) {
+    if (chunk.lodLevel === level) return;
+    const lods = chunk.lods;
+    for (let i = 0; i < lods.length; i++) lods[i].visible = i === level;
+    chunk.lodLevel = level;
+  }
+
+  // Nível de LOD (0 = detalhado ... 5 = triângulo 2D) a partir da distância ao jogador.
+  // Histerese de 6m evita o "pisca-pisca" quando o jogador anda na fronteira entre dois níveis.
+  _lodForDistance(dist, current) {
+    const d = this._lodDistances;
+    let level = d.length;
+    for (let i = 0; i < d.length; i++) {
+      // quem já está no lado perto da fronteira i tende a ficar (+6m); quem está do lado longe, também (-6m)
+      const limit = d[i] + (current < 0 ? 0 : current <= i ? 6 : -6);
+      if (dist < limit) {
+        level = i;
+        break;
+      }
+    }
+    return level;
+  }
+
   updateVisibility(camera, x, z, isCutscene = false) {
     camera.updateMatrixWorld();
     this._projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -1103,7 +1032,7 @@ export class World {
     const camX = camera.position.x;
     const camZ = camera.position.z;
     // Raio seguro circular onde o chão e mundo NUNCA somem (135m = > 2 chunks ao redor em 360°, inclusive atrás)
-    const alwaysVisibleRadiusSq = 135.0 * 135.0; // 18.225 m²
+    const alwaysVisibleRadiusSq = 135.0 * 135.0;
 
     for (let i = 0; i < this.activeChunks.length; i++) {
       const chunk = this.activeChunks[i];
@@ -1111,49 +1040,38 @@ export class World {
       const toChunkZ = chunk.centerZ - z;
       const distanceSq = toChunkX * toChunkX + toChunkZ * toChunkZ;
 
-      // Durante cutscenes: desativa filtros de descarte para garantir visual cinematográfico impecável sem glitches
+      // Cutscenes: sem descarte por frustum, LOD só por distância
       if (isCutscene) {
         chunk.group.visible = true;
-        chunk.near.visible = distanceSq < this.lodDistanceSq * 1.5;
-        chunk.far.visible = distanceSq >= this.lodDistanceSq * 1.5;
+        this._setChunkLod(chunk, this._lodForDistance(Math.sqrt(distanceSq), chunk.lodLevel));
         continue;
       }
 
-      // Se o chunk estiver além da distância de visão total, desativa
+      // Além da distância de visão total, desativa
       if (distanceSq > this.viewDistanceSq) {
         chunk.group.visible = false;
-        chunk.near.visible = false;
-        chunk.far.visible = false;
+        this._setChunkLod(chunk, -1);
         continue;
       }
 
-      // Visibilidade livre de "limbo":
-      // Chunks dentro do raio seguro imediato (135m) ficam SEMPRE visíveis em todas as direções (frente, lados e atrás).
-      // Chunks distantes (> 135m) usam Frustum Culling do Three.js.
       const inSafeRadius = distanceSq <= alwaysVisibleRadiusSq;
       const inFrustum = inSafeRadius || this._frustum.intersectsSphere(chunk.bounds);
 
       chunk.group.visible = inFrustum;
       if (!inFrustum) {
-        chunk.near.visible = false;
-        chunk.far.visible = false;
+        this._setChunkLod(chunk, -1);
         continue;
       }
 
+      // LOD dianteiro: chunks na frente da câmera ganham até 60% mais alcance em cada nível,
+      // evitando transições bruscas à frente do jogador/cavalo.
       const toCamX = chunk.centerX - camX;
       const toCamZ = chunk.centerZ - camZ;
-      const distToCamSq = toCamX * toCamX + toCamZ * toCamZ;
-
-      // LOD Dianteiro Direcional:
-      // Se o chunk estiver na frente da câmera (dotCam > 0), projeta o limiar do LOD em alta qualidade (near)
-      // muito mais à frente (até 130m), impedindo pop-in ou transição brusca na frente do cavalo.
+      const distToCam = Math.sqrt(toCamX * toCamX + toCamZ * toCamZ);
       const dotCam = toCamX * cdx + toCamZ * cdz;
-      const forwardFactor = Math.max(0, dotCam / Math.max(1, Math.sqrt(distToCamSq)));
-      const effectiveLodDist = this.lodDistance * (1.0 + forwardFactor * 0.95);
-      const effectiveLodSq = effectiveLodDist * effectiveLodDist;
-
-      chunk.near.visible = distanceSq < effectiveLodSq;
-      chunk.far.visible = distanceSq >= effectiveLodSq;
+      const forwardFactor = Math.max(0, dotCam / Math.max(1, distToCam));
+      const effectiveDist = Math.sqrt(distanceSq) / (1.0 + forwardFactor * 0.6);
+      this._setChunkLod(chunk, this._lodForDistance(effectiveDist, chunk.lodLevel));
     }
   }
 
@@ -1191,18 +1109,24 @@ export class World {
     terrain.matrixAutoUpdate = false;
     group.add(terrain);
 
-    const near = new THREE.Group();
-    near.matrixAutoUpdate = false;
-    const far = new THREE.Group();
-    far.matrixAutoUpdate = false;
+    // 6 grupos de LOD (0 = detalhado ... 5 = triângulo 2D); só um fica visível por vez
+    const lods = [];
+    for (let l = 0; l < this.lodLevels; l++) {
+      const g = new THREE.Group();
+      g.matrixAutoUpdate = false;
+      g.visible = l === this.lodLevels - 1; // começa no mais barato; updateVisibility ajusta no 1º frame
+      lods.push(g);
+    }
     const decor = this._createDecorations(cx, cz, heights);
-    for (let i = 0; i < decor.nearMeshes.length; i++) near.add(decor.nearMeshes[i]);
-    for (let i = 0; i < decor.farMeshes.length; i++) far.add(decor.farMeshes[i]);
+    for (let l = 0; l < decor.lodMeshes.length; l++) {
+      const list = decor.lodMeshes[l];
+      for (let i = 0; i < list.length; i++) lods[l].add(list[i]);
+    }
     for (let i = 0; i < decor.colliders.length; i++) {
       const c = decor.colliders[i];
       this.spatialGrid.insertCircle(c, c.x, c.z, c.radius);
     }
-    group.add(near, far);
+    for (let l = 0; l < lods.length; l++) group.add(lods[l]);
     this.scene.add(group);
 
     const chunkData = {
@@ -1213,8 +1137,8 @@ export class World {
       group,
       terrain,
       heights,
-      near,
-      far,
+      lods,
+      lodLevel: this.lodLevels - 1,
       bounds: geometry.boundingSphere,
       colliders: decor.colliders,
       shadowMeshes: decor.shadowMeshes,
@@ -1246,9 +1170,14 @@ export class World {
         positions[p + 2] = worldZ;
 
         const variation = hash2(Math.floor(worldX * 0.8), Math.floor(worldZ * 0.8), this.seed + 211);
-        let color = variation > 0.53 ? COLORS.grassB : COLORS.grassA;
-        if (height > 5.5) color = COLORS.dirt;
-        if (height > 9) color = COLORS.stone;
+        let color = _terrainColor.copy(variation > 0.53 ? COLORS.grassB : COLORS.grassA);
+        // manchas de vegetação morta espalhadas (ruído de baixa frequência)
+        const blight = hash2(Math.floor(worldX * 0.16), Math.floor(worldZ * 0.16), this.seed + 977);
+        if (blight > 0.7) color.copy(COLORS.rot);
+        // bioma em gradiente (pântano / ocre / cinzas / geada), atenuado perto de povoações
+        applyBiome(color, worldX, worldZ, height, this.seed);
+        if (height > 5.5) color.lerp(COLORS.dirt, Math.min(1, (height - 5.5) * 0.6));
+        if (height > 9) color.lerp(COLORS.stone, Math.min(1, (height - 9) * 0.6));
         const tint = 0.92 + variation * 0.12;
         colors[p] = color.r * tint;
         colors[p + 1] = color.g * tint;
@@ -1294,7 +1223,6 @@ export class World {
     const random = makeRandom(hash2(cx, cz, this.seed) * 4294967295);
     const colliders = [];
     const speciesData = { oak: [], pine: [], birch: [], bush: [] };
-    const farData = [];
     const rockData = [];
     const clayData = [];
     const grassData = [];
@@ -1315,10 +1243,7 @@ export class World {
       const kind = this.treeKit.pick(random());
       const tree = { x, y, z, scale: kind === "bush" ? scale * 0.9 : scale, rotation, tint: 0.88 + random() * 0.24, collider: null, farIndex: -1 };
       speciesData[kind].push(tree);
-      if (kind !== "bush") {
-        tree.farIndex = farData.length;
-        farData.push(tree);
-        // colisor só no tronco, nunca na copa
+      if (kind !== "bush") {        // colisor só no tronco, nunca na copa
         const col = { x, z, radius: 0.28 + scale * 0.11, top: y + 7.5 * scale, kind: "tree" };
         tree.collider = col;
         colliders.push(col);
@@ -1366,115 +1291,106 @@ export class World {
       grassData.push({ x, y, z, scale, rotation, tint: 0.86 + random() * 0.26 });
     }
 
-    const nearMeshes = [];
-    const farMeshes = [];
-    const treeMeshes = [];
+    const lodMeshes = [];
+    for (let l = 0; l < this.lodLevels; l++) lodMeshes.push([]);
     const instancedMeshes = [];
+    const shadowMeshes = [];
 
-    const farTrees = this._makeInstances(this._farTreeGeometry, this._farTreeMaterial, farData, (dummy, item) => {
-      dummy.position.set(item.x, item.y, item.z);
-      dummy.rotation.set(0, item.rotation, 0);
-      dummy.scale.set(item.scale, item.scale, item.scale);
-    }, false);
-    if (farTrees) {
-      farTrees.name = "FarTrees";
-      instancedMeshes.push(farTrees);
-    }
-
-    const farRocks = this._makeInstances(this._farRockGeometry, this._farRockMaterial, rockData, (dummy, item) => {
-      dummy.position.set(item.x, item.y, item.z);
-      dummy.rotation.set(0, item.rotation, 0);
-      dummy.scale.set(item.scale, item.scale, item.scale);
-    }, false);
-    if (farRocks) {
-      farRocks.name = "FarRocks";
-      instancedMeshes.push(farRocks);
-    }
+    // Registra o conjunto de LODs de um tipo de objeto. O nível 0 é o "mesh principal" (colheita, raycast, decay);
+    // os demais compartilham o MESMO buffer de matrizes, então colher/respawnar um item atualiza todos os níveis.
+    const register = (meshes, name, userData = null, castShadowLods = 0) => {
+      if (!meshes) return null;
+      for (let l = 0; l < meshes.length; l++) {
+        const m = meshes[l];
+        if (!m) continue;
+        m.name = l === 0 ? name : name + "LOD" + l;
+        if (l === 0 && userData) m.userData = userData;
+        m.castShadow = l < castShadowLods;
+        lodMeshes[l].push(m);
+        instancedMeshes.push(m);
+        if (m.castShadow) shadowMeshes.push(m);
+      }
+      return meshes[0];
+    };
 
     for (const [kind, data] of Object.entries(speciesData)) {
       const species = this.treeKit.species[kind];
-      const mesh = this._makeInstances(species.geometry, species.material, data, (dummy, item) => {
+      const meshes = this._makeLodSet(species.lods, data, (dummy, item) => {
         dummy.position.set(item.x, item.y, item.z);
         dummy.rotation.set(0, item.rotation, 0);
         dummy.scale.set(item.scale, item.scale, item.scale);
-      }, kind !== "bush");
-      if (!mesh) continue;
-      mesh.name = "Trees";
-      mesh.userData = {
+      }, (i, color) => color.setScalar(data[i].tint));
+      register(meshes, "Trees", {
         isResourceMesh: true,
         resourceType: "WOOD",
         species: kind,
         items: data,
-        farMesh: farTrees,
+        farMesh: null,
         harvested: new Map(),
-      };
-      for (let i = 0; i < data.length; i++) {
-        _tintColor.setScalar(data[i].tint);
-        mesh.setColorAt(i, _tintColor);
-      }
-      mesh.instanceColor.needsUpdate = true;
-      treeMeshes.push(mesh);
-      instancedMeshes.push(mesh);
+      }, kind === "bush" ? 0 : 2);
     }
 
-    const rocks = this._makeInstances(this._rockGeometry, this._rockMaterial, rockData, (dummy, item) => {
+    register(this._makeLodSet(this._rockLods, rockData, (dummy, item) => {
       dummy.position.set(item.x, item.y + item.scale * 0.22, item.z);
       dummy.rotation.set(item.rotation * 0.4, item.rotation, item.rotation * 0.7);
       dummy.scale.set(item.scale, item.scale * (0.72 + item.scale * 0.12), item.scale * 0.86);
-    }, false);
-    if (rocks) {
-      rocks.name = "Rocks";
-      rocks.userData = {
-        isResourceMesh: true,
-        resourceType: "STONE",
-        items: rockData,
-        harvested: new Map(),
-      };
-      instancedMeshes.push(rocks);
-    }
+    }), "Rocks", { isResourceMesh: true, resourceType: "STONE", items: rockData, harvested: new Map() });
 
-    const clays = this._makeInstances(this._clayGeometry, this._clayMaterial, clayData, (dummy, item) => {
+    register(this._makeLodSet(this._clayLods, clayData, (dummy, item) => {
       dummy.position.set(item.x, item.y + item.scale * 0.15, item.z);
       dummy.rotation.set(item.rotation * 0.3, item.rotation, item.rotation * 0.5);
       dummy.scale.set(item.scale * 1.15, item.scale * 0.65, item.scale * 1.05);
-    }, false);
-    if (clays) {
-      clays.name = "Clay";
-      clays.userData = {
-        isResourceMesh: true,
-        resourceType: "CLAY",
-        items: clayData,
-        harvested: new Map(),
-      };
-      instancedMeshes.push(clays);
-    }
+    }), "Clay", { isResourceMesh: true, resourceType: "CLAY", items: clayData, harvested: new Map() });
 
-    const grass = this._makeInstances(this.treeKit.grass.geometry, this.treeKit.grass.material, grassData, (dummy, item) => {
+    register(this._makeLodSet(this._grassLods, grassData, (dummy, item) => {
       dummy.position.set(item.x, item.y, item.z);
       dummy.rotation.set(0, item.rotation, 0);
       dummy.scale.set(item.scale, item.scale * (0.85 + (item.tint - 0.86) * 0.8), item.scale);
-    }, false);
-    if (grass) {
-      for (let i = 0; i < grassData.length; i++) {
-        _tintColor.setScalar(grassData[i].tint);
-        grass.setColorAt(i, _tintColor);
+    }, (i, color) => color.setScalar(grassData[i].tint)), "Grass");
+
+    return { lodMeshes, colliders, shadowMeshes, instancedMeshes };
+  }
+
+  /**
+   * Cria um InstancedMesh por nível de LOD, todos compartilhando o mesmo instanceMatrix/instanceColor
+   * (uma única cópia dos dados por objeto, não seis).
+   */
+  _makeLodSet(levels, data, setTransform, tintFn = null) {
+    if (data.length === 0) return null;
+    const meshes = new Array(levels.length).fill(null);
+    let base = null;
+    for (let lod = 0; lod < levels.length; lod++) {
+      const def = levels[lod];
+      if (!def || !def.geometry) continue;
+      let mesh;
+      if (!base) {
+        mesh = this._makeInstances(def.geometry, def.material, data, setTransform, false);
+        if (tintFn) {
+          for (let i = 0; i < data.length; i++) {
+            tintFn(i, _tintColor);
+            mesh.setColorAt(i, _tintColor);
+          }
+          mesh.instanceColor.needsUpdate = true;
+        }
+        base = mesh;
+      } else {
+        if (!def.geometry.boundingSphere) {
+          def.geometry.computeBoundingBox();
+          def.geometry.computeBoundingSphere();
+        }
+        mesh = new THREE.InstancedMesh(def.geometry, def.material, data.length);
+        mesh.instanceMatrix = base.instanceMatrix;
+        if (base.instanceColor) mesh.instanceColor = base.instanceColor;
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        mesh.frustumCulled = true;
+        mesh.matrixAutoUpdate = false;
+        mesh.computeBoundingBox();
+        mesh.computeBoundingSphere();
       }
-      grass.instanceColor.needsUpdate = true;
-      instancedMeshes.push(grass);
+      meshes[lod] = mesh;
     }
-
-    for (let i = 0; i < treeMeshes.length; i++) nearMeshes.push(treeMeshes[i]);
-    if (rocks) nearMeshes.push(rocks);
-    if (clays) nearMeshes.push(clays);
-    if (grass) nearMeshes.push(grass);
-    if (farTrees) farMeshes.push(farTrees);
-    if (farRocks) farMeshes.push(farRocks);
-
-    const shadowMeshes = [];
-    for (let i = 0; i < treeMeshes.length; i++) {
-      if (treeMeshes[i].castShadow) shadowMeshes.push(treeMeshes[i]);
-    }
-    return { nearMeshes, farMeshes, colliders, shadowMeshes, instancedMeshes };
+    return meshes;
   }
 
   _makeInstances(geometry, material, data, setTransform, castShadow) {

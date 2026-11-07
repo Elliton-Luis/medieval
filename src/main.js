@@ -215,16 +215,16 @@ scene.add(hemisphere);
 const sun = new THREE.DirectionalLight("#ffe1ae", 1.5);
 sun.position.set(35, 65, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(512, 512); // Otimizado: 512x512 reduz fillrate em 75%
-const SHADOW_BOUNDS = 28; // Frustum culling ortográfico de 28m concentrado onde importa
+sun.shadow.mapSize.set(1024, 1024);
+const SHADOW_BOUNDS = 34; // ~0,07m por texel; só LOD 0 e 1 projetam sombra, então o custo de geometria continua baixo
 sun.shadow.camera.left = -SHADOW_BOUNDS;
 sun.shadow.camera.right = SHADOW_BOUNDS;
 sun.shadow.camera.top = SHADOW_BOUNDS;
 sun.shadow.camera.bottom = -SHADOW_BOUNDS;
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 80;
-sun.shadow.bias = -0.0006;
-sun.shadow.normalBias = 0.04;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.07; // empurra o teste de profundidade ao longo da normal: elimina acne/listras no terreno
 scene.add(sun);
 scene.add(sun.target);
 
