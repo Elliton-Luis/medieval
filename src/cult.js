@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { igniteTarget, spawnLoot, PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 import { VILLAGES } from "./kingdom.js";
+import { finalizeMonster } from "./monsterParts.js";
 
 // ============================================================================
 // 1. Materiais e Geometrias Otimizadas do Culto dos Cátaros (Zero-GC)
@@ -944,7 +945,9 @@ export function buildCultistMesh() {
   model.add(daggerGroup);
 
   root.visible = false;
-  return { root, model, robe, armL, armR, torchGroup, torchLight: null };
+  const _parts = { root, model, robe, armL, armR, torchGroup, torchLight: null };
+  finalizeMonster(root, _parts); // funde peças estáticas do manto/ombreiras (menos draw calls)
+  return _parts;
 }
 
 // ============================================================================
@@ -1567,7 +1570,9 @@ export function buildCultLeaderMesh() {
   model.add(daggerGroup);
 
   root.visible = false;
-  return { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight: null };
+  const _leaderParts = { root, model, armL, armR, staffGroup, staffGem, staffLight, eyeLight: null };
+  finalizeMonster(root, _leaderParts);
+  return _leaderParts;
 }
 
 export class CultLeader {

@@ -3,6 +3,7 @@ import { createSeededRandom } from "./procedural.js";
 import { PlayerInventory, PlayerStats } from "./rpg.js";
 import { createIrregularBloodGeometry } from "./farmAnimals.js";
 import { addCityBeacon } from "./beacons.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 // ============================================================================
 // Cidades Fantasma Procedurais: Ruínas de Guerra, Escombros e Sangue Seco
@@ -310,7 +311,189 @@ function buildHereticBloodEyeMesh(mats, size = 1.35) {
  * Constrói uma casa medieval arruinada: vazia, sem tochas, com telhado partido,
  * vigas queimadas expostas, flechas cravadas e marcas de sangue.
  */
-function buildRuinedHouseMesh(mats, random, isDestroyed = false, hasBloodEye = false) {
+// ----------------------------------------------------------------------------
+// Detalhes de ruína (mesclados por material: poucos draw calls) e marcador de item coletável
+// ----------------------------------------------------------------------------
+let _detailId = 0;
+const _detailMats = {};
+function getDetailMats() {
+  if (_detailMats.soot) return _detailMats;
+  _detailMats.soot = new THREE.MeshBasicMaterial({ color: 0x050403, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  _detailMats.web = new THREE.MeshBasicMaterial({ color: 0xd8d8d0, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+  _detailMats.puddle = new THREE.MeshStandardMaterial({ color: 0x07090b, roughness: 0.12, metalness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  _detailMats.weed = new THREE.MeshStandardMaterial({ color: 0x59532a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+  _detailMats.wax = new THREE.MeshStandardMaterial({ color: 0xb8ab8a, roughness: 0.9, flatShading: true });
+  _detailMats.cloth = new THREE.MeshStandardMaterial({ color: 0x4a2a2a, roughness: 1, flatShading: true });
+  // marcador: material compartilhado entre todas as casas (animado uma vez por frame)
+  _detailMats.glowGold = new THREE.MeshBasicMaterial({ color: 0xffc95a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  _detailMats.glowPale = new THREE.MeshBasicMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  _detailMats.page = new THREE.MeshBasicMaterial({ color: 0xf2e4b2, side: THREE.DoubleSide });
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.3, "rgba(255,255,255,0.35)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  _detailMats.spriteGold = new THREE.SpriteMaterial({ map: tex, color: 0xffd070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 });
+  _detailMats.spritePale = new THREE.SpriteMaterial({ map: tex, color: 0xa8bce0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 });
+  return _detailMats;
+}
+
+function _ni(geometry, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const g = geometry.index ? geometry.toNonIndexed() : geometry;
+  if (g !== geometry) geometry.dispose();
+  g.rotateX(rx);
+  g.rotateY(ry);
+  g.rotateZ(rz);
+  g.translate(x, y, z);
+  for (const k of Object.keys(g.attributes)) if (k !== "position" && k !== "normal" && k !== "uv") g.deleteAttribute(k);
+  return g;
+}
+
+function _addMerged(group, geos, material, castShadow = false) {
+  if (geos.length === 0) return null;
+  const merged = mergeGeometries(geos, false);
+  for (const g of geos) g.dispose();
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = false;
+  group.add(mesh);
+  return mesh;
+}
+
+/** Móveis tombados, escombros, teias, ervas daninhas, poças, velas e marcas de fuligem. Só visual (sem colisão). */
+function buildRuinDetails(mats, w, d, h, isDestroyed) {
+  const dm = getDetailMats();
+  let seed = (++_detailId * 2654435761) >>> 0;
+  const rnd = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const group = new THREE.Group();
+  group.name = "RuinDetails";
+  const wood = [];
+  const stone = [];
+  const soot = [];
+  const web = [];
+  const puddle = [];
+  const weed = [];
+  const wax = [];
+  const cloth = [];
+  const FY = 0.45; // topo do piso interno
+
+  // mesa tombada: tampo inclinado + pernas quebradas
+  wood.push(_ni(new THREE.BoxGeometry(1.1, 0.07, 0.65), 0.9, FY + 0.32, 0.45, 0.1, 0.4, 1.05));
+  wood.push(_ni(new THREE.BoxGeometry(0.07, 0.55, 0.07), 1.35, FY + 0.2, 0.15, 0.2, 0, 0.5));
+  wood.push(_ni(new THREE.BoxGeometry(0.07, 0.4, 0.07), 0.45, FY + 0.12, 0.7, 1.3, 0.3, 0));
+  // cadeira caída
+  wood.push(_ni(new THREE.BoxGeometry(0.4, 0.05, 0.4), -0.5, FY + 0.18, 1.1, 0.2, 0.5, 1.2));
+  wood.push(_ni(new THREE.BoxGeometry(0.4, 0.5, 0.05), -0.78, FY + 0.12, 1.0, 0.1, 0.5, 1.5));
+  // tábua da porta arrombada encostada no batente
+  wood.push(_ni(new THREE.BoxGeometry(0.9, 1.9, 0.06), 0.55, FY + 0.9, d / 2 - 0.15, 0.12, 0.2, 0.18));
+  // venezianas penduradas em dobradiças tortas
+  for (const sx of [-1, 1]) {
+    wood.push(_ni(new THREE.BoxGeometry(0.06, 0.8, 0.5), sx * (w / 2 + 0.08), 1.9, -0.5 + sx * 0.4, 0, 0, sx * 0.25 * (rnd() < 0.5 ? 1 : -1)));
+  }
+  // vigas de piso quebradas e cinzeiro de brasas
+  for (let i = 0; i < 3; i++) {
+    wood.push(_ni(new THREE.BoxGeometry(0.14, 0.12, 1.1 + rnd() * 0.9), (rnd() - 0.5) * (w - 1), FY + 0.1, (rnd() - 0.5) * (d - 1), (rnd() - 0.5) * 0.3, rnd() * 3, (rnd() - 0.5) * 0.3));
+  }
+  // montes de entulho e pedras no interior e junto às paredes
+  const rubbleCount = isDestroyed ? 14 : 8;
+  for (let i = 0; i < rubbleCount; i++) {
+    const side = rnd() < 0.5 ? -1 : 1;
+    const x = isDestroyed ? (rnd() - 0.5) * (w + 1.4) : side * (w / 2 - 0.2 + rnd() * 0.9);
+    const z = (rnd() - 0.5) * (d + 0.8);
+    const sz = 0.14 + rnd() * 0.3;
+    stone.push(_ni(new THREE.DodecahedronGeometry(sz, 0), x, FY * 0.4 + sz * 0.4, z, rnd() * 3, rnd() * 3, rnd() * 3));
+  }
+  // marcas de queimado: manchas escuras no piso e subindo pelas paredes
+  for (let i = 0; i < 4; i++) {
+    const x = (rnd() - 0.5) * (w - 1);
+    const z = (rnd() - 0.5) * (d - 1);
+    soot.push(_ni(new THREE.CircleGeometry(0.5 + rnd() * 0.7, 9), x, FY + 0.012, z, -Math.PI / 2));
+  }
+  soot.push(_ni(new THREE.PlaneGeometry(1.6, 1.9), -w / 2 + 0.14, 1.9, 0.3 + rnd(), 0, Math.PI / 2));
+  soot.push(_ni(new THREE.PlaneGeometry(2.0, 1.5), 0.5, 2.2, -d / 2 + 0.14, 0, 0));
+  soot.push(_ni(new THREE.PlaneGeometry(1.2, 1.4), w / 2 + 0.14, 1.6, -0.6, 0, Math.PI / 2));
+  // teias nos cantos (triângulos translúcidos)
+  const cob = new THREE.BufferGeometry();
+  cob.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0, 0, 0, 0.7, 0, 0, 0, -0.7, 0, 0, 0, 0, 0, -0.7, 0, 0.5, -0.5, 0]), 3));
+  cob.computeVertexNormals();
+  const cobUv = new Float32Array(12);
+  cob.setAttribute("uv", new THREE.BufferAttribute(cobUv, 2));
+  const webSpots = [
+    [-w / 2 + 0.2, h + 0.35, -d / 2 + 0.2, 0.8],
+    [w / 2 - 0.2, h + 0.35, -d / 2 + 0.2, -0.8],
+    [-w / 2 + 0.2, h + 0.35, d / 2 - 0.2, 2.4],
+  ];
+  for (const [x, y, z, ry] of webSpots) web.push(_ni(cob.clone(), x, y, z, 0, ry, 0));
+  cob.dispose();
+  // poças escuras (água parada / piche) e ervas daninhas ao redor da casa
+  puddle.push(_ni(new THREE.CircleGeometry(0.55 + rnd() * 0.3, 10), 0.8, 0.5, d / 2 + 0.7, -Math.PI / 2));
+  puddle.push(_ni(new THREE.CircleGeometry(0.35, 9), -w / 2 - 0.5, 0.52, 0.8, -Math.PI / 2));
+  const weeds = 16;
+  for (let i = 0; i < weeds; i++) {
+    const a = rnd() * Math.PI * 2;
+    const rr = 0.78 + rnd() * 0.3;
+    const x = Math.cos(a) * (w / 2 + 0.6) * rr;
+    const z = Math.sin(a) * (d / 2 + 0.6) * rr;
+    const hgt = 0.35 + rnd() * 0.55;
+    weed.push(_ni(new THREE.ConeGeometry(0.06, hgt, 3, 1, true), x, 0.35 + hgt / 2, z, (rnd() - 0.5) * 0.5, rnd() * 3, (rnd() - 0.5) * 0.5));
+  }
+  // tocos de vela derretidos sobre a mesa e no chão
+  for (const [x, z] of [[1.2, 0.35], [-1.9, 0.9], [-0.2, -1.5]]) {
+    wax.push(_ni(new THREE.CylinderGeometry(0.035, 0.045, 0.1 + rnd() * 0.08, 6), x, FY + 0.06, z));
+    wax.push(_ni(new THREE.CylinderGeometry(0.09, 0.1, 0.02, 7), x, FY + 0.012, z));
+  }
+  // trapos de roupa jogados
+  cloth.push(_ni(new THREE.PlaneGeometry(0.55, 0.4), 1.7, FY + 0.03, -1.3, -Math.PI / 2, rnd() * 3, 0));
+  cloth.push(_ni(new THREE.PlaneGeometry(0.4, 0.5), -1.6, FY + 0.03, 1.5, -Math.PI / 2, rnd() * 3, 0));
+
+  _addMerged(group, wood, mats.timberBurned, true);
+  _addMerged(group, stone, mats.stoneDark, false);
+  _addMerged(group, soot, dm.soot);
+  _addMerged(group, web, dm.web);
+  _addMerged(group, puddle, dm.puddle);
+  _addMerged(group, weed, dm.weed);
+  _addMerged(group, wax, dm.wax);
+  _addMerged(group, cloth, dm.cloth);
+  return group;
+}
+
+/**
+ * Marcador de item coletável: sprite pulsante + feixe fino + folha flutuante. Zero PointLights.
+ * Material e textura compartilhados entre todas as casas.
+ */
+function buildPageMarker(hasPage) {
+  const dm = getDetailMats();
+  const group = new THREE.Group();
+  group.name = "PageMarker";
+  const glow = new THREE.Sprite(hasPage ? dm.spriteGold : dm.spritePale);
+  glow.scale.set(1.5, 1.5, 1);
+  glow.position.y = 0.55;
+  group.add(glow);
+  // feixe de luz que atravessa o telhado e se vê de longe
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.2, hasPage ? 5.4 : 3.2, 8, 1, true), hasPage ? dm.glowGold : dm.glowPale);
+  beam.position.y = (hasPage ? 5.4 : 3.2) / 2;
+  beam.renderOrder = 3;
+  group.add(beam);
+  let page = null;
+  if (hasPage) {
+    page = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.34), dm.page);
+    page.position.y = 0.95;
+    page.rotation.x = -0.25;
+    group.add(page);
+  }
+  group.userData = { glow, page, beam, hasPage, baseY: 0.95 };
+  return group;
+}
+
+function buildRuinedHouseMesh(mats, random, isDestroyed = false, hasBloodEye = false, hasPage = true) {
   const group = new THREE.Group();
   group.name = isDestroyed ? "DestroyedHouseRuin" : "AbandonedHouse";
 
@@ -322,8 +505,8 @@ function buildRuinedHouseMesh(mats, random, isDestroyed = false, hasBloodEye = f
   const foundationDepth = 2.4;
   const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.45, foundationDepth, d + 0.45), mats.stoneDark);
   found.position.y = -foundationDepth * 0.5 + 0.35;
-  found.castShadow = true;
-  found.receiveShadow = true;
+  found.castShadow = false; // fundação rente ao solo: sem sombra do chão sobre o chão
+  found.receiveShadow = false;
   group.add(found);
 
   // Piso interno de madeira carcomida / fuligem
@@ -459,7 +642,14 @@ function buildRuinedHouseMesh(mats, random, isDestroyed = false, hasBloodEye = f
   chestGroup.position.set(-w * 0.26, 0.38, -d * 0.22);
   group.add(chestGroup);
 
+  // Detalhes de ruína (mesclados) e marcador do item a ser pego, sobre o baú
+  group.add(buildRuinDetails(mats, w, d, h, isDestroyed));
+  const marker = buildPageMarker(hasPage);
+  marker.position.set(-w * 0.26, 0.85, -d * 0.22);
+  group.add(marker);
+
   group.userData = {
+    marker,
     isGhostHouse: true,
     isDestroyed,
     hasBloodEye,
@@ -618,7 +808,9 @@ export function generateGhostTown(townConfig, scene, world) {
     const by = world ? world.heightAt(bx, bz) : centerY;
     const isDestroyed = random() < 0.42; // ~42% das casas estão completamente arruinadas
     const hasBloodEye = (h === 0); // Casa de destaque porta a Marca Herética do Olho Sangrento do Demiurgo
-    const house = buildRuinedHouseMesh(mats, random, isDestroyed, hasBloodEye);
+    // 80% das casas guardam uma página; a casa do Olho de Sangue sempre (hash estável: não altera a sequência aleatória do layout)
+    const hasPage = hasBloodEye || ((seed * 31 + h * 17) >>> 0) % 10 < 8;
+    const house = buildRuinedHouseMesh(mats, random, isDestroyed, hasBloodEye, hasPage);
 
     const houseYaw = random() * Math.PI * 2;
     house.position.set(bx, by, bz);
@@ -704,6 +896,8 @@ export function generateGhostTown(townConfig, scene, world) {
       z: bz,
       hasBloodEye,
       isDestroyed,
+      hasPage,
+      marker: house.userData.marker,
       looted: false,
     };
     ActiveGhostHouses.push(houseLoot);
@@ -751,6 +945,116 @@ export function generateGhostTown(townConfig, scene, world) {
     }
   }
 
+
+  // --------------------------------------------------------------------------
+  // 4. Mobiliário de rua arruinado (mesclado por material): carroças quebradas, poço seco,
+  //    cercas caídas e postes de tocha apagados.
+  // --------------------------------------------------------------------------
+  {
+    let rs = (seed * 2246822519) >>> 0;
+    const rr = () => {
+      rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0;
+      return rs / 4294967296;
+    };
+    const woodG = [];
+    const stoneG = [];
+    const ironG = [];
+    const dmats = getDetailMats();
+    const clear = (x, z, r) => placedBounds.every((pb) => (x - pb.x) ** 2 + (z - pb.z) ** 2 > (pb.r + r) ** 2);
+    const ground = (x, z) => (world ? world.heightAt(x, z) : centerY);
+
+    // poço seco no centro (com colisor)
+    {
+      const wx = cx + 3.4;
+      const wz = cz + 2.6;
+      const wy = ground(wx, wz);
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2;
+        stoneG.push(_ni(new THREE.BoxGeometry(0.5, 0.85, 0.38), wx + Math.cos(a) * 0.95, wy + 0.4, wz + Math.sin(a) * 0.95, 0, -a + Math.PI / 2, 0));
+      }
+      woodG.push(_ni(new THREE.BoxGeometry(0.14, 2.1, 0.14), wx - 1.0, wy + 1.0, wz, 0, 0, 0.05));
+      woodG.push(_ni(new THREE.BoxGeometry(0.14, 1.7, 0.14), wx + 1.0, wy + 0.8, wz, 0, 0, -0.18));
+      woodG.push(_ni(new THREE.BoxGeometry(2.3, 0.1, 0.1), wx - 0.1, wy + 1.95, wz, 0, 0, 0.1));
+      if (world?.addStaticCollider) world.addStaticCollider(wx, wz, 1.25, 1.2);
+      placedBounds.push({ x: wx, z: wz, r: 1.6 });
+    }
+
+    // carroças quebradas (roda solta, eixo partido, caixa tombada)
+    const carts = 3;
+    for (let c = 0; c < carts; c++) {
+      let placed = false;
+      for (let t = 0; t < 12 && !placed; t++) {
+        const a = rr() * Math.PI * 2;
+        const dist = 12 + rr() * (radius - 22);
+        const x = cx + Math.cos(a) * dist;
+        const z = cz + Math.sin(a) * dist;
+        if (!clear(x, z, 3.2)) continue;
+        placed = true;
+        placedBounds.push({ x, z, r: 2.4 });
+        const y = ground(x, z);
+        const yaw = rr() * Math.PI;
+        const cs = Math.cos(yaw);
+        const sn = Math.sin(yaw);
+        const P = (lx, ly, lz) => [x + lx * cs + lz * sn, y + ly, z - lx * sn + lz * cs];
+        let q = P(0, 0.62, 0);
+        woodG.push(_ni(new THREE.BoxGeometry(1.5, 0.12, 2.5), q[0], q[1], q[2], 0.1, yaw, 0.28));
+        for (const sx of [-1, 1]) {
+          q = P(sx * 0.78, 0.95, 0.1);
+          woodG.push(_ni(new THREE.BoxGeometry(0.08, 0.5, 2.3), q[0], q[1], q[2], 0.1, yaw, 0.28));
+        }
+        q = P(1.15, 0.5, -0.9);
+        const wheel = _ni(new THREE.TorusGeometry(0.5, 0.07, 5, 12), q[0], q[1], q[2], 0, yaw + Math.PI / 2, 0);
+        woodG.push(wheel);
+        q = P(-1.6, 0.18, 0.6);
+        woodG.push(_ni(new THREE.TorusGeometry(0.5, 0.07, 5, 12), q[0], q[1], q[2], Math.PI / 2 - 0.2, yaw, 0.1)); // roda caída
+        q = P(0, 0.2, 1.6);
+        woodG.push(_ni(new THREE.BoxGeometry(0.1, 0.1, 1.8), q[0], q[1], q[2], 0.2, yaw + 1.1, 0)); // timão quebrado
+        q = P(-0.3, 0.55, -0.1);
+        ironG.push(_ni(new THREE.BoxGeometry(0.5, 0.35, 0.5), q[0], q[1], q[2], 0.3, yaw, 0.2)); // caixa de mercadoria
+      }
+    }
+
+    // trechos de cerca caídos, formando arcos ao redor das casas
+    const fences = 9;
+    for (let f = 0; f < fences; f++) {
+      const a = rr() * Math.PI * 2;
+      const dist = 8 + rr() * (radius - 14);
+      const x = cx + Math.cos(a) * dist;
+      const z = cz + Math.sin(a) * dist;
+      if (!clear(x, z, 2.4)) continue;
+      const y = ground(x, z);
+      const yaw = rr() * Math.PI;
+      for (let k = 0; k < 4; k++) {
+        const lx = (k - 1.5) * 0.85;
+        const fall = k % 2 ? 0.2 : 1.2 + rr() * 0.4;
+        const px = x + Math.cos(yaw) * lx;
+        const pz = z - Math.sin(yaw) * lx;
+        woodG.push(_ni(new THREE.BoxGeometry(0.1, 1.1, 0.1), px, y + 0.45, pz, fall, yaw, (rr() - 0.5) * 0.4));
+      }
+      woodG.push(_ni(new THREE.BoxGeometry(3.4, 0.08, 0.06), x, y + 0.32, z, 0.1, yaw, 0.07));
+      woodG.push(_ni(new THREE.BoxGeometry(2.2, 0.08, 0.06), x + 0.6, y + 0.08, z + 0.4, 0, yaw + 0.3, 0.02));
+    }
+
+    // postes de tocha apagados com restos de piche
+    for (let t = 0; t < 6; t++) {
+      const a = (t / 6) * Math.PI * 2 + rr() * 0.4;
+      const dist = 7 + rr() * 6;
+      const x = cx + Math.cos(a) * dist;
+      const z = cz + Math.sin(a) * dist;
+      if (!clear(x, z, 1.2)) continue;
+      const y = ground(x, z);
+      woodG.push(_ni(new THREE.CylinderGeometry(0.06, 0.08, 2.3, 5), x, y + 1.05, z, 0.05, 0, (rr() - 0.5) * 0.3));
+      ironG.push(_ni(new THREE.CylinderGeometry(0.13, 0.08, 0.28, 6), x, y + 2.25, z));
+    }
+
+    const props = new THREE.Group();
+    props.name = "GhostTownStreetProps";
+    _addMerged(props, woodG, mats.timberBurned, true);
+    _addMerged(props, stoneG, mats.stone, true);
+    _addMerged(props, ironG, mats.rustedIron, false);
+    townRoot.add(props);
+  }
+
   scene.add(townRoot);
 
   const townData = {
@@ -790,8 +1094,42 @@ let _atmosphereTimer = 0;
  * Atualiza checagem de proximidade e atmosfera de Cidades Fantasma para o jogador.
  * Otimizado com throttle de 0.25s para aliviar o loop de renderização a 60 FPS.
  */
+let _markerClock = 0;
+const _markerWorld = new THREE.Vector3();
+function _animateHouseMarkers(playerPos, dt) {
+  if (ActiveGhostHouses.length === 0) return;
+  _markerClock += dt;
+  const dm = getDetailMats();
+  // pulso único nos materiais compartilhados
+  const pulse = 0.5 + 0.5 * Math.sin(_markerClock * 2.6);
+  dm.glowGold.opacity = 0.18 + pulse * 0.22;
+  dm.glowPale.opacity = 0.1 + pulse * 0.14;
+  dm.spriteGold.opacity = 0.55 + pulse * 0.4;
+  dm.spritePale.opacity = 0.4 + pulse * 0.3;
+  const px = playerPos?.x ?? 0;
+  const pz = playerPos?.z ?? 0;
+  for (let i = 0; i < ActiveGhostHouses.length; i++) {
+    const gh = ActiveGhostHouses[i];
+    const m = gh.marker;
+    if (!m) continue;
+    m.visible = !gh.looted;
+    if (gh.looted) continue;
+    const dSq = (px - gh.x) ** 2 + (pz - gh.z) ** 2;
+    if (dSq > 90 * 90) continue; // longe demais: não anima
+    const ud = m.userData;
+    if (ud.page) {
+      ud.page.position.y = ud.baseY + Math.sin(_markerClock * 1.8 + i) * 0.07;
+      ud.page.rotation.y = _markerClock * 1.1 + i;
+    }
+    const s = 1.35 + pulse * 0.35;
+    ud.glow.scale.set(s, s, 1);
+  }
+}
+
 export function updateGhostTownAtmosphere(playerPos, ui, dt = 0.5) {
   if (!playerPos || ActiveGhostTowns.length === 0) return;
+
+  _animateHouseMarkers(playerPos, dt);
 
   _atmosphereTimer += dt;
   if (_atmosphereTimer < 0.25) return;
@@ -902,7 +1240,8 @@ export function lootGhostTownHouse(houseLoot, ui, audio, weapons = null) {
 
   // 1. Chance alta de página / fragmento avulso
   let lootedItemText = "";
-  if (missingPages.length > 0 && Math.random() < 0.65) {
+  if (houseLoot.marker) houseLoot.marker.visible = false;
+  if (missingPages.length > 0 && houseLoot.hasPage !== false) {
     const gainedPage = missingPages[Math.floor(Math.random() * missingPages.length)];
     PlayerInventory.discoveredBookPages.push(gainedPage);
     const pageTitle = gainedPage === 21 ? "O Sacrifício Final" : `Página ${gainedPage}`;

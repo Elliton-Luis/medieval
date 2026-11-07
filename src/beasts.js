@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addDetail, finalizeMonster } from "./monsterParts.js";
 import { spawnLoot, addGood, PlayerInventory, PlayerStats } from "./rpg.js";
 import { WorldDecay } from "./decay.js";
 
@@ -410,8 +411,68 @@ export class Gulur {
       kneeGroup.add(lower);
 
       this.legs.push({ legRoot, kneeGroup, upper, lower });
+
+      // Garras/esporões no fim de cada perna (animam junto com o joelho) e tufo de ossos no calcanhar
+      addDetail(kneeGroup, [
+        { t: "cone", a: [0.07, 0.55, 4], p: [0, -8.3, -0.28], r: [-1.9, 0, 0], c: 0xd0c4a4 },
+        { t: "cone", a: [0.06, 0.5, 4], p: [-0.16, -8.3, -0.22], r: [-1.8, 0.35, 0], c: 0xcabd9c },
+        { t: "cone", a: [0.06, 0.5, 4], p: [0.16, -8.3, -0.22], r: [-1.8, -0.35, 0], c: 0xcabd9c },
+        { t: "cone", a: [0.05, 0.4, 4], p: [0, -8.25, 0.22], r: [1.9, 0, 0], c: 0xb8ab8a },
+        { t: "sph", a: [0.12, 5, 4], p: [0, -8.15, 0], s: [1, 0.6, 1.2], c: 0x2a2630 },
+        { t: "cone", a: [0.05, 0.45, 4], p: [0, -4.3, 0.12], r: [0.5, 0, 0], c: 0xc6baa0 },
+      ], "GulurClaws");
     }
 
+    // Detalhes do tronco (uma malha só): costelas à mostra, quadril pontudo, cauda óssea, feridas
+    {
+      const d = [];
+      for (let i = 0; i < 7; i++) {
+        const z = -1.5 + i * 0.5;
+        for (const side of [-1, 1]) {
+          d.push({ t: "box", a: [0.07, 1.0 - Math.abs(i - 3) * 0.08, 0.13], p: [side * 0.74, -0.15, z], r: [0, 0, -side * 0.28], c: 0xcdc1a2, ao: 0.45 });
+        }
+      }
+      // vértebras proeminentes no dorso (assimétricas)
+      for (let i = 0; i < 9; i++) {
+        d.push({ t: "cone", a: [0.09 + (i % 3) * 0.02, 0.5 + ((i * 7) % 5) * 0.08, 4], p: [((i % 2) - 0.5) * 0.12, 0.8, -1.5 + i * 0.4], r: [0.35, 0, ((i % 2) - 0.5) * 0.4], c: 0xd8ccae });
+      }
+      // ossos do quadril
+      for (const side of [-1, 1]) {
+        d.push({ t: "cone", a: [0.14, 0.75, 4], p: [side * 0.62, 0.78, 1.7], r: [0.2, 0, -side * 0.35], c: 0xcabd9c });
+      }
+      // cauda: segmentos que afinam, com espinhos
+      for (let i = 0; i < 5; i++) {
+        const r0 = 0.2 - i * 0.032;
+        d.push({ t: "cyl", a: [r0 * 0.8, r0, 0.62, 5], p: [0, 0.15 - i * 0.2, 2.2 + i * 0.55], r: [Math.PI / 2 - 0.3, 0, 0], c: 0x211f27 });
+        d.push({ t: "cone", a: [0.05, 0.3, 4], p: [0, 0.38 - i * 0.2, 2.2 + i * 0.55], r: [0.3, 0, 0], c: 0xcabd9c });
+      }
+      d.push({ t: "cone", a: [0.09, 0.55, 4], p: [0, -0.95, 5.0], r: [Math.PI / 2 + 0.7, 0, 0], c: 0xd0c4a4 });
+      // feridas abertas / sangue escorrido nos flancos
+      for (const side of [-1, 1]) {
+        d.push({ t: "box", a: [0.05, 0.5, 0.8], p: [side * 0.71, -0.05, -0.55 + side * 0.4], c: 0x5c0a10, ao: 1 });
+        d.push({ t: "box", a: [0.05, 0.9, 0.12], p: [side * 0.72, -0.75, -0.3 + side * 0.4], c: 0x430609, ao: 1 });
+      }
+      addDetail(this.bodyGroup, d, "GulurTorsoDetail");
+
+      // Cabeça: fileira de dentes, presas, saliência óssea e baba sangrenta
+      const h = [];
+      for (let i = 0; i < 6; i++) {
+        for (const side of [-1, 1]) {
+          h.push({ t: "cone", a: [0.03, 0.15 + (i % 2) * 0.06, 4], p: [side * 0.21, 0.68, -1.3 - i * 0.14], r: [Math.PI, 0, 0], c: 0xf0e8d4, ao: 0.8 });
+          h.push({ t: "cone", a: [0.028, 0.12 + ((i + 1) % 2) * 0.06, 4], p: [side * 0.2, 0.46, -1.3 - i * 0.14], c: 0xe4dcc6, ao: 0.8 });
+        }
+      }
+      for (const side of [-1, 1]) {
+        h.push({ t: "cone", a: [0.06, 0.4, 4], p: [side * 0.24, 0.5, -1.92], r: [Math.PI, 0, 0], c: 0xfff6e0 });
+        h.push({ t: "box", a: [0.1, 0.1, 0.8], p: [side * 0.34, 1.2, -1.0], r: [0.12, 0, 0], c: 0xcabd9c });
+      }
+      h.push({ t: "box", a: [0.05, 0.4, 0.05], p: [0.12, 0.28, -1.75], c: 0x5a0a10, ao: 1 });
+      h.push({ t: "box", a: [0.04, 0.55, 0.04], p: [-0.15, 0.22, -1.7], c: 0x5a0a10, ao: 1 });
+      h.push({ t: "box", a: [0.5, 0.05, 0.5], p: [0, 0.84, -1.55], c: 0x4a0c10, ao: 1 });
+      addDetail(this.neck, h, "GulurHeadDetail");
+    }
+
+    finalizeMonster(this.root, this); // funde partes estáticas (menos draw calls e materiais)
     this.flashMaterials = [];
     this.root.traverse((child) => {
       if (child.isMesh && child.material && child.material.emissive) {
@@ -827,11 +888,60 @@ export class Necron {
     this.model.add(rightLeg);
     this.legs.push(rightLeg);
 
+    // --- Detalhes do Necron (malhas fundidas) ---
+    {
+      const d = [];
+      // coluna vertebral saltada nas costas + omoplatas
+      for (let i = 0; i < 7; i++) {
+        d.push({ t: "cone", a: [0.035, 0.1 + (i % 3) * 0.03, 4], p: [((i % 2) - 0.5) * 0.02, 0.72 + i * 0.1, 0.14 - i * 0.004], r: [Math.PI / 2 - 0.2, 0, 0], c: 0xd6caa8 });
+      }
+      for (const side of [-1, 1]) d.push({ t: "box", a: [0.13, 0.17, 0.03], p: [side * 0.1, 1.2, 0.15], r: [0.1, 0, side * 0.25], c: 0x8c867c });
+      // carne exposta e feridas no peito/abdômen
+      d.push({ t: "box", a: [0.2, 0.2, 0.02], p: [0.05, 1.0, -0.125], r: [-0.22, 0, 0], c: 0x6a1c20, ao: 1 });
+      d.push({ t: "box", a: [0.12, 0.28, 0.02], p: [-0.1, 0.8, -0.13], r: [-0.22, 0, 0.1], c: 0x4a0d12, ao: 1 });
+      // pelve + trapos presos por tiras de pele
+      d.push({ t: "box", a: [0.3, 0.1, 0.2], p: [0, 0.58, 0.04], c: 0x8a8478 });
+      for (let i = 0; i < 4; i++) d.push({ t: "box", a: [0.05, 0.3 + (i % 2) * 0.12, 0.02], p: [(i - 1.5) * 0.09, 0.45, -0.1], r: [0.1, 0, ((i % 2) - 0.5) * 0.2], c: 0x2b221d });
+      addDetail(this.model, d, "NecronBodyDetail");
+
+      // Cabeça: coroa de ossos quebrados, cabelo ralo/pele pendente, baba de sangue
+      const h = [];
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        h.push({ t: "cone", a: [0.03, 0.12 + (i % 3) * 0.07, 4], p: [Math.cos(a) * 0.15, 0.2 + (i % 2) * 0.03, Math.sin(a) * 0.15 - 0.02], r: [Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35], c: 0xcdc1a2 });
+      }
+      for (let i = 0; i < 6; i++) h.push({ t: "box", a: [0.015, 0.28 + (i % 3) * 0.1, 0.015], p: [(i - 2.5) * 0.05, 0.02 - (i % 2) * 0.03, 0.2], c: 0x15110e, ao: 0.9 });
+      for (let i = 0; i < 3; i++) h.push({ t: "box", a: [0.015, 0.22 + i * 0.07, 0.015], p: [(i - 1) * 0.08, -0.22, -0.18], c: 0x5a0a10, ao: 1 });
+      h.push({ t: "box", a: [0.1, 0.02, 0.02], p: [0, -0.1, -0.2], c: 0x5a0a10, ao: 1 });
+      addDetail(this.headGroup, h, "NecronHeadDetail");
+
+      // Braços: cotovelo ósseo e dedos mais longos
+      for (const armGroup of this.arms) {
+        addDetail(armGroup, [
+          { t: "cone", a: [0.045, 0.2, 4], p: [0, -0.34, 0.09], r: [1.2, 0, 0], c: 0xd0c4a4 },
+          { t: "sph", a: [0.07, 5, 4], p: [0, -0.34, 0], c: 0x8a8478 },
+          { t: "cone", a: [0.012, 0.3, 4], p: [-0.05, -0.9, 0.04], r: [Math.PI * 0.88, 0, 0.15], c: 0xd6caa8 },
+          { t: "cone", a: [0.012, 0.3, 4], p: [0.05, -0.9, 0.04], r: [Math.PI * 0.88, 0, -0.15], c: 0xd6caa8 },
+          { t: "box", a: [0.02, 0.2, 0.02], p: [0.04, -0.15, 0.07], c: 0x5a0a10, ao: 1 },
+        ], "NecronArmDetail");
+      }
+      // Pernas: joelho, canela fina e garras no pé
+      for (const leg of this.legs) {
+        addDetail(leg, [
+          { t: "cone", a: [0.05, 0.16, 4], p: [0, 0.02, -0.1], r: [-Math.PI / 2, 0, 0], c: 0xd0c4a4 },
+          { t: "box", a: [0.16, 0.06, 0.26], p: [0, -0.4, -0.06], c: 0x4a4540 },
+          { t: "cone", a: [0.02, 0.14, 4], p: [-0.04, -0.4, -0.2], r: [-Math.PI / 2, 0, 0], c: 0xcabd9c },
+          { t: "cone", a: [0.02, 0.14, 4], p: [0.04, -0.4, -0.2], r: [-Math.PI / 2, 0, 0], c: 0xcabd9c },
+        ], "NecronLegDetail");
+      }
+    }
+
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
     this._groundY = groundY;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    finalizeMonster(this.root, this); // funde partes estáticas (menos draw calls e materiais)
     this.flashMaterials = [];
     this.root.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -1235,11 +1345,58 @@ export class Hexoculus {
       this.legs.push(legRoot);
     }
 
+    // --- Detalhes do Hexoculus: cornos de galhada, costelas em arco, mantos esfarrapados, juntas pontudas ---
+    {
+      const d = [];
+      for (let r = 0; r < 6; r++) {
+        for (const side of [-1, 1]) {
+          d.push({ t: "box", a: [0.28, 0.035, 0.05], p: [side * 0.2, 1.38 + r * 0.19, 0.12], r: [0, side * -0.5, side * -0.18], c: 0xcec2a2, ao: 0.5 });
+        }
+      }
+      for (const side of [-1, 1]) {
+        d.push({ t: "cone", a: [0.08, 0.55, 4], p: [side * 0.34, 2.62, 0], r: [0, 0, -side * 0.9], c: 0xcabd9c });
+        d.push({ t: "cone", a: [0.05, 0.45, 4], p: [side * 0.5, 2.68, -0.05], r: [0.2, 0, -side * 1.2], c: 0xd6caa8 });
+      }
+      // pelve e cinta de tiras rasgadas
+      d.push({ t: "box", a: [0.4, 0.14, 0.24], p: [0, 1.2, 0], c: 0x211f27 });
+      for (let i = 0; i < 6; i++) d.push({ t: "box", a: [0.07, 0.8 + (i % 3) * 0.2, 0.025], p: [(i - 2.5) * 0.09, 0.72, 0.13], r: [0.06, 0, ((i % 2) - 0.5) * 0.12], c: 0x2b221d });
+      // ferida pulsante no peito
+      d.push({ t: "box", a: [0.16, 0.34, 0.03], p: [0.04, 1.85, 0.12], c: 0x5a0a10, ao: 1 });
+      d.push({ t: "box", a: [0.03, 0.55, 0.03], p: [0.1, 1.45, 0.12], c: 0x430609, ao: 1 });
+      addDetail(this.model, d, "HexoBodyDetail");
+
+      // coroa de espinhos na cabeça + mandíbula de dentes sem boca
+      const h = [];
+      for (let i = 0; i < 5; i++) {
+        const a = -0.7 + i * 0.35;
+        h.push({ t: "cone", a: [0.025, 0.35 + (i % 2) * 0.15, 4], p: [Math.sin(a) * 0.14, 0.4, -0.08], r: [-0.3, 0, -a * 0.9], c: 0xd0c4a4 });
+      }
+      for (let i = 0; i < 5; i++) h.push({ t: "cone", a: [0.015, 0.1, 4], p: [(i - 2) * 0.04, -0.3, 0.13], r: [Math.PI, 0, 0], c: 0xefe6cf });
+      addDetail(this.headGroup, h, "HexoHeadDetail");
+
+      for (const armRoot of this.arms) {
+        addDetail(armRoot, [
+          { t: "cone", a: [0.05, 0.28, 4], p: [0, -0.85, -0.1], r: [-1.1, 0, 0], c: 0xd0c4a4 },
+          { t: "sph", a: [0.07, 5, 4], p: [0, -0.9, 0.05], c: 0x15141a },
+          { t: "cone", a: [0.014, 0.32, 4], p: [-0.04, -1.8, 0.14], r: [Math.PI * 0.9, 0, 0.1], c: 0xd6caa8 },
+          { t: "cone", a: [0.014, 0.32, 4], p: [0.04, -1.8, 0.14], r: [Math.PI * 0.9, 0, -0.1], c: 0xd6caa8 },
+        ], "HexoArmDetail");
+      }
+      for (const legRoot of this.legs) {
+        addDetail(legRoot, [
+          { t: "cone", a: [0.045, 0.22, 4], p: [0, -0.62, 0.1], r: [1.2, 0, 0], c: 0xd0c4a4 },
+          { t: "box", a: [0.12, 0.05, 0.3], p: [0, -1.33, 0.08], c: 0x15141a },
+          { t: "cone", a: [0.02, 0.18, 4], p: [0, -1.33, 0.28], r: [Math.PI / 2, 0, 0], c: 0xcabd9c },
+        ], "HexoLegDetail");
+      }
+    }
+
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
     this._groundY = groundY;
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    finalizeMonster(this.root, this); // funde partes estáticas (menos draw calls e materiais)
     this.flashMaterials = [];
     this.root.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -1576,6 +1733,36 @@ export class Polyphonia {
       }
 
       this.mouths.push(mGroup);
+
+      // Bordas da boca: gengiva, dentes extras desiguais, baba e lábios rasgados
+      const md = [];
+      for (let t2 = 0; t2 < 7; t2++) {
+        const a2 = (t2 / 7) * Math.PI * 2 + 0.3;
+        md.push({ t: "cone", a: [0.018, 0.07 + (t2 % 3) * 0.04, 4], p: [Math.cos(a2) * 0.075, 0.075, Math.sin(a2) * 0.075 + 0.04], r: [Math.PI, 0, 0], c: 0xf0e8d4, ao: 0.8 });
+      }
+      md.push({ t: "box", a: [0.3, 0.035, 0.36], p: [0, 0.11, 0], c: 0x7a2a30, ao: 1 });
+      for (let t2 = 0; t2 < 3; t2++) md.push({ t: "box", a: [0.015, 0.2 + t2 * 0.06, 0.015], p: [(t2 - 1) * 0.07, -0.2, 0.15], c: 0x5a0a10, ao: 1 });
+      for (const sx of [-1, 1]) md.push({ t: "cone", a: [0.02, 0.2, 4], p: [sx * 0.14, 0.12, 0.1], r: [0.2, 0, -sx * 0.5], c: 0xcabd9c });
+      addDetail(mGroup, md, "PolyMouthDetail");
+    }
+
+    // Detalhes do corpo serpentino: vértebras, escamas, tentáculos e feridas
+    {
+      for (let s2 = 0; s2 < this.segments.length; s2++) {
+        const seg = this.segments[s2];
+        const sd = [];
+        for (let k = 0; k < 4; k++) sd.push({ t: "cone", a: [0.03, 0.18 + (k % 2) * 0.08, 4], p: [(k - 1.5) * 0.12, 0.28 - s2 * 0.01, 0.2], r: [Math.PI / 2, 0, (k - 1.5) * 0.25], c: 0xcabd9c });
+        sd.push({ t: "box", a: [0.3, 0.12, 0.05], p: [0.08, 0.05, -0.27], c: 0x5a0a10, ao: 1 });
+        sd.push({ t: "box", a: [0.02, 0.5, 0.02], p: [-0.2, -0.25, 0.1], r: [0, 0, 0.3], c: 0x3a0608, ao: 1 });
+        addDetail(seg, sd, "PolySegDetail");
+      }
+      for (const arm of this.arms) {
+        addDetail(arm, [
+          { t: "cone", a: [0.014, 0.22, 4], p: [-0.025, -0.45, 0.0], r: [Math.PI, 0, 0.15], c: 0xd0c4a4 },
+          { t: "cone", a: [0.014, 0.22, 4], p: [0.025, -0.45, 0.0], r: [Math.PI, 0, -0.15], c: 0xd0c4a4 },
+          { t: "sph", a: [0.06, 5, 4], p: [0, -0.1, 0], c: 0x8a8478 },
+        ], "PolyArmDetail");
+      }
     }
 
     const groundY = this.world ? this.world.heightAt(x, z) : 0;
@@ -1583,6 +1770,7 @@ export class Polyphonia {
     this.root.position.set(x, groundY, z);
     scene.add(this.root);
 
+    finalizeMonster(this.root, this); // funde partes estáticas (menos draw calls e materiais)
     this.flashMaterials = [];
     this.root.traverse((child) => {
       if (child.isMesh && child.material) {

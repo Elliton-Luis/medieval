@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { BloodFx, isBloodColor } from "./damagefx.js";
 
 const EFFECTS = {
   slash: { file: "slash_01.png", duration: 0.24, size: 1.7, rise: 0.15, spin: 1.2, add: true },
@@ -77,6 +78,7 @@ export class SpriteEffects {
     this.pool = [];
     this.cursor = 0;
     this.spinSign = 1;
+    this.blood = new BloodFx(scene);
     this._loader = new THREE.TextureLoader();
     for (const [kind, definition] of Object.entries(EFFECTS)) {
       if (definition.canvas) {
@@ -100,6 +102,8 @@ export class SpriteEffects {
   }
 
   play(kind, x, y, z, color = "#ffffff", size = 0) {
+    // acerto vermelho (feras/monstros): além da faísca, sangue que cai e mancha o chão
+    if (kind === "star" && isBloodColor(color)) this.blood.splash(x, y, z, 0, 0, Math.min(2, 0.6 + (size || 1) * 0.4));
     const definition = EFFECTS[kind] || EFFECTS.star;
     let effect = null;
     for (let attempt = 0; attempt < this.pool.length; attempt++) {
@@ -141,6 +145,7 @@ export class SpriteEffects {
   }
 
   update(dt) {
+    this.blood.update(dt);
     for (let i = 0; i < this.pool.length; i++) {
       const effect = this.pool[i];
       if (!effect.active) continue;

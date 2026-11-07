@@ -3,6 +3,7 @@ import { buildCultistMesh, CultState, CULT_ALTARS } from "./cult.js";
 import { spawnWaypointMarker, getEvilPercent } from "./rpg.js";
 import { showVictoryEndingModal } from "./gameEndingScreen.js";
 import { EventBus, GAME_EVENTS } from "./EventBus.js";
+import { finalizeMonster } from "./monsterParts.js";
 
 // ============================================================================
 // 1. Estado Global do Fim dos Tempos (WorldDecay)
@@ -841,7 +842,7 @@ export function buildDemiurgeMessengerMesh() {
   model.add(particles);
 
   root.visible = false;
-  return {
+  const _msgParts = {
     root,
     model,
     robe: robeCore,
@@ -859,6 +860,8 @@ export function buildDemiurgeMessengerMesh() {
     pSpeeds,
     pCount,
   };
+  finalizeMonster(root, _msgParts);
+  return _msgParts;
 }
 
 function _ensureMessenger(scene) {
@@ -1216,7 +1219,9 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
   angelLight.position.set(0, 1.7, 0.4);
   model.add(angelLight);
 
-  return { root, model, wingGroupL, wingGroupR, angelLight, scytheGroup };
+  const _angelParts = { root, model, wingGroupL, wingGroupR, angelLight, scytheGroup };
+  finalizeMonster(root, _angelParts);
+  return _angelParts;
 }
 
 /**
