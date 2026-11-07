@@ -108,6 +108,9 @@ export function getHayFromPool() {
 // ============================================================================
 // 2. Sistema de Atributos do Jogador (PlayerStats) e Inventário de Camponês
 // ============================================================================
+const TEMPLAR_NEUTRAL = Object.freeze({ dmg: 1, hp: 1, spd: 1, weak: 0 });
+const _templarMods = { dmg: 1, hp: 1, spd: 1, weak: 0 };
+
 export const PlayerStats = {
   // Atributos base
   str: 10, // Dano corpo a corpo e capacidade de carga
@@ -130,17 +133,29 @@ export const PlayerStats = {
   lastConfessionDay: null,
 
   // Getters otimizados com penalidade de Voto Quebrado e peso de armadura
-  getMaxHp: () => PlayerStats.con * 10,
-  getMaxHearts: () => Math.max(3, Math.round(PlayerStats.con * 0.5)),
+  // Juramento Templário: com maldade <= 50% => +25% dano, +20% vida máxima, +12% velocidade.
+  // Acima de 50% o voto vai apodrecendo de forma contínua: em 100% de maldade o templário rende 65% do dano,
+  // 75% da vida e 70% da velocidade. Voto quebrado ou sem juramento => sem modificador (1.0).
+  getTemplarMods: () => {
+    if (!PlayerStats.isTemplar || PlayerStats.hasBrokenVow) return TEMPLAR_NEUTRAL;
+    const w = Math.max(0, Math.min(1, (getEvilPercent() - 50) / 50)); // 0 = puro ... 1 = totalmente corrompido
+    _templarMods.dmg = 1.25 + (0.65 - 1.25) * w;
+    _templarMods.hp = 1.2 + (0.75 - 1.2) * w;
+    _templarMods.spd = 1.12 + (0.7 - 1.12) * w;
+    _templarMods.weak = w;
+    return _templarMods;
+  },
+  getMaxHp: () => PlayerStats.con * 10 * PlayerStats.getTemplarMods().hp,
+  getMaxHearts: () => Math.max(3, Math.round(PlayerStats.con * 0.5 * PlayerStats.getTemplarMods().hp)),
   getMeleeMult: () => {
-    let mult = 1.0 + (PlayerStats.str - 10) * 0.05;
+    let mult = (1.0 + (PlayerStats.str - 10) * 0.05) * PlayerStats.getTemplarMods().dmg;
     if (PlayerStats.wearingDemiurgeRobe) mult += 0.45; // Poder do Demiurgo (+45%)
     if (PlayerStats.hasBrokenVow) mult *= 0.5; // Fraqueza extrema (-50%)
     return mult;
   },
   getHitstunMult: () => Math.max(0.35, 1.0 - (PlayerStats.con - 10) * 0.04),
   getSpeedMult: () => {
-    let mult = 1.0 + (PlayerStats.spd - 10) * 0.03;
+    let mult = (1.0 + (PlayerStats.spd - 10) * 0.03) * PlayerStats.getTemplarMods().spd;
     if (PlayerStats.wearingDemiurgeRobe) mult += 0.25; // Leveza espectral (+25%)
     if (PlayerStats.armorLevel === 3) mult -= 0.15; // Armadura pesada deixa 15% mais lento
     if (PlayerStats.hasBrokenVow) mult *= 0.5; // Punição divina (50% mais lento)
@@ -214,6 +229,13 @@ export function addEvil(amount = 2, reason = null) {
 
   const evil = getEvilPercent();
 
+  // O Templário não pode fazer o mal: qualquer ato maligno quebra o voto
+  if (PlayerStats.isTemplar && !PlayerStats.hasBrokenVow) {
+    PlayerStats.hasBrokenVow = true;
+    ui?.showToast?.("⚠️ VOTO TEMPLÁRIO QUEBRADO! O mal não habita um cavaleiro da Ordem. Abata uma fera nas matas para se redimir.");
+  }
+  syncPlayerStatsToPlayer(); // a vida máxima/dano/velocidade do Templário dependem da maldade
+
   if (reason && ui) {
     ui.showToast(`🌑 Maldade ${evil}% (+${effectiveAmount.toFixed(1)}%) [${history.length}/${MAX_EVIL_REPEATS} em 5min] · ${reason}`);
   }
@@ -229,6 +251,7 @@ export function addGood(amount = 2, reason = null) {
   PlayerStats.morality = Math.max(-100, Math.min(100, currentMorality + amount * 2));
 
   const evil = getEvilPercent();
+  syncPlayerStatsToPlayer();
   const ui = _env.ui || window.__game?.ui;
   if (reason && ui) {
     ui.showToast(`✦ Maldade ${evil}% (-${Math.round(amount)}%) · ${reason}`);
@@ -240,6 +263,7 @@ export function setEvilPercent(targetPercent, reason = null) {
   const pct = Math.max(0, Math.min(100, Math.round(Number(targetPercent) || 0)));
   PlayerStats.morality = Math.max(-100, Math.min(100, 100 - pct * 2));
   const evil = getEvilPercent();
+  syncPlayerStatsToPlayer();
   const ui = _env.ui || window.__game?.ui;
   if (ui) {
     ui.showToast(`⚖️ Índice de Maldade definido para ${evil}%${reason ? ` · ${reason}` : ""}`);
@@ -304,6 +328,7 @@ export function takeTemplarVow(player = _env.player, ui = _env.ui, audio = _env.
   PlayerStats.isTemplar = true;
   PlayerStats.hasBrokenVow = false;
   equipArmor(3, player);
+  syncPlayerStatsToPlayer(player, ui);
   audio?.choir?.();
   ui?.showToast?.(
     "⚔️ Fizeste o Sagrado Juramento dos Templários! Armadura de Placas Completa concedida. Guarda a pureza de teus atos!"
@@ -1726,7 +1751,7 @@ function _buildPlayerHouseMesh() {
   // 1. Fundação maciça de pedra com degrau frontal de entrada
   const found = new THREE.Mesh(new THREE.BoxGeometry(5.4, 3.2, 4.6), stoneMat);
   found.position.set(0, -1.5, 0);
-  found.castShadow = true;
+  found.castShadow = false; // fundação enterrada: só gerava sombra chapada no próprio chão
   found.receiveShadow = true;
   group.add(found);
 
@@ -1901,7 +1926,7 @@ function _buildPlayerCabinMesh() {
   // Fundação baixa de pedra
   const found = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.4, 3.2), stoneMat);
   found.position.set(0, 0.1, 0);
-  found.castShadow = true;
+  found.castShadow = false;
   group.add(found);
 
   // Piso de tábuas

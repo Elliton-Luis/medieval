@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { makeRandom } from "./utils.js";
-import { buildHumanoid, bendJoints } from "./humanoid.js";
+import { buildHumanoid, bendJoints, addBeard, createPoseState, smoothPose } from "./humanoid.js";
 import { meleeThink, releaseToken } from "./melee.js";
 import { setupGuardTorch, releaseGuardTorch, updateGuardTracking, GUARD_SPEED, TORCH_VISION_RANGE_SQ } from "./torches.js";
 import { NPC_TYPES, NPC_STATES, updateNPCRoutine, addEvil, PlayerInventory, PlayerStats } from "./rpg.js";
@@ -48,27 +48,39 @@ const GEO = {
   bag: new THREE.BoxGeometry(0.17, 0.2, 0.11),
 };
 
+// Cada ofício tem paleta, silhueta (escala) e adereços próprios: dá para reconhecer de longe.
+//  guarda = azul-real + elmo/penacho vermelho + lança   | ferreiro = laranja, largo, barba preta + martelo
+//  mercador = verde-azulado, chapéu alto + mochila      | agricultora = verde-limão + chapéu de palha amarelo
+//  mensageiro = vermelho vivo + cinta branca            | padre = batina preta alta + colarinho branco + barba branca
+//  pedinte = trapos cinza, corcunda, capuz + cajado     
 const npcRoles = {
   guard: {
-    name: "Sir Alden Voss", title: "Guarda da estrada", skin: "#bb815f", cloth: "#33495c", leather: "#463b30", metal: "#abb0a5", accent: "#c5a45e", speed: 1.75, wait: 0.35,
+    name: "Sir Alden Voss", title: "Guarda da estrada", skin: "#bb815f", cloth: "#2c4f94", leather: "#463b30", metal: "#c3c8c0", accent: "#e0b84a", speed: 1.75, wait: 0.35,
+    scale: [1.02, 1.07, 1.02], beard: "short", hair: "#2f2420",
   },
   smith: {
-    name: "Marta Ferrovia", title: "Ferreira", skin: "#a96f54", cloth: "#904a32", leather: "#3d3027", metal: "#565e59", accent: "#d1a65b", speed: 1.1, wait: 1.1,
+    name: "Marta Ferrovia", title: "Ferreira", skin: "#9a6048", cloth: "#c2582c", leather: "#2b221c", metal: "#6c757a", accent: "#e8b04a", speed: 1.1, wait: 1.1,
+    scale: [1.16, 0.98, 1.14], beard: "full", hair: "#1c1411",
   },
   merchant: {
-    name: "Tomas Vell", title: "Mercador", skin: "#c68e69", cloth: "#385d69", leather: "#5b402c", metal: "#7f8c83", accent: "#d6b765", speed: 1.25, wait: 1.2,
+    name: "Tomas Vell", title: "Mercador", skin: "#c68e69", cloth: "#1f7f72", leather: "#5b402c", metal: "#7f8c83", accent: "#f0c84a", speed: 1.25, wait: 1.2,
+    scale: [1.0, 1.02, 1.12], beard: "mustache", hair: "#4a3526",
   },
   farmer: {
-    name: "Bruna do Vale", title: "Agricultora", skin: "#d19a70", cloth: "#66734a", leather: "#61432d", metal: "#797767", accent: "#c38b47", speed: 1.35, wait: 1.55,
+    name: "Bruna do Vale", title: "Agricultora", skin: "#d19a70", cloth: "#7da13a", leather: "#61432d", metal: "#797767", accent: "#e6cb6a", speed: 1.35, wait: 1.55,
+    scale: [1.0, 0.98, 1.0], beard: null, hair: "#8a4a26",
   },
   villager: {
-    name: "Ivo Salgueiro", title: "Mensageiro", skin: "#b77d5d", cloth: "#704653", leather: "#4f3929", metal: "#777e77", accent: "#b8955a", speed: 1.85, wait: 0.75,
+    name: "Ivo Salgueiro", title: "Mensageiro", skin: "#b77d5d", cloth: "#b42e3a", leather: "#4f3929", metal: "#777e77", accent: "#f2ead6", speed: 1.85, wait: 0.75,
+    scale: [0.96, 1.0, 0.96], beard: null,
   },
   priest: {
-    name: "Padre Anselmo", title: "Sacerdote da Capela", skin: "#d19a70", cloth: "#36312d", leather: "#2a2420", metal: "#c5a45e", accent: "#e0c36e", speed: 1.0, wait: 2.2,
+    name: "Padre Anselmo", title: "Sacerdote da Capela", skin: "#d8a47c", cloth: "#1d1b1e", leather: "#2a2420", metal: "#d8b64e", accent: "#f0d27a", speed: 1.0, wait: 2.2,
+    scale: [1.0, 1.08, 1.0], beard: "long", hair: "#d9d6cf",
   },
   beggar: {
-    name: "Bartolomeu", title: "Pedinte da Praça", skin: "#a96f54", cloth: "#6b5b4b", leather: "#4a3c30", metal: "#5c5750", accent: "#8c7a62", speed: 0.95, wait: 2.8,
+    name: "Bartolomeu", title: "Pedinte da Praça", skin: "#a06a52", cloth: "#6f685c", leather: "#4a3c30", metal: "#5c5750", accent: "#8c7a62", speed: 0.95, wait: 2.8,
+    scale: [0.97, 0.92, 0.97], beard: "long", hair: "#8d8b86",
   },
 };
 
@@ -192,6 +204,10 @@ export class NPC {
     });
     Object.assign(this, body);
     const face = body.head;
+    this._pose = createPoseState();
+    const sc = this.role.scale;
+    if (sc) this.model.scale.set(sc[0], sc[1], sc[2]);
+    if (this.role.beard) addBeard(face, hair, this.role.beard);
 
     addPart(this.model, GEO.tunic, cloth, 0, 0.62, 0, true);
     addPart(this.model, GEO.belt, accent, 0, 0.83, 0);
@@ -203,7 +219,10 @@ export class NPC {
       addPart(this.rightArm, GEO.pauldron, metal, 0, 0.02, 0);
       addPart(face, GEO.helmet, metal, 0, 0.035, 0);
       addPart(face, new THREE.BoxGeometry(0.022, 0.1, 0.02), metal, 0, -0.02, 0.128);
-      addPart(face, new THREE.ConeGeometry(0.03, 0.14, 4), accent, 0, 0.17, -0.02);
+      const plumeMat = material("#c0262f", 0, 0.8, "fabric");
+      this.flashMaterials.push(plumeMat);
+      addPart(face, new THREE.ConeGeometry(0.05, 0.3, 5), plumeMat, 0, 0.22, -0.03);
+      addPart(face, new THREE.BoxGeometry(0.02, 0.1, 0.13), plumeMat, 0, 0.12, -0.1);
       addPart(this.leftForearm, new THREE.BoxGeometry(0.3, 0.42, 0.04), cloth, 0, -0.14, 0.095);
       addPart(this.leftForearm, new THREE.SphereGeometry(0.05, 6, 5), accent, 0, -0.14, 0.13);
       addPart(this.model, new THREE.BoxGeometry(0.3, 0.46, 0.03), accent, 0, 0.62, 0.17);
@@ -216,17 +235,24 @@ export class NPC {
       addPart(spear, new THREE.ConeGeometry(0.05, 0.3, 5), metal, 0, 1.28, 0);
     } else if (this.roleKey === "smith") {
       addPart(this.model, new THREE.BoxGeometry(0.34, 0.62, 0.03), dark, 0, 0.98, 0.15);
-      addPart(face, new THREE.CylinderGeometry(0.127, 0.127, 0.035, 9), accent, 0, 0.065, 0);
+      addPart(face, new THREE.CylinderGeometry(0.14, 0.14, 0.04, 10), accent, 0, 0.065, 0);
+      addPart(this.model, new THREE.BoxGeometry(0.4, 0.14, 0.2), cloth, 0, 1.45, -0.02); // ombros largos
       this._addHammer(this.rightArm, leather, metal);
     } else if (this.roleKey === "merchant") {
-      addPart(face, new THREE.ConeGeometry(0.14, 0.17, 6), cloth, 0, 0.15, 0);
-      addPart(face, new THREE.CylinderGeometry(0.17, 0.17, 0.02, 8), accent, 0, 0.085, 0);
+      addPart(face, new THREE.ConeGeometry(0.14, 0.3, 6), cloth, 0, 0.22, 0);
+      addPart(face, new THREE.CylinderGeometry(0.19, 0.19, 0.02, 8), accent, 0, 0.085, 0);
+      const feather = addPart(face, new THREE.ConeGeometry(0.02, 0.2, 4), accent, 0.1, 0.3, 0);
+      feather.rotation.z = -0.7;
+      // mochila de mercadorias com rolo de cobertor nas costas
+      addPart(this.model, new THREE.BoxGeometry(0.36, 0.42, 0.2), leather, 0, 1.15, -0.2);
+      const roll = addPart(this.model, new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8), cloth, 0, 1.42, -0.2);
+      roll.rotation.z = Math.PI / 2;
       const sash = addPart(this.model, new THREE.BoxGeometry(0.075, 0.62, 0.03), accent, 0, 1.15, 0.13);
       sash.rotation.z = 0.62;
       addPart(this.model, GEO.bag, leather, -0.28, 0.82, 0.02);
       addPart(this.model, new THREE.BoxGeometry(0.1, 0.09, 0.08), accent, 0.26, 0.82, 0.05);
     } else if (this.roleKey === "farmer") {
-      addPart(face, new THREE.CylinderGeometry(0.235, 0.235, 0.02, 10), accent, 0, 0.1, 0);
+      addPart(face, new THREE.CylinderGeometry(0.32, 0.32, 0.02, 12), accent, 0, 0.1, 0);
       addPart(face, new THREE.SphereGeometry(0.128, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), accent, 0, 0.1, 0);
       addPart(this.model, new THREE.BoxGeometry(0.31, 0.52, 0.03), leather, 0, 0.98, 0.15);
       this._addHoe(this.rightArm, leather, metal);
@@ -237,6 +263,10 @@ export class NPC {
       addPart(this.model, new THREE.BoxGeometry(0.035, 0.2, 0.04), accent, 0, 1.18, 0.165);
       addPart(this.model, new THREE.BoxGeometry(0.12, 0.035, 0.04), accent, 0, 1.21, 0.165);
       addPart(face, GEO.cap, cloth, 0, 0.045, 0);
+      const whiteMat = material("#f4f1e8", 0, 0.8, "fabric");
+      this.flashMaterials.push(whiteMat);
+      addPart(this.model, new THREE.CylinderGeometry(0.2, 0.34, 1.0, 10).scale(1, 1, 0.8), cloth, 0, 0.5, 0, true); // batina longa
+      addPart(this.model, new THREE.CylinderGeometry(0.095, 0.115, 0.06, 10), whiteMat, 0, 1.5, 0); // colarinho branco
 
       // Hóstia Sagrada e Cálice dourado para a celebração da Santa Missa
       const hostGroup = new THREE.Group();
@@ -256,11 +286,16 @@ export class NPC {
     } else if (this.roleKey === "beggar") {
       addPart(this.model, new THREE.BoxGeometry(0.28, 0.45, 0.03), leather, 0, 0.95, 0.15);
       addPart(this.model, GEO.bag, leather, -0.26, 0.82, 0.04);
+      addPart(face, new THREE.SphereGeometry(0.15, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), cloth, 0, 0.02, -0.02); // capuz
+      const hump = addPart(this.model, new THREE.SphereGeometry(0.16, 8, 6), cloth, 0, 1.36, -0.15); // corcunda
+      hump.scale.set(1.2, 1, 0.9);
+      const cane = addPart(this.leftArm, GEO.shaft, leather, 0, -0.7, 0.04); // cajado
+      cane.scale.y = 1.25;
     } else {
       addPart(face, GEO.cap, leather, 0, 0.04, 0);
       addPart(face, new THREE.CylinderGeometry(0.15, 0.15, 0.018, 8), leather, 0, 0.065, 0.02);
       addPart(this.model, new THREE.CylinderGeometry(0.085, 0.1, 0.06, 8), accent, 0, 1.5, 0);
-      const strap = addPart(this.model, new THREE.BoxGeometry(0.05, 0.64, 0.02), leather, 0, 1.12, 0.135);
+      const strap = addPart(this.model, new THREE.BoxGeometry(0.09, 0.64, 0.02), accent, 0, 1.12, 0.135);
       strap.rotation.z = -0.62;
       addPart(this.model, GEO.bag, leather, 0.3, 0.88, 0);
     }
@@ -286,7 +321,16 @@ export class NPC {
     blade.rotation.z = -0.2;
   }
 
+  // Wrapper: a lógica de comportamento escolhe a pose-alvo; depois suavizamos as juntas para
+  // que trocas de estado (andar -> trabalhar -> alerta) não "estalem" de um frame para o outro.
   update(dt, playerX = 0, playerZ = 0) {
+    this._updateLogic(dt, playerX, playerZ);
+    if (this.alive && !this.removed && this._pose) {
+      smoothPose(this._pose, this, dt, this._hitStun > 0 ? 40 : 14);
+    }
+  }
+
+  _updateLogic(dt, playerX = 0, playerZ = 0) {
     if (this.removed) return;
     if (!this.alive) {
       if (this.npcSystem?.spatialGrid) this.npcSystem.spatialGrid.remove(this);
@@ -767,7 +811,7 @@ export class NPC {
     const rSq = radius * radius;
 
     // Se o jogador estiver vestindo o manto da seita do Demiurgo, a guarda o detecta como ameaça imediata
-    const isWearingCultRobe = Boolean(PlayerInventory?.hasDemiurgeRobe || PlayerStats?.wearingDemiurgeRobe);
+    const isWearingCultRobe = Boolean(PlayerStats?.wearingDemiurgeRobe);
     if (isWearingCultRobe) {
       const px = this.npcSystem.playerX ?? 0;
       const pz = this.npcSystem.playerZ ?? 0;
@@ -859,6 +903,15 @@ export class NPC {
       }
     }
 
+    // Guardas só são hostis ao JOGADOR se ele estiver procurado ou vestindo a roupa do culto (o disfarce vira
+    // `threatTarget.isPlayerCultist`). Fora isso nunca o perseguem nem o golpeiam; seguem defendendo o povo.
+    const playerIsFairTarget = (this.npcSystem?.wanted || 0) > 0 || Boolean(PlayerStats.wearingDemiurgeRobe);
+    if (this.roleKey === "guard" && this.mode === "hunt" && !isGuardingAgainstThreat && !playerIsFairTarget) {
+      this.endAlert();
+      return;
+    }
+    this._meleeTargetIsPlayer = !isGuardingAgainstThreat || Boolean(threatTarget?.isPlayerCultist);
+
     const targetPosX = isGuardingAgainstThreat ? (threatTarget.x ?? threatTarget.root?.position?.x ?? 0) : playerX;
     const targetPosZ = isGuardingAgainstThreat ? (threatTarget.z ?? threatTarget.root?.position?.z ?? 0) : playerZ;
 
@@ -935,7 +988,7 @@ export class NPC {
       speed = distSq > 24 * 24 ? GUARD_SPEED * 0.78 : GUARD_SPEED;
     } else if (this.meleeRange > 0) {
       this.root.userData.driftAngle = 0;
-      const think = meleeThink(this, dt, playerX, playerZ);
+      const think = meleeThink(this, dt, targetPosX, targetPosZ);
       dirX = think.mx;
       dirZ = think.mz;
       speed = think.speed * (3.4 + Math.min(3, this.huntBoost) * 0.45);
@@ -1113,6 +1166,7 @@ export class NPC {
     this.model.rotation.set(0, 0, 0);
     this.leftArm.rotation.set(0, 0, 0);
     this.rightArm.rotation.set(0, 0, 0);
+    if (this._pose) this._pose.ready = false;
     this.leftLeg.rotation.set(0, 0, 0);
     this.rightLeg.rotation.set(0, 0, 0);
     for (let i = 0; i < this.flashMaterials.length; i++) {
@@ -1562,7 +1616,7 @@ export class NPCSystem {
     if (this.wantedCooldown > 0) this.wantedCooldown -= clampedDt;
 
     // Se o jogador estiver vestindo o manto da seita, todos os guardas próximos entram em caçada imediata
-    const isWearingCultRobe = Boolean(PlayerInventory?.hasDemiurgeRobe || PlayerStats?.wearingDemiurgeRobe);
+    const isWearingCultRobe = Boolean(PlayerStats?.wearingDemiurgeRobe);
     if (isWearingCultRobe) {
       let spotted = false;
       for (let i = 0; i < this.npcs.length; i++) {

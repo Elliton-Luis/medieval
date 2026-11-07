@@ -347,18 +347,18 @@ export class InteractionSystem {
   _checkGhostTownNearby() {
     // 1. Checa se está no interior de uma casa abandonada com baú de despojos
     const house = checkGhostTownHouseNearby(this.player.root.position);
-    if (house && !this.ui.dialoguePanel.hidden) {
+    if (house && this.ui.dialoguePanel.hidden) {
       this.ui.setPrompt?.(
-        house.hasBloodEye
-          ? "✦ CASA SOB O OLHO DE SANGUE [E] Saquear Despojos do Demiurgo"
-          : "✦ CASA ARRUINADA [E] Saquear Baú & Fragmentos Perdidos",
+        house.hasPage
+          ? (house.hasBloodEye ? "✦ OLHO DE SANGUE · [E] pegar página" : "✦ [E] · pegar página")
+          : "✦ CASA ARRUINADA [E] Saquear Baú & Despojos",
       );
       return;
     }
 
     // 2. Checa se está na praça central das ruínas
     const town = checkGhostTownRubbleNearby(this.player.root.position);
-    if (town && !this.ui.dialoguePanel.hidden) {
+    if (town && this.ui.dialoguePanel.hidden) {
       this.ui.setPrompt?.(`✦ ${town.name.toUpperCase()} [E] Vasculhar Escombros & Códices`);
     }
   }
@@ -1468,7 +1468,11 @@ export class InteractionSystem {
           return;
         }
       }
-      this._showNPCDialogue("A celebração eucarística já está em andamento no Altar-Mor!");
+      this._showNPCDialogue(
+        this.houses?.mass?.active
+          ? "A celebração eucarística já está em andamento no Altar-Mor!"
+          : "Não há fiéis reunidos agora, filho. A Santa Missa só se celebra de dia, com o povo presente na paróquia.",
+      );
       return;
     } else if (action === "priest:guide") {
       this._showNPCDialogue(

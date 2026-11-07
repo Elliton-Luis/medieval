@@ -811,30 +811,71 @@ export class HouseSystem {
   // --------------------------------------------------------------------------
   // Celebração da Santa Missa (Random Church Mass Event)
   // --------------------------------------------------------------------------
+  // Raio (m) em torno da igreja que conta como "dentro da cidade": só aí o jogador recebe avisos da missa
+  static MASS_CITY_RADIUS = 85;
+
+  _playerInCity(church = this.mass.church) {
+    if (!church) return false;
+    return Math.hypot(this.player.x - church.x, this.player.z - church.z) <= HouseSystem.MASS_CITY_RADIUS;
+  }
+
+  // Avisos da missa só aparecem para quem está na cidade da igreja
+  _massToast(text) {
+    if (this._playerInCity()) this.ui.showToast(text);
+  }
+
+  // Monta uma missa VIÁVEL para a igreja: padre vivo e livre + fiéis civis vivos, todos perto da igreja.
+  _planMass(church) {
+    const near = (npc, r) => Math.hypot(npc.x - church.x, npc.z - church.z) <= r;
+    let priest = null;
+    let priestD = Infinity;
+    for (const npc of this.npcs.npcs) {
+      if (!npc.alive || npc.temporary || npc.controlled || npc.roleKey !== "priest") continue;
+      if (npc.mode !== "work" || npc.massTask || !near(npc, 55)) continue;
+      const d = Math.hypot(npc.x - church.x, npc.z - church.z);
+      if (d < priestD) { priest = npc; priestD = d; }
+    }
+    if (!priest) return null;
+    const attendees = [];
+    for (const npc of this.npcs.npcs) {
+      if (attendees.length >= 4) break;
+      if (!npc.alive || npc.temporary || npc.controlled || npc === priest || npc.massTask) continue;
+      if (npc.mode !== "work" || npc.hostile || npc.isBandit) continue;
+      if (npc.roleKey === "guard" || npc.roleKey === "horse" || npc.roleKey === "werewolf" || npc.roleKey === "priest") continue;
+      if (npc.root?.userData?.isSleeping || npc.root?.userData?.state === "SLEEP") continue;
+      if (!near(npc, 60)) continue;
+      attendees.push(npc);
+    }
+    if (attendees.length === 0) return null;
+    return { priest, attendees };
+  }
+
   startChurchMass(force = false) {
     if (this.mass.active) return false;
-    const church = this.houses.find((h) => h.type === "church");
-    if (!church) return false;
+    const churches = this.houses.filter((h) => h.type === "church");
+    if (churches.length === 0) return false;
 
-    // Encontra o padre e fiéis civis nas imediações
-    let priest = null;
-    const attendees = [];
-    for (let i = 0; i < this.npcs.npcs.length; i++) {
-      const npc = this.npcs.npcs[i];
-      if (!npc.alive || npc.temporary || npc.controlled) continue;
-      if (npc.roleKey === "priest" && !priest) {
-        priest = npc;
-      } else if (
-        npc.roleKey !== "guard" &&
-        npc.roleKey !== "horse" &&
-        npc.roleKey !== "werewolf" &&
-        attendees.length < 4
-      ) {
-        attendees.push(npc);
-      }
+    // Só celebra de dia (os fiéis dormem à noite)
+    const daylight = window.__game?.dayNight?.daylight ?? 1;
+    if (daylight < 0.5) return false;
+
+    // Igrejas candidatas, da mais próxima do jogador para a mais distante.
+    // Missa espontânea só perto do jogador (os NPCs só são simulados perto dele — assim a missa acontece de verdade);
+    // missa pedida ao padre (force) vale para a igreja onde o jogador está.
+    const maxPlayerDist = force ? 40 : HouseSystem.MASS_CITY_RADIUS;
+    const sorted = churches
+      .map((c) => ({ c, d: Math.hypot(this.player.x - c.x, this.player.z - c.z) }))
+      .filter((o) => o.d <= maxPlayerDist)
+      .sort((x, y) => x.d - y.d);
+
+    let church = null;
+    let plan = null;
+    for (const o of sorted) {
+      plan = this._planMass(o.c);
+      if (plan) { church = o.c; break; }
     }
-
-    if (!priest || attendees.length === 0) return false;
+    if (!plan) return false;
+    const { priest, attendees } = plan;
 
     this.mass.active = true;
     this.mass.state = "GATHERING";
@@ -881,7 +922,7 @@ export class HouseSystem {
       npc.hasReceivedCommunion = false;
     }
 
-    this.ui.showToast(`🔔 A celebração da Santa Missa está começando na ${church.name}!`);
+    this._massToast(`🔔 A celebração da Santa Missa está começando na ${church.name}!`);
     return true;
   }
 
@@ -890,7 +931,7 @@ export class HouseSystem {
       this.mass.nextRandomCheck -= dt;
       if (this.mass.nextRandomCheck <= 0) {
         this.mass.nextRandomCheck = 75 + Math.random() * 60; // Checa a cada ~1.5 - 2 minutos
-        // 45% de chance de iniciar missa espontânea se for dia
+        // 45% de chance de iniciar missa espontânea (só de dia e se for viável: padre + fiéis perto da igreja)
         if (Math.random() < 0.45) {
           this.startChurchMass(false);
         }
@@ -900,6 +941,23 @@ export class HouseSystem {
 
     this.mass.timer += dt;
     const { church, priest, attendees } = this.mass;
+
+    // Missa interrompida: padre morto/alarmado ou fiéis todos mortos/alarmados -> encerra com segurança
+    const priestOk = priest.alive && !priest.removed && priest.mode === "work";
+    const faithful = attendees.filter((n) => n.alive && !n.removed && n.mode === "work").length;
+    if (this.mass.state !== "DISMISSAL" && (!priestOk || faithful === 0)) {
+      for (const n of attendees) { n.massTask = null; n.hasReceivedCommunion = false; }
+      priest.massTask = null;
+      if (priest.hostMesh) priest.hostMesh.visible = false;
+      this._massToast("A Santa Missa foi interrompida.");
+      this.mass.active = false;
+      this.mass.state = "IDLE";
+      this.mass.timer = 0;
+      this.mass.attendees = [];
+      this.mass.church = null;
+      this.mass.priest = null;
+      return;
+    }
 
     switch (this.mass.state) {
       case "GATHERING": {
@@ -916,7 +974,7 @@ export class HouseSystem {
           this.mass.state = "PREACHING";
           this.mass.timer = 0;
           priest.massTask = "PREACHING";
-          this.ui.showToast("Padre no Altar: «O Senhor esteja convosco. Ouvi as santas palavras...»");
+          this._massToast("Padre no Altar: «O Senhor esteja convosco. Ouvi as santas palavras...»");
         }
         break;
       }
@@ -929,7 +987,7 @@ export class HouseSystem {
           priest.massTask = "ELEVATION";
           this.audio.choir?.();
           this.effects.play("star", priest.x, priest.root.position.y + 2.2, priest.z, "#fff1a8", 1.85);
-          this.ui.showToast("Padre no Altar: «Eis o Cordeiro de Deus que tira o pecado do mundo!»");
+          this._massToast("Padre no Altar: «Eis o Cordeiro de Deus que tira o pecado do mundo!»");
         }
         break;
       }
@@ -943,7 +1001,7 @@ export class HouseSystem {
           this.mass.communionQueue = [...attendees];
           this.mass.activeCommunionNpc = null;
           this.mass.communionCooldown = 0.5;
-          this.ui.showToast("Início da Comunhão: Os fiéis se levantam e vão ao altar receber a bênção.");
+          this._massToast("Início da Comunhão: Os fiéis se levantam e vão ao altar receber a bênção.");
         }
         break;
       }
@@ -980,7 +1038,7 @@ export class HouseSystem {
             priest.massTask = "FINAL_BLESSING";
             this.audio.choir?.();
             this.effects.play("glint", priest.x, priest.root.position.y + 2.0, priest.z, "#ffe57d", 2.0);
-            this.ui.showToast("Padre: «A bênção de Deus Todo-Poderoso desça sobre vós. Ide em paz!»");
+            this._massToast("Padre: «A bênção de Deus Todo-Poderoso desça sobre vós. Ide em paz!»");
           }
         }
         break;
@@ -997,7 +1055,7 @@ export class HouseSystem {
           priest.massTask = null;
           if (priest.hostMesh) priest.hostMesh.visible = false;
           priest.endAlert?.();
-          this.ui.showToast("A Santa Missa foi encerrada. Os fiéis saem em paz.");
+          this._massToast("A Santa Missa foi encerrada. Os fiéis saem em paz.");
         }
         break;
       }

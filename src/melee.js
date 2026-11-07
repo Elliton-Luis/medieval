@@ -145,7 +145,7 @@ export function meleeThink(e, dt, px, pz) {
     }
     case "strike": {
       // o golpe sai agora; o jogador ainda pode estar fora de alcance, de costas ou rolando
-      if (d <= reach + 0.6 && env.combat) {
+      if (d <= reach + 0.6 && env.combat && e._meleeTargetIsPlayer !== false) {
         env.combat.hurtPlayer(e.meleeDamage || 1, e.x, e.z, { knock: 3.4, weapon: "blade" });
       }
       e.swingTimer = 0.3;

@@ -592,7 +592,15 @@ export class GameUI {
     if (this.rpgStats) {
       const armPct = equip ? Math.round((equip.armorNegationChance || 0) * 100) : 0;
       const wepLv = equip ? equip.weaponLevel || 1 : 1;
-      const extra = (armPct > 0 ? ` · ARM ${armPct}%` : "") + (wepLv > 1 ? ` · ARMA Nv.${wepLv}` : "") + (equip?.blessingActive ? " · ✦BÊNÇÃO" : "");
+      const tm = stats.isTemplar && stats.getTemplarMods ? stats.getTemplarMods() : null;
+      const templarTag = stats.isTemplar
+        ? stats.hasBrokenVow
+          ? " · ⚠VOTO QUEBRADO"
+          : tm && tm.weak > 0
+            ? ` · ⚔TEMPLÁRIO enfraquecendo (dano ${Math.round(tm.dmg * 100)}%)`
+            : " · ⚔TEMPLÁRIO +25% dano · +20% vida · +vel"
+        : "";
+      const extra = templarTag + (armPct > 0 ? ` · ARM ${armPct}%` : "") + (wepLv > 1 ? ` · ARMA Nv.${wepLv}` : "") + (equip?.blessingActive ? " · ✦BÊNÇÃO" : "");
       const text = `FOR ${stats.str} · CON ${stats.con} · CAR ${stats.cha} · VEL ${stats.spd}${extra}`;
       if (this._lastRpgText !== text) {
         this._lastRpgText = text;
