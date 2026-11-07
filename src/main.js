@@ -1,3 +1,5 @@
+import { initWorld, rememberWorld, isCanonicalWorld, getWorld, getCapital } from "./worldgen.js";
+import { nearestFreePoint } from "./placement.js";
 import { updateCulling, setFogCull } from "./cullManager.js";
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
@@ -34,6 +36,7 @@ import { PauseMenu } from "./pause.js";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
 import { initDemiurgeDiary, updateDemiurgeDiary, isDemiurgeDiaryReaderOpen } from "./demiurgeBook.js";
+import { initFoodUI, isFoodPanelOpen } from "./foodUI.js";
 import { BeastManager } from "./beasts.js";
 import { spawnCrystalNodes, applyTorchColor, updateCrystalLight } from "./crystals.js";
 import { telemetry } from "./telemetry.js";
@@ -81,6 +84,7 @@ import {
   getEvilPercent,
   addEvil,
   addGood,
+  equipArmor,
 } from "./rpg.js";
 import {
   initProceduralEnv,
@@ -247,6 +251,10 @@ sun.shadow.normalBias = 0.07; // empurra o teste de profundidade ao longo da nor
 scene.add(sun);
 scene.add(sun.target);
 
+// Mundo procedural: resolve seed+caos (URL > save > último mundo > novo aleatório) ANTES de criar o terreno/as vilas.
+const worldInfo = initWorld();
+rememberWorld(worldInfo.seed, worldInfo.chaos);
+console.info(`[mundo] seed ${worldInfo.seed} · caos ${worldInfo.chaos}${worldInfo.canonical ? " (canônico)" : ""} · âncoras em ${worldInfo.genMs.toFixed(1)} ms`);
 const world = new World(scene);
 const settlement = createSettlement(scene, world);
 const player = new Player(scene, world);
@@ -272,11 +280,23 @@ const farming = new FarmFieldManager({ scene, world, settlement, effects, audio,
 world.farming = farming;
 interactions.farming = farming;
 // Plantações com canteiros arados e trigo, posicionadas em áreas abertas nos arredores das vilas e fora das muralhas
-farming.createFarmlandField(-58, -14, 4, 8, 1.8, 1.5);   // Campos do Poente (Oeste de Caldera)
-farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);    // Campos do Noroeste
-farming.createFarmlandField(88, -48, 3, 7, 1.8, 1.5);     // Campos da Alvorada (Leste de Caldera)
-farming.createFarmlandField(-126, -42, 4, 8, 1.8, 1.5);  // Campos de Pedraluz (Pastos oeste da vila)
-farming.createFarmlandField(-92, -144, 4, 8, 1.8, 1.5);  // Campos de Brumas (Pastos sul da vila)
+farming.createFarmlandField(-58, -14, 4, 8, 1.8, 1.5);   // Campos do Poente (Oeste de Caldera; molde fixo da capital)
+farming.createFarmlandField(-74, 38, 3, 7, 1.8, 1.5);    // Campos do Noroeste (molde fixo da capital)
+if (isCanonicalWorld()) {
+  farming.createFarmlandField(88, -48, 3, 7, 1.8, 1.5);     // Campos da Alvorada (Leste de Caldera)
+  farming.createFarmlandField(-126, -42, 4, 8, 1.8, 1.5);  // Campos de Pedraluz (Pastos oeste da vila)
+  farming.createFarmlandField(-92, -144, 4, 8, 1.8, 1.5);  // Campos de Brumas (Pastos sul da vila)
+} else {
+  // mundo procedural: os campos acompanham as vilas rurais (fazenda e mercado), no lado de fora da capital,
+  // sempre validados contra construções ("existe algo perto?")
+  const cap = getCapital();
+  for (const v of getWorld().villages) {
+    if (v.kind !== "farm" && v.kind !== "market") continue;
+    const ang = Math.atan2(v.z - cap.z, v.x - cap.x) + (v.kind === "farm" ? 0.3 : -0.3);
+    const free = nearestFreePoint(v.x + Math.cos(ang) * 33, v.z + Math.sin(ang) * 33, 4, 14);
+    if (free) farming.createFarmlandField(free.x, free.z, v.kind === "farm" ? 4 : 3, v.kind === "farm" ? 8 : 7, 1.8, 1.5);
+  }
+}
 const minimap = new Minimap(document.getElementById("minimap"));
 const drops = new DropSystem(scene, world, player, ui, audio, effects);
 drops.weapons = weapons;
@@ -502,6 +522,7 @@ const debugScreen = new DebugScreen({
   audio,
 });
 
+initFoodUI(); // tecla O: alforje (pão e maçã)
 window.__game = { farming, autoSave, loadingScreen, clutter, farmAnimals, villageGenerator, debugScreen, toggleDebugScreen: () => debugScreen.toggle(), beasts, ActiveGhostTowns, getEvilPercent, addEvil, addGood, HolyEndingState, triggerDeusVultEnding, triggerCultistMessenger, TRACK_CATALOG, getMusicCredits, CultState, GameState, startIntroSequence, endIntroSequence, createTallFigure, WorldDecay, triggerDailyDecayCycle, triggerDemiurgeCataclysm, MissionState, ActiveMissions, spawnWaypointMarker, removeWaypointMarker, updateWaypointBillboard, generateDeliveryMission, generateDebtMission, generateHorseTheftMission, generateBountyMission, startMission, failActiveMission, notifyMissionFistHit, payDebtorMission, updateMissionProgress, activeCities, dismountHorse, updateWorldChunks, PlayerInventory, BUILD_COSTS, gatherResource, buildStructure, destroyBuilding, sellResourcesToNPC, createPlayerBuildingsPool, monstersPool, cultistsPool, createSeededRandom, createSharedHouseMaterial, generateCity, assignNpcAnchors, updateWildernessSpawns, PlayerStats, PlayerEquipment, NPC_TYPES, NPC_STATES, checkWitnesses, updateNPCRoutine, handleNPCDeath, interactWithChest, dropHayBait, handleWeaponAction, updateMusketReload, igniteTarget, takeDamage, buyUpgrade, interactWithPriest, interactWithBeggar, damageFx, music, pause, renderer, ui, minimap, interactions, horses, riding, dayNight, hemisphere, houses, sleep, torches, candle, fire, deathScreen, audio, director, drops, THREE, scene, camera, world, player, npcs, input, cameraRig, aim, combat, weapons, explosions, effects, settlement };
 window.triggerCultistMessenger = () => triggerCultistMessenger(player, scene, world, true);
 
@@ -526,6 +547,7 @@ if (saved) {
     PlayerInventory.stone = saved.stats.stone ?? PlayerInventory.stone;
     PlayerInventory.clay = saved.stats.clay ?? PlayerInventory.clay;
     PlayerInventory.torches = saved.stats.torches ?? PlayerInventory.torches;
+    PlayerInventory.food = { bread: saved.stats.food?.bread || 0, apple: saved.stats.food?.apple || 0 };
     PlayerInventory.hasSword = saved.stats.hasSword ?? PlayerInventory.hasSword;
     PlayerInventory.hasDemiurgeDiary = Boolean(saved.stats.hasDemiurgeDiary || saved.hasDemiurgeDiary);
     PlayerInventory.hasCollectedGroundBook = Boolean(saved.stats.hasCollectedGroundBook || saved.hasCollectedGroundBook);
@@ -537,6 +559,16 @@ if (saved) {
   player.coins = saved.coins ?? player.coins;
   PlayerStats.gold = player.coins;
   PlayerInventory.gold = player.coins;
+  // Armadura, juramento templário e manto do culto (o juramento vem ANTES para o visual templário valer)
+  if (saved.stats) {
+    PlayerStats.isTemplar = Boolean(saved.stats.isTemplar);
+    PlayerStats.hasBrokenVow = Boolean(saved.stats.hasBrokenVow);
+    PlayerStats.lastConfessionDay = saved.stats.lastConfessionDay ?? PlayerStats.lastConfessionDay;
+    PlayerInventory.hasDemiurgeRobe = Boolean(saved.stats.hasDemiurgeRobe || saved.stats.wearingDemiurgeRobe);
+    PlayerStats.wearingDemiurgeRobe = Boolean(saved.stats.wearingDemiurgeRobe);
+    equipArmor(saved.stats.armorLevel ?? 0, player);
+    if (PlayerStats.wearingDemiurgeRobe && player.setDemiurgeAttire) player.setDemiurgeAttire(true);
+  }
   syncPlayerStatsToPlayer(player, ui);
   player.health = Math.max(1, Math.min(player.maxHealth, saved.health ?? player.maxHealth));
   player.potions = saved.potions ?? player.potions;
@@ -590,7 +622,7 @@ if (shouldPlayIntro) {
 // ============================================================================
 // Shader Warmup & Pipeline Precompilation (Zero-Hitch em eventos e armas)
 // ============================================================================
-export function warmupPipelines(renderer, scene, camera, weapons) {
+export function warmupPipelines(renderer, scene, camera, weapons, world = null) {
   const hiddenObjects = [];
   if (weapons?.models) {
     for (const model of Object.values(weapons.models)) {
@@ -617,12 +649,47 @@ export function warmupPipelines(renderer, scene, camera, weapons) {
     }
   }
 
+  // Tudo o que aparece DEPOIS (monstros e servos da noite, acampamentos, vilas fora de alcance, níveis de LOD
+  // distantes): compila os shaders e sobe geometrias/texturas à GPU agora, sob a tela de carregamento. Antes cada
+  // primeiro aparecimento (anoitecer, chegar a um acampamento, ver um LOD novo) compilava na hora e travava.
+  const culled = [];
+  // percorre a árvore INTEIRA (não só o topo): chamas de tocha, halos e peças só ligadas à noite estão dentro de
+  // grupos visíveis. Luzes ficam de fora: acendê-las aqui compilaria variantes de programa que o jogo nunca usa.
+  const walk = (node) => {
+    for (const child of node.children) {
+      if (!child.visible && !child.isLight && (child.isGroup || child.isMesh || child.isSprite || child.isPoints || child.type === "Object3D")) {
+        child.visible = true;
+        hiddenObjects.push(child);
+        child.traverse((m) => {
+          if (m.isMesh || m.isSprite || m.isPoints) {
+            culled.push([m, m.frustumCulled]);
+            m.frustumCulled = false;
+          }
+        });
+      }
+      walk(child);
+    }
+  };
+  walk(scene);
+  if (world?.chunks) {
+    for (const chunk of world.chunks.values()) {
+      for (const lod of chunk.lods || []) {
+        if (!lod.visible) {
+          lod.visible = true;
+          hiddenObjects.push(lod);
+        }
+      }
+    }
+  }
+
   try {
     renderer.compile(scene, camera);
+    renderer.render(scene, camera); // 1 render real: geometrias, texturas e variantes de programa que só o draw cria
   } catch (err) {
     console.warn("Shader warmup aviso:", err);
   }
 
+  for (const [m, f] of culled) m.frustumCulled = f;
   for (const obj of hiddenObjects) {
     obj.visible = false;
   }
@@ -632,7 +699,7 @@ export function warmupPipelines(renderer, scene, camera, weapons) {
 }
 
 // Pré-aquecimento da GPU durante a inicialização (100% dos shaders compilados antes do jogo)
-warmupPipelines(renderer, scene, camera, weapons);
+warmupPipelines(renderer, scene, camera, weapons, world);
 
 // Resolução adaptativa: parte do teto de 1.5x e só recua se o jogo estiver lento (abaixo de ~48 FPS por 1.5 s);
 // volta a subir devagar quando há folga. Em máquinas boas nada muda; em fracas o jogo segue fluido.
@@ -711,7 +778,7 @@ function frame(now) {
   const isBuildMenu = Boolean(weapons.buildHubOpen || (ui.buildPanel && !ui.buildPanel.hidden));
   const isDemiurge = Boolean(DemiurgeModalState.isOpen);
   // livro aberto = tempo congelado (dt = 0 para tudo: personagem, NPCs, dia/noite, combate)
-  const isBookOpen = isDemiurgeDiaryReaderOpen();
+  const isBookOpen = isDemiurgeDiaryReaderOpen() || isFoodPanelOpen(); // alforje aberto = mundo parado (como o livro)
   const isPaused = pause.open || isDemiurge || isReading || isBuildMenu || isBookOpen;
   const dt = isPaused ? 0 : Math.max(0, Math.min(elapsed, CONFIG.maxDelta)) * deathScreen.timeScale;
 

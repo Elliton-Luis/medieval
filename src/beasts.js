@@ -331,9 +331,10 @@ export class Gulur {
     // Aura Amarela Simples e Elegante do Gulur (Sem cilindro artificial)
     // ========================================================================
     // 1. Luz pontual suave banhando o dorso e pernas superiores do colosso
-    this.auraLight = new THREE.PointLight(0xffea44, 2.6, 26, 1.5);
-    this.auraLight.position.set(0, 0.4, -0.5);
-    this.bodyGroup.add(this.auraLight);
+    // NÃO é uma PointLight real: luzes que aparecem/somem com o monstro mudam o número de luzes da cena e forçam o
+    // three a RECOMPILAR todos os shaders com iluminação (stutter de ~1 s ao anoitecer/amanhecer). O visual da aura
+    // vem do halo aditivo abaixo; aqui fica só o valor de intensidade que a lógica já pulsa/apaga.
+    this.auraLight = { intensity: 2.6 };
 
     // 2. Halo/Sprite de neblina etérea suave em volta do corpo
     const auraMistTex = getAuraMistTexture();
@@ -602,7 +603,7 @@ export class Gulur {
     }
     if (this.auraSprite) {
       this.auraSprite.scale.set(13.0 * auraPulse, 9.5 * auraPulse, 1.0);
-      this.auraSprite.material.opacity = 0.32 + Math.sin(tNow * 1.2) * 0.05;
+      this.auraSprite.material.opacity = (0.32 + Math.sin(tNow * 1.2) * 0.05) * Math.min(1, (this.auraLight?.intensity ?? 2.6) / 2.6);
     }
     if (this.eyeHalos) {
       const eyeFlicker = 1.0 + Math.sin(tNow * 3.2) * 0.12;
@@ -2011,6 +2012,41 @@ export class BeastManager {
     this.hexoculusList = [];
     this.polyphoniaList = [];
     this.respawnTimer = 0;
+    // Despertar escalonado: ao anoitecer os monstros NÃO surgem todos juntos (o 1º desenho de cada um sobe geometria à
+    // GPU e inicializa a IA: 13 de uma vez = ~1 s de trava). Um acorda por vez, com intervalo calmo.
+    this._wasNight = false;
+    this._wakeQueue = [];
+    this._wakeTimer = 0;
+  }
+
+  _allBeasts() {
+    return [...this.walkers, ...this.biters, ...this.hexoculusList, ...this.polyphoniaList];
+  }
+
+  _updateWake(dt, isNight) {
+    if (isNight && !this._wasNight) {
+      this._wasNight = true;
+      const q = this._allBeasts().filter((b) => !b._awake);
+      for (let i = q.length - 1; i > 0; i--) { // embaralha: a ordem de surgimento muda a cada noite
+        const j = Math.floor(Math.random() * (i + 1));
+        [q[i], q[j]] = [q[j], q[i]];
+      }
+      this._wakeQueue = q;
+      this._wakeTimer = 2.0; // o primeiro só acorda 2 s depois de anoitecer
+    } else if (!isNight && this._wasNight) {
+      this._wasNight = false;
+      this._wakeQueue.length = 0;
+      for (const b of this._allBeasts()) b._awake = false;
+    }
+    if (isNight && this._wakeQueue.length > 0) {
+      this._wakeTimer -= dt;
+      if (this._wakeTimer <= 0) {
+        const b = this._wakeQueue.shift();
+        b._awake = true;
+        const eclipse = Boolean(WorldDecay && WorldDecay.isEclipse);
+        this._wakeTimer = eclipse ? 1.8 : 4.0 + Math.random() * 3.0; // um a cada ~4–7 s (1,8 s no eclipse)
+      }
+    }
   }
 
   spawnInitialBeasts(cityCenter) {
@@ -2090,13 +2126,23 @@ export class BeastManager {
     }
   }
 
-  spawnRandomBiters(cx, cz, count = 4) {
+  spawnRandomBiters(cx, cz, count = 4, awake = false) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       // Spawna no limiar da neblina (78m-88m) para o jogador avistar apenas a silhueta se aproximando
       const radius = 78 + Math.random() * 10;
       const bx = cx + Math.cos(angle) * radius;
       const bz = cz + Math.sin(angle) * radius;
+
+      // POOL: reaproveita um Necron morto/oculto (antes cada leva construía Necrons novos = trava de ~1 s por spawn
+      // e os mortos ficavam para sempre na cena). Só constrói um novo se não houver nenhum para reciclar e abaixo do teto.
+      const reusable = this.biters.find((b) => (!b.alive && b.deadTime > 6.0) || (b.alive === false && !b.root.visible));
+      if (reusable) {
+        reusable.reposition(bx, bz);
+        reusable._awake = awake;
+        continue;
+      }
+      if (this.biters.length >= 10) continue; // teto de Necrons existentes
 
       const necron = new Necron(
         this.scene,
@@ -2109,6 +2155,7 @@ export class BeastManager {
         bz,
         this.audio
       );
+      necron._awake = awake; // reposição noturna (já espaçada pelo timer) nasce acordada; os iniciais esperam a fila
       this.biters.push(necron);
       if (this.npcs?.npcs && !this.npcs.npcs.includes(necron)) {
         this.npcs.npcs.push(necron);
@@ -2120,14 +2167,17 @@ export class BeastManager {
     const px = this.player.x ?? 0;
     const pz = this.player.z ?? 0;
 
-    // Atualiza todos os Gulurs
+    this._updateWake(dt, isNight);
+
+    // Atualiza todos os Gulurs (cada um só fica ativo depois de "acordar" na fila escalonada)
     for (let i = 0; i < this.walkers.length; i++) {
-      this.walkers[i].update(dt, isNight);
+      this.walkers[i].update(dt, isNight && this.walkers[i]._awake);
     }
 
     // Reposicionamento dinâmico / Respawn dos Gulurs (Colossos dos Ermos com Olhos Amarelos)
     for (let i = 0; i < this.walkers.length; i++) {
       const g = this.walkers[i];
+      if (!g._awake) continue; // ainda dormindo na fila de despertar: não reposiciona (evita piscar 1 frame)
       const gdx = g.x - px;
       const gdz = g.z - pz;
       const gDistSq = gdx * gdx + gdz * gdz;
@@ -2141,17 +2191,17 @@ export class BeastManager {
 
     // Atualiza todos os Necrons
     for (let i = 0; i < this.biters.length; i++) {
-      this.biters[i].update(dt, isNight);
+      this.biters[i].update(dt, isNight && this.biters[i]._awake);
     }
 
     // Atualiza todos os Hexoculus (6 olhos)
     for (let i = 0; i < this.hexoculusList.length; i++) {
-      this.hexoculusList[i].update(dt, isNight);
+      this.hexoculusList[i].update(dt, isNight && this.hexoculusList[i]._awake);
     }
 
     // Atualiza todas as Polyphonias (fauces múltiplas)
     for (let i = 0; i < this.polyphoniaList.length; i++) {
-      this.polyphoniaList[i].update(dt, isNight);
+      this.polyphoniaList[i].update(dt, isNight && this.polyphoniaList[i]._awake);
     }
 
     // À noite ou durante o Eclipse, repõe criaturas mortas periodicamente
@@ -2160,6 +2210,7 @@ export class BeastManager {
       // Reposicionamento dinâmico dos Hexoculus nos ermos
       for (let i = 0; i < this.hexoculusList.length; i++) {
         const hex = this.hexoculusList[i];
+        if (!hex._awake) continue;
         const hdx = hex.x - px;
         const hdz = hex.z - pz;
         const hDistSq = hdx * hdx + hdz * hdz;
@@ -2173,6 +2224,7 @@ export class BeastManager {
       // Reposicionamento dinâmico das Polyphonias nos ermos
       for (let i = 0; i < this.polyphoniaList.length; i++) {
         const poly = this.polyphoniaList[i];
+        if (!poly._awake) continue;
         const pdx = poly.x - px;
         const pdz = poly.z - pz;
         const pDistSq = pdx * pdx + pdz * pdz;
@@ -2205,7 +2257,7 @@ export class BeastManager {
         const activeBiters = this.biters.filter((b) => b.alive && b.root.visible).length;
         if (activeBiters < maxBiters) {
           const spawnCount = isEclipse ? 4 : 2; // Dobro da quantidade spawnada por leva
-          this.spawnRandomBiters(px, pz, spawnCount);
+          this.spawnRandomBiters(px, pz, spawnCount, true);
         }
       }
     }

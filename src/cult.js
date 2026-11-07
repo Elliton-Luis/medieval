@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { createSeededRandom } from "./procedural.js";
 import { igniteTarget, spawnLoot, PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 import { VILLAGES } from "./kingdom.js";
+import { getCampOffsets, isCanonicalWorld, directionName } from "./worldgen.js";
 import { finalizeMonster, makeMergedGeometry, getSmoothDetailMaterial } from "./monsterParts.js";
 
 // ============================================================================
@@ -85,6 +86,12 @@ const _ebonyHornMat = new THREE.MeshStandardMaterial({
 });
 
 // Retrato Sombrio em SVG de Alta Definição do Líder da Seita Cátara (Morvath, o Perfeito)
+let _staffGlowTex = null; // textura do halo do cajado (criada uma vez)
+
+let _campSharedLight = null; // UMA luz para todos os acampamentos (nº de luzes da cena constante)
+let _campNearest = null;
+let _campNearestSq = Infinity;
+
 export const CULT_LEADER_PORTRAIT = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
     <radialGradient id="voidGlow" cx="50%" cy="45%" r="65%">
@@ -659,20 +666,27 @@ function animateCampFx(camp, time, dt) {
   }
 }
 
+// Troca palavras de direção (norte, sul, leste, oeste e compostas) por `dir`, preservando a capitalização.
+function retargetDirections(text, dir) {
+  return String(text || "").replace(/\b(nordeste|noroeste|sudeste|sudoeste|norte|sul|leste|oeste)\b/gi, (m) => (m[0] === m[0].toUpperCase() ? dir.charAt(0).toUpperCase() + dir.slice(1) : dir));
+}
+
 export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCenter, scene, world) {
   if (!skullsMesh || !weaponsMesh || !cityCenter) return;
   const random = createSeededRandom(regionSeed || 12345);
 
   CULT_ALTARS.length = 0;
   CULT_CAMP_GROUPS.length = 0;
+  const campOffsets = getCampOffsets();
 
   const cx = cityCenter.x ?? 0;
   const cz = cityCenter.z ?? 0;
 
   for (let c = 0; c < CULT_CAMPS_PRESETS.length; c++) {
     const preset = CULT_CAMPS_PRESETS[c];
-    let ax = cx + preset.dx;
-    let az = cz + preset.dz;
+    const off = campOffsets[c] || preset; // posição do acampamento vem da seed do mundo (worldgen)
+    let ax = cx + (off.dx ?? preset.dx);
+    let az = cz + (off.dz ?? preset.dz);
 
     // Salvaguarda matemática: garante que NUNCA colida com a Capital nem com qualquer Vila
     const distToCenter = Math.hypot(ax - cx, az - cz);
@@ -705,8 +719,9 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       cultistsCount: preset.cultistsCount,
       hasLeader: preset.hasLeader,
       inspected: false,
-      name: preset.name,
-      lorePrompt: preset.lorePrompt,
+      // mundo procedural: as direções citadas no nome e no texto passam a refletir a posição REAL do acampamento
+      name: isCanonicalWorld() ? preset.name : retargetDirections(preset.name, directionName(ax, az)),
+      lorePrompt: isCanonicalWorld() ? preset.lorePrompt : retargetDirections(preset.lorePrompt, directionName(ax, az)),
     };
     CULT_ALTARS.push(outpostData);
     if (!CultState.altarTarget) {
@@ -882,11 +897,16 @@ export function spawnCultistClues(skullsMesh, weaponsMesh, regionSeed, cityCente
       campGroup.userData.fx = { fireSlots, torchSlots, fireOuter, fireMid, fireCore, torchOuter, torchInner, fireHalo, embers, emberPos, emberSeed, emberN, flags, phase: random() * 6.28, ringR };
 
       // Única luz pontual por acampamento (otimização radical de shaders e draw calls)
-      const campfireLight = new THREE.PointLight(0xaa33ff, 0, isHuge ? 32 : isMedium ? 24 : 16, 1.8);
-      campfireLight.position.set(0, 1.1, 0);
-      campfireLight.visible = false;
-      campGroup.add(campfireLight);
-      campGroup.userData.mainLight = campfireLight;
+      // Sem PointLight por acampamento: luz que liga/desliga ao se aproximar muda o nº de luzes da cena e recompila
+      // todos os shaders (stutter). Existe UMA luz compartilhada e permanente (_campSharedLight) que o loop de
+      // atualização move para o acampamento mais próximo.
+      if (!_campSharedLight) {
+        _campSharedLight = new THREE.PointLight(0xaa33ff, 0, 32, 1.8);
+        _campSharedLight.visible = true; // NUNCA alternar visible em runtime (mantém o nº de luzes constante)
+        _campSharedLight.position.set(0, -9999, 0);
+        scene.add(_campSharedLight);
+      }
+      campGroup.userData.mainLight = null;
       campGroup.userData.isHuge = isHuge;
 
       // Os acampamentos só aparecem à noite
@@ -1710,9 +1730,28 @@ export function buildCultLeaderMesh() {
   staffGem.position.set(0, 1.35, 0);
   staffGroup.add(staffGem);
 
-  const staffLight = new THREE.PointLight(0xaa22ff, 4.5, 18, 1.8);
-  staffLight.position.set(0, 1.45, 0);
-  staffGroup.add(staffLight);
+  // Halo roxo aditivo no lugar de uma PointLight real (luz que nasce/some com o líder muda o nº de luzes da cena e
+  // recompila todos os shaders). `staffLight.intensity` segue sendo pulsado pela lógica e comanda o brilho do halo.
+  const staffLight = { intensity: 4.5, glow: null };
+  {
+    if (!_staffGlowTex) {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 64;
+      const g2 = cv.getContext("2d");
+      const gr = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, "rgba(255,255,255,1)");
+      gr.addColorStop(0.35, "rgba(255,255,255,0.4)");
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      g2.fillStyle = gr;
+      g2.fillRect(0, 0, 64, 64);
+      _staffGlowTex = new THREE.CanvasTexture(cv);
+    }
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: _staffGlowTex, color: 0xaa33ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55 }));
+    glow.scale.set(2.2, 2.2, 1);
+    glow.position.set(0, 1.45, 0);
+    staffGroup.add(glow);
+    staffLight.glow = glow;
+  }
   model.add(staffGroup);
 
   root.visible = false;
@@ -1967,6 +2006,7 @@ export class CultLeader {
 
     if (this.staffLight) {
       this.staffLight.intensity = 3.6 + Math.sin(performance.now() * 0.005) * 1.2;
+      if (this.staffLight.glow) this.staffLight.glow.material.opacity = 0.3 + (this.staffLight.intensity - 2.4) * 0.12;
     }
     // vida barata: a gema gira devagar e a barra do manto balança
     if (this.staffGem) this.staffGem.rotation.y += dt * 0.9;
@@ -2066,6 +2106,8 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
 
   // 1. Visibilidade dos Acampamentos dos Servos dos Demiurgos: SÓ APARECEM À NOITE, NUNCA DE DIA!
   // Otimização Zero-GC: Apenas o acampamento onde o jogador está por perto (< 45m) acende a luz suave.
+  _campNearest = null;
+  _campNearestSq = Infinity;
   for (let c = 0; c < CULT_CAMP_GROUPS.length; c++) {
     const camp = CULT_CAMP_GROUPS[c];
     if (!camp) continue;
@@ -2081,19 +2123,21 @@ export function updateCultistsLifeCycle(cultistsPool, player, npcs, firePool, dt
     if (wantVisible && cd0 < 60 * 60) {
       animateCampFx(camp, performance.now() * 0.001, dt);
     }
-    const light = camp.userData.mainLight;
-    if (light) {
-      if (!isNightBool) {
-        if (light.visible) light.visible = false;
-      } else {
-        const cdx = camp.position.x - px;
-        const cdz = camp.position.z - pz;
-        const isNear = cdx * cdx + cdz * cdz < 45 * 45;
-        if (light.visible !== isNear) {
-          light.visible = isNear;
-          light.intensity = isNear ? (camp.userData.isHuge ? 6.5 : 4.5) : 0;
-        }
-      }
+    // acampamento mais próximo (à noite, a < 45 m) recebe a luz compartilhada
+    if (isNightBool && cd0 < 45 * 45 && cd0 < _campNearestSq) {
+      _campNearestSq = cd0;
+      _campNearest = camp;
+    }
+  }
+  if (_campSharedLight) {
+    if (_campNearest) {
+      _campSharedLight.position.set(_campNearest.position.x, _campNearest.position.y + 1.1, _campNearest.position.z);
+      const base = _campNearest.userData.isHuge ? 6.5 : 4.5;
+      _campSharedLight.intensity = base * (0.86 + Math.sin(performance.now() * 0.004) * 0.12);
+      _campSharedLight.distance = _campNearest.userData.isHuge ? 32 : 22;
+    } else if (_campSharedLight.intensity !== 0) {
+      _campSharedLight.intensity = 0;
+      _campSharedLight.position.set(0, -9999, 0);
     }
   }
 
