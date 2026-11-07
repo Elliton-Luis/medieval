@@ -363,7 +363,10 @@ export class DayNightCycle {
       this.scene.fog.color.lerp(_fogMixed, fogTint);
       // perto do diário a neblina de DIA cede um pouco (até -30%); à noite não muda
       const relief = 1 - 0.3 * this._fogReliefS * this.daylight;
-      this.scene.fog.density = lerp(A.fog.density, B.fog.density) * fogMul * relief;
+      // De DIA a névoa é mais rala (até -38% ao meio-dia, para enxergar o caminho); a noite continua 100%.
+      // smoothstep sobre o nível de luz do dia: amanhecer/entardecer fazem a transição sem saltos.
+      const dayEase = 1 - 0.38 * smoothstep(0.35, 0.9, this.daylight);
+      this.scene.fog.density = lerp(A.fog.density, B.fog.density) * fogMul * relief * dayEase;
       // o horizonte acompanha a neblina, sem "faixa" de céu limpo atrás dela
       this.currentColor.lerp(this.scene.fog.color, Math.min(1, fogTint * 1.25));
       if (this.scene.background) this.scene.background.copy(this.currentColor);
