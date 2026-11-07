@@ -145,6 +145,11 @@ export class GameUI {
     });
     window.setTimeout(() => this.controls?.classList.add("hidden"), 16000);
     window.addEventListener("keydown", (event) => {
+      // F7: limpa TODOS os avisos da tela (o ativo e a pilha que esperava por baixo). Ctrl+F7 é a telemetria.
+      if (event.code === "F7" && !event.ctrlKey && !event.repeat) {
+        event.preventDefault();
+        this.clearToasts();
+      }
       if ((event.code === "KeyK" || event.code === "F1") && !event.repeat) {
         event.preventDefault();
         this.controls?.classList.toggle("hidden");
@@ -1106,6 +1111,18 @@ export class GameUI {
     this._toastTimeout = window.setTimeout(() => {
       this._onToastExpired();
     }, this._activeToast.remainingMs);
+  }
+
+  /** Limpa de uma vez o aviso atual e todos os empilhados por baixo, mais o aviso de ponteiro/controles. */
+  clearToasts() {
+    window.clearTimeout(this._toastTimeout);
+    this._toastStack = [];
+    this._activeToast = null;
+    if (this.toast) {
+      this.toast.classList.remove("visible");
+      this.toast.textContent = "";
+    }
+    this.notice?.classList.add("hidden");
   }
 
   _onToastExpired() {
