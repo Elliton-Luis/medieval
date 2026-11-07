@@ -1324,6 +1324,11 @@ kbd { display: inline-block; padding: 3px 6px; border: 1px solid #e8e1c933; bord
   font-weight: 700;
 }
 
+/* TELA LIMPA (F9 / P): só o mundo 3D; nada acima dele (HUD, vinheta, avisos, menus, legendas, overlays do body) */
+body.clean-screen { cursor: none; }
+body.clean-screen > *:not(#game) { display: none !important; }
+body.clean-screen #game > *:not(#world-canvas) { display: none !important; }
+
 /* Cutscene de abertura: sem HUD por cima da imagem (cinematográfico). O fundo, a vinheta e o loading seguem visíveis. */
 body.intro-playing #game > *:not(canvas):not(.vignette):not(#loading) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.4s ease; }
 
@@ -1390,3 +1395,5 @@ body.intro-playing #game > *:not(canvas):not(.vignette):not(#loading) { opacity:
 .chat-q:disabled { opacity: .5; cursor: default; }
 .dialogue-panel.chat-mode .dialogue-lore-box { display: none; }
 .dialogue-panel.chat-mode.tab-actions .dialogue-lore-box { display: block; }
+.chat-q.opt { border-left: 4px solid #d9b45a; background: #20262e; }
+.chat-q.opt:hover { background: #2c343f; }

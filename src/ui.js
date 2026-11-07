@@ -45,6 +45,7 @@ export class GameUI {
     this.dialogueEyebrow = document.getElementById("dialogue-eyebrow");
     this._dialogueActiveTab = "all";
     this.toast = document.getElementById("toast");
+    this._bindScreenKeys();
     this._toastStack = [];
     this._activeToast = null;
     this._toastTimeout = null;
@@ -145,11 +146,6 @@ export class GameUI {
     });
     window.setTimeout(() => this.controls?.classList.add("hidden"), 16000);
     window.addEventListener("keydown", (event) => {
-      // F7: limpa TODOS os avisos da tela (o ativo e a pilha que esperava por baixo). Ctrl+F7 é a telemetria.
-      if (event.code === "F7" && !event.ctrlKey && !event.repeat) {
-        event.preventDefault();
-        this.clearToasts();
-      }
       if ((event.code === "KeyK" || event.code === "F1") && !event.repeat) {
         event.preventDefault();
         this.controls?.classList.toggle("hidden");
@@ -858,7 +854,7 @@ export class GameUI {
       for (const q of chat.questions) {
         const b = document.createElement("button");
         b.type = "button";
-        b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
+        b.className = `chat-q ${q.id === "bye" || q.kind === "neutral" ? "bye" : ""} ${q.kind === "opt" ? "opt" : ""}`;
         b.textContent = q.label;
         b.addEventListener("click", () => {
           this._finishTyping(); // clicar durante a digitação conclui a fala e já faz a pergunta
@@ -873,7 +869,7 @@ export class GameUI {
       this._setMainTab("chat"); // a Conversa é a aba principal
     } else {
       if (chat.say) this.addChatLine("npc", chat.say, "");
-      this._setMainTab(this._npcTab || "chat");
+      this._setMainTab(chat.focusChat ? "chat" : this._npcTab || "chat");
     }
   }
 
@@ -921,7 +917,9 @@ export class GameUI {
     if (!this._chatDom) return;
     this._updatePersona(res);
     if (res.portrait && this.dialoguePortrait) this.dialoguePortrait.style.backgroundImage = `url("${res.portrait}")`;
-    this.addChatLine("npc", res.t, res.n || "");
+    if (!res.silent && res.t) this.addChatLine("npc", res.t, res.n || "");
+    else if (res.n && !res.silent) this.addChatLine("npc", "", res.n);
+    if (res.extra && res.extra.t) this.addChatLine("npc", res.extra.t, res.extra.n || "");
     if (res.questions) {
       // reconstrói perguntas sem trocar a conversa
       const d = this._chatDom;
@@ -929,7 +927,7 @@ export class GameUI {
       for (const q of res.questions) {
         const b = document.createElement("button");
         b.type = "button";
-        b.className = `chat-q ${q.id === "bye" ? "bye" : ""}`;
+        b.className = `chat-q ${q.id === "bye" || q.kind === "neutral" ? "bye" : ""} ${q.kind === "opt" ? "opt" : ""}`;
         b.textContent = q.label;
         b.addEventListener("click", () => {
           this._finishTyping(); // clicar durante a digitação conclui a fala e já faz a pergunta
@@ -1118,6 +1116,43 @@ export class GameUI {
     this._toastTimeout = window.setTimeout(() => {
       this._onToastExpired();
     }, this._activeToast.remainingMs);
+  }
+
+  /**
+   * Teclas globais de tela, em fase de CAPTURA (nenhum outro handler consegue engolir o evento e funcionam com menu,
+   * diálogo ou ponteiro travado):
+   *   F7 ou N  -> limpa todos os avisos (o ativo e a pilha)
+   *   F9 ou P  -> TELA LIMPA para capturas: some tudo que não é o mundo 3D (HUD, avisos, vinheta, menus, legendas)
+   *   ESC      -> sai da tela limpa (sem abrir o menu de pausa)
+   * Em notebooks as F-teclas costumam exigir Fn; por isso N e P existem como alternativas.
+   */
+  _bindScreenKeys() {
+    window.addEventListener("keydown", (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const t = event.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const key = event.code;
+      if (document.body.classList.contains("clean-screen") && key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.setCleanScreen(false);
+        return;
+      }
+      if (event.repeat) return;
+      if (key === "F7" || key === "KeyN") {
+        event.preventDefault();
+        this.clearToasts();
+      } else if (key === "F9" || key === "KeyP") {
+        event.preventDefault();
+        this.setCleanScreen(!document.body.classList.contains("clean-screen"));
+      }
+    }, true);
+  }
+
+  /** Tela limpa: nada aparece acima do mundo 3D (sem aviso de entrada/saída, para não sujar a captura). */
+  setCleanScreen(on) {
+    if (on) this.clearToasts();
+    document.body.classList.toggle("clean-screen", Boolean(on));
   }
 
   /** Limpa de uma vez o aviso atual e todos os empilhados por baixo, mais o aviso de ponteiro/controles. */
