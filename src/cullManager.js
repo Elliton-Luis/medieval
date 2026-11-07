@@ -6,6 +6,12 @@
 // ============================================================================
 const entries = [];
 let _timer = 0;
+let _fogVis = 260;
+
+/** Limite dinâmico vindo da névoa: nada além dessa distância precisa ser desenhado. */
+export function setFogCull(vis) {
+  _fogVis = vis;
+}
 
 /** Registra um grupo estático. (x, z) = centro no mundo, radius = raio que o envolve. */
 export function registerCullable(obj, x, z, radius, maxDist = 240) {
@@ -20,7 +26,7 @@ export function updateCulling(px, pz, dt, force = false) {
     const e = entries[i];
     const dx = e.x - px;
     const dz = e.z - pz;
-    const limit = e.maxDist + e.radius + (e.shown ? 12 : 0); // histerese de 12 m
+    const limit = Math.min(e.maxDist, _fogVis + 30) + e.radius + (e.shown ? 12 : 0); // histerese de 12 m
     const show = dx * dx + dz * dz < limit * limit;
     if (show !== e.shown) {
       e.shown = show;

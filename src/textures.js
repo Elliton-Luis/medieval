@@ -12,12 +12,17 @@ function rng(seed) {
   };
 }
 
+// Texturas leves: a neblina come o detalhe fino a poucos metros, então o canvas é 64 px (1/4 da memória e do
+// upload para a GPU) e o desenho continua em coordenadas de 128 (ctx.scale), sem reescrever cada textura.
+const TEX_PX = 64;
+
 function make(name, size, draw) {
   if (cache.has(name)) return cache.get(name);
   const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = TEX_PX;
+  canvas.height = TEX_PX;
   const ctx = canvas.getContext("2d");
+  ctx.scale(TEX_PX / size, TEX_PX / size);
   draw(ctx, size, rng(name.length * 7919 + size));
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -30,28 +35,39 @@ function make(name, size, draw) {
 
 const grey = (v) => `rgb(${v | 0},${v | 0},${(v * 0.96) | 0})`;
 
+// Pedra em 9 blocos (3 fiadas de 3, a do meio deslocada meio bloco): menos linhas, leitura clara.
+function blockWall(ctx, size, random, base, jitter, line, lineAlpha) {
+  ctx.fillStyle = grey(base);
+  ctx.fillRect(0, 0, size, size);
+  const rows = 3;
+  const cols = 3;
+  const bh = size / rows;
+  const bw = size / cols;
+  for (let r = 0; r < rows; r++) {
+    const shift = r % 2 ? bw * 0.5 : 0;
+    for (let c = -1; c < cols + 1; c++) {
+      const x = c * bw + shift;
+      if (x >= size || x + bw <= 0) continue;
+      const y = r * bh;
+      ctx.fillStyle = grey(base - 10 + random() * jitter);
+      ctx.fillRect(x + 1.5, y + 1.5, bw - 3, bh - 3);
+      ctx.fillStyle = "rgba(255,255,255,0.10)";
+      ctx.fillRect(x + 1.5, y + 1.5, bw - 3, 3);
+      ctx.fillStyle = "rgba(0,0,0,0.14)";
+      ctx.fillRect(x + 1.5, y + bh - 4.5, bw - 3, 3);
+      ctx.strokeStyle = `rgba(${line},${lineAlpha})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, bw, bh);
+    }
+  }
+}
+
 export function stoneTexture() {
   return make("stone", 128, (ctx, size, random) => {
-    ctx.fillStyle = grey(190);
-    ctx.fillRect(0, 0, size, size);
-    let y = 0;
-    while (y < size) {
-      const h = 16 + random() * 8;
-      let x = -random() * 20;
-      while (x < size) {
-        const w = 20 + random() * 18;
-        ctx.fillStyle = grey(165 + random() * 70);
-        ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-        ctx.strokeStyle = "rgba(70,66,60,0.55)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, w, h);
-        x += w;
-      }
-      y += h;
-    }
-    for (let i = 0; i < 260; i++) {
+    blockWall(ctx, size, random, 190, 70, "70,66,60", 0.55);
+    for (let i = 0; i < 70; i++) {
       ctx.fillStyle = `rgba(60,56,50,${random() * 0.12})`;
-      ctx.fillRect(random() * size, random() * size, 2, 2);
+      ctx.fillRect(random() * size, random() * size, 3, 3);
     }
   });
 }
@@ -147,66 +163,35 @@ export function tileTexture() {
 // manchas de umidade e sujeira. Tons claros (a cor final vem do material/vértice).
 export function weatheredStoneTexture() {
   return make("wallStone", 128, (ctx, size, random) => {
-    ctx.fillStyle = grey(176);
-    ctx.fillRect(0, 0, size, size);
-    let y = 0;
-    const rows = [];
-    while (y < size) {
-      const h = 18 + random() * 10;
-      let x = -random() * 24;
-      while (x < size) {
-        const w = 22 + random() * 24;
-        const tone = 150 + random() * 80;
-        ctx.fillStyle = grey(tone);
-        ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-        // luz no topo e sombra embaixo de cada bloco
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.fillRect(x + 1, y + 1, w - 2, 2);
-        ctx.fillStyle = "rgba(0,0,0,0.16)";
-        ctx.fillRect(x + 1, y + h - 3, w - 2, 2);
-        ctx.strokeStyle = "rgba(48,44,40,0.7)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, w, h);
-        rows.push([x, y, w, h]);
-        x += w;
-      }
-      y += h;
-    }
-    // rachaduras
-    ctx.strokeStyle = "rgba(34,30,26,0.55)";
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 7; i++) {
+    blockWall(ctx, size, random, 176, 80, "48,44,40", 0.7);
+    // 3 rachaduras, 3 escorridos de umidade e um pouco de musgo na base (o resto era invisível na neblina)
+    ctx.strokeStyle = "rgba(34,30,26,0.5)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
       let cx = random() * size;
-      let cy = random() * size;
+      let cy = random() * size * 0.6;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      for (let k = 0; k < 5; k++) {
+      for (let k = 0; k < 4; k++) {
         cx += (random() - 0.5) * 14;
-        cy += 4 + random() * 9;
+        cy += 5 + random() * 9;
         ctx.lineTo(cx, cy);
       }
       ctx.stroke();
     }
-    // manchas de umidade escorrendo
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 3; i++) {
       const sx = random() * size;
       const g = ctx.createLinearGradient(0, 0, 0, size * 0.6);
-      g.addColorStop(0, "rgba(40,36,32,0.22)");
+      g.addColorStop(0, "rgba(40,36,32,0.2)");
       g.addColorStop(1, "rgba(40,36,32,0)");
       ctx.fillStyle = g;
-      ctx.fillRect(sx, 0, 3 + random() * 6, size * 0.6);
+      ctx.fillRect(sx, 0, 5 + random() * 6, size * 0.6);
     }
-    // musgo esverdeado acumulando na base (parte de baixo da textura = pé da parede)
-    for (let i = 0; i < 160; i++) {
+    for (let i = 0; i < 40; i++) {
       const px = random() * size;
-      const py = size - Math.pow(random(), 2.2) * size * 0.45;
-      ctx.fillStyle = `rgba(${70 + random() * 30},${96 + random() * 40},${48 + random() * 20},${0.18 + random() * 0.25})`;
-      ctx.fillRect(px, py, 2 + random() * 4, 2 + random() * 3);
-    }
-    // sujeira fina
-    for (let i = 0; i < 260; i++) {
-      ctx.fillStyle = `rgba(50,44,38,${random() * 0.16})`;
-      ctx.fillRect(random() * size, random() * size, 2, 2);
+      const py = size - Math.pow(random(), 2.2) * size * 0.4;
+      ctx.fillStyle = `rgba(${70 + random() * 30},${96 + random() * 40},${48 + random() * 20},${0.2 + random() * 0.25})`;
+      ctx.fillRect(px, py, 4 + random() * 5, 3 + random() * 3);
     }
   });
 }

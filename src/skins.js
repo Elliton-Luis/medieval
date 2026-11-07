@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 const cache = new Map();
 
-const TEX = 128; // resolução das texturas (cache: 4 canvas no total)
+const TEX = 64; // texturas de personagem simples e leves: a forma (geometria) carrega o visual, não o detalhe da textura
 
 function patternTexture(kind) {
   if (cache.has(kind)) return cache.get(kind);
@@ -39,18 +39,18 @@ function patternTexture(kind) {
     for (let y = 0; y < TEX; y += 3) {
       for (let x = ((y / 3) % 2) * 1.5; x < TEX; x += 3) ctx.fillRect(x, y, 1, 1);
     }
-    speck(60, 0.18, "#555555", "#ffffff", 1);
+    speck(16, 0.18, "#555555", "#ffffff", 1);
     // remendos / dobras suaves
     ctx.globalAlpha = 0.08;
     ctx.fillStyle = "#444";
     for (let i = 0; i < 5; i++) ctx.fillRect(random() * TEX, random() * TEX, 14 + random() * 22, 2);
   } else if (kind === "leather") {
     // poros e rugas do couro + costura tracejada
-    speck(420, 0.2, "#5a5a5a", "#f0f0f0", 2);
+    speck(100, 0.2, "#5a5a5a", "#f0f0f0", 2);
     ctx.globalAlpha = 0.14;
     ctx.strokeStyle = "#555";
     ctx.lineWidth = 1;
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 6; i++) {
       const x = random() * TEX, y = random() * TEX;
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -83,19 +83,19 @@ function patternTexture(kind) {
     }
     ctx.globalAlpha = 0.18;
     ctx.strokeStyle = "#444";
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 3; i++) {
       const x = random() * TEX, y = random() * TEX;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + random() * 30 - 15, y + random() * 10 - 5);
       ctx.stroke();
     }
-    speck(40, 0.14, "#7a5a3a", "#9a7a5a", 2);
+    speck(10, 0.14, "#7a5a3a", "#9a7a5a", 2);
   } else {
     // pele: poros, manchas suaves e leve vermelhidão
-    speck(300, 0.14, "#888888", "#f4f4f4", 1);
+    speck(70, 0.14, "#888888", "#f4f4f4", 1);
     ctx.globalAlpha = 0.07;
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 5; i++) {
       ctx.fillStyle = random() > 0.5 ? "#7a7a7a" : "#ffffff";
       ctx.beginPath();
       ctx.arc(random() * TEX, random() * TEX, 6 + random() * 12, 0, Math.PI * 2);
@@ -110,7 +110,7 @@ function patternTexture(kind) {
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
-  texture.anisotropy = 4;
+  texture.anisotropy = 1;
   cache.set(kind, texture);
   return texture;
 }

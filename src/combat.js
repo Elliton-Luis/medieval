@@ -132,8 +132,8 @@ export class CombatSystem {
     const charging = isSpear && moveSpeed > 5.5;
     const reach = def.reach + (charging ? 1.25 : 0);
     const minFacing = def.arc;
-    const baseDamage = def.damage + (finisher ? 1 : 0) + (charge > 0.6 ? 1 : 0) + speedBonusDmg;
-    const damage = Math.max(1, Math.round(baseDamage * speedMult * PlayerStats.getMeleeMult() * PlayerEquipment.getWeaponMult() * 10) / 10);
+    const baseDamage = def.damage + (finisher ? (def.type === "fists" ? 0.5 : 1) : 0) + (charge > 0.6 ? 1 : 0) + speedBonusDmg;
+    const damage = Math.max(def.type === "fists" ? 0.3 : 1, Math.round(baseDamage * speedMult * PlayerStats.getMeleeMult() * PlayerEquipment.getWeaponMult() * 10) / 10);
     const knock = def.knock * (finisher ? 1.35 : 1) * (1 + charge * 0.8) * (isSpear ? speedMult : 1) * PlayerStats.getMeleeMult();
     const launch = def.launch ? def.launch * (0.5 + charge) : finisher || (isSpear && moveSpeed > 8) ? 0.95 : 0;
     const big = def.hands === 2 || finisher || charging;

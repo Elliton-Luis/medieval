@@ -141,7 +141,8 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
     scene.background.copy(eclipseBg);
     if (scene.fog) {
       scene.fog.color.copy(_eclipseFogColor);
-      scene.fog.density = 0.012 + decay * 0.008;
+      // o eclipse nunca deixa a névoa mais rala que o piso dramático; respeita níveis de neblina mais densos
+      scene.fog.density = Math.max(scene.fog.density, 0.012 + decay * 0.008);
     }
     if (dayNight.sun) {
       dayNight.sun.color.copy(_eclipseSunColor);
@@ -155,12 +156,9 @@ export function updateAtmosphereDecay(dayNight, scene, renderer) {
     const currentSky = daylight > 0.5 ? _tempSkyDay : _tempSkyNight;
 
     if (scene.fog) {
-      if (isNight) {
-        // Alcance da neblina noturna expandido em 50%
-        scene.fog.density = THREE.MathUtils.lerp(0.032, 0.037, decay);
-      } else {
-        scene.fog.density = 0.012 + decay * 0.011;
-      }
+      // A decadência ENGROSSA a névoa que o ciclo dia/noite e os níveis de neblina já definiram (antes ela
+      // sobrescrevia a densidade com valores fixos e os níveis/horários deixavam de ter efeito).
+      scene.fog.density *= isNight ? 1 + decay * 0.1 : 1 + decay * 0.5;
     }
     if (dayNight.sun && decay > 0.3) {
       dayNight.sun.color.lerp(_sunDecayColor, decay * 0.5);

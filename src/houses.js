@@ -62,6 +62,7 @@ const SCRIPTURE_CHAPTERS = [
 
 export class HouseSystem {
   constructor({ houses, player, ui, effects, audio, npcs, drops, sleep, candle, input = null, wells = [], townBenches = [] }) {
+    this.cullDistSq = 115 * 115; // reduzido em tempo real pela distância de visibilidade da névoa (main.js)
     this.houses = houses;
     this.player = player;
     this.ui = ui;
@@ -271,7 +272,7 @@ export class HouseSystem {
       }
 
       // 2. Culling de DISTÂNCIA MÁXIMA (neblina):
-      if (distanceSq > 115 * 115) {
+      if (distanceSq > this.cullDistSq) {
         if (house.group.visible) house.group.visible = false;
         if (house.interior && house.interior.visible) house.interior.visible = false;
         continue;

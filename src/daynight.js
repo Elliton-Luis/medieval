@@ -181,6 +181,11 @@ export class DayNightCycle {
     this._fogLevelF = 3;
     this.fogAuto = true;
     this._fogAutoTimer = 40;
+    // alívio local (0..1): ex.: perto do Diário de Demiurgo a névoa de DIA diminui ~30% (suavizado aqui)
+    this.fogRelief = 0;
+    this._fogReliefS = 0;
+    // distância (m) além da qual tudo é só a cor da névoa; o jogo usa isso para nem desenhar o que está lá
+    this.visibleDistance = 200;
 
     // Estado da Iluminação Pré-Assada
     this.weights = { day: 1.0, afternoon: 0.0, night: 0.0 };
@@ -293,6 +298,7 @@ export class DayNightCycle {
     }
     // aproximação lenta (~4s) do nível atual para o alvo
     this._fogLevelF += (this.fogLevel - this._fogLevelF) * (1 - Math.exp(-dt * 0.5));
+    this._fogReliefS += (this.fogRelief - this._fogReliefS) * (1 - Math.exp(-dt * 1.2));
   }
 
   /** Recalcula pesos, perfil dominante, daylight e isNight a partir do progresso. */
@@ -355,7 +361,9 @@ export class DayNightCycle {
       // a neblina de dia fica pálida e fria; à noite escurece junto com a luz
       _fogMixed.copy(FOG_TINT).multiplyScalar(0.015 + 0.985 * this.daylight * this.daylight); // à noite a neblina é preta
       this.scene.fog.color.lerp(_fogMixed, fogTint);
-      this.scene.fog.density = lerp(A.fog.density, B.fog.density) * fogMul;
+      // perto do diário a neblina de DIA cede um pouco (até -30%); à noite não muda
+      const relief = 1 - 0.3 * this._fogReliefS * this.daylight;
+      this.scene.fog.density = lerp(A.fog.density, B.fog.density) * fogMul * relief;
       // o horizonte acompanha a neblina, sem "faixa" de céu limpo atrás dela
       this.currentColor.lerp(this.scene.fog.color, Math.min(1, fogTint * 1.25));
       if (this.scene.background) this.scene.background.copy(this.currentColor);
@@ -371,8 +379,17 @@ export class DayNightCycle {
       this.fixedAstroGroup.scale.set(astroScale, astroScale, astroScale);
     }
 
+    // (calculado depois dos efeitos de decadência/eclipse, que também mexem na densidade; ver abaixo)
+
     // Efeitos Atmosféricos de Decadência / Eclipse do Demiurgo (se ativos)
     updateAtmosphereDecay(this, this.scene, renderer);
+
+    // Distância de visibilidade real: onde a transmitância da FogExp2 cai a ~0,01% (exp(-(d*dens)^2) -> d = 3/dens).
+    // Tudo além disso é pura cor de névoa, então chunks/casas/campos nem precisam ser desenhados lá.
+    if (this.scene && this.scene.fog) {
+      const target = clamp(3.0 / Math.max(0.004, this.scene.fog.density), 70, 260);
+      this.visibleDistance += (target - this.visibleDistance) * 0.2;
+    }
 
     // Posicionamento Estável da Luz Direcional (Sem trepidação de sombras)
     if (this.sun) {

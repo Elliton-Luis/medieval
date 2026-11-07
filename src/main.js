@@ -1,4 +1,4 @@
-import { updateCulling } from "./cullManager.js";
+import { updateCulling, setFogCull } from "./cullManager.js";
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { InputManager } from "./input.js";
@@ -29,10 +29,11 @@ import { loadGame, AutoSaveManager, saveGame } from "./save.js";
 import { HorseManager } from "./horses.js";
 import { RidingSystem, dismountHorse } from "./riding.js";
 import { MusicDirector, TRACK_CATALOG, getMusicCredits } from "./music.js";
+import { NpcLife } from "./npcLife.js";
 import { PauseMenu } from "./pause.js";
 import { DamageFx } from "./damagefx.js";
 import { setMeleeEnv, clearTokens } from "./melee.js";
-import { initDemiurgeDiary, updateDemiurgeDiary } from "./demiurgeBook.js";
+import { initDemiurgeDiary, updateDemiurgeDiary, isDemiurgeDiaryReaderOpen } from "./demiurgeBook.js";
 import { BeastManager } from "./beasts.js";
 import { spawnCrystalNodes, applyTorchColor, updateCrystalLight } from "./crystals.js";
 import { telemetry } from "./telemetry.js";
@@ -544,6 +545,10 @@ initDemiurgeDiary({
   isCollected: PlayerInventory.hasCollectedGroundBook,
 });
 
+// Vida social dos NPCs (diário, eventos dos dias, perguntas): sem save = história nova
+NpcLife.start({ npcs, ui, hasSave: Boolean(saved) });
+window.__game.npcLife = NpcLife;
+
 const shouldPlayIntro = !saved || new URLSearchParams(location.search).has("intro");
 if (shouldPlayIntro) {
   dayNight.setTime(0.05, true);
@@ -686,8 +691,10 @@ function frame(now) {
   const isReading = Boolean(ui.dialoguePanel && !ui.dialoguePanel.hidden);
   const isBuildMenu = Boolean(weapons.buildHubOpen || (ui.buildPanel && !ui.buildPanel.hidden));
   const isDemiurge = Boolean(DemiurgeModalState.isOpen);
-  const isPaused = pause.open || isDemiurge || isReading || isBuildMenu;
-  const dt = isPaused ? 0 : Math.min(elapsed, CONFIG.maxDelta) * deathScreen.timeScale;
+  // livro aberto = tempo congelado (dt = 0 para tudo: personagem, NPCs, dia/noite, combate)
+  const isBookOpen = isDemiurgeDiaryReaderOpen();
+  const isPaused = pause.open || isDemiurge || isReading || isBuildMenu || isBookOpen;
+  const dt = isPaused ? 0 : Math.max(0, Math.min(elapsed, CONFIG.maxDelta)) * deathScreen.timeScale;
 
   const isCutscene = Boolean(GameState.isIntroPlaying || DemiurgeCataclysm.active || HolyEndingState.active);
 
@@ -746,6 +753,14 @@ function frame(now) {
   updateFallingTrees(dt);
   ui.updateMissionHud(player.root.position);
   const clock = dayNight.update(dt, player.x, player.z);
+  // Névoa como orçamento de render: o que está além da distância de visibilidade é só cor de névoa, então
+  // chunks, casas e campos nem são desenhados lá (zero diferença visual, menos draw calls com névoa densa).
+  {
+    const vis = dayNight.visibleDistance;
+    world.setFogVisibility(vis);
+    houses.cullDistSq = Math.min(115, vis + 28) ** 2;
+    setFogCull(vis);
+  }
   const canAim = !input.modalOpen && !player.knockedOut && !player.blocking;
   aim.prepare(player, weapons.currentWeapon, canAim);
   cameraRig.update(dt, player, input, aim.active, aim);
@@ -765,6 +780,7 @@ function frame(now) {
   const isNightStrict = Boolean(dayNight.isNight && dayNight.daylight < 0.45);
   beasts.update(dt, isNightStrict);
   music.update(elapsed);
+  NpcLife.update(dt);
   damageFx.update(dt);
   world.updateWind(dt);
   sleep.update(elapsed);

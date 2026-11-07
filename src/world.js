@@ -181,7 +181,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=33", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=39", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -996,6 +996,17 @@ export class World {
     }
     if (this._hitsBoxShot(x, y, z, radius)) return true;
     return false;
+  }
+
+  // Distância de visibilidade da névoa (m). Chunks além dela só mostrariam a cor da névoa: nem são desenhados.
+  // Os limites de LOD encolhem de leve junto (nunca abaixo de 55%): sem pop-in visível, menos triângulos.
+  setFogVisibility(vis) {
+    const view = Math.min(CONFIG.viewDistance, vis + 48); // + meia diagonal do chunk
+    this.viewDistanceSq = view * view;
+    const k = Math.max(0.55, Math.min(1, vis / 110));
+    const base = CONFIG.lodDistances;
+    if (!this._lodDistances || this._lodDistances === base) this._lodDistances = base.slice();
+    for (let i = 0; i < base.length; i++) this._lodDistances[i] = base[i] * k;
   }
 
   _setChunkLod(chunk, level) {
