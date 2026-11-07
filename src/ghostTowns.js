@@ -4,6 +4,8 @@ import { PlayerInventory, PlayerStats } from "./rpg.js";
 import { createIrregularBloodGeometry } from "./farmAnimals.js";
 import { addCityBeacon } from "./beacons.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeStaticMeshes } from "./mergeUtils.js";
+import { registerCullable } from "./cullManager.js";
 
 // ============================================================================
 // Cidades Fantasma Procedurais: Ruínas de Guerra, Escombros e Sangue Seco
@@ -489,7 +491,7 @@ function buildPageMarker(hasPage) {
     page.rotation.x = -0.25;
     group.add(page);
   }
-  group.userData = { glow, page, beam, hasPage, baseY: 0.95 };
+  group.userData = { glow, page, beam, hasPage, baseY: 0.95, noMerge: true }; // animado a cada frame: fora da mesclagem estática
   return group;
 }
 
@@ -1055,6 +1057,10 @@ export function generateGhostTown(townConfig, scene, world) {
     townRoot.add(props);
   }
 
+  // Otimização: milhares de malhas estáticas viram dezenas (por material e célula de 48 m)
+  // e a vila inteira é desligada quando está além do alcance da névoa.
+  mergeStaticMeshes(townRoot, { cell: 48 });
+  registerCullable(townRoot, cx, cz, radius + 20);
   scene.add(townRoot);
 
   const townData = {

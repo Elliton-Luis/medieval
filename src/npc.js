@@ -1591,6 +1591,16 @@ export class NPCSystem {
     this.onWantedChange?.(0);
   }
 
+  // NPC fora de vista (atrás do jogador / atrás de casas): a IA continua, mas a 10 Hz com dt acumulado.
+  // Ninguém vê a animação, então o custo de pose/rig por frame some sem alterar o comportamento.
+  _tickHidden(npc, dt, playerX, playerZ) {
+    npc._hiddenAcc = (npc._hiddenAcc || 0) + dt;
+    if (npc._hiddenAcc < 0.1) return;
+    const step = npc._hiddenAcc;
+    npc._hiddenAcc = 0;
+    npc.update(step, playerX, playerZ);
+  }
+
   update(dt, playerX, playerZ, isNight = false, isPlayerLit = true, timeOfDay = 12, isCutscene = false) {
     const clampedDt = Math.min(dt, 0.05);
     this.playerX = playerX;
@@ -1707,7 +1717,7 @@ export class NPCSystem {
       const dot = toNpcX * cdx + toNpcZ * cdz;
       if (hasCam && dot < -2.2 && distanceSq > 14 * 14) {
         if (npc.root.visible) npc.root.visible = false;
-        if (npc.alive && !npc.temporary) npc.update(clampedDt, playerX, playerZ);
+        if (npc.alive && !npc.temporary) this._tickHidden(npc, clampedDt, playerX, playerZ);
         continue;
       }
 
@@ -1715,7 +1725,7 @@ export class NPCSystem {
       // O usuário: "não renderize o que está atrás das casas"
       if (hasCam && distanceSq > 16 * 16 && isOccludedByHouses(npc.x, npc.z)) {
         if (npc.root.visible) npc.root.visible = false;
-        if (npc.alive && !npc.temporary) npc.update(clampedDt, playerX, playerZ);
+        if (npc.alive && !npc.temporary) this._tickHidden(npc, clampedDt, playerX, playerZ);
         continue;
       }
 

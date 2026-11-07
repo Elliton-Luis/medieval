@@ -1,6 +1,9 @@
+import { registerCullable } from "./cullManager.js";
 import * as THREE from "three";
 import { PlayerInventory, PlayerStats, syncPlayerStatsToPlayer } from "./rpg.js";
 import { WorldDecay } from "./decay.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeStaticMeshes } from "./mergeUtils.js";
 
 // ============================================================================
 // farming.js — Plantações Orgânicas, Visual Aprimorado e Sistema de Colheita/Plantio
@@ -59,16 +62,35 @@ const _hayMat = new THREE.MeshStandardMaterial({
   flatShading: true,
 });
 
-/**
- * Cria a geometria combinada de um feixe de trigo dourado maduro (Wheat Sheaf).
- */
-function createWheatSheafGroup() {
-  const group = new THREE.Group();
+// Geometrias fundidas e compartilhadas por TODAS as plantas (12 meshes por feixe viravam 1 só).
+// A cor sai do vertex color; um único material serve a trigo e brotos.
+const _cropMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.84, flatShading: true });
+let _wheatGeoCache = null;
+let _sproutGeoCache = null;
+const _tmpObj = new THREE.Object3D();
 
-  // 6 caules finos com pequenas variações de ângulo e altura
+function bakePart(geometry, color, setup) {
+  const g = geometry.index ? geometry.toNonIndexed() : geometry.clone();
+  setup(_tmpObj);
+  _tmpObj.updateMatrix();
+  g.applyMatrix4(_tmpObj.matrix);
+  const count = g.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  const c = new THREE.Color(color);
+  for (let i = 0; i < count; i++) {
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  g.deleteAttribute("uv");
+  return g;
+}
+
+function getWheatGeometry() {
+  if (_wheatGeoCache) return _wheatGeoCache;
   const stalkGeo = new THREE.CylinderGeometry(0.022, 0.03, 1.15, 4);
   const headGeo = new THREE.ConeGeometry(0.075, 0.38, 5);
-
   const offsets = [
     { x: 0.0, z: 0.0, h: 1.15, rotX: 0.02, rotZ: 0.01 },
     { x: -0.09, z: 0.08, h: 1.05, rotX: 0.08, rotZ: -0.09 },
@@ -77,46 +99,63 @@ function createWheatSheafGroup() {
     { x: -0.10, z: -0.08, h: 1.08, rotX: -0.08, rotZ: -0.07 },
     { x: 0.0, z: 0.12, h: 1.18, rotX: 0.05, rotZ: 0.04 },
   ];
-
+  const parts = [];
   offsets.forEach((off, i) => {
-    // Caule
-    const stalk = new THREE.Mesh(stalkGeo, _wheatStalkMat);
-    stalk.position.set(off.x, off.h * 0.5, off.z);
-    stalk.rotation.set(off.rotX, 0, off.rotZ);
-    stalk.scale.set(1.0, off.h / 1.15, 1.0);
-    group.add(stalk);
-
-    // Espiga de trigo dourado no topo
-    const headMat = i % 2 === 0 ? _wheatHeadMat : _wheatDarkHeadMat;
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.set(off.x + off.rotZ * 0.4, off.h + 0.14, off.z - off.rotX * 0.4);
-    head.rotation.set(off.rotX * 1.5, (i * Math.PI) / 3, off.rotZ * 1.5);
-    group.add(head);
+    parts.push(bakePart(stalkGeo, "#e8c456", (o) => {
+      o.position.set(off.x, off.h * 0.5, off.z);
+      o.rotation.set(off.rotX, 0, off.rotZ);
+      o.scale.set(1.0, off.h / 1.15, 1.0);
+    }));
+    parts.push(bakePart(headGeo, i % 2 === 0 ? "#dfa735" : "#c28828", (o) => {
+      o.position.set(off.x + off.rotZ * 0.4, off.h + 0.14, off.z - off.rotX * 0.4);
+      o.rotation.set(off.rotX * 1.5, (i * Math.PI) / 3, off.rotZ * 1.5);
+      o.scale.set(1, 1, 1);
+    }));
   });
-
-  return group;
+  _wheatGeoCache = mergeGeometries(parts, false);
+  for (const g of parts) g.dispose();
+  _wheatGeoCache.computeBoundingSphere();
+  return _wheatGeoCache;
 }
 
-/**
- * Cria a malha de brotos jovens verdes para cultivo recém-plantado.
- */
-function createSproutGroup() {
-  const group = new THREE.Group();
+function getSproutGeometry() {
+  if (_sproutGeoCache) return _sproutGeoCache;
   const shootGeo = new THREE.ConeGeometry(0.03, 0.35, 4);
-
   const sprouts = [
     { x: -0.06, z: 0.04, ry: 0.2 },
     { x: 0.05, z: -0.03, ry: -0.3 },
     { x: 0.0, z: 0.06, ry: 0.8 },
   ];
+  const parts = sprouts.map((sp) => bakePart(shootGeo, "#6c9937", (o) => {
+    o.position.set(sp.x, 0.17, sp.z);
+    o.rotation.set(0, 0, sp.ry * 0.3);
+    o.scale.set(1, 1, 1);
+  }));
+  _sproutGeoCache = mergeGeometries(parts, false);
+  for (const g of parts) g.dispose();
+  _sproutGeoCache.computeBoundingSphere();
+  return _sproutGeoCache;
+}
 
-  sprouts.forEach((s) => {
-    const shoot = new THREE.Mesh(shootGeo, _sproutMat);
-    shoot.position.set(s.x, 0.17, s.z);
-    shoot.rotation.z = s.ry * 0.3;
-    group.add(shoot);
-  });
+/**
+ * Feixe de trigo dourado maduro: um grupo (para o vento/colheita) com UM mesh de geometria compartilhada.
+ */
+function createWheatSheafGroup() {
+  const group = new THREE.Group();
+  const mesh = new THREE.Mesh(getWheatGeometry(), _cropMat);
+  mesh.matrixAutoUpdate = false;
+  group.add(mesh);
+  return group;
+}
 
+/**
+ * Brotos jovens verdes para cultivo recém-plantado (1 mesh, geometria compartilhada).
+ */
+function createSproutGroup() {
+  const group = new THREE.Group();
+  const mesh = new THREE.Mesh(getSproutGeometry(), _cropMat);
+  mesh.matrixAutoUpdate = false;
+  group.add(mesh);
   return group;
 }
 
@@ -306,6 +345,8 @@ export class FarmFieldManager {
 
     const totalWidth = rows * spacingX;
     const totalDepth = cols * spacingZ;
+    // campo inteiro (milhares de meshes de trigo) é desligado quando está além do alcance da névoa
+    registerCullable(fieldGroup, centerX, centerZ, Math.hypot(totalWidth, totalDepth) * 0.5 + 12);
 
     // 1. Canteiros de Terra Arada com Cristas Elevadas
     for (let r = 0; r < rows; r++) {
@@ -403,6 +444,16 @@ export class FarmFieldManager {
         this.world.addStaticCollider(rightX, pz, 0.15, 1.1);
       }
     }
+
+    // Canteiros, cristas, cercas e fardos são estáticos: viram poucos meshes por material.
+    // Trigo e brotos (visibilidade/vento/colheita) ficam de fora da mesclagem.
+    for (const slot of this.slots) {
+      if (slot.fieldGroup === fieldGroup || slot.wheatGroup?.parent === fieldGroup) {
+        slot.wheatGroup.userData.noMerge = true;
+        slot.sproutGroup.userData.noMerge = true;
+      }
+    }
+    mergeStaticMeshes(fieldGroup, { cell: 24 });
   }
 
   /**

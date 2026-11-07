@@ -1,3 +1,4 @@
+import { updateCulling } from "./cullManager.js";
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { InputManager } from "./input.js";
@@ -146,7 +147,7 @@ function createSafeRenderer() {
   const options = {
     antialias: false,
     alpha: false,
-    powerPreference: "default",
+    powerPreference: "high-performance", // usa a GPU dedicada em notebooks híbridos
     failIfMajorPerformanceCaveat: false, // Permite fallback de renderização sem travar
     stencil: false,
     depth: true,
@@ -611,12 +612,50 @@ export function warmupPipelines(renderer, scene, camera, weapons) {
 // Pré-aquecimento da GPU durante a inicialização (100% dos shaders compilados antes do jogo)
 warmupPipelines(renderer, scene, camera, weapons);
 
+// Resolução adaptativa: parte do teto de 1.5x e só recua se o jogo estiver lento (abaixo de ~48 FPS por 1.5 s);
+// volta a subir devagar quando há folga. Em máquinas boas nada muda; em fracas o jogo segue fluido.
+const DPR_CAP = Math.min(window.devicePixelRatio || 1, 1.5);
+const DPR_MIN = 0.7;
+let _dpr = DPR_CAP;
+let _slowTime = 0;
+let _fastTime = 0;
+let _dprHold = 0;
+let _dprUpWait = 6;
+
+function applyPixelRatio(ratio) {
+  _dpr = ratio;
+  renderer.setPixelRatio(_dpr);
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  // GPU apertada: o mapa de sombras também cai de 1024 para 512 (1/4 do fillrate da passada de sombra)
+  const wantShadow = _dpr < 1.0 ? 512 : 1024;
+  if (sun.shadow.mapSize.x !== wantShadow) {
+    sun.shadow.mapSize.set(wantShadow, wantShadow);
+    if (sun.shadow.map) {
+      sun.shadow.map.dispose();
+      sun.shadow.map = null;
+    }
+  }
+}
+
+function adaptResolution(frameMs) {
+  if (_dprHold > 0) { _dprHold -= frameMs / 1000; return; }
+  if (frameMs > 21) { _slowTime += frameMs / 1000; _fastTime = 0; }
+  else if (frameMs < 17.8) { _fastTime += frameMs / 1000; _slowTime = Math.max(0, _slowTime - frameMs / 1000); }
+  if (_slowTime > 1.5 && _dpr > DPR_MIN + 0.01) {
+    applyPixelRatio(Math.max(DPR_MIN, _dpr - 0.15));
+    _slowTime = 0; _dprHold = 2.5; _dprUpWait = Math.min(40, _dprUpWait * 1.6);
+  } else if (_fastTime > _dprUpWait && _dpr < DPR_CAP - 0.01) {
+    applyPixelRatio(Math.min(DPR_CAP, _dpr + 0.1));
+    _fastTime = 0; _dprHold = 2.5;
+  }
+}
+
 function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(_dpr);
   renderer.setSize(width, height, false);
 }
 
@@ -637,6 +676,7 @@ function frame(now) {
   const delta = now - _lastRenderStamp;
   if (delta < FRAME_MIN_MS) return;
   _lastRenderStamp = now - (delta % FRAME_MIN_MS);
+  adaptResolution(Math.min(delta, 100));
 
   telemetry.beginFrame();
   const elapsed = Math.min((now - lastTime) / 1000, 0.1);
@@ -737,6 +777,7 @@ function frame(now) {
   telemetry.mark("combat");
 
   world.updateVisibility(camera, player.x, player.z, isCutscene);
+  updateCulling(player.x, player.z, dt);
   renderer.render(scene, camera);
   telemetry.mark("render");
 
