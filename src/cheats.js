@@ -464,6 +464,12 @@ export function openCheatModal(env) {
               <button class="cheat-btn" data-cheat="evil_75">😈 75% (Corrupto)</button>
               <button class="cheat-btn" data-cheat="evil_100">💀 100% (Herege)</button>
             </div>
+            <div class="cheat-grid" style="grid-template-columns: repeat(4, 1fr); margin-top: 8px;">
+              <button class="cheat-btn" data-cheat="evil_sub_10">➖ −10%</button>
+              <button class="cheat-btn" data-cheat="evil_sub_5">➖ −5%</button>
+              <button class="cheat-btn" data-cheat="evil_add_5">➕ +5%</button>
+              <button class="cheat-btn" data-cheat="evil_add_10">➕ +10%</button>
+            </div>
           </div>
         </div>
 
@@ -701,6 +707,11 @@ export function openCheatModal(env) {
     evilSlider.addEventListener("input", () => {
       evilLabel.textContent = `${evilSlider.value}% Maldade`;
     });
+    // soltar o slider já aplica (o botão continua existindo, como no seletor de hora)
+    evilSlider.addEventListener("change", () => {
+      window.CheatMenu?.setEvil(Number(evilSlider.value));
+      _updateStatusDisplays();
+    });
     btnApplyEvil?.addEventListener("click", () => {
       window.CheatMenu?.setEvil(Number(evilSlider.value));
       _updateStatusDisplays();
@@ -739,6 +750,10 @@ function _handleCheatAction(type) {
     case "set_day_7":
       window.CheatMenu.setCalendarDay(7);
       break;
+    case "evil_sub_10": window.CheatMenu.stepEvil(-10); break;
+    case "evil_sub_5": window.CheatMenu.stepEvil(-5); break;
+    case "evil_add_5": window.CheatMenu.stepEvil(5); break;
+    case "evil_add_10": window.CheatMenu.stepEvil(10); break;
     case "evil_0":
       window.CheatMenu.setEvil(0);
       break;
@@ -1109,6 +1124,12 @@ export function initCheatMenu(env = {}) {
       const evil = setEvilPercent(targetPercent, "Cheat Menu");
       env.audio?.bell?.();
       return `${evil}% Maldade`;
+    },
+
+    // Passo relativo (±): ajusta a maldade a partir do valor atual, limitado a 0–100
+    stepEvil(delta = 5) {
+      const target = Math.max(0, Math.min(100, getEvilPercent() + Number(delta)));
+      return this.setEvil(target);
     },
 
     addEvil(amount = 5) {

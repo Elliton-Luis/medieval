@@ -203,6 +203,14 @@ export class TorchSystem {
     this.headMaterial = new THREE.MeshStandardMaterial({ color: "#2c2218", emissive: "#ff7a22", emissiveIntensity: 0, roughness: 1, flatShading: true });
     this.guardHeadMaterial = new THREE.MeshStandardMaterial({ color: "#2c2218", emissive: "#ff8833", emissiveIntensity: 4.5, roughness: 1, flatShading: true });
     this.poleMaterial = new THREE.MeshStandardMaterial({ color: "#503b2a", roughness: 1, flatShading: true });
+    // Chama de verdade (2 cones aninhados, geometria/material compartilhados): lê como FOGO e não como lâmpada
+    this.flameGeoOuter = new THREE.ConeGeometry(0.085, 0.34, 6, 1, true);
+    this.flameGeoOuter.translate(0, 0.17, 0);
+    this.flameGeoInner = new THREE.ConeGeometry(0.048, 0.24, 5, 1, true);
+    this.flameGeoInner.translate(0, 0.12, 0);
+    this.flameInnerMat = new THREE.MeshBasicMaterial({ color: "#ffe9a0", transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, fog: false });
+    this._flameOuterMats = new Map();
+    this.guardProps = [];
     this.group = new THREE.Group();
     scene.add(this.group);
 
@@ -284,6 +292,40 @@ export class TorchSystem {
     for (let i = 0; i < EMBERS; i++) this.emberPositions[i * 3 + 1] = -500;
   }
 
+  _flameOuterMat(hex) {
+    let m = this._flameOuterMats.get(hex);
+    if (!m) {
+      m = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false, fog: false });
+      this._flameOuterMats.set(hex, m);
+    }
+    return m;
+  }
+
+  _makeFlame(hex) {
+    const g = new THREE.Group();
+    const outer = new THREE.Mesh(this.flameGeoOuter, this._flameOuterMat(hex));
+    const inner = new THREE.Mesh(this.flameGeoInner, this.flameInnerMat);
+    outer.frustumCulled = false;
+    inner.frustumCulled = false;
+    g.add(outer, inner);
+    g.userData = { outer, inner, phase: Math.random() * 6.28 };
+    return g;
+  }
+
+  // Dança das chamas: escala/rotação/deslocamento diferentes em cada camada (barato, só senos)
+  _animateFlame(flame, t) {
+    const { outer, inner, phase } = flame.userData;
+    const a = Math.sin(t * 17 + phase);
+    const b = Math.sin(t * 11.3 + phase * 1.7);
+    const c = Math.sin(t * 29 + phase * 0.6);
+    outer.scale.set(1 + a * 0.12, 1 + b * 0.26 + c * 0.1, 1 + a * 0.12);
+    outer.rotation.y = t * 2.6 + phase;
+    outer.position.x = Math.sin(t * 8 + phase) * 0.014;
+    outer.position.z = Math.cos(t * 7 + phase) * 0.014;
+    inner.scale.set(1 - a * 0.1, 0.92 + c * 0.2 + b * 0.1, 1 - a * 0.1);
+    inner.rotation.y = -t * 3.4;
+  }
+
   // Cria o modelo visual de tocha na mão do guarda (visível apenas quando hasTorch = true).
   attachGuardTorchProp(guardRoot, handParent) {
     if (guardRoot.userData.torchProp) return guardRoot.userData.torchProp;
@@ -303,9 +345,13 @@ export class TorchSystem {
       blending: THREE.AdditiveBlending,
       fog: false,
     }));
-    flame.scale.set(0.48, 0.62, 1);
-    flame.position.y = 0.38;
-    prop.add(stick, head, flame);
+    flame.scale.set(0.34, 0.44, 1); // halo menor: a chama de verdade é o cone animado
+    flame.position.y = 0.42;
+    const fire = this._makeFlame(0xff7a1a);
+    fire.position.y = 0.3;
+    prop.add(stick, head, flame, fire);
+    prop.userData.fire = fire;
+    this.guardProps.push(prop);
     prop.visible = false;
     (handParent || guardRoot).add(prop);
     guardRoot.userData.torchProp = prop;
@@ -353,6 +399,10 @@ export class TorchSystem {
     const head = new THREE.Mesh(this.headGeometry, customHeadMaterial);
     head.position.set(nx * 0.09, 0.34, nz * 0.09);
     group.add(head);
+    const fire = this._makeFlame(pal.flameHex);
+    fire.position.set(nx * 0.09, 0.43, nz * 0.09);
+    fire.visible = isAlwaysLit || this.lit;
+    group.add(fire);
 
     if (!post) {
       const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.22), this.poleMaterial);
@@ -391,6 +441,7 @@ export class TorchSystem {
       isLit: Boolean(isAlwaysLit || this.lit),
       light: true,
       group,
+      fire,
       lightColor: pal.flameHex,
       colorKey,
       headMaterial: customHeadMaterial,
@@ -482,6 +533,12 @@ export class TorchSystem {
     const candidates = this.pending;
     candidates.length = 0;
 
+    // chamas das tochas dos guardas (poucas): animadas enquanto visíveis
+    for (let g = 0; g < this.guardProps.length; g++) {
+      const prop = this.guardProps[g];
+      if (prop.visible && prop.userData.fire) this._animateFlame(prop.userData.fire, this.time);
+    }
+
     // Regra: PointLights reais iluminam em um raio de até 45m do jogador (praças, ruas e arredores de Caldera e vilas)
     const POINTLIGHT_ACTIVATION_DIST = 45.0;
     const POINTLIGHT_ACTIVATION_DIST_SQ = POINTLIGHT_ACTIVATION_DIST * POINTLIGHT_ACTIVATION_DIST; // 2025 m²
@@ -497,11 +554,19 @@ export class TorchSystem {
       const nearPointLight = on && d <= POINTLIGHT_ACTIVATION_DIST_SQ;
       const flicker = 0.88 + 0.12 * Math.sin(this.time * 11 + source.phase) + 0.06 * Math.sin(this.time * 23 + source.phase * 2);
 
+      // 0. Chama real (cones): só dança quando está perto; longe fica parada (nem dá para ver)
+      if (source.fire) {
+        source.fire.visible = on;
+        if (on && d < 60 * 60) this._animateFlame(source.fire, this.time);
+      }
+
       // 1. Halo / Chama do Sprite nativo: sempre visível de perto com fidelidade
       if (source.sprite) {
         source.sprite.visible = on;
         if (on) {
-          const baseScale = source.kind === "hearth" ? 2.4 : (source.isPost ? 1.8 : 1.5);
+          // de perto o halo encolhe (a chama de verdade é o cone animado); de longe ele volta ao tamanho cheio
+          const nearK = source.fire && d < 256 ? 0.5 + 0.5 * (d / 256) : 1;
+          const baseScale = (source.kind === "hearth" ? 2.4 : (source.isPost ? 1.8 : 1.5)) * nearK;
           source.sprite.scale.set(baseScale * flicker, baseScale * flicker * 1.25, 1);
         }
       }
