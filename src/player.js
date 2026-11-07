@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { makeSkinnedMaterial } from "./skins.js";
+import { buildPlayerArmor, mailTexture } from "./armorKit.js";
 import { buildHumanoid, bendJoints, addBeard, addVikingHair, addTiredEyes, createPoseState, smoothPose } from "./humanoid.js";
 import { PlayerStats } from "./rpg.js";
 
@@ -181,93 +182,40 @@ export class Player {
     addVikingHair(this.head, hair);
     addTiredEyes(this.head, skin, hair);
 
-    // Armadura do Jogador: Peitoral detalhado, espaldar, cinto com fivela, grevas e túnica
-    const plate = new THREE.LatheGeometry(
-      [[0.01, 0.12], [0.16, 0.14], [0.18, 0.3], [0.22, 0.46], [0.225, 0.54], [0.16, 0.62], [0.01, 0.62]].map(([r, y]) => new THREE.Vector2(r, y)),
-      12,
-    ).scale(1.04, 1.0, 0.76);
-    this.chestArmor = makePart(plate, tplPlate, this.model, 0, 0.82, 0.015);
-    this.chestArmor.name = "PlateArmor";
-    // Cruz vermelha com bordas brancas (bordas um pouco maiores e atrás da cruz)
-    const chestBorder1 = makePart(new THREE.BoxGeometry(0.125, 0.38, 0.02), tplWhite, this.model, 0, 1.3, 0.168, false);
-    const chestBorder2 = makePart(new THREE.BoxGeometry(0.29, 0.125, 0.02), tplWhite, this.model, 0, 1.38, 0.163, false);
-    const chestCross1 = makePart(new THREE.BoxGeometry(0.08, 0.32, 0.025), tplRed, this.model, 0, 1.3, 0.175, false);
-    const chestCross2 = makePart(new THREE.BoxGeometry(0.22, 0.07, 0.025), tplRed, this.model, 0, 1.38, 0.17, false);
-
-    // Colete de Couro rústico (Nível 1)
-    const leatherJerkin = makePart(new THREE.CylinderGeometry(0.21, 0.23, 0.44, 12), leather, this.model, 0, 1.15, 0);
-    leatherJerkin.scale.z = 0.78;
-    leatherJerkin.name = "LeatherArmor";
-
-    // Ombreiras sólidas anatômicas
-    const pauldronsList = [];
-    for (const arm of [this.leftArm, this.rightArm]) {
-      const pauldron = makePart(new THREE.SphereGeometry(0.1, 10, 8), tplDark, arm, 0, 0.02, 0);
-      pauldron.scale.set(1.22, 0.9, 1.1);
-      const pauldronEdge = makePart(new THREE.BoxGeometry(0.16, 0.04, 0.14), tplTrim, arm, 0, -0.04, 0);
-      pauldronsList.push(pauldron, pauldronEdge);
-    }
-    const belt = makePart(new THREE.CylinderGeometry(0.21, 0.21, 0.07, 12), leather, this.model, 0, 0.84, 0);
-    belt.scale.z = 0.78;
-    const buckle = makePart(new THREE.BoxGeometry(0.08, 0.07, 0.035), gold, this.model, 0, 0.84, 0.17, false);
-
-    // Túnica camponesa e tabardo heráldico
-    const skirt = makePart(new THREE.CylinderGeometry(0.2, 0.28, 0.32, 12), cloth, this.model, 0, 0.66, 0);
-    skirt.scale.z = 0.76;
-    skirt.name = "Tunic";
-    const heraldicTabard = makePart(new THREE.BoxGeometry(0.22, 0.44, 0.03), tplCloth, this.model, 0, 0.6, 0.19, false);
-    const tabardBorderV = makePart(new THREE.BoxGeometry(0.085, 0.27, 0.012), tplWhite, this.model, 0, 0.62, 0.208, false);
-    const tabardBorderH = makePart(new THREE.BoxGeometry(0.17, 0.085, 0.012), tplWhite, this.model, 0, 0.7, 0.208, false);
-    const tabardCrossV = makePart(new THREE.BoxGeometry(0.05, 0.25, 0.016), tplRed, this.model, 0, 0.62, 0.212, false);
-    const tabardCrossH = makePart(new THREE.BoxGeometry(0.15, 0.05, 0.016), tplRed, this.model, 0, 0.7, 0.212, false);
-
-    // Placas de perna / grevas
-    const greavesList = [];
-    for (const knee of [this.leftKnee, this.rightKnee]) {
-      const greave = makePart(new THREE.BoxGeometry(0.11, 0.26, 0.03), tplPlate, knee, 0, -0.19, 0.06, false);
-      const kneecap = makePart(new THREE.SphereGeometry(0.068, 8, 6), tplTrim, knee, 0, 0, 0.035);
-      greavesList.push(greave, kneecap);
-    }
-    // Braçadeiras protetoras / cota de malha nos antebraços
-    const vambracesList = [];
-    for (const fore of [this.leftForearm, this.rightForearm]) {
-      const vambrace = makePart(new THREE.CylinderGeometry(0.055, 0.048, 0.18, 9), darkSteel, fore, 0, -0.15, 0);
-      vambracesList.push(vambrace);
-    }
-
-    // Elmo Cavaleiresco medieval com cota de malha / camal no pescoço
-    const head = this.head;
-    const camail = makePart(new THREE.CylinderGeometry(0.12, 0.15, 0.18, 10), darkSteel, head, 0, -0.1, 0); // Camal de malha
-    camail.name = "Chainmail";
-    const helmDome = makePart(new THREE.SphereGeometry(0.142, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), tplPlate, head, 0, 0.035, -0.005);
-    const helmRim = makePart(new THREE.CylinderGeometry(0.146, 0.146, 0.035, 12), tplTrim, head, 0, 0.075, 0);
-    const nasalBar = makePart(new THREE.BoxGeometry(0.024, 0.11, 0.025), tplTrim, head, 0, -0.01, 0.132, false);
-    const plume = makePart(new THREE.ConeGeometry(0.035, 0.22, 4), tplRed, head, 0, 0.2, -0.06, false);
-
-    // Estrutura modular de armaduras (Zero-GC: apenas altera visible = true/false)
-    this.armorPieces = {
-      tunic: [skirt, belt, buckle],
-      leather: [leatherJerkin],
-      chainmail: [camail, ...vambracesList],
-      plate: [
-        this.chestArmor,
-        chestBorder1,
-        chestBorder2,
-        chestCross1,
-        chestCross2,
-        tabardBorderV,
-        tabardBorderH,
-        tabardCrossV,
-        tabardCrossH,
-        ...pauldronsList,
-        ...greavesList,
-        helmDome,
-        helmRim,
-        nasalBar,
-        plume,
-        heraldicTabard,
-      ],
+    // Armadura do Jogador: peças detalhadas e mescladas (armorKit.js). Materiais do kit: com cor por vértice (oclusão falsa)
+    const kitMat = (mat) => {
+      const c = mat.clone();
+      c.vertexColors = true;
+      return c;
     };
+    const mailTex = mailTexture();
+    mailTex.repeat.set(3, 2);
+    const kitMats = {
+      cloth: kitMat(cloth),
+      leather: kitMat(makeSkinnedMaterial("leather", "#ffffff", 0, 0.95)),
+      gold: kitMat(makeSkinnedMaterial("metal", "#ffffff", 0.55, 0.45)),
+      mail: new THREE.MeshStandardMaterial({ map: mailTex, color: "#ffffff", vertexColors: true, metalness: 0.5, roughness: 0.6, flatShading: true }),
+      tplPlate: kitMat(tplPlate),
+      tplDark: kitMat(tplDark),
+      tplTrim: kitMat(tplTrim),
+      tplRed: kitMat(tplRed),
+      tplWhite: kitMat(tplWhite),
+      tplCloth: kitMat(tplCloth),
+    };
+    const armor = buildPlayerArmor(kitMats, {
+      model: this.model,
+      head: this.head,
+      leftArm: this.leftArm,
+      rightArm: this.rightArm,
+      leftForearm: this.leftForearm,
+      rightForearm: this.rightForearm,
+      leftLeg: this.leftLeg,
+      rightLeg: this.rightLeg,
+      leftKnee: this.leftKnee,
+      rightKnee: this.rightKnee,
+    });
+    this.chestArmor = armor.chestArmor;
+    this.armorPieces = armor.armorPieces;
     this.setArmorVisuals(0); // Inicia como Camponês (apenas túnica)
 
     // Escudo preso ao antebraço esquerdo. `shieldAnchor` fica no meio do antebraço e a face do escudo
@@ -308,7 +256,8 @@ export class Player {
     this.blockLocked = false;
     this.blockPose = 0;
 
-    const cape = makePart(new THREE.BoxGeometry(0.4, 0.82, 0.03), leather, this.model, 0, 1.06, -0.18, false);
+    // manto: trapézio que se alarga na barra (mais natural que um retângulo)
+    const cape = makePart(new THREE.CylinderGeometry(0.255, 0.33, 0.86, 4).rotateY(Math.PI / 4).scale(1, 1, 0.085), leather, this.model, 0, 1.06, -0.18, false);
     cape.rotation.x = -0.08;
     this.cape = cape;
 
@@ -840,6 +789,11 @@ export class Player {
         this.leftArm.rotation.x += (this.rightArm.rotation.x * 0.85 - this.leftArm.rotation.x) * 0.8;
         this.leftArm.rotation.z = 0.42;
         this.leftForearm.rotation.x = this.rightForearm.rotation.x;
+      } else if (this.weaponGrip === "blade") {
+        // foice de duas mãos: a mão esquerda segura o cabo logo abaixo da direita e acompanha o corte
+        this.leftArm.rotation.x += (this.rightArm.rotation.x * 0.92 - 0.1 - this.leftArm.rotation.x) * 0.85;
+        this.leftArm.rotation.z = 0.3;
+        this.leftForearm.rotation.x = this.rightForearm.rotation.x - 0.12;
       }
     }
 
@@ -975,17 +929,45 @@ export class Player {
     const elbowTotal = this.rightArm.rotation.x + this.rightForearm.rotation.x;
     const elevation = aim ? aim.elevation : 0;
     const grip = this.weaponGrip;
-    if (grip === "blade") {
+    if (grip === "blade" || grip === "torch") {
+      // Ângulo MUNDIAL desejado da lâmina (0 = vertical para cima, π/2 = horizontal para a frente, > π/2 = para baixo):
+      // o soquete compensa o braço (socket = desejado - braço), então a lâmina desenha um arco limpo no golpe
+      // em vez de apontar sempre para o céu.
       if (this.attackTimer > 0) {
         const p = 1 - this.attackTimer / this.attackLen;
-        targetSocket = 1.05 + Math.sin(p * Math.PI) * 0.38;
+        const sm = THREE.MathUtils.smoothstep;
+        let desired;
+        if (this.attackKind === 2) {
+          // golpe vertical: sobe para trás da cabeça e desce até a frente, levemente para baixo
+          desired = -0.3 + 2.5 * sm(p, 0.14, 0.72);
+        } else if (this.attackKind === 4) {
+          desired = 1.42; // estocada: ponta para a frente
+        } else {
+          // corte lateral: lâmina sobe no wind-up, cruza na horizontal e termina um pouco abaixo (follow-through)
+          desired = -0.35 + 0.5 * sm(p, 0, 0.2) + 1.95 * sm(p, 0.22, 0.58) - 0.25 * sm(p, 0.72, 1);
+        }
+        targetSocket = desired - elbowTotal;
+      } else if (grip === "torch") {
+        targetSocket = 0.42 - elbowTotal; // tocha em pé, levemente inclinada para a frente: a chama sobe
       } else {
         targetSocket = 0.85 - elbowTotal;
       }
     } else if (grip === "pole") {
-      targetSocket = this.attackTimer > 0 ? Math.PI / 2 - 0.12 - elbowTotal : 0.78 - elbowTotal;
+      if (this.attackTimer > 0 && this.attackKind === 2) {
+        const p = 1 - this.attackTimer / this.attackLen;
+        targetSocket = -0.2 + 2.1 * THREE.MathUtils.smoothstep(p, 0.14, 0.72) - elbowTotal; // alabarda: golpe de cima para baixo
+      } else {
+        targetSocket = this.attackTimer > 0 ? Math.PI / 2 - 0.12 - elbowTotal : 0.78 - elbowTotal;
+      }
     } else if (grip === "heavy") {
-      targetSocket = this.attackTimer > 0 ? 1.05 : this.chargePose > 0.01 ? 0.15 - elbowTotal : 0.35 - elbowTotal;
+      if (this.attackTimer > 0) {
+        const p = 1 - this.attackTimer / this.attackLen;
+        const sm = THREE.MathUtils.smoothstep;
+        // martelo/montante: levanta atrás, vem de cima (kind 2) ou varre lateral (kind 1) e termina à frente
+        targetSocket = (this.attackKind === 2 ? -0.35 + 2.55 * sm(p, 0.2, 0.74) : -0.2 + 2.1 * sm(p, 0.2, 0.62) - 0.2 * sm(p, 0.75, 1)) - elbowTotal;
+      } else {
+        targetSocket = this.chargePose > 0.01 ? 0.15 - elbowTotal : 0.35 - elbowTotal;
+      }
     } else if (grip === "bow") {
       targetSocket = 0.05 - elevation * 0.4 * this.aimPose - elbowTotal;
     } else if (grip === "throw") {
@@ -994,7 +976,10 @@ export class Player {
       const ready = Math.PI / 2 + 0.4;
       targetSocket = ready + (Math.PI / 2 - elevation - ready) * this.aimPose - elbowTotal;
     }
-    this.handSocket.rotation.x += (targetSocket - this.handSocket.rotation.x) * (1 - Math.exp(-24 * dt));
+    // proteção: um dt anômalo (negativo/NaN) nunca pode contaminar o soquete da arma (NaN some com a arma para sempre)
+    if (!Number.isFinite(targetSocket)) targetSocket = 0.85;
+    if (!Number.isFinite(this.handSocket.rotation.x)) this.handSocket.rotation.x = targetSocket;
+    this.handSocket.rotation.x += (targetSocket - this.handSocket.rotation.x) * (1 - Math.exp(-24 * Math.max(0, dt)));
 
     // Bobbing vertical e balanço dinâmico natural do corpo
     const runBob = (running ? 0.05 : 0.03) * stepBob * s;
@@ -1222,6 +1207,10 @@ export class Player {
         for (const p of this.armorPieces.plate) if (p) p.visible = showPlate;
       }
     }
+    // traje do Demiurgo esconde as placas do tronco (couraça, cruz, tabardo)
+    if (this.wearingDemiurgeAttire && this.armorPieces?.plate) {
+      for (const pc of this.armorPieces.plate) if (pc.userData.bodyPlate) pc.visible = false;
+    }
     // Escudo: com placas vira o escudo templário (campo escuro + cruz vermelha de borda branca)
     if (this._shieldFace && this._tplMats) {
       this._shieldFace.material = showPlate ? this._tplMats.tplCloth : this._tplMats.heraldry;
@@ -1240,7 +1229,10 @@ export class Player {
     if (this.demiurgeGroup) this.demiurgeGroup.visible = this.wearingDemiurgeAttire;
     if (this.demiurgeHeadGroup) this.demiurgeHeadGroup.visible = this.wearingDemiurgeAttire;
     if (this.cape) this.cape.visible = !this.wearingDemiurgeAttire;
-    if (this.chestArmor) this.chestArmor.visible = !this.wearingDemiurgeAttire;
+    if (this.armorPieces?.plate) {
+      const plateOn = this.armorLevel >= 3 && !this.wearingDemiurgeAttire;
+      for (const pc of this.armorPieces.plate) if (pc.userData.bodyPlate) pc.visible = plateOn;
+    }
     if (this.head?.children) {
       for (let i = 0; i < this.head.children.length; i++) {
         const c = this.head.children[i];

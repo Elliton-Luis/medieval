@@ -874,7 +874,7 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
   if (!GameState.isIntroPlaying) return;
 
   // dt suavizado (média exponencial) e limitado: picos isolados não viram trancos de câmera
-  const clamped = Math.min(dtRaw, 0.05);
+  const clamped = Math.max(0, Math.min(dtRaw, 0.05)); // dt negativo (1º frame) faria a pose divergir até NaN
   _dtSmooth = _dtSmooth === 0 ? clamped : _dtSmooth + (clamped - _dtSmooth) * 0.2;
   const dt = _dtSmooth * INTRO_SPEED;
 

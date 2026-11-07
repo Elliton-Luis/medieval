@@ -1,7 +1,8 @@
+import { scytheSweep, updateHay } from "./hay.js";
 import * as THREE from "three";
 import { makeSkinnedMaterial } from "./skins.js";
 import { segmentHit } from "./hitboxes.js";
-import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel } from "./weapondata.js";
+import { WEAPON_LIST, WEAPONS_BY_ID, SLOTS, STARTER_WEAPONS, AMMO_LABELS, AMMO_SHOP, buildWeaponModel, updateTorchFx } from "./weapondata.js";
 import {
   PlayerEquipment,
   PlayerInventory,
@@ -117,49 +118,34 @@ export class WeaponSystem {
     const cloth = makeSkinnedMaterial("fabric", "#8e4c3c", 0, 0.9);
     const socket = this.player.handSocket;
     this.models = Object.create(null);
-    this.models.shortsword = this.player.sword;
+    // a espada curta antiga do jogador (player.sword) é substituída pelo modelo novo de weapondata.js
+    if (this.player.sword) this.player.sword.visible = false;
 
-    const crossbow = (scale) => {
-      const g = new THREE.Group();
+    // Besta: modelo em weapondata.js; a escala do corpo da balestra pesada fica a cargo do construtor
+    const crossbow = (id, scale) => {
+      const g = buildWeaponModel(id);
       g.position.set(0, 0.27 * scale, 0);
       g.scale.setScalar(scale);
       socket.add(g);
-      addMesh(g, new THREE.BoxGeometry(0.16, 0.78, 0.17), wood, 0, 0.15, 0);
-      addMesh(g, new THREE.BoxGeometry(0.96, 0.095, 0.14), iron, 0, 0.57, 0);
-      addMesh(g, new THREE.BoxGeometry(0.78, 0.035, 0.04), brass, 0, 0.54, 0.08);
-      addMesh(g, new THREE.BoxGeometry(0.15, 0.32, 0.14), darkWood, 0, -0.27, 0.03);
       return g;
     };
-    this.models.lightcrossbow = crossbow(1);
-    this.models.heavycrossbow = crossbow(1.22);
-    addMesh(this.models.heavycrossbow, new THREE.BoxGeometry(1.1, 0.06, 0.18), brass, 0, 0.5, 0);
+    this.models.lightcrossbow = crossbow("lightcrossbow", 1);
+    this.models.heavycrossbow = crossbow("heavycrossbow", 1.22);
 
-    const bow = (scale) => {
-      const g = new THREE.Group();
+    // Arcos: a curva é construída em +X; o grupo gira -90° para a frente do arco apontar para +Z
+    const bow = (id, scale) => {
+      const g = buildWeaponModel(id);
       g.rotation.y = -Math.PI / 2;
       g.scale.setScalar(scale);
       socket.add(g);
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, -0.55, 0), new THREE.Vector3(0.3, -0.32, 0),
-        new THREE.Vector3(0.42, 0.05, 0), new THREE.Vector3(0.3, 0.42, 0),
-        new THREE.Vector3(0, 0.62, 0), new THREE.Vector3(-0.3, 0.42, 0),
-        new THREE.Vector3(-0.42, 0.05, 0), new THREE.Vector3(-0.3, -0.32, 0),
-        new THREE.Vector3(0, -0.55, 0),
-      ]);
-      addMesh(g, new THREE.TubeGeometry(curve, 20, 0.055, 5, false), wood, 0, 0, 0);
-      const stringGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.55, 0.035), new THREE.Vector3(0, 0.62, 0.035)]);
-      g.add(new THREE.Line(stringGeometry, new THREE.LineBasicMaterial({ color: "#d5c8a5" })));
       return g;
     };
-    this.models.shortbow = bow(1);
-    this.models.longbow = bow(1.3);
+    this.models.shortbow = bow("shortbow", 1);
+    this.models.longbow = bow("longbow", 1.3);
 
-    const bomb = new THREE.Group();
+    const bomb = buildWeaponModel("firebomb");
     bomb.position.set(0, -0.1, 0);
     socket.add(bomb);
-    addMesh(bomb, new THREE.IcosahedronGeometry(0.27, 1), darkWood, 0, 0.12, 0);
-    addMesh(bomb, new THREE.CylinderGeometry(0.045, 0.055, 0.2, 5), cloth, 0, 0.43, 0);
-    addMesh(bomb, new THREE.SphereGeometry(0.055, 5, 4), brass, 0, 0.55, 0);
     this.models.firebomb = bomb;
 
     // armas de corte, contusão e haste: construídas em weapondata.js
@@ -296,6 +282,7 @@ export class WeaponSystem {
   update(dt, cameraYaw) {
     this._yaw = cameraYaw;
     const now = performance.now();
+    updateHay(dt); // fardos do mundo voltam no dia seguinte
 
     if (this.input.consumeBuildModePressed?.()) {
       if (this.buildHubOpen || (this.ui.buildPanel && !this.ui.buildPanel.hidden)) {
@@ -401,6 +388,8 @@ export class WeaponSystem {
       if (isTorchActive) {
         // Cintilação viva com iluminação dobrada (~14.5 a 16.5 de intensidade)
         this.torchLight.intensity = 15.0 + Math.sin(now * 0.012) * 0.9 + Math.cos(now * 0.027) * 0.6;
+        // fogo da tocha: cones, línguas, halo e brasas animados (inequivocamente fogo, não lâmpada/cajado)
+        updateTorchFx(this.models.torch, now * 0.001);
       } else {
         this.torchLight.intensity = 0;
       }
@@ -1158,6 +1147,8 @@ export class WeaponSystem {
         this._igniteWithTorch(cameraYaw);
       } else if (def.toolType === "AXE" || def.toolType === "PICKAXE") {
         gatherResource(this.player, def.toolType, this.world.environmentInstancedMeshes);
+      } else if (def.toolType === "SCYTHE") {
+        scytheSweep(this.player, cameraYaw, def, { effects: this.effects, audio: this.audio, ui: this.ui });
       }
     }
   }
