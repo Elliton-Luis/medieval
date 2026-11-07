@@ -28,7 +28,11 @@ function make(name, size, draw) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.anisotropy = 2;
+  // Pixels NÍTIDOS (estilo de arte low-res, não "low-res borrado"): sem filtragem suave ao ampliar e sem
+  // mistura entre mipmaps ao reduzir (NearestMipmapNearest escolhe um nível, sem borrar, e evita o cintilar de longe).
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestMipmapNearestFilter;
+  texture.anisotropy = 1;
   cache.set(name, texture);
   return texture;
 }

@@ -800,6 +800,7 @@ export class Necron {
     torso.rotation.x = 0.22;
     torso.castShadow = true;
     this.model.add(torso);
+    this.torso = torso;
 
     // Costelas salientes e vértebras visíveis sob a pele esticada
     for (let r = 0; r < 4; r++) {
@@ -1179,8 +1180,8 @@ export class Necron {
     this.deadTime = 0;
     this.speed = 0;
     this.root.userData.isDead = false;
-    this.torso.rotation.set(0, 0, 0);
-    this.torso.position.set(0, 0.8, 0);
+    this.torso.rotation.set(0.22, 0, 0);
+    this.torso.position.set(0, 0.95, 0);
     this.legs[0].rotation.set(0, 0, 0);
     this.legs[1].rotation.set(0, 0, 0);
     this._groundY = this.world ? this.world.heightAt(x, z) : 0;

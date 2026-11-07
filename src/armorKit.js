@@ -106,6 +106,7 @@ export function mailTexture() {
   _mailTex.wrapS = THREE.RepeatWrapping;
   _mailTex.wrapT = THREE.RepeatWrapping;
   _mailTex.magFilter = THREE.NearestFilter;
+  _mailTex.minFilter = THREE.NearestMipmapNearestFilter; // sem mistura entre mipmaps: malha de cota com pixels nítidos
   _mailTex.anisotropy = 2;
   return _mailTex;
 }

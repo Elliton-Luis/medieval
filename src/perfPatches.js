@@ -24,6 +24,32 @@ THREE.Object3D.prototype.updateMatrixWorld = function patchedUpdateMatrixWorld(f
   _origUpdateMatrixWorld.call(this, force);
 };
 
+// ----------------------------------------------------------------------------
+// 3) DITHERING ordenado estilo PS1/PS2 (opcional: ?dither=1). Cor de 16 bits = 5 bits por canal; o degradê (névoa,
+//    sombra noturna) vira padrão de pontos em vez de faixas. Reaproveita o gancho `material.dithering` do three
+//    (que roda por último no fragment shader, já em sRGB): troca o ruído sutil dele por matriz de Bayer 4x4 e
+//    quantiza em 32 níveis por canal. Sem passada extra de tela e sem render target.
+// ----------------------------------------------------------------------------
+export const DITHER_ON = typeof location !== "undefined" && new URLSearchParams(location.search).get("dither") === "1";
+
+if (DITHER_ON) {
+  THREE.ShaderChunk.dithering_pars_fragment = /* glsl */ `
+#ifdef DITHERING
+	vec3 dithering( vec3 color ) {
+		const mat4 bayer = mat4(
+			0.0,  8.0,  2.0, 10.0,
+			12.0, 4.0, 14.0,  6.0,
+			3.0, 11.0,  1.0,  9.0,
+			15.0, 7.0, 13.0,  5.0 );
+		ivec2 p = ivec2( mod( floor( gl_FragCoord.xy ), 4.0 ) );
+		float threshold = bayer[ p.x ][ p.y ] / 16.0 - 0.5;
+		const float LEVELS = 31.0;
+		return floor( color * LEVELS + 0.5 + threshold ) / LEVELS;
+	}
+#endif
+`;
+}
+
 const _seen = new WeakSet();
 
 /** Marca forceSinglePass nos materiais transparentes de duas faces ainda não tratados. Retorna quantos mudou. */
@@ -44,6 +70,7 @@ export function fixDoubleSidedTransparent(root) {
 function _fix(m) {
   if (_seen.has(m)) return 0;
   _seen.add(m);
+  if (DITHER_ON && m.dithering === false) m.dithering = true;
   if (m.transparent === true && m.side === THREE.DoubleSide && m.forceSinglePass === false) {
     m.forceSinglePass = true;
     return 1;
