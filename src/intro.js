@@ -214,65 +214,166 @@ export function createTallFigure() {
 // ============================================================================
 function _createThreeEyedBeast() {
   const group = new THREE.Group();
-  const furMat = new THREE.MeshLambertMaterial({ color: 0x0c0b0a });
-  const redEyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.65, 1.55), furMat);
-  body.position.y = 0.72;
+  const furMat = _wolfFurMat;
+  const body = new THREE.Group(); // tronco: balança/arqueia no galope
+  body.position.y = 0.92;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.45, 0.55), furMat);
-  head.position.set(0, 1.05, 0.85);
-  group.add(head);
-
-  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.48, 5), furMat);
-  snout.rotation.x = Math.PI * 0.5;
-  snout.position.set(0, 0.94, 1.2);
-  group.add(snout);
-
-  for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 4), furMat);
-    ear.rotation.z = side * -0.25;
-    ear.position.set(side * 0.18, 1.34, 0.75);
-    group.add(ear);
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.7, 0.78), furMat);
+  chest.position.set(0, 0.04, 0.38);
+  body.add(chest);
+  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.48, 0.66), furMat);
+  hip.position.set(0, -0.04, -0.38);
+  body.add(hip);
+  // lombo descarnado e crista de espinhos
+  for (let i = 0; i < 6; i++) {
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3 - i * 0.02, 4), furMat);
+    sp.position.set(0, 0.42 - i * 0.025, 0.62 - i * 0.24);
+    sp.rotation.x = -0.45;
+    body.add(sp);
+  }
+  // costelas aparentes
+  for (let i = 0; i < 3; i++) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.035, 0.05), _wolfBoneMat);
+    rib.position.set(0, -0.05 - i * 0.07, 0.22 + i * 0.16);
+    body.add(rib);
   }
 
-  const eyeGeo = new THREE.BoxGeometry(0.07, 0.07, 0.07);
+  // pescoço + cabeça baixa (de caça)
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.5), furMat);
+  neck.position.set(0, 0.14, 0.88);
+  neck.rotation.x = 0.35;
+  body.add(neck);
+  const head = new THREE.Group();
+  head.position.set(0, 0.0, 1.18);
+  body.add(head);
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.34, 0.46), furMat);
+  head.add(skull);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.46), furMat);
+  snout.position.set(0, -0.06, 0.4);
+  head.add(snout);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.07), _maskDarkMat);
+  nose.position.set(0, -0.02, 0.65);
+  head.add(nose);
+  // gengiva exposta (vermelho escuro) + mandíbula sempre aberta
+  const gum = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.4), _wolfGumMat);
+  gum.position.set(0, -0.16, 0.4);
+  head.add(gum);
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -0.16, 0.18);
+  jaw.rotation.x = 0.5;
+  head.add(jaw);
+  const jawBox = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.46), furMat);
+  jawBox.position.set(0, -0.03, 0.23);
+  jaw.add(jawBox);
+  const jawGum = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.03, 0.4), _wolfGumMat);
+  jawGum.position.set(0, 0.015, 0.24);
+  jaw.add(jawGum);
+  // dentes: fileira superior (para baixo) e inferior (para cima), sempre à mostra
+  for (let i = 0; i < 6; i++) {
+    const z = 0.22 + i * 0.075;
+    const big = i === 2 ? 1.6 : 1;
+    for (const sd of [-1, 1]) {
+      const up = new THREE.Mesh(new THREE.ConeGeometry(0.022 * big, 0.12 * big, 4), _wolfToothMat);
+      up.rotation.x = Math.PI;
+      up.position.set(sd * 0.095, -0.2 - 0.04 * big, z);
+      head.add(up);
+      const lo = new THREE.Mesh(new THREE.ConeGeometry(0.02 * big, 0.1 * big, 4), _wolfToothMat);
+      lo.position.set(sd * 0.085, 0.07 * big, 0.06 + i * 0.07);
+      jaw.add(lo);
+    }
+  }
+  // órbitas fundas + olhos vermelhos oblíquos (3)
+  for (const sd of [-1, 1]) {
+    const socket = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.08), _maskDarkMat);
+    socket.position.set(sd * 0.14, 0.07, 0.2);
+    head.add(socket);
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.032, 0.03), _wolfEyeMat);
+    eye.position.set(sd * 0.14, 0.075, 0.245);
+    eye.rotation.z = sd * -0.4;
+    head.add(eye);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 4), furMat);
+    ear.position.set(sd * 0.15, 0.26, -0.05);
+    ear.rotation.set(-0.5, 0, sd * -0.3);
+    head.add(ear);
+  }
+  const eye3 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.03), _wolfEyeMat);
+  eye3.position.set(0, 0.17, 0.235);
+  head.add(eye3);
 
-  const eyeL = new THREE.Mesh(eyeGeo, redEyeMat);
-  eyeL.position.set(-0.16, 1.05, 1.1);
-  group.add(eyeL);
-
-  const eyeR = new THREE.Mesh(eyeGeo, redEyeMat);
-  eyeR.position.set(0.16, 1.05, 1.1);
-  group.add(eyeR);
-
-  const eyeThird = new THREE.Mesh(eyeGeo, redEyeMat);
-  eyeThird.position.set(0.0, 1.22, 1.02);
-  group.add(eyeThird);
-
-  group.userData.legs = [];
-  const legGeo = new THREE.BoxGeometry(0.16, 0.7, 0.16);
-  const legPositions = [
-    [-0.26, 0.35, 0.5],
-    [0.26, 0.35, 0.5],
-    [-0.26, 0.35, -0.5],
-    [0.26, 0.35, -0.5],
-  ];
-  legPositions.forEach((p, idx) => {
-    const leg = new THREE.Mesh(legGeo, furMat);
-    leg.position.set(p[0], p[1], p[2]);
-    group.add(leg);
-    group.userData.legs.push({ mesh: leg, baseZ: p[2], phase: idx * Math.PI * 0.5 });
+  // pernas articuladas (coxa + joelho/canela + pata com garras)
+  const legs = [];
+  const defs = [[-0.24, 0.42, 0], [0.24, 0.42, 0], [-0.2, -0.5, 0.9], [0.2, -0.5, 0.9]]; // [x, z, fase]
+  defs.forEach((d, idx) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(d[0], -0.12, d[1]);
+    body.add(pivot);
+    const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.5, 0.19), furMat);
+    thigh.position.y = -0.2;
+    pivot.add(thigh);
+    const knee = new THREE.Group();
+    knee.position.y = -0.42;
+    pivot.add(knee);
+    const shin = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.46, 0.12), furMat);
+    shin.position.y = -0.2;
+    knee.add(shin);
+    const paw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.24), furMat);
+    paw.position.set(0, -0.44, 0.06);
+    knee.add(paw);
+    for (const cx of [-0.04, 0.04]) {
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.1, 4), _wolfToothMat);
+      claw.rotation.x = Math.PI / 2;
+      claw.position.set(cx, -0.45, 0.2);
+      knee.add(claw);
+    }
+    legs.push({ pivot, knee, front: idx < 2, off: d[2] });
   });
 
+  // cauda rala, baixa
+  const tail = new THREE.Group();
+  tail.position.set(0, 0.08, -0.7);
+  body.add(tail);
+  const tailMesh = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.8, 4), furMat);
+  tailMesh.position.set(0, -0.1, -0.34);
+  tailMesh.rotation.x = -1.25;
+  tail.add(tailMesh);
+
+  group.userData = { body, head, jaw, tail, legs };
+  group.scale.setScalar(1.22);
+  group.visible = false;
   return group;
+}
+
+// Galope: pares dianteiro e traseiro defasados, tronco arqueia, cabeça balança, mandíbula pulsa, cauda chicoteia
+function _animateWolf(b, ph) {
+  const u = b.userData;
+  const gal = Math.sin(ph);
+  const gal2 = Math.sin(ph + 0.9);
+  for (const l of u.legs) {
+    const a = l.front ? Math.sin(ph + l.off) : Math.sin(ph + 2.1 + l.off);
+    l.pivot.rotation.x = a * (l.front ? 1.0 : 0.85) - 0.1;
+    l.knee.rotation.x = Math.max(0, -Math.cos(ph + (l.front ? 0 : 2.1) + l.off)) * 1.25 + 0.15;
+  }
+  u.body.position.y = 0.92 + Math.abs(Math.sin(ph * 1.0 + 0.4)) * 0.17;
+  u.body.rotation.x = gal * 0.09;
+  u.head.rotation.x = -gal * 0.12 + 0.12;
+  u.jaw.rotation.x = 0.46 + (Math.sin(ph * 2) * 0.5 + 0.5) * 0.28;
+  u.tail.rotation.y = Math.sin(ph * 0.5) * 0.35;
+  u.tail.rotation.x = 0.1 + gal2 * 0.12;
 }
 
 // ============================================================================
 // 3b. Fogueira e Cultistas da cutscene (poucas malhas, nenhuma luz além da fogueira)
 // ============================================================================
+const _wolfFurMat = new THREE.MeshLambertMaterial({ color: 0x2a2521, emissive: 0x17120f, flatShading: true });
+const _wolfBoneMat = new THREE.MeshLambertMaterial({ color: 0x3a342c });
+const _wolfGumMat = new THREE.MeshBasicMaterial({ color: 0x5a0710 });
+const _wolfToothMat = new THREE.MeshBasicMaterial({ color: 0xe9e1c8 });
+const _wolfEyeMat = new THREE.MeshBasicMaterial({ color: 0xff1515 });
 let _baseFov = 0;
+let _sword = null;
+let _grabArm = null;
+const _handW = new THREE.Vector3();
 let _fire = null;
 let _cultists = [];
 let _caption = null;
@@ -281,10 +382,11 @@ let _path = null;
 const _purpleEyeMat = new THREE.MeshBasicMaterial({ color: 0xb53cff });
 const _maskMat = new THREE.MeshBasicMaterial({ color: 0xe6e0d2 });
 const _maskDarkMat = new THREE.MeshBasicMaterial({ color: 0x050405 });
-const _robeMat = new THREE.MeshLambertMaterial({ color: 0x0b080d });
+const _robeMat = new THREE.MeshLambertMaterial({ color: 0x0b080d, emissive: 0x0f0b14 });
 let _glowTex = null;
 const _tmpP = { x: 0, z: 0, psi: 0 };
 const _tmpW = { x: 0, z: 0, psi: 0 };
+const _wolfPh = [0, 1.3, 2.6, 3.9, 5.2];
 
 function _glow() {
   if (!_glowTex) _glowTex = makeGlowTexture("255,235,170");
@@ -399,7 +501,7 @@ function _buildCultist() {
   halo.position.set(0, 0.035, 0.19);
   halo.scale.setScalar(0.3);
   head.add(halo);
-  g.userData = { eyes, halo, head };
+  g.userData = { eyes, halo, head, maskParts: [mask, nose, mouth] };
   g.visible = false;
   return g;
 }
@@ -407,7 +509,7 @@ function _buildCultist() {
 // ============================================================================
 // 3c. Trajetória da fuga: pré-calculada (determinística), então cada frame só consulta a tabela
 // ============================================================================
-const RUN_DURATION = 11.2;
+const RUN_DURATION = 9.6;
 const PATH_STEP = 1 / 60;
 
 function _buildPath() {
@@ -420,7 +522,8 @@ function _buildPath() {
   for (let i = 0; i < n; i++) {
     const tau = i * PATH_STEP;
     const turn = _smooth(tau / 7.5);
-    const psi = -1.45 + turn * 1.35; // foge para o lado (-X) e vai curvando para a estrada
+    void turn;
+    const psi = Math.PI + Math.sin(tau * 0.5) * 0.12; // corre RETO para a frente (-Z), só um leve balanço
     const accel = Math.min(1, tau / 0.7);
     const brake = tau > RUN_DURATION - 0.6 ? Math.max(0, (RUN_DURATION - tau) / 0.6) : 1;
     const v = 6.4 * accel * brake;
@@ -512,19 +615,26 @@ function _attachSkipListener() {
 // 5. Linha do tempo (segundos)
 // ============================================================================
 const T = {
-  look: 5.6, // o protagonista vira o rosto para o lado
-  cultist: 6.3, // o cultista surge na penumbra
-  zoom: 8.8, // zoom nos olhos
-  wolves: 12.0, // as 3 sombras de olhos vermelhos
-  run: 14.0, // começa a fuga
-  caption: 27.8, // legenda
-  captionOff: 31.0,
-  black: 31.4, // fade suave para preto
-  monster: 33.4, // som do bicho com a tela preta
-  end: 37.2,
+  look: 5.6, // o protagonista vira o rosto para o lado, para o breu
+  cultist: 6.6, // dois olhos roxos/vermelhos surgem no breu (onde estava a câmera)
+  zoom: 9.6, // o servo entra na luz: a máscara aparece; zoom no rosto
+  wolves: 12.2, // a máscara chama os lobos: 5 sombras a galope
+  run: 16.2, // corte: o protagonista corre reto
+  caption: 29.4, // legenda (ele já está no braço da entidade)
+  captionOff: 32.8,
+  black: 33.0, // fade suave para preto
+  monster: 35.0, // som do bicho com a tela preta
+  end: 38.8,
 };
-const ENTITY_DIST = 3.4; // distância entre o ponto final da corrida e a entidade
-const WOLF_X = [-3.0, 0.0, 3.0];
+const STOP_T = T.run + RUN_DURATION; // ele freia diante da espada
+const ENTITY_T = STOP_T + 1.5; // a entidade surge ATRÁS dele
+const GRAB_T = STOP_T + 2.6; // ela o agarra e levanta
+const ENTITY_DIST = 3.4; // distância (atrás do jogador) em que a entidade surge
+const WOLF_X = [-3.2, -1.6, 0.0, 1.6, 3.2];
+const SERV_TAUS = [3.0, 3.6, 4.3, 4.9, 5.6, 6.3, 7.0];
+const SERV_SIDES = [3.4, -3.2, 3.8, -3.6, 3.2, -3.5, 3.6];
+const MAIN_FROM = [6.2, 5.0]; // servo: de onde vem (na direção para onde o protagonista olha, onde a câmera estava)
+const MAIN_TO = [3.6, 2.9];
 
 // ============================================================================
 // 5a. Preparação para rodar LISO (gambiarras assumidas)
@@ -555,7 +665,7 @@ function _prepareIntroWorld(env, startX, startZ) {
   GameState.anchorZ = startZ;
 
   // 2) esconde o resto do mundo
-  const keep = new Set([player.root, _tallFigure, _fire, ..._introWolves, ..._cultists, dayNight?.fixedAstroGroup]);
+  const keep = new Set([player.root, _tallFigure, _fire, _sword, ..._introWolves, ..._cultists, dayNight?.fixedAstroGroup]);
   if (world?.chunks) for (const chunk of world.chunks.values()) keep.add(chunk.group);
   _hiddenForIntro.length = 0;
   for (const ch of scene.children) {
@@ -567,7 +677,7 @@ function _prepareIntroWorld(env, startX, startZ) {
   }
 
   // 3) pré-compila e envia à GPU tudo o que a cena usa (com a fogueira já presente => mesma contagem de luzes)
-  const objs = [_tallFigure, _fire, ..._introWolves, ..._cultists];
+  const objs = [_tallFigure, _fire, _sword, ..._introWolves, ..._cultists];
   const prev = objs.map((o) => o.visible);
   const culled = [];
   for (const o of objs) {
@@ -717,14 +827,60 @@ export function startIntroSequence(env) {
       glow.position.set(x, 5.2, 0.66);
       eyes.add(glow);
     }
+    _tallFigure.traverse((o) => {
+      if (o.material && o.material.isMeshLambertMaterial && o.material.emissive) o.material.emissive.setHex(0x0b0910); // silhueta legível no breu
+    });
     _tallFigure.add(eyes);
+    // Braço que agarra: manga longa + mão de garras; pendurado até o momento de pegar o protagonista
+    _grabArm = new THREE.Group();
+    _grabArm.position.set(0.7, 4.15, 0.25);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0x07050a, emissive: 0x0c0a12 });
+    const sleeveG = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.34, 2.9, 7), armMat);
+    sleeveG.position.y = -1.45;
+    _grabArm.add(sleeveG);
+    const handG = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.5, 0.2), armMat);
+    handG.position.y = -3.0;
+    _grabArm.add(handG);
+    for (let c = -1; c <= 2; c++) {
+      const cl = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.55, 4), new THREE.MeshBasicMaterial({ color: 0x050405 }));
+      cl.position.set(c * 0.085 - 0.04, -3.4, 0.05);
+      cl.rotation.x = 0.25;
+      _grabArm.add(cl);
+    }
+    _tallFigure.add(_grabArm);
     scene.add(_tallFigure);
   } else if (!_tallFigure.parent) {
     scene.add(_tallFigure);
   }
 
+  if (!_sword) {
+    _sword = new THREE.Group();
+    const bladeMat = new THREE.MeshLambertMaterial({ color: 0xa9adb3, emissive: 0x3a3d44, flatShading: true });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.95, 0.018), bladeMat);
+    blade.position.y = 0.52;
+    _sword.add(blade);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0535, 0.14, 4), bladeMat);
+    tip.rotation.y = Math.PI / 4;
+    tip.scale.z = 0.25;
+    tip.position.y = 1.07;
+    _sword.add(tip);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.045, 0.05), new THREE.MeshLambertMaterial({ color: 0x4a3a20 }));
+    guard.position.y = 0.03;
+    _sword.add(guard);
+    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.24, 6), new THREE.MeshLambertMaterial({ color: 0x2a1a10 }));
+    hilt.position.y = -0.11;
+    _sword.add(hilt);
+    const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: _glow(), color: 0xcfe0ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+    glint.scale.setScalar(0.7);
+    glint.position.y = 0.5;
+    _sword.add(glint);
+    scene.add(_sword);
+  }
+  _sword.visible = false;
+  if (_sword.parent !== scene) scene.add(_sword);
+
   if (_introWolves.length === 0) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const beast = _createThreeEyedBeast();
       scene.add(beast);
       _introWolves.push(beast);
@@ -734,7 +890,7 @@ export function startIntroSequence(env) {
   }
 
   if (_cultists.length === 0) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       const c = _buildCultist();
       scene.add(c);
       _cultists.push(c);
@@ -789,44 +945,53 @@ export function startIntroSequence(env) {
   _fire.position.set(startX - 0.45, fy, startZ + 1.5);
   _fire.scale.setScalar(0.72);
 
-  // Cultista principal: de lado, na penumbra, encarando o jogador
-  const cx = startX + 6.2;
-  const cz = startZ + 0.8;
+  // Servo principal: sai do breu (onde estava a câmera), na direção para onde o protagonista olha
   const main = _cultists[0];
-  main.position.set(cx, world.heightAt(cx, cz), cz);
-  main.rotation.y = Math.atan2(startX - cx, startZ - cz);
+  main.position.set(startX + MAIN_FROM[0], world.heightAt(startX + MAIN_FROM[0], startZ + MAIN_FROM[1]), startZ + MAIN_FROM[1]);
+  main.rotation.y = Math.atan2(startX - main.position.x, startZ - main.position.z);
   main.visible = false;
   main.userData.eyes.scale.setScalar(1);
   main.userData.halo.material.opacity = 0;
+  for (const m of main.userData.maskParts) m.visible = false; // primeiro só os olhos; a máscara aparece ao entrar na luz
 
-  // Cultistas ao longo da fuga (aparecem de relance na escuridão)
-  const taus = [2.6, 4.6, 6.8, 8.6];
-  const sides = [5.0, -4.6, 4.2, -3.8];
-  for (let k = 0; k < taus.length; k++) {
-    const pp = _pathAt(taus[k] + 0.6, _tmpP);
-    const wx = startX + pp.x + Math.cos(pp.psi) * sides[k];
-    const wz = startZ + pp.z - Math.sin(pp.psi) * sides[k];
+  // Servos que ladeiam a fuga (dos dois lados): só há servos
+  for (let k = 0; k < SERV_TAUS.length; k++) {
+    const pp = _pathAt(SERV_TAUS[k], _tmpP);
+    const wx = startX + pp.x + Math.cos(pp.psi) * SERV_SIDES[k];
+    const wz = startZ + pp.z - Math.sin(pp.psi) * SERV_SIDES[k];
     const c = _cultists[k + 1];
     c.position.set(wx, world.heightAt(wx, wz), wz);
     c.rotation.y = Math.atan2(startX + pp.x - wx, startZ + pp.z - wz);
     c.visible = false;
     c.userData.eyes.scale.setScalar(1);
-    c.userData.halo.material.opacity = 0.0;
+    c.userData.halo.material.opacity = 0.3;
+    for (const m of c.userData.maskParts) m.visible = true;
   }
 
-  // Lobos: começam escondidos na escuridão atrás do jogador (-Z)
-  for (let i = 0; i < 3; i++) {
+  // Lobos: começam escondidos no breu longe (+Z), de onde chega o servo
+  for (let i = 0; i < _introWolves.length; i++) {
     const b = _introWolves[i];
     b.visible = false;
-    b.position.set(startX + WOLF_X[i], world.heightAt(startX + WOLF_X[i], startZ - 17), startZ - 17 - i * 1.5);
+    b.position.set(startX + WOLF_X[i], world.heightAt(startX + WOLF_X[i], startZ + 36), startZ + 36 + i * 1.4);
   }
+
+  // Espada no chão, adiante do ponto onde ele vai frear
+  const ps = _pathAt(RUN_DURATION, _tmpP);
+  const swx = startX + ps.x + Math.sin(ps.psi) * 0.85;
+  const swz = startZ + ps.z + Math.cos(ps.psi) * 0.85;
+  if (_sword.parent !== scene) scene.add(_sword);
+  _sword.position.set(swx, world.heightAt(swx, swz) + 0.05, swz);
+  _sword.rotation.set(Math.PI / 2 - 0.08, 0, ps.psi + 0.5);
+  _sword.visible = false;
+  if (_grabArm) _grabArm.rotation.set(0, 0, 0);
+  player.root.rotation.set(0, 0, 0);
 
   // Entidade alta: parada no fim da corrida, de frente para o jogador
   const pe = _pathAt(RUN_DURATION, _tmpP);
-  const ex = startX + pe.x + Math.sin(pe.psi) * ENTITY_DIST;
-  const ez = startZ + pe.z + Math.cos(pe.psi) * ENTITY_DIST;
+  const ex = startX + pe.x - Math.sin(pe.psi) * ENTITY_DIST; // ATRÁS dele
+  const ez = startZ + pe.z - Math.cos(pe.psi) * ENTITY_DIST;
   _tallFigure.position.set(ex, world.heightAt(ex, ez), ez);
-  _tallFigure.rotation.set(0, pe.psi + Math.PI, 0);
+  _tallFigure.rotation.set(0, pe.psi, 0); // de frente para a nuca do protagonista
   _tallFigure.visible = false;
   _entitySpawnedZ = 0;
 
@@ -900,7 +1065,8 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
   _howl(audio, "h3", t, T.run + 0.3, 0.95, 8);
   _howl(audio, "h4", t, T.run + 3.6, 0.85, 10);
   _howl(audio, "h5", t, T.run + 7.0, 0.8, 12);
-  if (t >= T.wolves + 0.2 && t < T.run + 8.5) {
+  _howl(audio, "h6", t, T.zoom + 1.2, 0.6, 30); // a máscara chama os lobos
+  if (t >= T.wolves + 0.2 && t < STOP_T) {
     _wolfStepsTimer += dt;
     if (_wolfStepsTimer >= 0.28) {
       _wolfStepsTimer = 0;
@@ -913,6 +1079,14 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
   const px = ox + _pathAt(Math.max(0, Math.min(RUN_DURATION, runTau)), _tmpP).x;
   const pz = oz + _tmpP.z;
   const ppsi = _tmpP.psi;
+  const fwdX = Math.sin(ppsi);
+  const fwdZ = Math.cos(ppsi);
+  const sideX = Math.cos(ppsi);
+  const sideZ = -Math.sin(ppsi);
+  const afterStop = t - STOP_T; // >= 0 depois que ele freia
+  const grabT = t - GRAB_T;
+  const reach = _smooth(grabT / 0.8);
+  const lift = _smooth((grabT - 0.7) / 1.0);
 
   // ------------------------------------------------------------------ jogador
   if (runTau >= 0) {
@@ -925,7 +1099,6 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
   const groundY = world ? world.heightAt(player.x, player.z) : 0;
   player.root.position.set(player.x, groundY, player.z);
 
-  const modelYaw = player.model ? player.model.rotation.y : 0;
   const playerEye = _look.set(player.x, groundY + 1.62, player.z); // reutilizado abaixo (copiado antes de usar)
   const eyeX = playerEye.x;
   const eyeY = playerEye.y;
@@ -933,27 +1106,22 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
 
   let headYaw = 0;
   let headPitch = 0.1; // cabeça levemente caída: cansaço
+  const LOOK_YAW = 0.9; // olha para o breu, na diagonal (onde estava a câmera)
   if (t < T.look) {
     _poseIdle(player, dt, 0.8);
     if (player.model) player.model.rotation.y = 0;
     headPitch = 0.12 + Math.sin(t * 0.9) * 0.025;
-    // pisca lento e pesado perto dos 3,5 s: leve queda da cabeça
     const sag = _smooth((t - 3.2) / 0.5) * (1 - _smooth((t - 3.9) / 0.6));
     headPitch += sag * 0.12;
-  } else if (t < T.wolves) {
-    _poseIdle(player, dt, t > T.zoom ? 2.2 : 1.1);
-    // olhar: cabeça vai primeiro, o corpo acompanha
-    const yawBody = 1.45 * _smooth((t - (T.look + 0.5)) / 1.5);
-    if (player.model) player.model.rotation.y = yawBody;
-    headYaw = 0.6 * _smooth((t - T.look) / 0.6) * (1 - _smooth((t - (T.look + 1.2)) / 1.2));
-    headPitch = 0.04;
-    if (t > T.zoom) headPitch = -0.02;
   } else if (runTau < 0) {
-    _poseIdle(player, dt, 3.0);
-    // vira rápido para trás ao ouvir/ver os lobos
-    const turn = _smooth((t - (T.wolves + 0.5)) / 0.55);
-    if (player.model) player.model.rotation.y = 1.45 + _angDiff(Math.PI, 1.45) * turn;
-    headPitch = 0.0;
+    _poseIdle(player, dt, t > T.zoom ? 2.2 : 1.1);
+    // a cabeça vai primeiro, o corpo acompanha; antes da corrida ele já se vira para fugir
+    let yaw = LOOK_YAW * _smooth((t - (T.look + 0.5)) / 1.5);
+    const turn = _smooth((t - (T.run - 0.9)) / 0.7);
+    yaw += _angDiff(Math.PI, yaw) * turn;
+    if (player.model) player.model.rotation.y = yaw;
+    headYaw = 0.5 * _smooth((t - T.look) / 0.6) * (1 - _smooth((t - (T.look + 1.2)) / 1.2));
+    headPitch = t > T.zoom ? -0.02 : 0.04;
   } else if (running && _pathSpeedOK(runTau)) {
     player.grounded = true;
     player.crouching = false;
@@ -970,90 +1138,147 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
     }
     if (typeof player._animate === "function") player._animate(dt, null, false, true, 0);
     if (player.model) player.model.rotation.y += _angDiff(ppsi, player.model.rotation.y) * (1 - Math.exp(-14 * dt));
-    // glance para os lados onde passam os cultistas: primeiro um lado, depois o outro
-    const gA = _smooth((runTau - 2.7) / 0.4) * (1 - _smooth((runTau - 4.3) / 0.4));
-    const gB = _smooth((runTau - 4.7) / 0.4) * (1 - _smooth((runTau - 6.0) / 0.4));
+    // olha para um lado, depois para o outro: só há servos
+    const gA = _smooth((runTau - 3.0) / 0.4) * (1 - _smooth((runTau - 4.7) / 0.4));
+    const gB = _smooth((runTau - 5.1) / 0.4) * (1 - _smooth((runTau - 6.5) / 0.4));
     headYaw = 0.95 * gA - 0.95 * gB;
-    headPitch = 0.02 + (runTau > 9.4 ? -0.35 * _smooth((runTau - 9.4) / 0.9) : 0); // olha para cima, para a entidade
+    headPitch = 0.02 + (runTau > 7.2 ? 0.28 * _smooth((runTau - 7.2) / 1.0) : 0); // olha para o chão: a espada
+  } else if (afterStop < 2.6) {
+    // freou: agacha, pega a espada, levanta com ela
+    const crouch = afterStop < 0.95;
+    player.crouching = crouch;
+    _poseIdle(player, dt, 2.6);
+    player.crouching = crouch;
+    if (player.model) player.model.rotation.y += _angDiff(ppsi, player.model.rotation.y) * (1 - Math.exp(-10 * dt));
+    const reachArm = crouch ? -0.55 - 0.9 * _smooth(afterStop / 0.7) : -1.0 - 0.4 * _smooth((afterStop - 1.0) / 0.5);
+    if (player.rightArm) player.rightArm.rotation.x = reachArm;
+    headPitch = crouch ? 0.35 : 0.0;
+    if (afterStop >= 1.9) headYaw = 0.35; // sente algo atrás
+    if (afterStop >= 0.95 && _sword.parent !== player.rightArm && player.rightArm) {
+      _sword.visible = true;
+      player.rightArm.add(_sword);
+      _sword.position.set(0, -0.62, 0.04);
+      _sword.rotation.set(Math.PI / 2, 0, 0);
+    }
   } else {
-    // freou diante da entidade: choque
-    _poseIdle(player, dt, 3.4);
-    headPitch = -0.5;
+    // agarrado: se debate no braço da entidade
+    _poseIdle(player, dt, 4.0);
+    if (player.rightArm) player.rightArm.rotation.x = -1.4 + Math.sin(t * 9) * 0.25 * lift;
+    if (player.leftArm) player.leftArm.rotation.x = -0.8 + Math.sin(t * 8 + 1) * 0.3 * lift;
+    headPitch = -0.3;
+    headYaw = Math.sin(t * 4) * 0.25 * lift;
   }
   if (player.head) {
     player.head.rotation.y = headYaw;
     player.head.rotation.x = headPitch;
   }
+  // levantado pela entidade: deitado no braço, de rosto para cima (pivô nos pés: ajusta posição)
+  if (runTau >= RUN_DURATION && grabT > 0) {
+    _tallFigure.updateMatrixWorld(true);
+    _handW.set(0, -2.9, 0.12);
+    _grabArm.localToWorld(_handW);
+    const hx = _handW.x;
+    const hy = _handW.y;
+    const hz = _handW.z;
+    player.root.rotation.order = "YXZ";
+    const rx = -Math.PI / 2 * lift + Math.sin(t * 7) * 0.05 * lift;
+    player.root.rotation.set(rx, 0, Math.sin(t * 6) * 0.08 * lift);
+    // com o corpo deitado (cabeça para trás), os pés ficam 0,9 m à frente da mão
+    player.root.position.set(
+      THREE.MathUtils.lerp(player.x, hx + fwdX * 0.9, lift),
+      THREE.MathUtils.lerp(groundY, hy - 0.15, lift),
+      THREE.MathUtils.lerp(player.z, hz + fwdZ * 0.9, lift)
+    );
+  }
 
-  // ------------------------------------------------------------------ cultistas
+  // ------------------------------------------------------------------ servos
   const main = _cultists[0];
+  // principal: olhos no breu -> anda até a luz da fogueira -> máscara aparece -> aura vermelha cresce
   if (t >= T.cultist) main.visible = true;
-  // olhos: tremeluzem na penumbra, depois crescem em zoom com aura vermelha
-  const zoomP = _smooth((t - T.zoom) / 2.8);
+  {
+    const wk = _smooth((t - T.cultist) / (T.zoom + 1.0 - T.cultist));
+    const mx = ox + MAIN_FROM[0] + (MAIN_TO[0] - MAIN_FROM[0]) * wk;
+    const mz = oz + MAIN_FROM[1] + (MAIN_TO[1] - MAIN_FROM[1]) * wk;
+    main.position.set(mx, (world ? world.heightAt(mx, mz) : 0) + Math.abs(Math.sin(t * 2.4)) * 0.03 * (1 - wk), mz);
+    main.rotation.y = Math.atan2(ox - mx, oz - mz);
+  }
+  if (t >= T.zoom - 0.35 && !main.userData.maskShown) {
+    main.userData.maskShown = true;
+    for (const m of main.userData.maskParts) m.visible = true;
+  }
+  if (t < T.cultist - 1) main.userData.maskShown = false;
+  const eyeP = _smooth((t - T.cultist) / 1.2); // os olhos "acendem" primeiro
+  const zoomP = _smooth((t - T.zoom) / 2.6);
   const flick = 0.85 + Math.sin(t * 31) * 0.08 + Math.sin(t * 7.3) * 0.07;
-  main.userData.eyes.scale.setScalar(1 + zoomP * zoomP * 1.7 * flick);
-  main.userData.halo.material.opacity = zoomP * 0.42 * flick;
+  main.userData.eyes.scale.setScalar((1 + zoomP * zoomP * 1.7) * (0.85 + eyeP * 0.15) * flick);
+  main.userData.halo.material.opacity = (0.18 * eyeP + zoomP * 0.3) * flick;
   main.userData.halo.scale.setScalar(0.3 + zoomP * 0.55);
   main.userData.head.rotation.y = Math.sin(t * 0.7) * 0.08;
   for (let k = 1; k < _cultists.length; k++) {
     const c = _cultists[k];
-    const appear = runTau >= (k === 1 ? 1.4 : k === 2 ? 3.4 : k === 3 ? 5.6 : 7.4);
-    c.visible = appear && runTau < RUN_DURATION + 3;
+    c.visible = runTau >= -0.2 && t < STOP_T + 6;
     c.userData.eyes.scale.setScalar(1 + Math.sin(t * 5 + k) * 0.08);
+    // viram o rosto para o protagonista quando ele passa
+    c.userData.head.rotation.y = THREE.MathUtils.clamp(_angDiff(Math.atan2(player.x - c.position.x, player.z - c.position.z), c.rotation.y), -1.1, 1.1) * 0.8;
   }
 
-  // ------------------------------------------------------------------ lobos
-  for (let i = 0; i < 3; i++) {
+  // ------------------------------------------------------------------ lobos (5, galope animado)
+  for (let i = 0; i < _introWolves.length; i++) {
     const b = _introWolves[i];
-    const show = t >= T.wolves - 0.7 && runTau < RUN_DURATION + 2;
+    const show = t >= T.wolves - 0.1 && t < STOP_T + 0.4;
     b.visible = show;
     if (!show) continue;
     let wx;
     let wz;
-    let wpsi = 0;
+    let wpsi = Math.PI;
+    let wspeed = 7.5;
+    const sx = ox + WOLF_X[i];
+    const sz = oz + 36 + i * 1.4;
+    const ex = ox + WOLF_X[i] * 0.5;
+    const ez = oz + 5.0 + i * 0.55;
     if (runTau < 0) {
-      const q = _smooth((t - (T.wolves - 0.7)) / (T.run - T.wolves + 0.7));
-      const sx = ox + WOLF_X[i];
-      const sz = oz - 17 - i * 1.5;
-      const ex = ox + WOLF_X[i] * 0.6;
-      const ez = oz - 5.5 - i * 0.8;
+      const q = Math.max(0, Math.min(1, (t - T.wolves) / (T.run - T.wolves)));
       wx = sx + (ex - sx) * q;
       wz = sz + (ez - sz) * q;
+      wpsi = Math.atan2(ex - sx, ez - sz);
     } else {
-      const lag = (1.55 + 0.22 * i) + ((0.8 + 0.12 * i) - (1.55 + 0.22 * i)) * _smooth(runTau / 8);
+      const lag = (1.7 + 0.2 * i) + ((0.9 + 0.12 * i) - (1.7 + 0.2 * i)) * _smooth(runTau / 8);
       const qq = runTau - lag;
       if (qq >= 0) {
         const wp = _pathAt(Math.min(RUN_DURATION, qq), _tmpW);
-        wx = ox + wp.x + Math.cos(wp.psi) * (i - 1) * 0.9;
-        wz = oz + wp.z - Math.sin(wp.psi) * (i - 1) * 0.9;
+        wx = ox + wp.x + Math.cos(wp.psi) * (i - 2) * 0.85;
+        wz = oz + wp.z - Math.sin(wp.psi) * (i - 2) * 0.85;
         wpsi = wp.psi;
+        if (runTau > RUN_DURATION - 0.7) wspeed = 3.0;
       } else {
         const u = _smooth(runTau / lag);
-        const ex = ox + WOLF_X[i] * 0.6;
-        const ez = oz - 5.5 - i * 0.8;
         wx = ex + (ox - ex) * u;
         wz = ez + (oz - ez) * u;
         wpsi = Math.atan2(ox - ex, oz - ez);
       }
     }
+    _wolfPh[i] += dt * wspeed * 1.9;
     b.position.set(wx, world ? world.heightAt(wx, wz) : 0, wz);
-    b.rotation.set(0, wpsi + Math.sin(t * 6 + i) * 0.05, 0);
-    if (b.userData.legs) {
-      for (const leg of b.userData.legs) leg.mesh.position.z = leg.baseZ + Math.sin(t * 18 + leg.phase) * 0.16;
-    }
+    b.rotation.set(0, wpsi + Math.sin(t * 3 + i) * 0.04, 0);
+    _animateWolf(b, _wolfPh[i]);
   }
 
-  // ------------------------------------------------------------------ entidade
-  if (runTau >= 6.4 && !_tallFigure.visible) _tallFigure.visible = true;
-  if (runTau >= RUN_DURATION + 1.3) {
-    _tallFigure.rotation.x = THREE.MathUtils.lerp(_tallFigure.rotation.x, -0.1, 1 - Math.exp(-3.0 * dt));
+  // ------------------------------------------------------------------ entidade e espada
+  if (t >= ENTITY_T && !_tallFigure.visible) _tallFigure.visible = true;
+  if (t >= ENTITY_T) {
+    // surge ATRÁS dele: leve avanço enquanto se curva sobre ele
+    const lean = _smooth((t - ENTITY_T) / 1.2);
+    _tallFigure.rotation.x = -0.08 * lean + (grabT > 0 ? -0.1 * reach : 0);
   }
-  if (runTau >= RUN_DURATION + 0.2 && GameState.introPhase < 2) {
-    GameState.introPhase = 2;
+  if (_grabArm) {
+    // braço pendurado -> estende para a frente -> levanta o protagonista
+    _grabArm.rotation.x = (-Math.PI / 2) * reach - 0.3 * lift;
+    _grabArm.rotation.z = -0.1 * reach;
   }
+  if (afterStop < 0 && runTau > RUN_DURATION - 3.5) _sword.visible = true; // brilha no chão quando ele chega perto
+  if (afterStop >= 0 && GameState.introPhase < 2) GameState.introPhase = 2;
 
   // ------------------------------------------------------------------ câmera
-  // FOV: fecha devagar no plano 1 (zoom nos olhos cansados) e volta ao normal nos demais
   const fovTarget = t < T.look ? _baseFov - 32 * _smooth(t / T.look) : t >= T.zoom && t < T.wolves ? _baseFov - 12 * _smooth((t - T.zoom) / 2.5) : _baseFov;
   if (Math.abs(camera.fov - fovTarget) > 0.01) {
     camera.fov = fovTarget;
@@ -1067,62 +1292,62 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
     camera.position.copy(_camPos);
     camera.lookAt(ox, gy + 1.62 - (1 - k) * 0.06, oz);
   } else if (t < T.zoom) {
-    // PLANO 2: lateral, protagonista (à esq.), fogueira e o cultista surgindo na penumbra (à dir.)
+    // PLANO 2: lateral; o protagonista (perto) olha para o breu e dois olhos roxos vão surgindo, sozinhos, na escuridão
     const k = _smooth((t - T.look) / (T.zoom - T.look));
-    camera.position.set(ox + 3.2 - k * 0.5 + shakeL, gy + 1.2 + shakeLY, oz + 3.4);
-    camera.lookAt(ox + 2.9 + k * 0.4, gy + 1.45, oz + 0.5);
+    camera.position.set(ox - 3.1 + k * 0.5 + shakeL, gy + 1.15 + shakeLY, oz + 0.2);
+    camera.lookAt(ox + 4.0, gy + 1.45, oz + 3.6);
   } else if (t < T.wolves) {
-    // PLANO 3: zoom do ponto de vista do protagonista até o rosto mascarado (olhos enormes, aura vermelha)
+    // PLANO 3: do ponto de vista do protagonista até o rosto mascarado (olhos enormes, aura vermelha)
     const k = _smooth((t - T.zoom) / (T.wolves - T.zoom - 0.4));
     const kk = k * k;
     const cx = main.position.x;
     const cy = main.position.y + 1.88;
     const cz = main.position.z;
-    const fx = THREE.MathUtils.lerp(eyeX + 0.4, cx - 0.9, kk);
+    const mdx = cx - eyeX;
+    const mdz = cz - eyeZ;
+    const mlen = Math.hypot(mdx, mdz) || 1;
+    const fx = THREE.MathUtils.lerp(eyeX + 0.4, cx - (mdx / mlen) * 0.95, kk);
     const fy = THREE.MathUtils.lerp(eyeY, cy, k);
-    const fz = THREE.MathUtils.lerp(eyeZ, cz - 0.1, kk);
+    const fz = THREE.MathUtils.lerp(eyeZ, cz - (mdz / mlen) * 0.95, kk);
     camera.position.set(fx + shakeH * k, fy + shakeHY * k, fz);
     camera.lookAt(cx, cy, cz);
   } else if (runTau < 0) {
-    // PLANO 4: sobre o ombro, olhando para a escuridão onde só se veem 6 olhos vermelhos se aproximando
-    camera.position.set(ox + 0.9 + shakeH * 0.5, gy + 1.35 + shakeHY * 0.5, oz + 0.6);
-    camera.lookAt(ox - 0.2, gy + 1.05, oz - 14);
+    // PLANO 4: tracking lateral baixo dos 5 lobos a galope, vindo do breu; a câmera corre junto
+    const q = Math.max(0, Math.min(1, (t - T.wolves) / (T.run - T.wolves)));
+    const wz = oz + 36 + (5.0 + 1.0 - 36) * q; // centro aproximado da matilha
+    camera.position.set(ox - 8.6 + shakeH * 0.4, gy + 1.0 + shakeHY * 0.4, wz + 8.0 - 5.0 * q);
+    camera.lookAt(ox, gy + 0.95, wz - 1.0);
   } else if (runTau < 3.0) {
-    // PLANO 5: câmera à frente, baixa, o protagonista corre em direção a ela com os lobos nas costas
-    const fwdX = Math.sin(ppsi);
-    const fwdZ = Math.cos(ppsi);
-    camera.position.set(px + fwdX * 3.8 + Math.cos(ppsi) * 1.0 + shakeH, groundY + 0.95 + shakeHY, pz + fwdZ * 3.8 - Math.sin(ppsi) * 1.0);
+    // PLANO 5 (corte): câmera à frente, baixa; o protagonista corre em direção a ela com os lobos nas costas
+    camera.position.set(px + fwdX * 3.8 + sideX * 1.0 + shakeH, groundY + 0.95 + shakeHY, pz + fwdZ * 3.8 + sideZ * 1.0);
     camera.lookAt(px, groundY + 1.3, pz);
-  } else if (runTau < 6.0) {
-    // PLANO 6: tracking lateral; ele olha para o lado e vê outros membros do culto no escuro
-    const sx = Math.cos(ppsi);
-    const sz = -Math.sin(ppsi);
-    camera.position.set(px - sx * 3.6 + Math.sin(ppsi) * 0.8 + shakeH * 0.6, groundY + 1.0 + shakeHY * 0.6, pz - sz * 3.6 + Math.cos(ppsi) * 0.8);
-    camera.lookAt(px + sx * 1.5, groundY + 1.25, pz + sz * 1.5);
-  } else if (runTau < RUN_DURATION - 0.9) {
-    // PLANO 7: POV da corrida; olhos amarelos crescem na névoa à frente
-    const fwdX = Math.sin(ppsi);
-    const fwdZ = Math.cos(ppsi);
+  } else if (runTau < 7.0) {
+    // PLANO 6: tracking lateral; ele olha para um lado e para o outro: só há servos no escuro (a câmera troca de lado)
+    const sgn = runTau < 4.9 ? 1 : -1;
+    camera.position.set(px - sgn * sideX * 3.4 + fwdX * 0.8 + shakeH * 0.6, groundY + 1.0 + shakeHY * 0.6, pz - sgn * sideZ * 3.4 + fwdZ * 0.8);
+    camera.lookAt(px + sgn * sideX * 1.5, groundY + 1.25, pz + sgn * sideZ * 1.5);
+  } else if (runTau < RUN_DURATION - 0.6) {
+    // PLANO 7: POV da corrida; o olhar desce até a espada brilhando no chão
     const bob = Math.sin(player.walkPhase * 2) * 0.05;
+    const dive = _smooth((runTau - 7.2) / 1.6);
     camera.position.set(px + fwdX * 0.25 + shakeH * 1.2, groundY + 1.6 + bob + shakeHY * 1.2, pz + fwdZ * 0.25);
-    camera.lookAt(px + fwdX * 8, groundY + 2.2 + (runTau > 8.5 ? (runTau - 8.5) * 0.9 : 0), pz + fwdZ * 8);
-  } else if (t < T.caption - 0.4) {
-    // PLANO 8: freou. Contra-plongée sobre o ombro até os olhos amarelos a poucos passos
-    const fwdX = Math.sin(ppsi);
-    const fwdZ = Math.cos(ppsi);
-    camera.position.set(px - fwdX * 1.1 + Math.cos(ppsi) * 0.8 + shakeL, groundY + 0.8 + shakeLY, pz - fwdZ * 1.1 - Math.sin(ppsi) * 0.8);
-    camera.lookAt(_tallFigure.position.x, _tallFigure.position.y + 4.9, _tallFigure.position.z);
+    camera.lookAt(px + fwdX * 6, groundY + 1.7 - dive * 1.4, pz + fwdZ * 6);
+  } else if (afterStop < 2.6) {
+    // PLANO 8: câmera à frente, baixa: ele pega a espada; a silhueta enorme da entidade se ergue ATRÁS dele
+    camera.position.set(px + fwdX * 3.0 + sideX * 0.7 + shakeL, groundY + 0.9 + shakeLY, pz + fwdZ * 3.0 + sideZ * 0.7);
+    camera.lookAt(px - fwdX * 1.2, groundY + 2.4, pz - fwdZ * 1.2);
+  } else if (t < T.caption + 1.0) {
+    // PLANO 9: lateral, vê-se a entidade erguer o protagonista no braço
+    camera.position.set(px + sideX * 9.5 + shakeL, groundY + 2.6 + shakeLY, pz + sideZ * 9.5);
+    camera.lookAt(px - fwdX * 1.2, groundY + 2.9, pz - fwdZ * 1.2);
   } else {
-    // PLANO 9: a entidade encara de perto: capuz e olhos amarelos preenchem a tela
-    const fwdX = Math.sin(ppsi);
-    const fwdZ = Math.cos(ppsi);
-    const kk = _smooth((t - (T.caption - 0.4)) / 1.2);
-    const dist = THREE.MathUtils.lerp(1.9, 1.5, kk);
-    // posição REAL dos olhos (a figura se inclina): a câmera fica sempre à frente deles, nunca dentro da cabeça
+    // PLANO 10: a entidade encara de perto: capuz e olhos amarelos preenchem a tela
+    const kk = _smooth((t - (T.caption + 1.0)) / 1.2);
+    const dist = THREE.MathUtils.lerp(2.3, 1.5, kk);
     _tallFigure.updateMatrixWorld(true);
     _eyeW.set(0, 5.25, 0.64);
     _tallFigure.localToWorld(_eyeW);
-    _camPos.set(_eyeW.x - fwdX * dist + shakeH * 1.2, _eyeW.y - 0.12 + shakeHY * 1.2, _eyeW.z - fwdZ * dist);
+    _camPos.set(_eyeW.x + fwdX * dist + shakeH * 1.2, _eyeW.y - 0.12 + shakeHY * 1.2, _eyeW.z + fwdZ * dist);
     camera.position.lerp(_camPos, 1 - Math.exp(-9 * dt));
     camera.lookAt(_eyeW.x, _eyeW.y, _eyeW.z);
   }
@@ -1143,7 +1368,7 @@ export function updateIntroSequence(dtRaw, player, camera, world, audio, effects
     audio?._tone?.("sine", 90, 28, 0.9, 0.6); // pancada de saída
     audio?.pain?.();
   }
-  if (runTau >= RUN_DURATION + 0.2 && !_introFlags.stEntity) {
+  if (t >= ENTITY_T && !_introFlags.stEntity) {
     _introFlags.stEntity = true;
     audio?._tone?.("sine", 55, 24, 2.2, 0.7);
     audio?._tone?.("sawtooth", 82, 41, 1.6, 0.12);
@@ -1196,6 +1421,12 @@ export function endIntroSequence(isSkipped = false) {
   }
   for (const beast of _introWolves) beast.visible = false;
   for (const c of _cultists) c.visible = false;
+  if (_sword) {
+    _sword.visible = false;
+    _sword.parent?.remove(_sword);
+  }
+  if (_grabArm) _grabArm.rotation.set(0, 0, 0);
+  if (_introEnv?.player?.root) _introEnv.player.root.rotation.set(0, 0, 0);
   if (_fire) {
     _fire.visible = false;
     if (_fire.parent) _fire.parent.remove(_fire); // remove a PointLight da cena (a tela já está preta)
