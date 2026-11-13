@@ -853,6 +853,20 @@ function frame(now) {
     return;
   }
 
+  // Isolamento de performance total durante o Final Sagrado (Assunção Celestial):
+  // Descarrega entidades, NPCs, casas e cidades para garantir 60 FPS limpos e fluidos
+  if (HolyEndingState.active) {
+    updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig, player, effects, camera, world, npcs, houses, settlement, beasts, clutter, farmAnimals, farming, torches, villageGenerator, horses, weapons });
+    dayNight.update(dt, player.x, player.z, renderer);
+    effects.update(dt);
+    world.updateVisibility(camera, player.x, player.z, false);
+    sun.shadow.autoUpdate = true;
+    renderer.render(scene, camera);
+    governor.update(delta, performance.now() - _frameWorkStart, true);
+    telemetry.endFrame(renderer);
+    return;
+  }
+
   const isPlayerLit = torches.isPlayerLit(player, candle, fire);
   const timeOfDay = (dayNight.progress * 24) % 24;
   if (settlement.cityData) {

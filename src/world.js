@@ -186,7 +186,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=81", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=82", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
