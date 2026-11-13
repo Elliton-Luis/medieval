@@ -186,7 +186,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=82", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=83", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1137,6 +1137,8 @@ export class World {
   _isSettlementClear(x, z) {
     // nada nasce dentro ou colado em construções (casas, igrejas, torres, ferrarias, campos...): registro de pegadas
     if (pointBlocked(x, z, 1.4)) return true;
+    // Corredor da cutscene 100% limpo e plano para a perseguição e os ângulos de câmera (todas as seeds):
+    if (Math.abs(x) < 22 && z <= -250 && z >= -355) return true;
     // nem sobre ruínas, acampamentos do culto e o ponto da cutscene (âncoras de lore do worldgen)
     if (anchorNear(x, z, 4)) return true;
     if (isKingdomClear(x, z)) return true;

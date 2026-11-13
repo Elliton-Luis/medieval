@@ -328,7 +328,7 @@ function generateWorld(seed, chaos) {
     const rad = clamp(radBase + (rng() * 2 - 1) * 34 * c, 92, 168);
     const tx = cx0 + Math.cos(ang) * rad;
     const tz = cz0 + Math.sin(ang) * rad;
-    const site = placeAnchor(rng, seed, tx, tz, (x, z) => dist(x, z, cx0, cz0) >= 88 && farFromAll(villages, x, z, 86), [92, 170]);
+    const site = placeAnchor(rng, seed, tx, tz, (x, z) => dist(x, z, cx0, cz0) >= 88 && farFromAll(villages, x, z, 86) && dist(x, z, CANON.cutscene.x, CANON.cutscene.z) >= 80, [92, 170]);
     const p = site || { x: tx, z: tz };
     villages.push({ x: p.x, z: p.z, kind: kinds[i], ang });
   }
@@ -471,7 +471,7 @@ function generateWorld(seed, chaos) {
     const j = Math.floor(rng() * (i + 1));
     [ghostNames[i], ghostNames[j]] = [ghostNames[j], ghostNames[i]];
   }
-  const anchorsSoFar = [{ x: cx0, z: cz0 }, ...villages];
+  const anchorsSoFar = [{ x: cx0, z: cz0 }, CANON.cutscene, ...villages];
   const ghostTowns = [];
   const ghostRot = rng() * Math.PI * 2 * Math.min(1, c * 1.6);
   for (let i = 0; i < nGhost; i++) {
@@ -541,22 +541,8 @@ function generateWorld(seed, chaos) {
     bookSpots.push({ x: p.x, z: p.z });
   }
 
-  // ---- ponto da cutscene: mata fechada, longe de tudo ----------------------
-  const csConstraint = (x, z) => farFromAll(villages, x, z, 90) && farFromAll(camps, x, z, 110) && farFromAll(ghostTowns, x, z, 110);
-  let cutscene = null;
-  for (let i = 0; i < 60 && !cutscene; i++) {
-    const ang = rng() * Math.PI * 2;
-    const rad = 245 + rng() * 45;
-    const x = cx0 + Math.cos(ang) * rad;
-    const z = cz0 + Math.sin(ang) * rad;
-    if (!csConstraint(x, z)) continue;
-    const s = siteScore(x, z, seed, 20);
-    if (s.span < 7 && s.h < 8) cutscene = { x, z };
-  }
-  if (!cutscene) {
-    const f = findInAnnulus(rng, seed, 200, 340, csConstraint, 600, 9);
-    cutscene = f ? { x: f.x, z: f.z } : { x: cx0, z: cz0 - 260 };
-  }
+  // ---- ponto da cutscene: clareira canônica segura e estável para todas as seeds ----
+  const cutscene = { ...CANON.cutscene };
 
   // ---- tinta global do mundo (matiz leve, dentro de uma faixa que preserva o clima sinistro) ----
   const tr = rng();
@@ -652,7 +638,7 @@ export function getBookSpotsFull() {
   return _world ? _world.bookSpotsFull : [];
 }
 export function getCutscenePoint() {
-  return _world ? _world.cutscene : CANON.cutscene;
+  return CANON.cutscene; // Sempre o ponto canônico seguro, testado e estável para qualquer seed
 }
 export function getSpawnPoint() {
   return _world ? _world.spawn : SPAWN;
@@ -666,11 +652,13 @@ export function getWorldTint() {
 
 /** Âncoras de lore (ruínas e acampamentos) perto de (x,z)? Usado para a vegetação não nascer em cima delas. */
 export function anchorNear(x, z, margin = 6) {
+  // Corredor da cutscene 100% livre de árvores, rochas e obstáculos em todas as seeds
+  const cs = CANON.cutscene;
+  if (Math.abs(x - cs.x) < 22 && z <= cs.z + 20 && z >= cs.z - 85) return true;
   if (!_world) return false;
   for (const g of _world.ghostTowns) if (dist(x, z, g.x, g.z) < g.radius + margin) return true;
   for (const c of _world.camps) if (dist(x, z, c.dx ?? c.x, c.dz ?? c.z) < 26 + margin) return true;
-  const cs = _world.cutscene;
-  return dist(x, z, cs.x, cs.z) < 8 + margin;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
