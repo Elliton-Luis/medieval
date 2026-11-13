@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { clamp } from "./utils.js";
-import { updateAtmosphereDecay } from "./decay.js";
+import { updateAtmosphereDecay, DemiurgeCataclysm } from "./decay.js";
+import { HolyEndingState } from "./holyEnding.js";
 
 // ============================================================================
 // Perfis de Iluminação Pré-Assados (Pre-Baked Lighting Keyframes)
@@ -175,6 +176,7 @@ export class DayNightCycle {
     this._lastMinute = -1;
     this._prevProgress = 0.45;
     this.onNewDay = null;
+    this.timeFrozen = false; // Trava o tempo no perfil atual sem alternâncias ou desvios
 
     // Neblina: nível alvo (0..5), nível suavizado (float) e modo automático
     this.fogLevel = 3;
@@ -251,6 +253,15 @@ export class DayNightCycle {
   }
 
   /**
+   * Trava ou destrava o avanço do tempo e do ciclo dia/noite.
+   * Quando travado, a iluminação pré-assada permanece 100% fixa e estável sem oscilações.
+   */
+  freeze(frozen = true) {
+    this.timeFrozen = Boolean(frozen);
+    return this.timeFrozen;
+  }
+
+  /**
    * Define o horário do dia e recalcula a iluminação pré-assada sem atrasos ou glitches.
    */
   setTime(prog, immediate = true, playerX = 0, playerZ = 0, renderer = null) {
@@ -320,9 +331,43 @@ export class DayNightCycle {
   }
 
   /**
+   * Atualização consistente e suave do posicionamento ortográfico do sol com a posição do jogador.
+   */
+  _updateSunPosition(playerX = 0, playerZ = 0) {
+    if (this.sun) {
+      this.sun.castShadow = true;
+      const sx = Math.round((playerX ?? 0) / 4) * 4;
+      const sz = Math.round((playerZ ?? 0) / 4) * 4;
+      const sunDist = 56.0;
+      this.sun.position.set(
+        sx + _tempSunDir.x * sunDist,
+        Math.max(12.0, _tempSunDir.y * 64.0),
+        sz + _tempSunDir.z * sunDist
+      );
+      this.sun.target.position.set(sx, 0, sz);
+      this.sun.target.updateMatrixWorld();
+    }
+  }
+
+  /**
    * Interpolação e envio para materiais e Three.js das luzes pré-assadas (Zero-GC).
    */
   applyLighting(playerX = 0, playerZ = 0, renderer = null) {
+    // Se o Cataclismo do Demiurgo (final mal) ou a Assunção Celestial (final bom) estiverem ativos,
+    // não sobrescreve os parâmetros específicos do clímax. Mantém apenas sombras e sol alinhados.
+    if (DemiurgeCataclysm?.active) {
+      if (this.scene && this.scene.fog) {
+        this.scene.fog.density = 0;
+      }
+      this._updateSunPosition(playerX, playerZ);
+      return;
+    }
+
+    if (HolyEndingState?.active) {
+      this._updateSunPosition(playerX, playerZ);
+      return;
+    }
+
     const A = this._kfA;
     const B = this._kfB;
     const t = this._kfT;
@@ -395,19 +440,7 @@ export class DayNightCycle {
     }
 
     // Posicionamento Estável da Luz Direcional (Sem trepidação de sombras)
-    if (this.sun) {
-      this.sun.castShadow = true;
-      const sx = Math.round((playerX ?? 0) / 4) * 4;
-      const sz = Math.round((playerZ ?? 0) / 4) * 4;
-      const sunDist = 56.0;
-      this.sun.position.set(
-        sx + _tempSunDir.x * sunDist,
-        Math.max(12.0, _tempSunDir.y * 64.0),
-        sz + _tempSunDir.z * sunDist
-      );
-      this.sun.target.position.set(sx, 0, sz);
-      this.sun.target.updateMatrixWorld();
-    }
+    this._updateSunPosition(playerX, playerZ);
 
     // Astro Celeste Fixo no Firmamento (Azimute 215°, Elevação 32°)
     if (this.fixedAstroGroup) {
@@ -421,12 +454,15 @@ export class DayNightCycle {
 
   update(dt, playerX = 0, playerZ = 0, renderer = null) {
     const prevProg = this._prevProgress;
-    this.progress = (this.progress + dt / CONFIG.dayLengthSeconds) % 1;
-    if (this.progress < prevProg && prevProg > 0.85) {
-      // Virada da meia-noite in-game executada exatamente 1 vez por dia
-      this.onNewDay?.();
+    if (!this.timeFrozen) {
+      this.progress = (this.progress + dt / CONFIG.dayLengthSeconds) % 1;
+      if (this.progress < 0) this.progress += 1;
+      if (this.progress < prevProg && prevProg > 0.85) {
+        // Virada da meia-noite in-game executada exatamente 1 vez por dia
+        this.onNewDay?.();
+      }
+      this._prevProgress = this.progress;
     }
-    this._prevProgress = this.progress;
 
     // 1. Estado de iluminação (keyframes, daylight, isNight) e neblina
     this._updateFog(dt);

@@ -720,15 +720,6 @@ let _dprUpWait = 6;
 function applyPixelRatio(ratio) {
   _dpr = ratio;
   _applyRenderSize(_dpr);
-  // GPU apertada: o mapa de sombras também cai de 1024 para 512 (1/4 do fillrate da passada de sombra)
-  const wantShadow = _dpr < 1.0 ? 512 : 1024;
-  if (sun.shadow.mapSize.x !== wantShadow) {
-    sun.shadow.mapSize.set(wantShadow, wantShadow);
-    if (sun.shadow.map) {
-      sun.shadow.map.dispose();
-      sun.shadow.map = null;
-    }
-  }
 }
 
 function adaptResolution(frameMs) {
@@ -767,14 +758,7 @@ let _frameCounter = 0;
 const governor = new PerfGovernor((level, cfg) => {
   _renderScale = cfg.scale;
   _applyRenderSize(_dpr);
-  _govShadowEvery = cfg.shadowEvery;
-  if (sun.shadow.mapSize.x !== cfg.shadow) {
-    sun.shadow.mapSize.set(cfg.shadow, cfg.shadow);
-    if (sun.shadow.map) {
-      sun.shadow.map.dispose();
-      sun.shadow.map = null;
-    }
-  }
+  _govShadowEvery = 1; // Sombras sempre contínuas para evitar descompasso e piscamentos
   _qView = cfg.view;
   world.setQuality(cfg.lod, cfg.view);
   houses.detailScale = cfg.lod;
@@ -816,7 +800,8 @@ function frame(now) {
   const isPaused = pause.open || isDemiurge || isReading || isBuildMenu || isBookOpen;
   const dt = isPaused ? 0 : Math.max(0, Math.min(elapsed, CONFIG.maxDelta)) * deathScreen.timeScale;
 
-  const isCutscene = Boolean(GameState.isIntroPlaying || DemiurgeCataclysm.active || HolyEndingState.active);
+  const isCutscene = Boolean(GameState.isIntroPlaying);
+  const isEndingActive = Boolean(DemiurgeCataclysm.active || HolyEndingState.active);
 
   if (GameState.isIntroPlaying) {
     updateIntroSequence(dt, player, camera, world, audio, effects, ui);
@@ -853,14 +838,31 @@ function frame(now) {
   ui.setStealth(player.crouching);
   telemetry.mark("physics");
 
+  // Isolamento de performance total durante o Cataclismo do Demiurgo (Fim do Mundo):
+  // Descarrega entidades, NPCs, casas e cidades para garantir 60 FPS limpos e fluidos
+  if (DemiurgeCataclysm.active) {
+    updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig, hemisphere, damageFx, houses, settlement, beasts, clutter, farmAnimals, farming, torches, villageGenerator, horses, weapons });
+    dayNight.update(dt, player.x, player.z, renderer);
+    cameraRig.update(dt, player, input, false, aim);
+    effects.update(dt);
+    world.updateVisibility(camera, player.x, player.z, false);
+    sun.shadow.autoUpdate = true;
+    renderer.render(scene, camera);
+    governor.update(delta, performance.now() - _frameWorkStart, true);
+    telemetry.endFrame(renderer);
+    return;
+  }
+
   const isPlayerLit = torches.isPlayerLit(player, candle, fire);
   const timeOfDay = (dayNight.progress * 24) % 24;
   if (settlement.cityData) {
     updateWildernessSpawns(player.root.position, settlement.cityData, dayNight.isNight, monstersPool, dt);
     updateCultistsLifeCycle(cultistsPool, player, npcs.npcs, weapons.firePool, dt, dayNight.isNight, settlement.cityData);
   }
-  updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
-  updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig });
+  if (!DemiurgeCataclysm.active) {
+    updateEclipseLightning(player.root.position, dt, effects, audio, damageFx, combat, npcs, player);
+  }
+  updateDemiurgeCataclysm(dt, { scene, camera, player, effects, audio, ui, world, npcs, dayNight, deathScreen, cameraRig, hemisphere });
   updateDeusVultEnding(dt, { scene, renderer, hemisphere, dayNight, ui, audio, cameraRig, player, effects, camera });
   updateMessenger(dt, player, effects, ui, audio, world, input);
   npcs.update(dt, player.x, player.z, dayNight.isNight, isPlayerLit, timeOfDay, isCutscene);
@@ -872,7 +874,7 @@ function frame(now) {
   updateWaypointBillboard(player.root.position, now);
   updateFallingTrees(dt);
   ui.updateMissionHud(player.root.position);
-  const clock = dayNight.update(dt, player.x, player.z);
+  const clock = dayNight.update(dt, player.x, player.z, renderer);
   // Névoa como orçamento de render: o que está além da distância de visibilidade é só cor de névoa, então
   // chunks, casas e campos nem são desenhados lá (zero diferença visual, menos draw calls com névoa densa).
   {
@@ -920,7 +922,7 @@ function frame(now) {
   damageFx.update(dt);
   world.updateWind(dt);
   sleep.update(elapsed);
-  autoSave.update(dt, { player, weapons, dayNight, candle, ui, world }, isCutscene, isPaused);
+  autoSave.update(dt, { player, weapons, dayNight, candle, ui, world }, isCutscene || isEndingActive, isPaused);
   drops.update(dt);
   updateDemiurgeDiary(dt, now);
   minimap.churches = settlement.churches;
@@ -937,14 +939,9 @@ function frame(now) {
     _singlePassTimer = 3;
     fixDoubleSidedTransparent(scene);
   }
-  // cadência das sombras do governador (1 = todo quadro; N = a cada N; 0 = congela). Fora da cutscene (ela as congela).
+  // Sombras consistentes e contínuas: autoUpdate sempre ativo fora da cutscene de intro
   if (!GameState.isIntroPlaying) {
-    if (_govShadowEvery === 1) {
-      sun.shadow.autoUpdate = true;
-    } else {
-      sun.shadow.autoUpdate = false;
-      if (_govShadowEvery > 0 && _frameCounter % _govShadowEvery === 0) sun.shadow.needsUpdate = true;
-    }
+    sun.shadow.autoUpdate = true;
   }
   renderer.render(scene, camera);
   telemetry.mark("render");

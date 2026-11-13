@@ -12,14 +12,14 @@
 // ============================================================================
 
 export const PERF_LEVELS = [
-  // scale = fração da altura de render | shadow = lado do mapa | shadowEvery = atualiza a sombra a cada N quadros (0 = congela)
+  // scale = fração da altura de render | shadow = lado do mapa | shadowEvery = 1 (sempre contínuo para evitar piscamentos)
   // lod/view = multiplicam as distâncias de LOD / de desenho | npc = multiplica o corte de taxa de animação dos NPCs
   { name: "Máxima", scale: 1.0, shadow: 1024, shadowEvery: 1, lod: 1.0, view: 1.0, npc: 1.0 },
   { name: "Alta", scale: 0.92, shadow: 1024, shadowEvery: 1, lod: 0.9, view: 0.92, npc: 1.0 },
   { name: "Média", scale: 0.85, shadow: 512, shadowEvery: 1, lod: 0.8, view: 0.85, npc: 1.3 },
-  { name: "Baixa", scale: 0.75, shadow: 512, shadowEvery: 2, lod: 0.7, view: 0.75, npc: 1.6 },
-  { name: "Mínima", scale: 0.67, shadow: 512, shadowEvery: 3, lod: 0.6, view: 0.65, npc: 2.0 },
-  { name: "Emergência", scale: 0.67, shadow: 512, shadowEvery: 0, lod: 0.55, view: 0.55, npc: 3.0 },
+  { name: "Baixa", scale: 0.75, shadow: 512, shadowEvery: 1, lod: 0.7, view: 0.75, npc: 1.6 },
+  { name: "Mínima", scale: 0.67, shadow: 512, shadowEvery: 1, lod: 0.6, view: 0.65, npc: 2.0 },
+  { name: "Emergência", scale: 0.67, shadow: 512, shadowEvery: 1, lod: 0.55, view: 0.55, npc: 3.0 },
 ];
 
 export class PerfGovernor {

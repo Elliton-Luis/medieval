@@ -37,15 +37,18 @@ export function buildArchangelMichaelMesh() {
     roughness: 0.25,
     emissive: 0xaa7700,
     emissiveIntensity: 0.8,
+    fog: false,
   });
   const whiteClothMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.7,
+    fog: false,
   });
   const crimsonCloakMat = new THREE.MeshStandardMaterial({
     color: 0xaa1122,
     roughness: 0.6,
     side: THREE.DoubleSide,
+    fog: false,
   });
   const holyWingMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -53,9 +56,10 @@ export function buildArchangelMichaelMesh() {
     emissiveIntensity: 0.9,
     roughness: 0.45,
     side: THREE.DoubleSide,
+    fog: false,
   });
-  const haloMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
-  const bladeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const haloMat = new THREE.MeshBasicMaterial({ color: 0xffea00, fog: false });
+  const bladeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
 
   const model = new THREE.Group();
   root.add(model);
@@ -176,7 +180,8 @@ export function buildArchangelMichaelMesh() {
   trumpetGroup.add(trumpetBanner);
 
   // Brilho divino emitido pela boca da trombeta ao soar o Apocalipse
-  const trumpetLight = new THREE.PointLight(0xfff099, 8.0, 30, 2.0);
+  const trumpetLight = new THREE.PointLight(0xfff099, 6.0, 30, 2.0);
+  trumpetLight.castShadow = false;
   trumpetLight.position.set(0, 1.95, 0);
   trumpetGroup.add(trumpetLight);
 
@@ -210,7 +215,8 @@ export function buildArchangelMichaelMesh() {
   model.add(wingGroupR);
 
   // Luz Sagrada própria emitida por São Miguel
-  const holyLight = new THREE.PointLight(0xffea88, 6.5, 45, 1.6);
+  const holyLight = new THREE.PointLight(0xffea88, 5.0, 40, 1.6);
+  holyLight.castShadow = false;
   holyLight.position.set(0, 2.2, 0.5);
   model.add(holyLight);
 
@@ -231,6 +237,7 @@ export function spawnHolySword(churchAnchorPos, scene) {
     opacity: 0.88,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
 
   const coreMat = new THREE.MeshBasicMaterial({
@@ -239,6 +246,7 @@ export function spawnHolySword(churchAnchorPos, scene) {
     opacity: 0.95,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
 
   // 1. Lâmina / Feixe Vertical Colossal atravessando os céus até o altar
@@ -284,6 +292,7 @@ export function spawnAscensionPillar(playerPos, scene) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
+    fog: false,
   });
 
   const coreMat = new THREE.MeshBasicMaterial({
@@ -293,6 +302,7 @@ export function spawnAscensionPillar(playerPos, scene) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
+    fog: false,
   });
 
   // Coluna externa dourada translúcida e núcleo branco ofuscante
@@ -312,6 +322,7 @@ export function spawnAscensionPillar(playerPos, scene) {
     opacity: 0.8,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
 
   for (let i = 0; i < 4; i++) {
@@ -412,10 +423,10 @@ export function triggerDeusVultEnding(env = {}) {
   audio?.churchBell?.();
   audio?.playEpicChoir?.();
 
-  // 2. Estouro Branco do Céu (Abertura dos Céus)
+  // 2. Estouro Branco do Céu (Abertura dos Céus) - Mais suave e leve
   if (scene && scene.fog) {
     scene.fog.color.copy(_pureWhite);
-    scene.fog.density = 0.048;
+    scene.fog.density = 0.016;
   }
   if (renderer) {
     renderer.setClearColor(_pureWhite);
@@ -520,7 +531,7 @@ export function updateDeusVultEnding(dt, env = HolyEndingState.env) {
   if (scene && scene.fog && t <= 6.0) {
     const p = Math.min(1.0, t / 5.0);
     scene.fog.color.lerp(_sunColor, p * 0.1);
-    scene.fog.density = THREE.MathUtils.lerp(0.048, 0.0165, p);
+    scene.fog.density = THREE.MathUtils.lerp(0.016, 0.005, p);
     if (renderer) renderer.setClearColor(scene.fog.color);
   }
 

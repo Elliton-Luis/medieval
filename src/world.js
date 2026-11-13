@@ -57,6 +57,7 @@ export class World {
     this.loadRadiusSq = (this.radius + 0.35) * (this.radius + 0.35);
     this.unloadRadiusSq = CONFIG.chunkUnloadRadius * CONFIG.chunkUnloadRadius;
     this.viewDistanceSq = CONFIG.viewDistance * CONFIG.viewDistance;
+    this.cataclysmIsolated = false; // Isola o cenário para o clímax final (60 FPS puros)
     this._dummy = new THREE.Object3D();
     this._frustum = new THREE.Frustum();
     this._projectionView = new THREE.Matrix4();
@@ -185,7 +186,7 @@ export class World {
 
   _initTerrainWorker() {
     try {
-      this._worker = new Worker(new URL("./terrainWorker.js?v=76", import.meta.url), { type: "module" });
+      this._worker = new Worker(new URL("./terrainWorker.js?v=81", import.meta.url), { type: "module" });
       this._worker.onmessage = (e) => {
         const { id, positions, colors, heights, indices } = e.data;
         const cb = this._workerCallbacks.get(id);
@@ -1050,6 +1051,23 @@ export class World {
   }
 
   updateVisibility(camera, x, z, isCutscene = false) {
+    if (this.cataclysmIsolated) {
+      // Isola o terreno: mantém apenas o chão imediatamente abaixo do jogador e anjos
+      const nearRadiusSq = (this.chunkSize * 0.95) ** 2;
+      for (let i = 0; i < this.activeChunks.length; i++) {
+        const chunk = this.activeChunks[i];
+        const toChunkX = chunk.centerX - x;
+        const toChunkZ = chunk.centerZ - z;
+        const distanceSq = toChunkX * toChunkX + toChunkZ * toChunkZ;
+        const isNear = distanceSq <= nearRadiusSq;
+        chunk.group.visible = isNear;
+        if (isNear) {
+          this._setChunkLod(chunk, -1); // Oculta todas as árvores, pedras e mato do chunk
+        }
+      }
+      return;
+    }
+
     camera.updateMatrixWorld();
     this._projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._projectionView);

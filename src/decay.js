@@ -130,6 +130,19 @@ const _sunDecayColor = new THREE.Color("#c8c0b4");
 export function updateAtmosphereDecay(dayNight, scene, renderer) {
   if (!dayNight || !scene) return;
 
+  if (DemiurgeCataclysm.active) {
+    // Durante o Cataclismo do Demiurgo (final mal), zera a neblina completamente
+    // para que a abóbada de olhos e a descida do Sol Negro fiquem 100% visíveis
+    if (scene.fog) {
+      scene.fog.density = 0;
+    }
+    const isNight = dayNight.isNight;
+    const eclipseBg = isNight ? _eclipseSkyNight : _eclipseSkyDay;
+    if (scene.background) scene.background.copy(eclipseBg);
+    if (renderer) renderer.setClearColor(eclipseBg);
+    return;
+  }
+
   const isEclipse = WorldDecay.isEclipse;
   const decay = WorldDecay.decayLevel;
   const daylight = dayNight.daylight ?? 1.0;
@@ -1116,6 +1129,7 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
     roughness: 0.82,
     metalness: 0.35,
     flatShading: true,
+    fog: false,
   });
   const matWing = new THREE.MeshStandardMaterial({
     color: wingColor,
@@ -1124,12 +1138,15 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
     roughness: 0.3,
     metalness: 0.15,
     side: THREE.DoubleSide,
+    fog: false,
   });
   const matEyes = new THREE.MeshBasicMaterial({
     color: eyeColor,
+    fog: false,
   });
   const matPupilDot = new THREE.MeshBasicMaterial({
     color: 0xffffff,
+    fog: false,
   });
   const matBlade = new THREE.MeshStandardMaterial({
     color: 0x110d18,
@@ -1137,6 +1154,7 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
     emissiveIntensity: 1.4,
     metalness: 0.9,
     roughness: 0.2,
+    fog: false,
   });
 
   // Manto/Corpo espectral esguio e imponente (2.6m de altura)
@@ -1212,13 +1230,7 @@ export function buildDarkAngelMesh({ wingColor = 0xff1a33, eyeColor = 0xff2222 }
   scytheGroup.add(scytheBlade);
   model.add(scytheGroup);
 
-  // Luz espectral emitida pelo anjo
-  const angelLight = new THREE.PointLight(wingColor, 2.2, 12, 1.8);
-  angelLight.position.set(0, 1.7, 0.4);
-  model.add(angelLight);
-
-  const _angelParts = { root, model, wingGroupL, wingGroupR, angelLight, scytheGroup };
-  finalizeMonster(root, _angelParts);
+  const _angelParts = { root, model, wingGroupL, wingGroupR, scytheGroup };
   return _angelParts;
 }
 
@@ -1236,9 +1248,10 @@ export function buildDemiurgeColossalEyeMesh() {
   const blackSunGroup = new THREE.Group();
   root.add(blackSunGroup);
 
-  // 1. Materiais do Sol Negro e Vazio Abissal
+  // 1. Materiais do Sol Negro e Vazio Abissal (fog: false para nunca ser ocultado pela neblina)
   const matVoidCore = new THREE.MeshBasicMaterial({
-    color: 0x010002, // Absorção abissal total de luz
+    color: 0x010002,
+    fog: false,
   });
 
   const matDarkPlasma = new THREE.MeshStandardMaterial({
@@ -1249,6 +1262,7 @@ export function buildDemiurgeColossalEyeMesh() {
     transparent: true,
     opacity: 0.92,
     flatShading: true,
+    fog: false,
   });
 
   const matCoronaCrimson = new THREE.MeshBasicMaterial({
@@ -1256,6 +1270,7 @@ export function buildDemiurgeColossalEyeMesh() {
     transparent: true,
     opacity: 0.85,
     side: THREE.DoubleSide,
+    fog: false,
   });
 
   const matCoronaViolet = new THREE.MeshBasicMaterial({
@@ -1263,6 +1278,7 @@ export function buildDemiurgeColossalEyeMesh() {
     transparent: true,
     opacity: 0.78,
     side: THREE.DoubleSide,
+    fog: false,
   });
 
   const matScleraTrio = new THREE.MeshStandardMaterial({
@@ -1270,6 +1286,7 @@ export function buildDemiurgeColossalEyeMesh() {
     emissive: 0x3d0408,
     emissiveIntensity: 0.45,
     roughness: 0.35,
+    fog: false,
   });
 
   const matIrisTrio = new THREE.MeshStandardMaterial({
@@ -1277,29 +1294,30 @@ export function buildDemiurgeColossalEyeMesh() {
     emissive: 0xdd001a,
     emissiveIntensity: 3.8,
     roughness: 0.15,
+    fog: false,
   });
 
-  const matSlitBlack = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const matSlitBlack = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
 
   // 2. Núcleo Amorfo do Sol Negro (diâmetro ~28m)
   const coreMesh = new THREE.Mesh(new THREE.SphereGeometry(14.0, 24, 18), matVoidCore);
   blackSunGroup.add(coreMesh);
 
-  // Nuvens e massas de matéria escura amorfa pulsante orbitando o núcleo
+  // Nuvens e massas de matéria escura amorfa pulsante orbitando o núcleo (otimizado: 5 blobs)
   const amorphousBlobs = [];
-  for (let b = 0; b < 7; b++) {
+  for (let b = 0; b < 5; b++) {
     const blob = new THREE.Mesh(new THREE.DodecahedronGeometry(10.5 + (b % 3) * 1.8, 1), matDarkPlasma);
-    const ang = (b / 7) * Math.PI * 2;
+    const ang = (b / 5) * Math.PI * 2;
     blob.position.set(Math.cos(ang) * 6.5, (b % 2 === 0 ? 3.5 : -3.5), Math.sin(ang) * 6.5);
     blob.rotation.set(b * 0.7, b * 1.2, b * 0.5);
     blackSunGroup.add(blob);
     amorphousBlobs.push(blob);
   }
 
-  // 3. Coroa de Espículas e Prominências Cósmicas Flamejantes
+  // 3. Coroa de Espículas e Prominências Cósmicas Flamejantes (otimizado: 16 espículas)
   const coronaSpikes = [];
-  for (let i = 0; i < 24; i++) {
-    const ang = (i / 24) * Math.PI * 2;
+  for (let i = 0; i < 16; i++) {
+    const ang = (i / 16) * Math.PI * 2;
     const spikeH = 11.0 + (i % 4) * 3.5;
     const spike = new THREE.Mesh(
       new THREE.ConeGeometry(1.4, spikeH, 4),
@@ -1373,11 +1391,6 @@ export function buildDemiurgeColossalEyeMesh() {
   eyeRight.rotation.y = -0.32;
   blackSunGroup.add(eyeRight);
 
-  // Ponto de luz e feixe gravitacional devastador do Sol Negro
-  const sunLight = new THREE.PointLight(0xff0028, 10.0, 160, 1.5);
-  sunLight.position.set(0, -6, 8);
-  blackSunGroup.add(sunLight);
-
   return {
     root,
     blackSunGroup,
@@ -1389,7 +1402,6 @@ export function buildDemiurgeColossalEyeMesh() {
     eyeCenter,
     eyeLeft,
     eyeRight,
-    sunLight,
     eyeball: coreMesh,
   };
 }
@@ -1412,7 +1424,8 @@ const HE_IS_COMING_CSS = `
   pointer-events: none;
   opacity: 0;
   transition: opacity 1.0s cubic-bezier(0.16, 1, 0.3, 1);
-  background: radial-gradient(circle at center, rgba(32, 2, 8, 0.8) 0%, rgba(2, 0, 4, 0.94) 100%);
+  background: transparent;
+  text-shadow: 0 0 45px #ff0022, 0 0 95px #880011, 0 8px 24px #000;
   text-align: center;
   padding: 20px;
 }
@@ -1481,133 +1494,186 @@ function _hideHeIsComingBanner() {
 }
 
 /**
- * Olho do Firmamento colossal com pupila reptiliana vertical pontiaguda.
+ * Geometrias e materiais compartilhados dos Olhos do Firmamento.
+ * Ultra-leve: aloca 1 única vez, compartilha entre todos os olhos, sem PointLights e com fog: false.
  */
+let _sharedEyeBallGeom = null;
+let _sharedIrisGeom = null;
+let _sharedIrisRingGeom = null;
+let _sharedSlitGeom = null;
+let _matScleraShared = null;
+let _matPupilShared = null;
+let _matIrisRingShared = null;
+const _irisMatCache = new Map();
+
+function _initSharedEyeResources() {
+  if (_sharedEyeBallGeom) return;
+  _sharedEyeBallGeom = new THREE.SphereGeometry(1.0, 16, 12);
+  _sharedIrisGeom = new THREE.CircleGeometry(0.48, 20);
+  _sharedIrisRingGeom = new THREE.RingGeometry(0.44, 0.52, 20);
+
+  const slitShape = new THREE.Shape();
+  const sw = 0.48 * 0.22;
+  const sh = 0.48 * 1.35;
+  slitShape.moveTo(0, sh * 0.5);
+  slitShape.lineTo(sw * 0.5, 0);
+  slitShape.lineTo(0, -sh * 0.5);
+  slitShape.lineTo(-sw * 0.5, 0);
+  slitShape.closePath();
+  _sharedSlitGeom = new THREE.ShapeGeometry(slitShape);
+
+  _matScleraShared = new THREE.MeshBasicMaterial({
+    color: 0xedebe4,
+    fog: false,
+  });
+  _matPupilShared = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    fog: false,
+  });
+  _matIrisRingShared = new THREE.MeshBasicMaterial({
+    color: 0x330006,
+    fog: false,
+  });
+}
+
+function _getIrisMaterial(color) {
+  if (!_irisMatCache.has(color)) {
+    _irisMatCache.set(color, new THREE.MeshBasicMaterial({
+      color: color,
+      fog: false,
+    }));
+  }
+  return _irisMatCache.get(color);
+}
+
 /**
- * Olho do Firmamento colossal esférico, com esclera branca ensanguentada,
- * veias vermelhas, músculos retro-oculares e íris de crocodilo voltada diretamente para o Player.
+ * Olho do Firmamento colossal com pupila reptiliana vertical pontiaguda.
+ * Otimizado: geometria compartilhada, fog: false para visão cristalina no céu, zero PointLights.
  */
 export function buildFirmamentEyeMesh(color = 0xd91624, radius = 9) {
+  _initSharedEyeResources();
   const root = new THREE.Group();
   root.name = "FirmamentReptilianEye";
 
-  // Esclera branca leitosa orgânica com leve tonalidade ensanguentada
-  const matSclera = new THREE.MeshStandardMaterial({
-    color: 0xedebe4,
-    emissive: 0x28060a,
-    emissiveIntensity: 0.35,
-    roughness: 0.35,
-    metalness: 0.05,
-  });
-
-  // Íris de crocodilo carmesim / plasma cósmico
-  const matIris = new THREE.MeshStandardMaterial({
-    color: color,
-    emissive: 0xaa0e1a,
-    emissiveIntensity: 3.2,
-    roughness: 0.2,
-  });
-
-  // Pupila de réptil fenda negra profunda
-  const matPupil = new THREE.MeshBasicMaterial({ color: 0x000000 });
-
-  // Veias sanguíneas na esclera
-  const matVein = new THREE.MeshBasicMaterial({ color: 0x990011 });
-
-  // Músculos e feixes retro-oculares arrancados
-  const matMuscle = new THREE.MeshStandardMaterial({
-    color: 0x5e0810,
-    emissive: 0x2a0306,
-    roughness: 0.85,
-    metalness: 0.1,
-  });
-
-  // 1. Globo Ocular Esférico Completo Tridimensional (não é achatado nem disco)
-  const eyeBall = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 18), matSclera);
+  const eyeBall = new THREE.Mesh(_sharedEyeBallGeom, _matScleraShared);
   root.add(eyeBall);
 
-  // 2. Veias vermelhas ramificadas sobre a esclera
-  for (let v = 0; v < 8; v++) {
-    const vAngle = (v / 8) * Math.PI * 2;
-    const veinCurve = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06 * radius, 0.02 * radius, radius * 1.1, 4),
-      matVein
-    );
-    veinCurve.position.set(
-      Math.cos(vAngle) * radius * 0.75,
-      Math.sin(vAngle) * radius * 0.75,
-      radius * 0.2
-    );
-    veinCurve.rotation.z = vAngle + 0.3;
-    veinCurve.rotation.x = 0.5;
-    root.add(veinCurve);
-  }
-
-  // 3. Músculos Retro-Oculares e Nervo Óptico (estendendo-se para trás em -Z)
-  const opticNerve = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius * 0.22, radius * 0.35, radius * 1.6, 8),
-    matMuscle
-  );
-  opticNerve.position.set(0, 0, -radius * 1.1);
-  opticNerve.rotation.x = Math.PI / 2;
-  root.add(opticNerve);
-
-  const muscleOffsets = [
-    [0, radius * 0.7, -radius * 0.8],
-    [0, -radius * 0.7, -radius * 0.8],
-    [radius * 0.7, 0, -radius * 0.8],
-    [-radius * 0.7, 0, -radius * 0.8],
-  ];
-  for (let m = 0; m < muscleOffsets.length; m++) {
-    const mPos = muscleOffsets[m];
-    const muscle = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius * 0.12, radius * 0.18, radius * 1.2, 5),
-      matMuscle
-    );
-    muscle.position.set(mPos[0], mPos[1], mPos[2]);
-    muscle.rotation.x = Math.PI / 2 + (mPos[1] !== 0 ? Math.sign(mPos[1]) * 0.25 : 0);
-    muscle.rotation.y = mPos[0] !== 0 ? Math.sign(mPos[0]) * 0.25 : 0;
-    root.add(muscle);
-  }
-
-  // 4. ÍRIS VERMELHA DE CROCODILO NO PÓLO FRONTAL (+Z, voltada para o Player)
-  const irisRadius = radius * 0.48;
-  const iris = new THREE.Mesh(new THREE.CircleGeometry(irisRadius, 32), matIris);
-  iris.position.set(0, 0, radius * 0.97);
+  const irisMat = _getIrisMaterial(color);
+  const iris = new THREE.Mesh(_sharedIrisGeom, irisMat);
+  iris.position.set(0, 0, 0.97);
   root.add(iris);
 
-  // Anel de transição da íris
-  const irisRing = new THREE.Mesh(
-    new THREE.RingGeometry(irisRadius * 0.88, irisRadius * 1.02, 32),
-    new THREE.MeshBasicMaterial({ color: 0x220004 })
-  );
-  irisRing.position.set(0, 0, radius * 0.98);
+  const irisRing = new THREE.Mesh(_sharedIrisRingGeom, _matIrisRingShared);
+  irisRing.position.set(0, 0, 0.98);
   root.add(irisRing);
 
-  // 5. PUPILA DE CROCODILO / RÉPTIL: Fenda vertical negra pontiaguda no centro
-  const slitGroup = new THREE.Group();
-  slitGroup.position.set(0, 0, radius * 0.99);
+  const slitMesh = new THREE.Mesh(_sharedSlitGeom, _matPupilShared);
+  slitMesh.position.set(0, 0, 0.99);
+  root.add(slitMesh);
 
-  const slitWidth = irisRadius * 0.18;
-  const slitHeight = irisRadius * 1.35;
+  root.scale.setScalar(radius);
 
-  const slitShape = new THREE.Shape();
-  slitShape.moveTo(0, slitHeight * 0.5);
-  slitShape.lineTo(slitWidth * 0.5, 0);
-  slitShape.lineTo(0, -slitHeight * 0.5);
-  slitShape.lineTo(-slitWidth * 0.5, 0);
-  slitShape.closePath();
+  return { root, eyeBall, iris, slit: slitMesh, radius };
+}
 
-  const slitMesh = new THREE.Mesh(new THREE.ShapeGeometry(slitShape), matPupil);
-  slitGroup.add(slitMesh);
-  root.add(slitGroup);
+/**
+ * Sistema de Chuva de Sangue Apocalíptica (60 FPS, ultra leve, 1 draw call, partículas carmesins).
+ */
+class BloodRainSystem {
+  constructor(scene, count = 900) {
+    this.scene = scene;
+    this.count = count;
+    this.positions = new Float32Array(count * 3);
+    this.velocities = new Float32Array(count);
+    this.active = false;
 
-  // Luz incandescente avermelhada que emana da íris em direção ao solo (+Z)
-  const pLight = new THREE.PointLight(color, 4.5, 95, 1.8);
-  pLight.position.set(0, 0, radius * 1.1);
-  root.add(pLight);
+    for (let i = 0; i < count; i++) {
+      this.positions[i * 3 + 0] = (Math.random() - 0.5) * 44;
+      this.positions[i * 3 + 1] = Math.random() * 26;
+      this.positions[i * 3 + 2] = (Math.random() - 0.5) * 44;
+      this.velocities[i] = 24 + Math.random() * 12;
+    }
 
-  return { root, eyeBall, iris, slit: slitGroup, pLight, radius };
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
+
+    // Textura de gota de sangue vertical alongada (procedural via Canvas)
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 32;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(8, 0, 8, 32);
+    grad.addColorStop(0, "rgba(255, 30, 50, 0.95)");
+    grad.addColorStop(0.7, "rgba(180, 0, 20, 0.9)");
+    grad.addColorStop(1, "rgba(90, 0, 10, 0.2)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(8, 16, 5, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const dropTexture = new THREE.CanvasTexture(canvas);
+
+    const material = new THREE.PointsMaterial({
+      color: 0xff1128,
+      size: 0.9,
+      map: dropTexture,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      fog: false,
+    });
+
+    this.points = new THREE.Points(geometry, material);
+    this.points.frustumCulled = false;
+    this.points.visible = false;
+    if (scene) scene.add(this.points);
+  }
+
+  start(px, py, pz) {
+    this.active = true;
+    this.points.visible = true;
+    for (let i = 0; i < this.count; i++) {
+      this.positions[i * 3 + 0] = px + (Math.random() - 0.5) * 44;
+      this.positions[i * 3 + 1] = py + Math.random() * 26;
+      this.positions[i * 3 + 2] = pz + (Math.random() - 0.5) * 44;
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  update(dt, px, py, pz) {
+    if (!this.active || !this.points.visible) return;
+    const pos = this.positions;
+    const v = this.velocities;
+    const minHeight = py - 0.8;
+    const maxHeight = py + 26;
+
+    for (let i = 0; i < this.count; i++) {
+      const idx = i * 3;
+      pos[idx + 1] -= v[i] * dt;
+
+      const dx = pos[idx] - px;
+      const dz = pos[idx + 2] - pz;
+      if (pos[idx + 1] < minHeight || Math.abs(dx) > 24 || Math.abs(dz) > 24) {
+        pos[idx] = px + (Math.random() - 0.5) * 44;
+        pos[idx + 1] = maxHeight + Math.random() * 4;
+        pos[idx + 2] = pz + (Math.random() - 0.5) * 44;
+      }
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  stop() {
+    this.active = false;
+    this.points.visible = false;
+  }
+}
+
+let _bloodRain = null;
+function _getBloodRain(scene) {
+  if (!_bloodRain && scene) {
+    _bloodRain = new BloodRainSystem(scene, 900);
+  }
+  return _bloodRain;
 }
 
 export const DemiurgeCataclysm = {
@@ -1622,10 +1688,75 @@ export const DemiurgeCataclysm = {
   eyesOpened: false,
   descentStarted: false,
   groundImpactDone: false,
+  impactTime: 0,
   modalShown: false,
   destroyed: false,
   env: null,
 };
+
+let _abyssOverlayEl = null;
+
+function _showAbyssVoidOverlay() {
+  if (!_abyssOverlayEl) {
+    _abyssOverlayEl = document.getElementById("demiurge-abyss-overlay");
+    if (!_abyssOverlayEl) {
+      _abyssOverlayEl = document.createElement("div");
+      _abyssOverlayEl.id = "demiurge-abyss-overlay";
+      _abyssOverlayEl.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: #000000;
+        z-index: 99998;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.22s ease-in-out;
+      `;
+      document.body.appendChild(_abyssOverlayEl);
+    }
+  }
+  requestAnimationFrame(() => {
+    if (_abyssOverlayEl) _abyssOverlayEl.style.opacity = "1";
+  });
+}
+
+/**
+ * Descarrega e oculta todas as entidades do mundo durante o cataclismo para travar o jogo a 60 FPS:
+ * Mantém apenas o terreno imediato, os 8 anjos malignos, os 10 olhos, o sol negro e o céu.
+ */
+export function isolateDemiurgeCataclysmScene(env) {
+  if (!env) return;
+  const { world, player, npcs, houses, settlement, beasts, clutter, farmAnimals, farming, torches, villageGenerator, horses, weapons } = env;
+
+  if (world) {
+    world.cataclysmIsolated = true;
+    const px = player?.x ?? 0;
+    const pz = player?.z ?? 0;
+    world.updateVisibility(env.camera || world.camera, px, pz, false);
+  }
+
+  if (npcs?.group) npcs.group.visible = false;
+  if (houses?.group) houses.group.visible = false;
+  if (settlement?.group) settlement.group.visible = false;
+  if (beasts?.group) beasts.group.visible = false;
+  if (clutter?.group) clutter.group.visible = false;
+  if (farmAnimals?.group) farmAnimals.group.visible = false;
+  if (farming?.group) farming.group.visible = false;
+  if (villageGenerator?.group) villageGenerator.group.visible = false;
+  if (horses?.group) horses.group.visible = false;
+  if (torches?.group) torches.group.visible = false;
+  if (torches?.impostorMesh) torches.impostorMesh.visible = false;
+  if (torches?.lights) {
+    for (let i = 0; i < torches.lights.length; i++) torches.lights[i].intensity = 0;
+  }
+  if (weapons?.playerBuildingsPool) {
+    for (let b of weapons.playerBuildingsPool) {
+      if (b) b.visible = false;
+    }
+  }
+
+  const gameRoot = document.getElementById("game");
+  if (gameRoot) gameRoot.classList.add("wasted");
+}
 
 /**
  * Inicia o Fim dos Tempos: Descida do Demiurgo à Terra.
@@ -1639,18 +1770,34 @@ export function triggerDemiurgeCataclysm(env, force = false) {
   DemiurgeCataclysm.timer = 0;
   DemiurgeCataclysm.lastDescentSound = 0;
   DemiurgeCataclysm.bannerShown = false;
-  DemiurgeCataclysm.eyesOpened = false;
+  DemiurgeCataclysm.eyesOpened = true; // Olhos abertos e visíveis imediatamente!
   DemiurgeCataclysm.descentStarted = false;
   DemiurgeCataclysm.groundImpactDone = false;
   DemiurgeCataclysm.modalShown = false;
   DemiurgeCataclysm.destroyed = false;
   DemiurgeCataclysm.env = env;
 
-  const { scene, player, dayNight, ui, audio } = env;
+  const { scene, player, dayNight, ui, audio, hemisphere } = env;
 
   WorldDecay.isEclipse = true;
   if (dayNight) {
     dayNight.progress = 0.5; // Meia-noite do Eclipse
+    if (dayNight.sun) {
+      dayNight.sun.color.setHex(0xcc1111);
+      dayNight.sun.intensity = 1.2;
+    }
+  }
+
+  // Banha o mundo em luz carmesim profunda sem custo de shader
+  if (hemisphere) {
+    hemisphere.color.setHex(0x990011);
+    hemisphere.groundColor.setHex(0x220004);
+    hemisphere.intensity = 2.5;
+  }
+
+  // Tira a neblina completamente para que o céu e os olhos fiquem 100% visíveis
+  if (scene && scene.fog) {
+    scene.fog.density = 0;
   }
 
   ui?.showToast?.("🌑 O VÉU DA CRIAÇÃO FOI RASGADO! OS ANJOS MALIGNOS DESCEM!");
@@ -1662,10 +1809,17 @@ export function triggerDemiurgeCataclysm(env, force = false) {
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
 
+  // Inicia a chuva de sangue apocalíptica contínua
+  const rain = _getBloodRain(scene);
+  rain?.start(px, py, pz);
+
   // Trava controle do jogador para contemplação
   if (player) {
     player.knockedOut = true;
   }
+
+  // Descarrega tudo o que for desnecessário do mundo para garantir 60 FPS puros
+  isolateDemiurgeCataclysmScene(env);
 
   // 1. Spawna os Anjos Pretos com Asas Vermelhas e Roxas em círculo ao redor do jogador
   DemiurgeCataclysm.angels = [];
@@ -1692,64 +1846,47 @@ export function triggerDemiurgeCataclysm(env, force = false) {
     DemiurgeCataclysm.angels.push(angelData);
   }
 
-  // 2. Spawna 42 Olhos Colossais com Pupilas Reptilianas cobrindo todo o céu
+  // 2. Spawna EXATAMENTE 10 Olhos Colossais BEM PERTO nos céus, olhando diretamente para o jogador
   DemiurgeCataclysm.firmamentEyes = [];
-  const colors = [0xff1133, 0xffaa00, 0xee11ee, 0xffcc00, 0xff0022, 0xaa00ee];
+  const colors = [0xff1133, 0xff7700, 0xee11ee, 0xff0033, 0xdd0022, 0xaa00ee, 0xff3355, 0xcc00ff, 0xff5500, 0xff0055];
 
-  // Domo Zenite (Topo do Céu): 6 olhos colossais
-  for (let k = 0; k < 6; k++) {
-    const ang = (k / 6) * Math.PI * 2;
-    const dist = 32 + (k % 2) * 12;
+  // Anel 1 (Próximo e Envolvente): 7 olhos em círculo a apenas 11-13m de distância e 5.5-8.5m de altura
+  for (let k = 0; k < 7; k++) {
+    const ang = (k / 7) * Math.PI * 2 + 0.15;
+    const dist = 11.5 + (k % 2) * 2.0;
     const eyX = px + Math.cos(ang) * dist;
     const eyZ = pz + Math.sin(ang) * dist;
-    const eyY = py + 85 + (k % 3) * 16;
+    const eyY = py + 5.5 + (k % 3) * 1.5;
 
-    const fEye = buildFirmamentEyeMesh(colors[k % colors.length], 20, 11);
+    const fEye = buildFirmamentEyeMesh(colors[k % colors.length], 4.8);
     fEye.root.position.set(eyX, eyY, eyZ);
     fEye.root.lookAt(px, py + 1.6, pz);
-    fEye.root.visible = false;
+    fEye.root.visible = true;
 
     if (scene) scene.add(fEye.root);
     DemiurgeCataclysm.firmamentEyes.push(fEye);
   }
 
-  // Domo Médio: 16 olhos colossais
-  for (let k = 0; k < 16; k++) {
-    const ang = (k / 16) * Math.PI * 2 + 0.15;
-    const dist = 65 + (k % 3) * 18;
+  // Anel 2 (Cúpula Superior / Zênite): 3 olhos a apenas 5.5-7.5m de raio e 11-13m de altura
+  for (let k = 0; k < 3; k++) {
+    const ang = (k / 3) * Math.PI * 2 + 0.4;
+    const dist = 5.5 + (k % 2) * 2.0;
     const eyX = px + Math.cos(ang) * dist;
     const eyZ = pz + Math.sin(ang) * dist;
-    const eyY = py + 55 + (k % 4) * 14;
+    const eyY = py + 11.0 + (k % 2) * 2.0;
 
-    const fEye = buildFirmamentEyeMesh(colors[(k + 1) % colors.length], 16, 9);
+    const fEye = buildFirmamentEyeMesh(colors[(k + 7) % colors.length], 6.2);
     fEye.root.position.set(eyX, eyY, eyZ);
     fEye.root.lookAt(px, py + 1.6, pz);
-    fEye.root.visible = false;
+    fEye.root.visible = true;
 
     if (scene) scene.add(fEye.root);
     DemiurgeCataclysm.firmamentEyes.push(fEye);
   }
 
-  // Domo do Horizonte: 20 olhos colossais
-  for (let k = 0; k < 20; k++) {
-    const ang = (k / 20) * Math.PI * 2;
-    const dist = 100 + (k % 3) * 25;
-    const eyX = px + Math.cos(ang) * dist;
-    const eyZ = pz + Math.sin(ang) * dist;
-    const eyY = py + 30 + (k % 4) * 12;
-
-    const fEye = buildFirmamentEyeMesh(colors[(k + 2) % colors.length], 14, 8);
-    fEye.root.position.set(eyX, eyY, eyZ);
-    fEye.root.lookAt(px, py + 1.6, pz);
-    fEye.root.visible = false;
-
-    if (scene) scene.add(fEye.root);
-    DemiurgeCataclysm.firmamentEyes.push(fEye);
-  }
-
-  // 3. Spawna o Olho Colossal do Demiurgo nos altos céus
+  // 3. Spawna o Olho Colossal do Demiurgo próximo nos céus (py + 52m para visão imediata e imponente)
   const eyeData = buildDemiurgeColossalEyeMesh();
-  eyeData.root.position.set(px, py + 180, pz);
+  eyeData.root.position.set(px, py + 52, pz);
   eyeData.targetY = py + 0.8;
   if (scene) scene.add(eyeData.root);
   DemiurgeCataclysm.colossalEye = eyeData;
@@ -1760,6 +1897,8 @@ export function triggerDemiurgeCataclysm(env, force = false) {
     transparent: true,
     opacity: 0,
     side: THREE.DoubleSide,
+    depthWrite: false,
+    fog: false,
   });
   const shockGeom = new THREE.RingGeometry(0.5, 3.0, 32);
   const shockMesh = new THREE.Mesh(shockGeom, shockMat);
@@ -1771,16 +1910,29 @@ export function triggerDemiurgeCataclysm(env, force = false) {
 }
 
 /**
- * Atualiza o Cataclismo a cada frame com progressão cinematográfica dramática.
+ * Atualiza o Cataclismo a cada frame com progressão cinematográfica dramática e suave.
  */
 export function updateDemiurgeCataclysm(dt, env) {
   if (!DemiurgeCataclysm.active) return;
   DemiurgeCataclysm.timer += dt;
   const t = DemiurgeCataclysm.timer;
-  const { player, cameraRig, effects, audio } = env;
+  const { player, cameraRig, effects, audio, scene, hemisphere } = env;
   const px = player?.x ?? 0;
   const pz = player?.z ?? 0;
   const py = player?.root?.position?.y ?? 0;
+
+  // Atualiza a chuva contínua de sangue ao redor do jogador
+  _bloodRain?.update(dt, px, py, pz);
+
+  // Garante que a neblina permaneça desativada em todos os frames do cataclismo
+  if (scene && scene.fog && scene.fog.density > 0) {
+    scene.fog.density = 0;
+  }
+
+  // Pulso de luz carmesim apocalíptica no céu
+  if (hemisphere) {
+    hemisphere.intensity = 2.2 + Math.sin(t * 5.0) * 0.7;
+  }
 
   // Rugido contínuo da descida a cada 3.0s
   if (t - DemiurgeCataclysm.lastDescentSound >= 3.0 && !DemiurgeCataclysm.groundImpactDone) {
@@ -1799,14 +1951,14 @@ export function updateDemiurgeCataclysm(dt, env) {
     a.scytheGroup.rotation.x = Math.sin(a.wingPhase * 0.5) * 0.15;
     a.root.lookAt(px, py + 1.2, pz);
 
-    if (Math.random() < 0.1 && effects) {
+    if (Math.random() < 0.08 && effects) {
       const col = i % 2 === 1 ? "#aa22ee" : "#ff1a33";
-      effects.play("star", a.root.position.x, a.root.position.y + 1.6, a.root.position.z, col, 1.4);
+      effects.play("star", a.root.position.x, a.root.position.y + 1.6, a.root.position.z, col, 1.2);
     }
   }
 
-  // FASE 2 (t = 3.5s a 6.5s): Aparece enorme na tela "ELE ESTÁ VINDO"
-  if (t >= 3.5 && !DemiurgeCataclysm.bannerShown) {
+  // FASE 2 (t = 2.5s a 6.0s): Título cinematográfico "ELE ESTÁ VINDO"
+  if (t >= 2.5 && !DemiurgeCataclysm.bannerShown) {
     DemiurgeCataclysm.bannerShown = true;
     _showHeIsComingBanner();
     audio?.deathBell?.();
@@ -1815,41 +1967,26 @@ export function updateDemiurgeCataclysm(dt, env) {
     }
   }
 
-  // FASE 3 (t = 6.5s a 16.5s — 10 SEGUNDOS COMPLETOS DE OLHOS REPTILIANOS):
-  // Esconde o banner e revela os 42 olhos cobrindo todo o céu, fitando o jogador
-  if (t >= 6.5 && !DemiurgeCataclysm.eyesOpened) {
-    DemiurgeCataclysm.eyesOpened = true;
+  if (t >= 6.0 && _heIsComingEl) {
     _hideHeIsComingBanner();
-    for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
-      const fEye = DemiurgeCataclysm.firmamentEyes[k];
-      fEye.root.visible = true;
-    }
-    audio?.demiurgeDescent?.();
-    if (cameraRig?.shakeAt) {
-      cameraRig.shakeAt(px, pz, 0.8, px, pz);
+  }
+
+  // Inclinação suave da câmera para o céu para enquadrar a abóbada de olhos e a descida
+  if (cameraRig) {
+    cameraRig.pitch = THREE.MathUtils.lerp(cameraRig.pitch, -0.32, dt * 1.5);
+  }
+
+  // Atualização dos 10 Olhos no Céu: SEMPRE olhando diretamente para os olhos do jogador
+  for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
+    const fEye = DemiurgeCataclysm.firmamentEyes[k];
+    fEye.root.lookAt(px, py + 1.6, pz);
+    if (fEye.slit) {
+      fEye.slit.scale.x = 0.85 + Math.sin(t * 3.0 + k) * 0.45;
     }
   }
 
-  // Atualização frame a frame dos Olhos Reptilianos no Céu
-  if (DemiurgeCataclysm.eyesOpened) {
-    for (let k = 0; k < DemiurgeCataclysm.firmamentEyes.length; k++) {
-      const fEye = DemiurgeCataclysm.firmamentEyes[k];
-      // Todos os olhos acompanham e olham diretamente para o jogador!
-      fEye.root.lookAt(px, py + 1.6, pz);
-
-      // Pupila reptiliana dilata e pulsa organicamente
-      const pulse = 1.0 + Math.sin(t * 2.8 + k * 0.7) * 0.35;
-      if (fEye.slit) {
-        fEye.slit.scale.x = 0.85 + Math.sin(t * 3.0 + k) * 0.45;
-      }
-      if (fEye.pLight) {
-        fEye.pLight.intensity = 3.8 * pulse;
-      }
-    }
-  }
-
-  // FASE 4 (t >= 16.5s): Após 10 segundos com os olhos no céu, o Demiurgo desce com fúria total
-  if (t >= 16.5) {
+  // FASE 4 (t >= 14.0s): O Demiurgo desce com fúria total
+  if (t >= 14.0) {
     if (!DemiurgeCataclysm.descentStarted) {
       DemiurgeCataclysm.descentStarted = true;
       audio?.demiurgeDescent?.();
@@ -1862,8 +1999,8 @@ export function updateDemiurgeCataclysm(dt, env) {
       eye.root.position.z = pz;
 
       // Velocidade de descida acelerando até o chão
-      const fallProgress = (t - 16.5);
-      const descentSpeed = THREE.MathUtils.clamp(0.8 + fallProgress * 0.45, 0.8, 4.2);
+      const fallProgress = (t - 14.0);
+      const descentSpeed = THREE.MathUtils.clamp(0.6 + fallProgress * 0.35, 0.6, 3.8);
       eye.root.position.y = THREE.MathUtils.lerp(eye.root.position.y, eye.targetY, dt * descentSpeed);
 
       eye.ring1.rotation.z += dt * 1.4;
@@ -1879,24 +2016,36 @@ export function updateDemiurgeCataclysm(dt, env) {
           eye.coronaSpikes[s].rotation.z += dt * (s % 2 === 0 ? 0.3 : -0.3);
         }
       }
-      if (eye.sunLight) {
-        eye.sunLight.intensity = 8.0 + Math.sin(t * 8.0) * 4.0;
-      }
 
       // Tremores de terra crescentes conforme o Olho cai
       if (cameraRig?.shakeAt) {
-        const shakeAmt = THREE.MathUtils.clamp(0.4 + fallProgress * 0.35, 0.4, 2.8);
+        const shakeAmt = THREE.MathUtils.clamp(0.3 + fallProgress * 0.3, 0.3, 2.5);
         cameraRig.shakeAt(px, pz, shakeAmt, px, pz);
       }
 
-      // Impacto Colossal do Demiurgo no solo (t >= 21.0s ou proximidade do solo)
-      if ((t >= 21.0 || eye.root.position.y <= py + 2.5) && !DemiurgeCataclysm.groundImpactDone) {
+      // Impacto Colossal do Demiurgo no solo (t >= 19.5s ou proximidade do solo)
+      if ((t >= 19.5 || eye.root.position.y <= py + 2.5) && !DemiurgeCataclysm.groundImpactDone) {
         DemiurgeCataclysm.groundImpactDone = true;
+        DemiurgeCataclysm.impactTime = t;
         audio?.colossalImpact?.();
-        audio?.explosion?.(px, pz, 15.0);
+        audio?.explosion?.(px, pz, 30.0);
+        audio?.deathBell?.();
 
         if (cameraRig?.shakeAt) {
-          cameraRig.shakeAt(px, pz, 3.5, px, pz);
+          cameraRig.shakeAt(px, pz, 4.5, px, pz);
+        }
+
+        // 1. "faça que não dê para vê nada": Blecaute instantâneo total da tela
+        _showAbyssVoidOverlay();
+
+        // 2. "eu tomo muito dano mas ao invés de morrer, acaba o jogo":
+        if (env.damageFx?.triggerFlash) {
+          env.damageFx.triggerFlash("critical");
+        }
+        if (player) {
+          player.health = 1; // Dano devastador sem zerar (evita tela de morte comum / respawn)
+          player.dead = false;
+          player.knockedOut = true;
         }
 
         // Ativa onda de choque devastadora
@@ -1905,14 +2054,13 @@ export function updateDemiurgeCataclysm(dt, env) {
           DemiurgeCataclysm.shockwave.material.opacity = 0.98;
         }
 
-        // Erupção de 50 plumas de poeira e chamas cósmicas
+        // Erupção de partículas cósmicas leve
         if (effects) {
-          for (let k = 0; k < 50; k++) {
-            const ang = Math.random() * Math.PI * 2;
-            const rad = Math.random() * 35;
-            const dustColor = k % 2 === 0 ? "#ff1144" : "#220533";
-            effects.play("dust", px + Math.cos(ang) * rad, py + 0.5, pz + Math.sin(ang) * rad, dustColor, 6.0);
-            effects.play("star", px + Math.cos(ang) * rad, py + 1.5, pz + Math.sin(ang) * rad, "#ff2244", 4.2);
+          for (let k = 0; k < 12; k++) {
+            const ang = (k / 12) * Math.PI * 2;
+            const rad = 6 + Math.random() * 22;
+            effects.play("dust", px + Math.cos(ang) * rad, py + 0.5, pz + Math.sin(ang) * rad, "#220533", 4.0);
+            effects.play("star", px + Math.cos(ang) * rad, py + 1.2, pz + Math.sin(ang) * rad, "#ff6600", 2.5);
           }
         }
       }
@@ -1927,24 +2075,19 @@ export function updateDemiurgeCataclysm(dt, env) {
     }
   }
 
-  // FASE 5 (t >= 24.0s): Fim definitivo do jogo e abertura da tela de vitória do Mal
-  if (t >= 24.0 && !DemiurgeCataclysm.destroyed) {
-    DemiurgeCataclysm.destroyed = true;
+  // FASE 5: Logo após o impacto e o blecaute total (1.2s), acaba o jogo definitivamente
+  if (DemiurgeCataclysm.groundImpactDone && !DemiurgeCataclysm.destroyed) {
+    if (t - DemiurgeCataclysm.impactTime >= 1.2) {
+      DemiurgeCataclysm.destroyed = true;
+      _bloodRain?.stop();
 
-    if (effects) {
-      for (let k = 0; k < 20; k++) {
-        const ang = Math.random() * Math.PI * 2;
-        const rad = Math.random() * 40;
-        effects.play("dust", px + Math.cos(ang) * rad, py + 1, pz + Math.sin(ang) * rad, "#220533", 5.0);
-      }
+      // Fim definitivo do jogo: a tela de encerramento do Demiurgo se abre diretamente sobre o vazio
+      showVictoryEndingModal({
+        type: "DEMIURGE",
+        title: "O FIM DA CRIAÇÃO MATERIAL",
+        subtitle: "A TERRA E A MATÉRIA FORAM TOTALMENTE CONSUMIDAS",
+        quote: "«O Demiurgo colidiu contra a terra e consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre. Não há mais terra, corpos ou sofrimento.»",
+      });
     }
-
-    // Fim definitivo do jogo: a matéria ruiu
-    showVictoryEndingModal({
-      type: "DEMIURGE",
-      title: "O FIM DA CRIAÇÃO MATERIAL",
-      subtitle: "A TERRA E A MATÉRIA FORAM TOTALMENTE CONSUMIDAS",
-      quote: "«O Demiurgo colidiu contra a terra e consumiu o mundo na pureza do nada. O cárcere da carne ruiu para sempre. Não há mais terra, corpos ou sofrimento.»",
-    });
   }
 }

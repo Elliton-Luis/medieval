@@ -1,4 +1,4 @@
-import { WorldDecay } from "./decay.js";
+import { WorldDecay, triggerDemiurgeCataclysm } from "./decay.js";
 import {
   PlayerStats,
   PlayerInventory,
@@ -281,7 +281,8 @@ function _updateStatusDisplays() {
     const minutes = (totalMinutes % 60).toString().padStart(2, "0");
     const prof = dn.currentProfile ? dn.currentProfile.toUpperCase() : (dn.isNight ? "NOITE" : "DIA");
     const w = dn.weights ? ` · [D:${Math.round(dn.weights.day * 100)}% T:${Math.round(dn.weights.afternoon * 100)}% N:${Math.round(dn.weights.night * 100)}%]` : "";
-    clockEl.textContent = `${hours}:${minutes} (${prof}${w})`;
+    const frozenTag = dn.timeFrozen ? ' · <span style="color:#ffd700;font-weight:bold;">[🔒 FIXA]</span>' : "";
+    clockEl.innerHTML = `${hours}:${minutes} (${prof}${w})${frozenTag}`;
   }
 
   const worldEl = _cheatModalEl.querySelector("#cs-world");
@@ -392,10 +393,13 @@ export function openCheatModal(env) {
           </div>
 
           <div style="font-size: 12px; color: #ffd700; font-weight: 700; margin: 10px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">🎨 Perfis de Iluminação Pré-Assados (Baked Lighting)</div>
-          <div class="cheat-grid" style="margin-bottom: 12px;">
+          <div class="cheat-grid" style="margin-bottom: 8px;">
             <button class="cheat-btn highlight" data-cheat="lighting_day">☀️ Perfil Assado: DIA (12:00)</button>
             <button class="cheat-btn highlight" data-cheat="lighting_afternoon">🌇 Perfil Assado: TARDE (18:00)</button>
             <button class="cheat-btn highlight" data-cheat="lighting_night">🌙 Perfil Assado: NOITE (22:00)</button>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <button class="cheat-btn highlight" data-cheat="toggle_freeze_time" style="width: 100%; border: 1px solid #ffd700; font-weight: 700; background: rgba(255, 215, 0, 0.15);">🔒 Travar Iluminação / Congelar Horário (Evita Alternância)</button>
           </div>
 
           <div style="font-size: 12px; color: #bba8d8; font-weight: 700; margin: 10px 0 6px 2px; text-transform: uppercase; letter-spacing: 1px;">Presets de Horário Imediatos</div>
@@ -754,6 +758,9 @@ function _handleCheatAction(type) {
       break;
     case "lighting_night":
       window.CheatMenu.setBakedNight();
+      break;
+    case "toggle_freeze_time":
+      window.CheatMenu.toggleFreezeTime();
       break;
     case "set_day_1":
       window.CheatMenu.setCalendarDay(1);
@@ -1192,22 +1199,40 @@ export function initCheatMenu(env = {}) {
       return name;
     },
 
-    setBakedDay() {
+    setBakedDay(lock = false) {
       const res = this.setTime(12, 0);
-      env.ui?.showToast?.("☀️ Iluminação Pré-Assada: DIA ativado");
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (lock && dn) dn.freeze(true);
+      env.ui?.showToast?.("☀️ Iluminação Pré-Assada: DIA ativado" + (lock ? " (Travada)" : ""));
       return res;
     },
 
-    setBakedAfternoon() {
+    setBakedAfternoon(lock = false) {
       const res = this.setTime(18, 0);
-      env.ui?.showToast?.("🌇 Iluminação Pré-Assada: TARDE (Golden Hour) ativado");
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (lock && dn) dn.freeze(true);
+      env.ui?.showToast?.("🌇 Iluminação Pré-Assada: TARDE (Golden Hour) ativado" + (lock ? " (Travada)" : ""));
       return res;
     },
 
-    setBakedNight() {
+    setBakedNight(lock = false) {
       const res = this.setTime(22, 0);
-      env.ui?.showToast?.("🌙 Iluminação Pré-Assada: NOITE ativado");
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (lock && dn) dn.freeze(true);
+      env.ui?.showToast?.("🌙 Iluminação Pré-Assada: NOITE ativado" + (lock ? " (Travada)" : ""));
       return res;
+    },
+
+    toggleFreezeTime() {
+      const dn = env.dayNight || window.__game?.dayNight;
+      if (!dn) return "DayNight não disponível";
+      const isFrozen = dn.freeze(!dn.timeFrozen);
+      const msg = isFrozen
+        ? "🔒 Iluminação TRAVADA no perfil atual (Zero alternâncias)!"
+        : "▶️ Ciclo do tempo retomado (Mudança natural contínua)";
+      env.ui?.showToast?.(msg);
+      console.log(msg);
+      return isFrozen;
     },
 
     addHours(delta = 1) {
@@ -1726,13 +1751,10 @@ export function initCheatMenu(env = {}) {
     },
 
     triggerApocalypse() {
-      import("./decay.js").then(({ triggerDemiurgeCataclysm }) => {
-        triggerDemiurgeCataclysm(window.__game || env, true);
-        env.ui?.showToast?.("☄️ CHEAT: O Mal Final foi invocado! O Demiurgo desce dos céus!");
-        console.log("☄️ CHEAT: Descida do Demiurgo iniciada");
-      }).catch((err) => {
-        console.error("Erro no apocalipse:", err);
-      });
+      if (_cheatModalEl) _cheatModalEl.classList.remove("active");
+      triggerDemiurgeCataclysm(window.__game || env, true);
+      env.ui?.showToast?.("☄️ CHEAT: O Mal Final foi invocado! O Demiurgo desce dos céus!");
+      console.log("☄️ CHEAT: Descida do Demiurgo iniciada");
       return "Apocalipse iniciado";
     },
 
